@@ -132,6 +132,7 @@ function MemberFormFields({
 }) {
   const [status, setStatus] = useState<string>(member?.status ?? "active");
   const [branchId, setBranchId] = useState<string>(member?.branch_id ?? "");
+  const [maritalStatus, setMaritalStatus] = useState<string>(member?.marital_status ?? "");
 
   return (
     <div className="space-y-4">
@@ -187,6 +188,55 @@ function MemberFormFields({
         />
         <FieldError id="phone-error" message={errors?.phone} />
       </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="dateOfBirth">Date of birth</Label>
+          <Input
+            id="dateOfBirth"
+            name="dateOfBirth"
+            type="date"
+            defaultValue={member?.date_of_birth ?? ""}
+            required
+            aria-invalid={Boolean(errors?.dateOfBirth)}
+            aria-describedby={errors?.dateOfBirth ? "dateOfBirth-error" : undefined}
+          />
+          <FieldError id="dateOfBirth-error" message={errors?.dateOfBirth} />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="maritalStatus">Marital status</Label>
+          <input type="hidden" name="maritalStatus" value={maritalStatus} />
+          <Select value={maritalStatus} onValueChange={(v) => setMaritalStatus(v ?? "")}>
+            <SelectTrigger id="maritalStatus" className="w-full" aria-invalid={Boolean(errors?.maritalStatus)}>
+              <SelectValue placeholder="Select">
+                {(value: string | null) => (value === "married" ? "Married" : value === "unmarried" ? "Unmarried" : "Select")}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="married">Married</SelectItem>
+              <SelectItem value="unmarried">Unmarried</SelectItem>
+            </SelectContent>
+          </Select>
+          <FieldError id="maritalStatus-error" message={errors?.maritalStatus} />
+        </div>
+      </div>
+
+      {maritalStatus === "married" && (
+        <div className="space-y-2">
+          <Label htmlFor="weddingDate">Wedding date</Label>
+          <Input
+            id="weddingDate"
+            name="weddingDate"
+            type="date"
+            defaultValue={member?.wedding_date ?? ""}
+            required
+            aria-invalid={Boolean(errors?.weddingDate)}
+            aria-describedby={errors?.weddingDate ? "weddingDate-error" : undefined}
+          />
+          <FieldError id="weddingDate-error" message={errors?.weddingDate} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">

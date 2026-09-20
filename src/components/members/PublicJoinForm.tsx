@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { submitMemberRequest, type PublicJoinFormState } from "@/lib/members/public-actions";
 import type { PublicFieldDefinition, Branch } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -77,6 +77,7 @@ export function PublicJoinForm({
 }) {
   const boundAction = submitMemberRequest.bind(null, orgSlug);
   const [state, formAction, pending] = useActionState(boundAction, initialState);
+  const [maritalStatus, setMaritalStatus] = useState("");
 
   if (state.success) {
     return (
@@ -179,6 +180,65 @@ export function PublicJoinForm({
             </SelectContent>
           </Select>
           <FieldError id="branchId-error" message={state.fieldErrors?.branchId} />
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="dateOfBirth">
+            Date of birth <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="dateOfBirth"
+            name="dateOfBirth"
+            type="date"
+            required
+            aria-invalid={Boolean(state.fieldErrors?.dateOfBirth)}
+            aria-describedby={state.fieldErrors?.dateOfBirth ? "dateOfBirth-error" : undefined}
+          />
+          <FieldError id="dateOfBirth-error" message={state.fieldErrors?.dateOfBirth} />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="maritalStatus">
+            Marital status <span className="text-destructive">*</span>
+          </Label>
+          <input type="hidden" name="maritalStatus" value={maritalStatus} />
+          <Select value={maritalStatus} onValueChange={(v) => setMaritalStatus(v ?? "")}>
+            <SelectTrigger
+              id="maritalStatus"
+              className="w-full"
+              aria-invalid={Boolean(state.fieldErrors?.maritalStatus)}
+            >
+              <SelectValue placeholder="Select">
+                {(value: string | null) =>
+                  value === "married" ? "Married" : value === "unmarried" ? "Unmarried" : "Select"
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="married">Married</SelectItem>
+              <SelectItem value="unmarried">Unmarried</SelectItem>
+            </SelectContent>
+          </Select>
+          <FieldError id="maritalStatus-error" message={state.fieldErrors?.maritalStatus} />
+        </div>
+      </div>
+
+      {maritalStatus === "married" && (
+        <div className="space-y-2">
+          <Label htmlFor="weddingDate">
+            Wedding date <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="weddingDate"
+            name="weddingDate"
+            type="date"
+            required
+            aria-invalid={Boolean(state.fieldErrors?.weddingDate)}
+            aria-describedby={state.fieldErrors?.weddingDate ? "weddingDate-error" : undefined}
+          />
+          <FieldError id="weddingDate-error" message={state.fieldErrors?.weddingDate} />
         </div>
       )}
 

@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth/dal";
 import {
   validateFieldDefinition,
   validateMemberBasics,
+  validateMemberDetails,
   parseCustomFieldValues,
   parseOptionsText,
   slugifyFieldKey,
@@ -13,7 +14,7 @@ import {
   type FieldDefinitionErrors,
   type MemberFieldErrors,
 } from "@/lib/members/validation";
-import type { MemberFieldDefinition, MemberFieldType, MemberStatus } from "@/types/database";
+import type { MaritalStatus, MemberFieldDefinition, MemberFieldType, MemberStatus } from "@/types/database";
 
 const MEMBER_STATUSES: MemberStatus[] = ["active", "left"];
 
@@ -25,6 +26,13 @@ function readMemberStatus(formData: FormData): MemberStatus {
 function readBranchId(formData: FormData): string | null {
   const raw = String(formData.get("branchId") ?? "").trim();
   return raw || null;
+}
+
+function readMemberDetails(formData: FormData) {
+  const dateOfBirth = String(formData.get("dateOfBirth") ?? "").trim();
+  const maritalStatus = String(formData.get("maritalStatus") ?? "").trim();
+  const weddingDate = String(formData.get("weddingDate") ?? "").trim();
+  return { dateOfBirth, maritalStatus, weddingDate };
 }
 
 // ---------------------------------------------------------------------------
@@ -188,8 +196,10 @@ export async function createMember(
   const lastName = String(formData.get("lastName") ?? "");
   const email = String(formData.get("email") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
+  const { dateOfBirth, maritalStatus, weddingDate } = readMemberDetails(formData);
 
   const basicErrors = validateMemberBasics({ firstName, lastName, email, phone });
+  const detailErrors = validateMemberDetails({ dateOfBirth, maritalStatus, weddingDate });
 
   const supabase = await createClient();
   const { data: definitions } = await supabase
@@ -201,10 +211,10 @@ export async function createMember(
     String(formData.get(`custom_${key}`) ?? ""),
   );
 
-  const fieldErrors: MemberFieldErrors = { ...basicErrors };
+  const fieldErrors: MemberFieldErrors = { ...basicErrors, ...detailErrors };
   if (Object.keys(customErrors).length > 0) fieldErrors.custom = customErrors;
 
-  if (Object.values(basicErrors).some(Boolean) || Object.keys(customErrors).length > 0) {
+  if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
   }
 
@@ -216,6 +226,9 @@ export async function createMember(
     phone: phone || null,
     status: readMemberStatus(formData),
     branch_id: readBranchId(formData),
+    date_of_birth: dateOfBirth || null,
+    marital_status: maritalStatus as MaritalStatus,
+    wedding_date: maritalStatus === "married" ? weddingDate || null : null,
     custom_fields: values,
     created_by: user.id,
   });
@@ -240,8 +253,10 @@ export async function updateMember(
   const lastName = String(formData.get("lastName") ?? "");
   const email = String(formData.get("email") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
+  const { dateOfBirth, maritalStatus, weddingDate } = readMemberDetails(formData);
 
   const basicErrors = validateMemberBasics({ firstName, lastName, email, phone });
+  const detailErrors = validateMemberDetails({ dateOfBirth, maritalStatus, weddingDate });
 
   const supabase = await createClient();
   const { data: definitions } = await supabase
@@ -253,10 +268,10 @@ export async function updateMember(
     String(formData.get(`custom_${key}`) ?? ""),
   );
 
-  const fieldErrors: MemberFieldErrors = { ...basicErrors };
+  const fieldErrors: MemberFieldErrors = { ...basicErrors, ...detailErrors };
   if (Object.keys(customErrors).length > 0) fieldErrors.custom = customErrors;
 
-  if (Object.values(basicErrors).some(Boolean) || Object.keys(customErrors).length > 0) {
+  if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
   }
 
@@ -269,6 +284,9 @@ export async function updateMember(
       phone: phone || null,
       status: readMemberStatus(formData),
       branch_id: readBranchId(formData),
+      date_of_birth: dateOfBirth || null,
+      marital_status: maritalStatus as MaritalStatus,
+      wedding_date: maritalStatus === "married" ? weddingDate || null : null,
       custom_fields: values,
     })
     .eq("id", memberId);

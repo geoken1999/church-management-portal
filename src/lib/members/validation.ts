@@ -55,6 +55,9 @@ export interface MemberFieldErrors {
   lastName?: string;
   email?: string;
   phone?: string;
+  dateOfBirth?: string;
+  maritalStatus?: string;
+  weddingDate?: string;
   custom?: Record<string, string>;
 }
 
@@ -76,6 +79,44 @@ export function validateMemberBasics(input: {
   }
   if (input.phone.trim() && !PHONE_RE.test(input.phone.trim())) {
     errors.phone = "Enter a valid phone number.";
+  }
+
+  return errors;
+}
+
+export const MARITAL_STATUSES = ["married", "unmarried"] as const;
+
+// Date of birth and marital status are default (not org-customizable)
+// member fields — mandatory on both the admin form and the public join
+// form. Wedding date is only required (and only meaningful) when married.
+// Comparing as "YYYY-MM-DD" strings sorts chronologically correctly, so no
+// Date parsing/timezone handling is needed here.
+export function validateMemberDetails(input: {
+  dateOfBirth: string;
+  maritalStatus: string;
+  weddingDate: string;
+}): Pick<MemberFieldErrors, "dateOfBirth" | "maritalStatus" | "weddingDate"> {
+  const errors: Pick<MemberFieldErrors, "dateOfBirth" | "maritalStatus" | "weddingDate"> = {};
+  const today = new Date().toISOString().slice(0, 10);
+
+  if (!input.dateOfBirth) {
+    errors.dateOfBirth = "Date of birth is required.";
+  } else if (input.dateOfBirth > today) {
+    errors.dateOfBirth = "Date of birth can't be in the future.";
+  }
+
+  if (!MARITAL_STATUSES.includes(input.maritalStatus as (typeof MARITAL_STATUSES)[number])) {
+    errors.maritalStatus = "Select a marital status.";
+  }
+
+  if (input.maritalStatus === "married") {
+    if (!input.weddingDate) {
+      errors.weddingDate = "Wedding date is required.";
+    } else if (input.weddingDate > today) {
+      errors.weddingDate = "Wedding date can't be in the future.";
+    } else if (input.dateOfBirth && input.weddingDate < input.dateOfBirth) {
+      errors.weddingDate = "Wedding date can't be before the date of birth.";
+    }
   }
 
   return errors;

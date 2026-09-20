@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { validateMemberBasics } from "@/lib/members/validation";
+import { validateMemberBasics, validateMemberDetails } from "@/lib/members/validation";
 
 export interface PublicJoinFormState {
   error?: string;
@@ -11,6 +11,9 @@ export interface PublicJoinFormState {
     email?: string;
     phone?: string;
     branchId?: string;
+    dateOfBirth?: string;
+    maritalStatus?: string;
+    weddingDate?: string;
   };
   success?: boolean;
 }
@@ -29,6 +32,9 @@ export async function submitMemberRequest(
   const email = String(formData.get("email") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const branchId = String(formData.get("branchId") ?? "").trim();
+  const dateOfBirth = String(formData.get("dateOfBirth") ?? "").trim();
+  const maritalStatus = String(formData.get("maritalStatus") ?? "").trim();
+  const weddingDate = String(formData.get("weddingDate") ?? "").trim();
   // Set by the form to however many branches the church has — lets us give
   // a proper field-level error instead of leaning on the RPC's generic one.
   const branchRequired = String(formData.get("__branchCount") ?? "0") !== "0";
@@ -43,6 +49,7 @@ export async function submitMemberRequest(
   // leaves it optional since the admin-side add/edit form still allows it.
   if (!phone) fieldErrors.phone = "Phone number is required.";
   if (branchRequired && !branchId) fieldErrors.branchId = "Please select a branch.";
+  Object.assign(fieldErrors, validateMemberDetails({ dateOfBirth, maritalStatus, weddingDate }));
   if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
   }
@@ -67,7 +74,10 @@ export async function submitMemberRequest(
     last_name: lastName.trim(),
     phone,
     branch_id: branchId || null,
+    date_of_birth: dateOfBirth,
+    marital_status: maritalStatus,
     email: email || null,
+    wedding_date: maritalStatus === "married" ? weddingDate || null : null,
     custom_fields: customFields,
   });
 

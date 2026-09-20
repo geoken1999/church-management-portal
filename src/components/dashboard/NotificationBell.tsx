@@ -2,11 +2,13 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { Bell, UserPlus } from "lucide-react";
+import { Bell, UserPlus, X } from "lucide-react";
 import {
   getNotificationsForOrg,
   markNotificationRead,
   markAllNotificationsRead,
+  deleteNotification,
+  clearAllNotifications,
 } from "@/lib/notifications/actions";
 import type { Notification } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -59,6 +61,20 @@ export function NotificationBell({
     });
   }
 
+  function handleClear(notificationId: string) {
+    setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+    startTransition(() => {
+      deleteNotification(notificationId);
+    });
+  }
+
+  function handleClearAll() {
+    setNotifications([]);
+    startTransition(() => {
+      clearAllNotifications(organizationId);
+    });
+  }
+
   return (
     <Popover>
       <PopoverTrigger
@@ -81,35 +97,64 @@ export function NotificationBell({
             <PopoverTitle>Notifications</PopoverTitle>
             <PopoverDescription>New join requests show up here.</PopoverDescription>
           </div>
-          {unreadCount > 0 && (
-            <Button type="button" variant="ghost" size="sm" onClick={handleMarkAllRead}>
-              Mark all read
-            </Button>
-          )}
+          <div className="flex shrink-0 items-center gap-1">
+            {notifications.length > 0 && (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleMarkAllRead}
+                  disabled={unreadCount === 0}
+                >
+                  Mark all read
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={handleClearAll}>
+                  Clear all
+                </Button>
+              </>
+            )}
+          </div>
         </div>
         <div className="flex max-h-80 flex-col gap-1 overflow-y-auto">
           {notifications.length === 0 && (
             <p className="px-1.5 py-4 text-center text-sm text-muted-foreground">No notifications yet.</p>
           )}
           {notifications.map((notification) => (
-            <Link
+            <div
               key={notification.id}
-              href={notification.link ?? "/dashboard"}
-              onClick={() => handleOpen(notification)}
-              className={`flex items-start gap-2.5 rounded-lg px-1.5 py-2 transition-colors hover:bg-accent ${
+              className={`group flex items-start gap-1 rounded-lg px-1.5 py-2 transition-colors hover:bg-accent ${
                 notification.read_at ? "" : "bg-accent/50"
               }`}
             >
-              <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
-                <UserPlus className="size-3.5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">{notification.title}</p>
-                {notification.body && <p className="text-xs text-muted-foreground">{notification.body}</p>}
-                <p className="mt-0.5 text-xs text-muted-foreground">{relativeTime(notification.created_at)}</p>
-              </div>
-              {!notification.read_at && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />}
-            </Link>
+              <Link
+                href={notification.link ?? "/dashboard"}
+                onClick={() => handleOpen(notification)}
+                className="flex min-w-0 flex-1 items-start gap-2.5"
+              >
+                <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
+                  <UserPlus className="size-3.5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">{notification.title}</p>
+                  {notification.body && <p className="text-xs text-muted-foreground">{notification.body}</p>}
+                  <p className="mt-0.5 text-xs text-muted-foreground">{relativeTime(notification.created_at)}</p>
+                </div>
+                {!notification.read_at && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />}
+              </Link>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleClear(notification.id);
+                }}
+                className="mt-0.5 shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                aria-label="Clear notification"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
           ))}
         </div>
       </PopoverContent>

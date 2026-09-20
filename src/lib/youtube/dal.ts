@@ -7,9 +7,13 @@ import {
   fetchVideos,
   fetchChannelAnalytics,
   fetchCommentThreads,
+  fetchLiveBroadcasts,
+  fetchTopVideos,
   type YouTubeVideoPage,
   type YouTubeAnalyticsValue,
   type YouTubeCommentPage,
+  type YouTubeBroadcast,
+  type YouTubeTopVideo,
 } from "@/lib/youtube/client";
 
 // Returns the full row, including access_token/refresh_token — this file
@@ -33,6 +37,7 @@ export interface YouTubeConnectionSummary {
   subscriberCount: number | null;
   videoCount: number | null;
   viewCount: number | null;
+  connectedAt: string;
 }
 
 export type YouTubeDashboardData =
@@ -43,6 +48,8 @@ export type YouTubeDashboardData =
       videos: YouTubeVideoPage;
       analytics: YouTubeAnalyticsValue[];
       comments: YouTubeCommentPage;
+      liveBroadcasts: { live: YouTubeBroadcast[]; upcoming: YouTubeBroadcast[] };
+      topVideos: YouTubeTopVideo[];
       syncError: boolean;
     };
 
@@ -60,18 +67,21 @@ export async function getYouTubeDashboardData(organizationId: string): Promise<Y
     subscriberCount: connection.subscriber_count,
     videoCount: connection.video_count,
     viewCount: connection.view_count,
+    connectedAt: connection.created_at,
   };
 
   try {
     const accessToken = await getValidAccessToken(connection);
-    const [videos, analytics, comments] = await Promise.all([
+    const [videos, analytics, comments, liveBroadcasts, topVideos] = await Promise.all([
       // The uploads playlist id is derived from the channel id
       // (UC... -> UU...) rather than re-fetching the channel every time.
       fetchVideos(accessToken, `UU${connection.channel_id.slice(2)}`),
       fetchChannelAnalytics(accessToken),
       fetchCommentThreads(accessToken, connection.channel_id),
+      fetchLiveBroadcasts(accessToken),
+      fetchTopVideos(accessToken),
     ]);
-    return { connected: true, channel, videos, analytics, comments, syncError: false };
+    return { connected: true, channel, videos, analytics, comments, liveBroadcasts, topVideos, syncError: false };
   } catch {
     return {
       connected: true,
@@ -79,6 +89,8 @@ export async function getYouTubeDashboardData(organizationId: string): Promise<Y
       videos: { items: [], nextCursor: null },
       analytics: [],
       comments: { items: [], nextCursor: null },
+      liveBroadcasts: { live: [], upcoming: [] },
+      topVideos: [],
       syncError: true,
     };
   }

@@ -3,7 +3,7 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { getMembers } from "@/lib/members/dal";
 import { getBranches } from "@/lib/branches/dal";
 import { getEvents } from "@/lib/events/dal";
-import { EventsManager } from "@/components/events/EventsManager";
+import { EventsManagerClient } from "@/components/events/EventsManagerClient";
 
 export const metadata: Metadata = {
   title: "Events | KingdomFlow",
@@ -35,7 +35,7 @@ export default async function EventsPage() {
         </p>
       </div>
 
-      <EventsManager
+      <EventsManagerClient
         organizationId={organizationId}
         members={assignableMembers}
         branches={branches}

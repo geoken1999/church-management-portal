@@ -41,3 +41,17 @@ export async function markAllNotificationsRead(organizationId: string) {
     .eq("organization_id", organizationId)
     .is("read_at", null);
 }
+
+export async function deleteNotification(notificationId: string) {
+  await requireUser();
+
+  const supabase = await createClient();
+  await supabase.from("notifications").delete().eq("id", notificationId);
+}
+
+export async function clearAllNotifications(organizationId: string) {
+  await requireUser();
+
+  const supabase = await createClient();
+  await supabase.from("notifications").delete().eq("organization_id", organizationId);
+}

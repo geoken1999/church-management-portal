@@ -93,6 +93,7 @@ export type PublicFieldDefinition = {
 
 export type CustomFieldValue = string | number | boolean | null;
 export type MemberStatus = "active" | "left" | "pending";
+export type MaritalStatus = "married" | "unmarried";
 
 export type Member = {
   id: string;
@@ -103,6 +104,9 @@ export type Member = {
   phone: string | null;
   status: MemberStatus;
   branch_id: string | null;
+  date_of_birth: string | null;
+  marital_status: MaritalStatus | null;
+  wedding_date: string | null;
   custom_fields: Record<string, CustomFieldValue>;
   created_by: string | null;
   created_at: string;
@@ -218,7 +222,11 @@ export type Event = {
   updated_at: string;
 };
 
-export type NotificationType = "member_request";
+export type NotificationType =
+  | "member_request"
+  | "youtube_video_uploaded"
+  | "youtube_video_updated"
+  | "youtube_live_started";
 
 export type Notification = {
   id: string;
@@ -559,7 +567,10 @@ export type Database = {
           last_name: string;
           phone: string;
           branch_id: string | null;
+          date_of_birth: string;
+          marital_status: string;
           email?: string | null;
+          wedding_date?: string | null;
           custom_fields?: Record<string, unknown> | null;
         };
         Returns: string;
@@ -570,6 +581,10 @@ export type Database = {
       };
       delete_instagram_connection_by_ig_user: {
         Args: { ig_user_id: string };
+        Returns: undefined;
+      };
+      backfill_member_custom_field: {
+        Args: { p_organization_id: string; p_key: string; p_value: unknown };
         Returns: undefined;
       };
     };

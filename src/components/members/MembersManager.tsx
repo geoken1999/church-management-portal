@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Plus, Pencil, Trash2, Mail, Phone, MapPin, X, Check, Inbox, Search } from "lucide-react";
+import { useRef, useState, useTransition } from "react";
+import { Plus, Pencil, Trash2, Mail, Phone, MapPin, X, Check, Inbox, Search, Upload, Download } from "lucide-react";
 import {
   createMember,
   updateMember,
@@ -11,6 +11,7 @@ import {
   bulkDeleteMembers,
   type MemberFormState,
 } from "@/lib/members/actions";
+import { downloadMemberTemplate, bulkImportMembers } from "@/lib/members/bulk-actions";
 import { PublicJoinLinkCard } from "@/components/members/PublicJoinLinkCard";
 import type { Branch, Member, MemberFieldDefinition, MemberStatus } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -596,6 +597,154 @@ function BulkActionsBar({
   );
 }
 
+function base64ToBlob(base64: string, mimeType: string): Blob {
+  const byteChars = atob(base64);
+  const byteNumbers = new Uint8Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+  return new Blob([byteNumbers], { type: mimeType });
+}
+
+const XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+function BulkUploadMembersDialog({ organizationId }: { organizationId: string }) {
+  const [open, setOpen] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [error, setError] = useState<string | undefined>();
+  const [result, setResult] = useState<{ imported: number; rowErrors: { row: number; message: string }[] } | null>(
+    null,
+  );
+  const [downloading, startDownload] = useTransition();
+  const [importing, startImport] = useTransition();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (next) {
+      setFile(null);
+      setError(undefined);
+      setResult(null);
+    }
+  }
+
+  function handleDownloadTemplate() {
+    startDownload(async () => {
+      const res = await downloadMemberTemplate(organizationId);
+      if (res.error || !res.base64 || !res.filename) {
+        setError(res.error ?? "Couldn't generate the template.");
+        return;
+      }
+      const blob = base64ToBlob(res.base64, XLSX_MIME_TYPE);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = res.filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  function handleImport() {
+    if (!file) return;
+    setError(undefined);
+    setResult(null);
+    const formData = new FormData();
+    formData.set("file", file);
+    startImport(async () => {
+      const res = await bulkImportMembers(organizationId, formData);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      setResult({ imported: res.imported ?? 0, rowErrors: res.rowErrors ?? [] });
+      setFile(null);
+      if (inputRef.current) inputRef.current.value = "";
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger
+        render={
+          <Button type="button" variant="outline">
+            <Upload className="size-4" />
+            Bulk upload
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Bulk upload members</DialogTitle>
+          <DialogDescription>Add many members at once from an Excel file.</DialogDescription>
+        </DialogHeader>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="space-y-4">
+          <div className="space-y-2 rounded-lg border border-border p-3">
+            <p className="text-sm font-medium">1. Download the template</p>
+            <p className="text-xs text-muted-foreground">
+              Includes this organization&apos;s branches and custom fields. Row 2 is an example — replace or delete
+              it before importing.
+            </p>
+            <Button type="button" variant="outline" size="sm" onClick={handleDownloadTemplate} disabled={downloading}>
+              <Download className="size-3.5" />
+              {downloading ? "Preparing..." : "Download template"}
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="bulk-file">2. Upload your completed file</Label>
+            <input
+              ref={inputRef}
+              id="bulk-file"
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              className="hidden"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
+            <Button type="button" variant="outline" onClick={() => inputRef.current?.click()} className="w-full">
+              <Upload className="size-4" />
+              {file ? file.name : "Choose an Excel file"}
+            </Button>
+          </div>
+
+          {result && (
+            <div className="space-y-2 rounded-lg border border-border p-3">
+              <p className="text-sm font-medium">
+                {result.imported} member{result.imported === 1 ? "" : "s"} imported.
+              </p>
+              {result.rowErrors.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-destructive">
+                    {result.rowErrors.length} row{result.rowErrors.length === 1 ? "" : "s"} skipped:
+                  </p>
+                  <ul className="max-h-32 space-y-0.5 overflow-y-auto text-xs text-muted-foreground">
+                    {result.rowErrors.map((rowError) => (
+                      <li key={rowError.row}>
+                        Row {rowError.row}: {rowError.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button type="button" onClick={handleImport} disabled={importing || !file}>
+              {importing ? "Importing..." : "Import"}
+            </Button>
+          </DialogFooter>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function MembersManager({
   organizationId,
   orgSlug,
@@ -724,7 +873,14 @@ export function MembersManager({
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {canManage && <FieldDefinitionsManager organizationId={organizationId} definitions={definitions} />}
+            {canManage && (
+              <FieldDefinitionsManager
+                organizationId={organizationId}
+                definitions={definitions}
+                hasMembers={members.length > 0}
+              />
+            )}
+            {canManage && <BulkUploadMembersDialog organizationId={organizationId} />}
             <AddMemberDialog organizationId={organizationId} definitions={definitions} branches={branches} />
           </div>
         </div>

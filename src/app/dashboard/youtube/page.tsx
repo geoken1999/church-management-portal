@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getYouTubeDashboardData } from "@/lib/youtube/dal";
-import { YouTubeManager } from "@/components/youtube/YouTubeManager";
+import { YouTubeManagerClient } from "@/components/youtube/YouTubeManagerClient";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export const metadata: Metadata = {
@@ -46,7 +46,7 @@ export default async function YouTubePage({
         </Alert>
       )}
 
-      <YouTubeManager organizationId={organizationId} canManage={canManage} data={data} />
+      <YouTubeManagerClient organizationId={organizationId} canManage={canManage} data={data} />
     </div>
   );
 }

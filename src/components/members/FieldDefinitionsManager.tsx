@@ -36,13 +36,22 @@ function FieldForm({
   field,
   fieldType,
   onFieldTypeChange,
+  required,
+  onRequiredChange,
+  hasMembers,
   errors,
 }: {
   field?: MemberFieldDefinition;
   fieldType: string;
   onFieldTypeChange: (value: string) => void;
+  required: boolean;
+  onRequiredChange: (value: boolean) => void;
+  hasMembers: boolean;
   errors?: FieldDefinitionState["fieldErrors"];
 }) {
+  const defaultPlaceholder =
+    fieldType === "checkbox" ? "Yes or No" : fieldType === "date" ? "YYYY-MM-DD" : fieldType === "select" ? "One of the options above" : "Value";
+
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -97,18 +106,30 @@ function FieldForm({
       )}
 
       <label className="flex items-center gap-2 text-sm">
-        <Checkbox name="required" defaultChecked={field?.required} />
+        <Checkbox name="required" checked={required} onCheckedChange={(checked) => onRequiredChange(checked === true)} />
         Required field
       </label>
+
+      {required && hasMembers && (
+        <div className="space-y-2">
+          <Label htmlFor="existingDefault">Default value for existing members</Label>
+          <Input id="existingDefault" name="existingDefault" placeholder={defaultPlaceholder} />
+          <p className="text-xs text-muted-foreground">
+            This organization already has members. Since this field is required, this value fills it in for any
+            member record that doesn&apos;t have one yet — leave blank to skip.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
 
-function AddFieldDialog({ organizationId }: { organizationId: string }) {
+function AddFieldDialog({ organizationId, hasMembers }: { organizationId: string; hasMembers: boolean }) {
   const [state, setState] = useState<FieldDefinitionState>(initialState);
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [fieldType, setFieldType] = useState("text");
+  const [required, setRequired] = useState(false);
 
   function handleSubmit(formData: FormData) {
     startTransition(async () => {
@@ -126,6 +147,7 @@ function AddFieldDialog({ organizationId }: { organizationId: string }) {
         if (next) {
           setState(initialState);
           setFieldType("text");
+          setRequired(false);
         }
       }}
     >
@@ -149,7 +171,14 @@ function AddFieldDialog({ organizationId }: { organizationId: string }) {
               <AlertDescription>{state.error}</AlertDescription>
             </Alert>
           )}
-          <FieldForm fieldType={fieldType} onFieldTypeChange={setFieldType} errors={state.fieldErrors} />
+          <FieldForm
+            fieldType={fieldType}
+            onFieldTypeChange={setFieldType}
+            required={required}
+            onRequiredChange={setRequired}
+            hasMembers={hasMembers}
+            errors={state.fieldErrors}
+          />
           <DialogFooter>
             <Button type="submit" disabled={pending}>
               {pending ? "Adding..." : "Add field"}
@@ -161,11 +190,12 @@ function AddFieldDialog({ organizationId }: { organizationId: string }) {
   );
 }
 
-function EditFieldDialog({ field }: { field: MemberFieldDefinition }) {
+function EditFieldDialog({ field, hasMembers }: { field: MemberFieldDefinition; hasMembers: boolean }) {
   const [state, setState] = useState<FieldDefinitionState>(initialState);
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [fieldType, setFieldType] = useState<string>(field.field_type);
+  const [required, setRequired] = useState(field.required);
 
   function handleSubmit(formData: FormData) {
     startTransition(async () => {
@@ -180,7 +210,10 @@ function EditFieldDialog({ field }: { field: MemberFieldDefinition }) {
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (next) setState(initialState);
+        if (next) {
+          setState(initialState);
+          setRequired(field.required);
+        }
       }}
     >
       <DialogTrigger
@@ -202,7 +235,15 @@ function EditFieldDialog({ field }: { field: MemberFieldDefinition }) {
               <AlertDescription>{state.error}</AlertDescription>
             </Alert>
           )}
-          <FieldForm field={field} fieldType={fieldType} onFieldTypeChange={setFieldType} errors={state.fieldErrors} />
+          <FieldForm
+            field={field}
+            fieldType={fieldType}
+            onFieldTypeChange={setFieldType}
+            required={required}
+            onRequiredChange={setRequired}
+            hasMembers={hasMembers}
+            errors={state.fieldErrors}
+          />
           <DialogFooter>
             <Button type="submit" disabled={pending}>
               {pending ? "Saving..." : "Save changes"}
@@ -217,9 +258,11 @@ function EditFieldDialog({ field }: { field: MemberFieldDefinition }) {
 export function FieldDefinitionsManager({
   organizationId,
   definitions,
+  hasMembers,
 }: {
   organizationId: string;
   definitions: MemberFieldDefinition[];
+  hasMembers: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -259,7 +302,7 @@ export function FieldDefinitionsManager({
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <EditFieldDialog field={field} />
+                  <EditFieldDialog field={field} hasMembers={hasMembers} />
                   <form action={deleteFieldDefinition}>
                     <input type="hidden" name="fieldId" value={field.id} />
                     <Button type="submit" variant="ghost" size="icon-sm" aria-label="Delete field">
@@ -273,7 +316,7 @@ export function FieldDefinitionsManager({
         </div>
 
         <div>
-          <AddFieldDialog organizationId={organizationId} />
+          <AddFieldDialog organizationId={organizationId} hasMembers={hasMembers} />
         </div>
       </DialogContent>
     </Dialog>

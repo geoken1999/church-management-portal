@@ -13,7 +13,7 @@ import {
   type FieldDefinitionErrors,
   type MemberFieldErrors,
 } from "@/lib/members/validation";
-import type { MemberFieldType, MemberStatus } from "@/types/database";
+import type { MemberFieldDefinition, MemberFieldType, MemberStatus } from "@/types/database";
 
 const MEMBER_STATUSES: MemberStatus[] = ["active", "left"];
 
@@ -39,6 +39,25 @@ export interface FieldDefinitionState {
 
 const FIELD_TYPES = FIELD_TYPE_OPTIONS.map((o) => o.value);
 
+// Backfills a required field's default onto existing members that don't
+// have a value for it yet — the RPC only touches rows missing the key, so
+// this is always safe to call even when nothing actually needs filling in.
+async function backfillRequiredFieldDefault(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  definition: MemberFieldDefinition,
+  rawDefault: string,
+) {
+  if (!definition.required || !rawDefault.trim()) return;
+
+  const { values } = parseCustomFieldValues([definition], () => rawDefault);
+  await supabase.rpc("backfill_member_custom_field", {
+    p_organization_id: organizationId,
+    p_key: definition.key,
+    p_value: values[definition.key] ?? null,
+  });
+}
+
 export async function createFieldDefinition(
   _prevState: FieldDefinitionState,
   formData: FormData,
@@ -50,6 +69,7 @@ export async function createFieldDefinition(
   const fieldType = String(formData.get("fieldType") ?? "");
   const required = formData.get("required") === "on";
   const options = parseOptionsText(String(formData.get("options") ?? ""));
+  const existingDefault = String(formData.get("existingDefault") ?? "");
 
   const fieldErrors = validateFieldDefinition({ label, fieldType, options });
   if (!FIELD_TYPES.includes(fieldType as MemberFieldType)) {
@@ -69,7 +89,8 @@ export async function createFieldDefinition(
 
   for (let attempt = 0; attempt < 3; attempt++) {
     const key = attempt === 0 ? baseKey : `${baseKey}_${attempt + 1}`;
-    const { error } = await supabase.from("member_field_definitions").insert({
+    const definition: MemberFieldDefinition = {
+      id: "",
       organization_id: organizationId,
       key,
       label: label.trim(),
@@ -77,9 +98,13 @@ export async function createFieldDefinition(
       options: fieldType === "select" ? options : null,
       required,
       sort_order: count ?? 0,
-    });
+      created_at: "",
+      updated_at: "",
+    };
+    const { error } = await supabase.from("member_field_definitions").insert(definition);
 
     if (!error) {
+      await backfillRequiredFieldDefault(supabase, organizationId, definition, existingDefault);
       revalidatePath("/dashboard/members");
       return { success: true };
     }
@@ -103,6 +128,7 @@ export async function updateFieldDefinition(
   const fieldType = String(formData.get("fieldType") ?? "");
   const required = formData.get("required") === "on";
   const options = parseOptionsText(String(formData.get("options") ?? ""));
+  const existingDefault = String(formData.get("existingDefault") ?? "");
 
   const fieldErrors = validateFieldDefinition({ label, fieldType, options });
   if (Object.values(fieldErrors).some(Boolean)) {
@@ -110,18 +136,22 @@ export async function updateFieldDefinition(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("member_field_definitions")
     .update({
       label: label.trim(),
       options: fieldType === "select" ? options : null,
       required,
     })
-    .eq("id", fieldId);
+    .eq("id", fieldId)
+    .select()
+    .single();
 
-  if (error) {
+  if (error || !updated) {
     return { error: "Couldn't save that field. You may not have permission to customize the form." };
   }
+
+  await backfillRequiredFieldDefault(supabase, updated.organization_id, updated, existingDefault);
 
   revalidatePath("/dashboard/members");
   return { success: true };

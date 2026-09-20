@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getInstagramDashboardData } from "@/lib/instagram/dal";
-import { InstagramManager } from "@/components/instagram/InstagramManager";
+import { InstagramManagerClient } from "@/components/instagram/InstagramManagerClient";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export const metadata: Metadata = {
@@ -46,7 +46,7 @@ export default async function InstagramPage({
         </Alert>
       )}
 
-      <InstagramManager organizationId={organizationId} canManage={canManage} data={data} />
+      <InstagramManagerClient organizationId={organizationId} canManage={canManage} data={data} />
     </div>
   );
 }

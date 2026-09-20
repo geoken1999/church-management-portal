@@ -140,6 +140,39 @@ export type MediaSocialAccount = {
   updated_at: string;
 };
 
+export type InstagramConnection = {
+  id: string;
+  organization_id: string;
+  instagram_user_id: string;
+  username: string;
+  account_type: string | null;
+  profile_picture_url: string | null;
+  media_count: number | null;
+  followers_count: number | null;
+  access_token: string;
+  token_expires_at: string;
+  connected_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type YouTubeConnection = {
+  id: string;
+  organization_id: string;
+  channel_id: string;
+  channel_title: string;
+  thumbnail_url: string | null;
+  subscriber_count: number | null;
+  video_count: number | null;
+  view_count: number | null;
+  access_token: string;
+  refresh_token: string;
+  token_expires_at: string;
+  connected_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type WorshipTeamMember = {
   id: string;
   organization_id: string;
@@ -450,6 +483,39 @@ export type Database = {
           },
         ];
       };
+      instagram_connections: {
+        Row: InstagramConnection;
+        Insert: Partial<InstagramConnection> &
+          Pick<InstagramConnection, "organization_id" | "instagram_user_id" | "username" | "access_token" | "token_expires_at">;
+        Update: Partial<InstagramConnection>;
+        Relationships: [
+          {
+            foreignKeyName: "instagram_connections_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: true;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      youtube_connections: {
+        Row: YouTubeConnection;
+        Insert: Partial<YouTubeConnection> &
+          Pick<
+            YouTubeConnection,
+            "organization_id" | "channel_id" | "channel_title" | "access_token" | "refresh_token" | "token_expires_at"
+          >;
+        Update: Partial<YouTubeConnection>;
+        Relationships: [
+          {
+            foreignKeyName: "youtube_connections_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: true;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -501,6 +567,10 @@ export type Database = {
       get_shared_worship_document: {
         Args: { token: string };
         Returns: { title: string; file_path: string; file_type: string }[];
+      };
+      delete_instagram_connection_by_ig_user: {
+        Args: { ig_user_id: string };
+        Returns: undefined;
       };
     };
     Enums: Record<string, never>;

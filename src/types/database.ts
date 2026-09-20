@@ -163,6 +163,28 @@ export type WorshipDocument = {
   updated_at: string;
 };
 
+export type EventRecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
+export type EventMeetingMode = "offline" | "online";
+
+export type Event = {
+  id: string;
+  organization_id: string;
+  title: string;
+  description: string | null;
+  start_at: string;
+  end_at: string | null;
+  is_recurring: boolean;
+  recurrence_frequency: EventRecurrenceFrequency | null;
+  recurrence_end_date: string | null;
+  branch_id: string | null;
+  meeting_mode: EventMeetingMode;
+  meeting_link: string | null;
+  managed_by: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type NotificationType = "member_request";
 
 export type Notification = {
@@ -396,6 +418,34 @@ export type Database = {
             columns: ["organization_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      events: {
+        Row: Event;
+        Insert: Partial<Event> & Pick<Event, "organization_id" | "title" | "start_at">;
+        Update: Partial<Event>;
+        Relationships: [
+          {
+            foreignKeyName: "events_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "events_managed_by_fkey";
+            columns: ["managed_by"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "events_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
             referencedColumns: ["id"];
           },
         ];

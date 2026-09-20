@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthErrorMessage } from "@/lib/auth/errors";
+import { getSiteUrl } from "@/lib/site-url";
 import {
   validateLogin,
   validatePassword,
@@ -55,7 +56,7 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   }
 
   const supabase = await createClient();
-  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const origin = getSiteUrl();
   const callbackUrl = new URL("/auth/callback", origin);
   callbackUrl.searchParams.set("next", redirectTarget);
 
@@ -132,7 +133,7 @@ export async function requestPasswordReset(
   }
 
   const supabase = await createClient();
-  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const origin = getSiteUrl();
 
   // Errors are intentionally not surfaced in detail — returning the same
   // generic message regardless of outcome avoids leaking which emails have

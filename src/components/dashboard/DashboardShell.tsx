@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LayoutDashboard, UserRound, Users, MapPin, Contact, Video, Music } from "lucide-react";
+import { Menu, X, LayoutDashboard, UserRound, Users, MapPin, Contact, Video, Music, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ChurchLogoUpload } from "@/components/organizations/ChurchLogoUpload";
@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/members", label: "Members", icon: Contact },
   { href: "/dashboard/media", label: "Media", icon: Video },
   { href: "/dashboard/worship", label: "Worship", icon: Music },
+  { href: "/dashboard/events", label: "Events", icon: CalendarDays },
 ];
 
 export function DashboardShell({

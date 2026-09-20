@@ -1,28 +1,27 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getMembers } from "@/lib/members/dal";
-import { getWorshipTeamMembers, getWorshipDocuments } from "@/lib/worship/dal";
-import { getSiteUrl } from "@/lib/site-url";
-import { WorshipManager } from "@/components/worship/WorshipManager";
+import { getBranches } from "@/lib/branches/dal";
+import { getEvents } from "@/lib/events/dal";
+import { EventsManager } from "@/components/events/EventsManager";
 
 export const metadata: Metadata = {
-  title: "Worship | KingdomFlow",
+  title: "Events | KingdomFlow",
 };
 
-export default async function WorshipPage() {
+export default async function EventsPage() {
   const membership = await requireOrganization();
   const canManage = membership.role === "owner" || membership.role === "admin";
   const organizationId = membership.organization.id;
-  const siteUrl = getSiteUrl();
 
-  const [members, teamMembers, documents] = await Promise.all([
+  const [members, branches, events] = await Promise.all([
     getMembers(organizationId),
-    getWorshipTeamMembers(organizationId),
-    getWorshipDocuments(organizationId),
+    getBranches(organizationId),
+    getEvents(organizationId),
   ]);
 
   // Pending join requests haven't been approved yet, so they aren't
-  // eligible to be assigned a worship role.
+  // eligible to be assigned as an event manager.
   const assignableMembers = members
     .filter((member) => member.status !== "pending")
     .map((member) => ({ id: member.id, first_name: member.first_name, last_name: member.last_name }));
@@ -30,18 +29,17 @@ export default async function WorshipPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-heading text-3xl font-bold tracking-tight">Worship</h1>
+        <h1 className="font-heading text-3xl font-bold tracking-tight">Events</h1>
         <p className="mt-1 text-muted-foreground">
-          The team and shared documents behind {membership.organization.name}&apos;s worship services.
+          The calendar and schedule for {membership.organization.name}.
         </p>
       </div>
 
-      <WorshipManager
+      <EventsManager
         organizationId={organizationId}
-        siteUrl={siteUrl}
         members={assignableMembers}
-        teamMembers={teamMembers}
-        documents={documents}
+        branches={branches}
+        events={events}
         canManage={canManage}
       />
     </div>

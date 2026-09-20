@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getMembers, getMemberFieldDefinitions } from "@/lib/members/dal";
 import { getBranches } from "@/lib/branches/dal";
+import { getSiteUrl } from "@/lib/site-url";
 import { MembersManager } from "@/components/members/MembersManager";
 
 export const metadata: Metadata = {
@@ -20,7 +21,7 @@ export default async function MembersPage() {
 
   // Resolved server-side (not via window.location) so the rendered link is
   // identical during SSR and client hydration — avoids a hydration mismatch.
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const siteUrl = getSiteUrl();
 
   return (
     <div className="space-y-8">

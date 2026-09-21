@@ -1,8 +1,8 @@
 import "server-only";
 
 import * as XLSX from "xlsx";
-import { validateMemberBasics, parseCustomFieldValues } from "@/lib/members/validation";
-import type { Branch, CustomFieldValue, MemberFieldDefinition, MemberStatus } from "@/types/database";
+import { validateMemberBasics, validateMemberDetails, parseCustomFieldValues } from "@/lib/members/validation";
+import type { Branch, CustomFieldValue, MaritalStatus, MemberFieldDefinition, MemberStatus } from "@/types/database";
 
 const MEMBER_STATUSES: MemberStatus[] = ["active", "left"];
 
@@ -31,11 +31,29 @@ function exampleValue(definition: MemberFieldDefinition): string {
 // actual branches and custom field definitions, since those vary org to
 // org and the uploaded file has to match them to import cleanly.
 export function buildMemberTemplate(definitions: MemberFieldDefinition[], branches: Branch[]): ArrayBuffer {
-  const headers = ["First Name*", "Last Name*", "Email", "Phone", "Status (Active/Left)"];
+  const headers = [
+    "First Name*",
+    "Last Name*",
+    "Email",
+    "Phone",
+    "Date of Birth (YYYY-MM-DD)*",
+    "Marital Status (Married/Unmarried)*",
+    "Wedding Date (YYYY-MM-DD)",
+    "Status (Active/Left)",
+  ];
   if (branches.length > 0) headers.push("Branch*");
   for (const definition of definitions) headers.push(columnHeader(definition));
 
-  const exampleRow = ["Jane", "Doe", "jane@example.com", "+1 555 000 1234", "Active"];
+  const exampleRow = [
+    "Jane",
+    "Doe",
+    "jane@example.com",
+    "+1 555 000 1234",
+    "1990-05-15",
+    "Unmarried",
+    "",
+    "Active",
+  ];
   if (branches.length > 0) exampleRow.push(branches[0].name);
   for (const definition of definitions) exampleRow.push(exampleValue(definition));
 
@@ -54,6 +72,7 @@ export function buildMemberTemplate(definitions: MemberFieldDefinition[], branch
     ["Columns marked with * are required."],
     ["Dates use YYYY-MM-DD. Yes/No fields accept Yes, No, True, or False."],
     ["Dropdown fields must exactly match one of the options shown in the column header."],
+    ["Wedding Date is required only when Marital Status is Married — leave it blank otherwise."],
   ];
   if (branches.length > 0) notes.push(["Branch must exactly match a name from the Branches sheet."]);
   const notesSheet = XLSX.utils.aoa_to_sheet(notes);
@@ -70,6 +89,9 @@ export interface ParsedMemberRow {
   phone: string;
   status: MemberStatus;
   branchId: string | null;
+  dateOfBirth: string;
+  maritalStatus: MaritalStatus;
+  weddingDate: string | null;
   customFields: Record<string, CustomFieldValue>;
 }
 
@@ -114,13 +136,24 @@ export function parseMemberSpreadsheet(
     const email = readColumn(record, "Email");
     const phone = readColumn(record, "Phone");
     const statusRaw = readColumn(record, "Status").toLowerCase();
+    const dateOfBirth = readColumn(record, "Date of Birth");
+    const maritalStatusRaw = readColumn(record, "Marital Status").toLowerCase();
+    const weddingDate = readColumn(record, "Wedding Date");
 
     // Skip fully blank rows — trailing empty rows are common in exported
     // spreadsheets and shouldn't surface as errors.
     if (!firstName && !lastName && !email && !phone) return;
 
     const basicErrors = validateMemberBasics({ firstName, lastName, email, phone });
-    const messages = Object.values(basicErrors).filter((v): v is string => Boolean(v));
+    const detailErrors = validateMemberDetails({
+      dateOfBirth,
+      maritalStatus: maritalStatusRaw,
+      weddingDate,
+    });
+    const messages = [
+      ...Object.values(basicErrors).filter((v): v is string => Boolean(v)),
+      ...Object.values(detailErrors).filter((v): v is string => Boolean(v)),
+    ];
 
     const status: MemberStatus = MEMBER_STATUSES.includes(statusRaw as MemberStatus)
       ? (statusRaw as MemberStatus)
@@ -163,6 +196,9 @@ export function parseMemberSpreadsheet(
       phone,
       status,
       branchId,
+      dateOfBirth,
+      maritalStatus: maritalStatusRaw as MaritalStatus,
+      weddingDate: maritalStatusRaw === "married" ? weddingDate || null : null,
       customFields,
     });
   });

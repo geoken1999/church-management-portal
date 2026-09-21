@@ -78,7 +78,7 @@ function ConnectInstagramCard({ canManage }: { canManage: boolean }) {
           </p>
         </div>
         {canManage ? (
-          <Button type="button" render={<a href="/api/instagram/connect" />}>
+          <Button type="button" nativeButton={false} render={<a href="/api/instagram/connect" />}>
             <InstagramIcon className="size-4" />
             Connect Instagram
           </Button>
@@ -131,7 +131,7 @@ function InstagramHeader({
         </div>
         {canManage && (
           <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" size="sm" render={<a href="/api/instagram/connect" />}>
+            <Button type="button" variant="outline" size="sm" nativeButton={false} render={<a href="/api/instagram/connect" />}>
               <RefreshCw className="size-3.5" />
               Reconnect
             </Button>

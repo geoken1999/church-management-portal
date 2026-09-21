@@ -82,7 +82,8 @@ export async function getYouTubeDashboardData(organizationId: string): Promise<Y
       fetchTopVideos(accessToken),
     ]);
     return { connected: true, channel, videos, analytics, comments, liveBroadcasts, topVideos, syncError: false };
-  } catch {
+  } catch (err) {
+    console.error("[youtube] dashboard sync failed:", err);
     return {
       connected: true,
       channel,

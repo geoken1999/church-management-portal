@@ -468,7 +468,7 @@ function DocumentCard({ document, siteUrl, canManage }: { document: WorshipDocum
           >
             {copied ? "Copied" : "Copy link"}
           </Button>
-          <Button type="button" size="sm" variant="ghost" render={<a href={link} target="_blank" rel="noreferrer" />}>
+          <Button type="button" size="sm" variant="ghost" nativeButton={false} render={<a href={link} target="_blank" rel="noreferrer" />}>
             Open
           </Button>
           {canManage && (

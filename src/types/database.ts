@@ -177,6 +177,20 @@ export type YouTubeConnection = {
   updated_at: string;
 };
 
+export type FacebookConnection = {
+  id: string;
+  organization_id: string;
+  page_id: string;
+  page_name: string;
+  page_picture_url: string | null;
+  fan_count: number | null;
+  access_token: string;
+  token_expires_at: string | null;
+  connected_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type WorshipTeamMember = {
   id: string;
   organization_id: string;
@@ -226,7 +240,9 @@ export type NotificationType =
   | "member_request"
   | "youtube_video_uploaded"
   | "youtube_video_updated"
-  | "youtube_live_started";
+  | "youtube_live_started"
+  | "facebook_post_created"
+  | "facebook_post_updated";
 
 export type Notification = {
   id: string;
@@ -517,6 +533,21 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "youtube_connections_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: true;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      facebook_connections: {
+        Row: FacebookConnection;
+        Insert: Partial<FacebookConnection> &
+          Pick<FacebookConnection, "organization_id" | "page_id" | "page_name" | "access_token">;
+        Update: Partial<FacebookConnection>;
+        Relationships: [
+          {
+            foreignKeyName: "facebook_connections_organization_id_fkey";
             columns: ["organization_id"];
             isOneToOne: true;
             referencedRelation: "organizations";

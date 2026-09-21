@@ -7,17 +7,21 @@ const DATA_API_BASE = "https://www.googleapis.com/youtube/v3";
 const ANALYTICS_API_BASE = "https://youtubeanalytics.googleapis.com/v2";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 
-// The full "youtube" scope (not just youtube.readonly/force-ssl) is
-// required for live broadcast management (liveBroadcasts/liveStreams
-// insert, bind, transition) — Google doesn't cover that under force-ssl.
-// It's a superset that also covers comment replies, so force-ssl is no
-// longer needed once this is granted.
+// The full "youtube" scope is required for live broadcast management
+// (liveBroadcasts/liveStreams insert, bind, transition) — Google doesn't
+// cover that under force-ssl. It is NOT, despite being the broadest "manage"
+// scope, a superset of force-ssl: Google's own API requires force-ssl
+// specifically for commentThreads.list/insert, and "youtube" alone 403s
+// those calls with "insufficient authentication scopes" (confirmed against
+// the live API). Both scopes are needed together.
 //
 // NOTE: any org connected before this scope was added needs to click
 // "Reconnect" once — their existing token was issued under the old,
-// narrower scope set and can't manage broadcasts until re-consented.
+// narrower scope set and can't read/manage comments (or broadcasts, if
+// connected before that scope) until re-consented.
 export const YOUTUBE_SCOPES = [
   "https://www.googleapis.com/auth/youtube",
+  "https://www.googleapis.com/auth/youtube.force-ssl",
   "https://www.googleapis.com/auth/yt-analytics.readonly",
 ].join(" ");
 

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { YouTubeIcon } from "@/components/icons/YouTubeIcon";
+import { FacebookIcon } from "@/components/icons/FacebookIcon";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ChurchLogoUpload } from "@/components/organizations/ChurchLogoUpload";
@@ -38,6 +39,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/events", label: "Events", icon: CalendarDays },
   { href: "/dashboard/instagram", label: "Instagram", icon: InstagramIcon },
   { href: "/dashboard/youtube", label: "YouTube", icon: YouTubeIcon },
+  { href: "/dashboard/facebook", label: "Facebook", icon: FacebookIcon },
   { href: "/dashboard/sms", label: "SMS", icon: MessageSquareText },
 ];
 

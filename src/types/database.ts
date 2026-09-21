@@ -29,6 +29,7 @@ export type Organization = {
   logo_url: string | null;
   member_count_range: MemberCountRange | null;
   branch_count: number | null;
+  plan: string;
   created_at: string;
   updated_at: string;
 };
@@ -144,6 +145,17 @@ export type MediaSocialAccount = {
   updated_at: string;
 };
 
+export type MediaDocument = {
+  id: string;
+  organization_id: string;
+  title: string;
+  file_path: string;
+  file_type: string;
+  file_size: number;
+  uploaded_by: string | null;
+  created_at: string;
+};
+
 export type InstagramConnection = {
   id: string;
   organization_id: string;
@@ -191,6 +203,51 @@ export type FacebookConnection = {
   updated_at: string;
 };
 
+export type EmailCampaignStatus = "sent" | "partial_failure" | "failed";
+export type EmailCampaignProvider = "shared" | "smtp";
+
+export type EmailCampaign = {
+  id: string;
+  organization_id: string;
+  subject: string;
+  body_html: string;
+  recipient_count: number;
+  sent_count: number;
+  failed_count: number;
+  failed_recipients: { email: string; error: string }[];
+  status: EmailCampaignStatus;
+  provider: EmailCampaignProvider;
+  sent_by: string | null;
+  created_at: string;
+};
+
+export type EmailSmtpSettings = {
+  id: string;
+  organization_id: string;
+  host: string;
+  port: number;
+  secure: boolean;
+  username: string;
+  password: string;
+  from_email: string;
+  from_name: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EmailSetupRequestStatus = "open" | "resolved";
+
+export type EmailSetupRequest = {
+  id: string;
+  organization_id: string;
+  requested_by: string | null;
+  message: string | null;
+  status: EmailSetupRequestStatus;
+  created_at: string;
+  resolved_at: string | null;
+};
+
 export type WorshipTeamMember = {
   id: string;
   organization_id: string;
@@ -210,6 +267,22 @@ export type WorshipDocument = {
   file_size: number;
   share_token: string;
   uploaded_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TodoStatus = "pending" | "completed";
+
+export type Todo = {
+  id: string;
+  organization_id: string;
+  title: string;
+  description: string | null;
+  due_at: string | null;
+  status: TodoStatus;
+  assigned_to: string | null;
+  created_by: string | null;
+  completed_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -443,6 +516,28 @@ export type Database = {
           },
         ];
       };
+      media_documents: {
+        Row: MediaDocument;
+        Insert: Partial<MediaDocument> &
+          Pick<MediaDocument, "organization_id" | "title" | "file_path" | "file_type" | "file_size">;
+        Update: Partial<MediaDocument>;
+        Relationships: [
+          {
+            foreignKeyName: "media_documents_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "media_documents_uploaded_by_fkey";
+            columns: ["uploaded_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["auth_user_id"];
+          },
+        ];
+      };
       worship_team_members: {
         Row: WorshipTeamMember;
         Insert: Partial<WorshipTeamMember> & Pick<WorshipTeamMember, "organization_id" | "member_id" | "role">;
@@ -507,6 +602,34 @@ export type Database = {
           },
         ];
       };
+      todos: {
+        Row: Todo;
+        Insert: Partial<Todo> & Pick<Todo, "organization_id" | "title">;
+        Update: Partial<Todo>;
+        Relationships: [
+          {
+            foreignKeyName: "todos_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "todos_assigned_to_fkey";
+            columns: ["assigned_to"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["auth_user_id"];
+          },
+          {
+            foreignKeyName: "todos_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["auth_user_id"];
+          },
+        ];
+      };
       instagram_connections: {
         Row: InstagramConnection;
         Insert: Partial<InstagramConnection> &
@@ -552,6 +675,64 @@ export type Database = {
             isOneToOne: true;
             referencedRelation: "organizations";
             referencedColumns: ["id"];
+          },
+        ];
+      };
+      email_campaigns: {
+        Row: EmailCampaign;
+        Insert: Partial<EmailCampaign> &
+          Pick<EmailCampaign, "organization_id" | "subject" | "body_html" | "status">;
+        Update: Partial<EmailCampaign>;
+        Relationships: [
+          {
+            foreignKeyName: "email_campaigns_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "email_campaigns_sent_by_fkey";
+            columns: ["sent_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["auth_user_id"];
+          },
+        ];
+      };
+      email_smtp_settings: {
+        Row: EmailSmtpSettings;
+        Insert: Partial<EmailSmtpSettings> &
+          Pick<EmailSmtpSettings, "organization_id" | "host" | "port" | "username" | "password" | "from_email">;
+        Update: Partial<EmailSmtpSettings>;
+        Relationships: [
+          {
+            foreignKeyName: "email_smtp_settings_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: true;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      email_setup_requests: {
+        Row: EmailSetupRequest;
+        Insert: Partial<EmailSetupRequest> & Pick<EmailSetupRequest, "organization_id">;
+        Update: Partial<EmailSetupRequest>;
+        Relationships: [
+          {
+            foreignKeyName: "email_setup_requests_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "email_setup_requests_requested_by_fkey";
+            columns: ["requested_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["auth_user_id"];
           },
         ];
       };
@@ -617,6 +798,10 @@ export type Database = {
       backfill_member_custom_field: {
         Args: { p_organization_id: string; p_key: string; p_value: unknown };
         Returns: undefined;
+      };
+      get_organization_storage_bytes: {
+        Args: { target_org_id: string };
+        Returns: number;
       };
     };
     Enums: Record<string, never>;

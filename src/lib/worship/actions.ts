@@ -10,6 +10,7 @@ import {
   documentExtension,
   type WorshipTeamMemberFieldErrors,
 } from "@/lib/worship/validation";
+import { checkStorageQuota } from "@/lib/plans/dal";
 
 const WORSHIP_PATH = "/dashboard/worship";
 
@@ -129,6 +130,11 @@ export async function uploadWorshipDocument(
   }
   if (file.size > MAX_DOCUMENT_BYTES) {
     return { error: `File must be smaller than ${Math.round(MAX_DOCUMENT_BYTES / (1024 * 1024))}MB.` };
+  }
+
+  const quotaError = await checkStorageQuota(organizationId, file.size);
+  if (quotaError) {
+    return { error: quotaError };
   }
 
   // Generated up front (rather than letting the table default it) so the

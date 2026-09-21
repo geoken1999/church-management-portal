@@ -15,6 +15,8 @@ import {
   Music,
   CalendarDays,
   MessageSquareText,
+  Mail,
+  ListTodo,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { YouTubeIcon } from "@/components/icons/YouTubeIcon";
@@ -37,6 +39,8 @@ const NAV_ITEMS = [
   { href: "/dashboard/media", label: "Media", icon: Video },
   { href: "/dashboard/worship", label: "Worship", icon: Music },
   { href: "/dashboard/events", label: "Events", icon: CalendarDays },
+  { href: "/dashboard/todos", label: "To Do", icon: ListTodo },
+  { href: "/dashboard/email", label: "Email", icon: Mail },
   { href: "/dashboard/instagram", label: "Instagram", icon: InstagramIcon },
   { href: "/dashboard/youtube", label: "YouTube", icon: YouTubeIcon },
   { href: "/dashboard/facebook", label: "Facebook", icon: FacebookIcon },

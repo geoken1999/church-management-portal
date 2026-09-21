@@ -7,10 +7,14 @@ import {
   validateMediaTeamMember,
   validateMediaEquipment,
   validateMediaSocialAccount,
+  ALLOWED_MEDIA_DOCUMENT_TYPES,
+  MAX_MEDIA_DOCUMENT_BYTES,
+  mediaDocumentExtension,
   type MediaTeamMemberFieldErrors,
   type MediaEquipmentFieldErrors,
   type MediaSocialAccountFieldErrors,
 } from "@/lib/media/validation";
+import { checkStorageQuota } from "@/lib/plans/dal";
 
 const MEDIA_PATH = "/dashboard/media";
 
@@ -270,6 +274,88 @@ export async function deleteMediaSocialAccount(formData: FormData) {
 
   const supabase = await createClient();
   await supabase.from("media_social_accounts").delete().eq("id", id);
+
+  revalidatePath(MEDIA_PATH);
+}
+
+// ---------------------------------------------------------------------------
+// Documents
+// ---------------------------------------------------------------------------
+
+export interface MediaDocumentFormState {
+  error?: string;
+  success?: boolean;
+}
+
+export async function uploadMediaDocument(
+  _prevState: MediaDocumentFormState,
+  formData: FormData,
+): Promise<MediaDocumentFormState> {
+  const user = await requireUser();
+
+  const organizationId = String(formData.get("organizationId") ?? "");
+  const title = String(formData.get("title") ?? "").trim();
+  const file = formData.get("file");
+
+  if (!title || title.length < 2) {
+    return { error: "Give the document a title of at least 2 characters." };
+  }
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "Choose a file to upload." };
+  }
+  if (!ALLOWED_MEDIA_DOCUMENT_TYPES.includes(file.type)) {
+    return { error: "That file type isn't supported." };
+  }
+  if (file.size > MAX_MEDIA_DOCUMENT_BYTES) {
+    return { error: `File must be smaller than ${Math.round(MAX_MEDIA_DOCUMENT_BYTES / (1024 * 1024))}MB.` };
+  }
+
+  const quotaError = await checkStorageQuota(organizationId, file.size);
+  if (quotaError) {
+    return { error: quotaError };
+  }
+
+  const documentId = crypto.randomUUID();
+  const path = `${organizationId}/${documentId}${mediaDocumentExtension(file.type)}`;
+
+  const supabase = await createClient();
+  const { error: uploadError } = await supabase.storage
+    .from("media-documents")
+    .upload(path, file, { contentType: file.type });
+
+  if (uploadError) {
+    return { error: "Couldn't upload that file. You may not have permission to manage media." };
+  }
+
+  const { error: insertError } = await supabase.from("media_documents").insert({
+    id: documentId,
+    organization_id: organizationId,
+    title,
+    file_path: path,
+    file_type: file.type,
+    file_size: file.size,
+    uploaded_by: user.id,
+  });
+
+  if (insertError) {
+    await supabase.storage.from("media-documents").remove([path]);
+    return { error: "Couldn't save that document. Please try again." };
+  }
+
+  revalidatePath(MEDIA_PATH);
+  return { success: true };
+}
+
+export async function deleteMediaDocument(formData: FormData) {
+  await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const path = String(formData.get("path") ?? "");
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("media_documents").delete().eq("id", id);
+  if (!error && path) {
+    await supabase.storage.from("media-documents").remove([path]);
+  }
 
   revalidatePath(MEDIA_PATH);
 }

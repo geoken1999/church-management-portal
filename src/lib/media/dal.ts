@@ -35,3 +35,14 @@ export const getMediaSocialAccounts = cache(async (organizationId: string) => {
 
   return data ?? [];
 });
+
+export const getMediaDocuments = cache(async (organizationId: string) => {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("media_documents")
+    .select("*, profiles(first_name, last_name)")
+    .eq("organization_id", organizationId)
+    .order("created_at", { ascending: false });
+
+  return data ?? [];
+});

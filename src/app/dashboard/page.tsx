@@ -4,6 +4,9 @@ import { getProfile } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { OverviewStats } from "@/components/dashboard/OverviewStats";
+import { UpcomingCelebrations } from "@/components/dashboard/UpcomingCelebrations";
+import { UpcomingTodos } from "@/components/dashboard/UpcomingTodos";
+import { PlanUsageCard } from "@/components/dashboard/PlanUsageCard";
 import { MEMBER_COUNT_OPTIONS } from "@/lib/organizations/validation";
 
 export const metadata: Metadata = {
@@ -34,44 +37,47 @@ export default async function DashboardPage() {
         <p className="mt-1 text-muted-foreground">You are successfully authenticated.</p>
       </div>
 
-      <OverviewStats />
+      <OverviewStats organizationId={membership.organization.id} />
 
-      <Card className="max-w-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Church className="size-4 text-primary" />
-            Church profile
-          </CardTitle>
-          <CardDescription>{membership.organization.name}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <dl className="space-y-3 text-sm">
-            {memberCountLabel && (
-              <div className="flex items-center justify-between">
-                <dt className="text-muted-foreground">Congregation size</dt>
-                <dd className="font-medium">{memberCountLabel}</dd>
-              </div>
-            )}
-            {branchCount != null && (
-              <div className="flex items-center justify-between">
-                <dt className="text-muted-foreground">Locations</dt>
-                <dd className="font-medium">
-                  {branchCount} {branchCount === 1 ? "location" : "locations"}
-                </dd>
-              </div>
-            )}
-            <div className="flex items-center justify-between">
-              <dt className="text-muted-foreground">Your role</dt>
-              <dd className="font-medium capitalize">{membership.role}</dd>
-            </div>
-          </dl>
-        </CardContent>
-      </Card>
+      <UpcomingCelebrations organizationId={membership.organization.id} />
 
-      <p className="text-sm text-muted-foreground">
-        The Overview stats above are sample data. This dashboard will grow with each future
-        module (members, ministries, events, giving, and more).
-      </p>
+      <UpcomingTodos organizationId={membership.organization.id} />
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card className="max-w-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Church className="size-4 text-primary" />
+              Church profile
+            </CardTitle>
+            <CardDescription>{membership.organization.name}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="space-y-3 text-sm">
+              {memberCountLabel && (
+                <div className="flex items-center justify-between">
+                  <dt className="text-muted-foreground">Congregation size</dt>
+                  <dd className="font-medium">{memberCountLabel}</dd>
+                </div>
+              )}
+              {branchCount != null && (
+                <div className="flex items-center justify-between">
+                  <dt className="text-muted-foreground">Locations</dt>
+                  <dd className="font-medium">
+                    {branchCount} {branchCount === 1 ? "location" : "locations"}
+                  </dd>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <dt className="text-muted-foreground">Your role</dt>
+                <dd className="font-medium capitalize">{membership.role}</dd>
+              </div>
+            </dl>
+          </CardContent>
+        </Card>
+
+        <PlanUsageCard organizationId={membership.organization.id} />
+      </div>
     </div>
   );
 }

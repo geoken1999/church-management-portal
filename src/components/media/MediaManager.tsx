@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Plus, Pencil, Trash2, UserRound, Wrench, Share2, StickyNote } from "lucide-react";
+import { useRef, useState, useTransition } from "react";
+import { Plus, Pencil, Trash2, UserRound, Wrench, Share2, StickyNote, FileText, Upload, Download } from "lucide-react";
 import {
   createMediaTeamMember,
   updateMediaTeamMember,
@@ -12,11 +12,16 @@ import {
   createMediaSocialAccount,
   updateMediaSocialAccount,
   deleteMediaSocialAccount,
+  uploadMediaDocument,
+  deleteMediaDocument,
   type MediaTeamMemberFormState,
   type MediaEquipmentFormState,
   type MediaSocialAccountFormState,
+  type MediaDocumentFormState,
 } from "@/lib/media/actions";
-import type { Member, MediaEquipment, MediaSocialAccount, MediaTeamMember } from "@/types/database";
+import { ALLOWED_MEDIA_DOCUMENT_TYPES, MAX_MEDIA_DOCUMENT_BYTES, mediaDocumentTypeLabel } from "@/lib/media/validation";
+import { formatBytes } from "@/lib/plans/format";
+import type { Member, MediaEquipment, MediaSocialAccount, MediaTeamMember, MediaDocument } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,6 +46,7 @@ type MemberBasic = Pick<Member, "id" | "first_name" | "last_name">;
 type TeamMemberRow = MediaTeamMember & { members: MemberBasic | null };
 type EquipmentRow = MediaEquipment & { members: MemberBasic | null };
 type SocialAccountRow = MediaSocialAccount & { members: MemberBasic | null };
+type DocumentRow = MediaDocument & { profiles: { first_name: string; last_name: string } | null; url: string };
 
 function personName(member: MemberBasic | null): string {
   return member ? `${member.first_name} ${member.last_name}` : "Unassigned";
@@ -848,6 +854,188 @@ function MediaSocialTab({
 }
 
 // ---------------------------------------------------------------------------
+// Documents
+// ---------------------------------------------------------------------------
+
+const initialDocumentState: MediaDocumentFormState = {};
+const MAX_MEDIA_DOCUMENT_MB = Math.round(MAX_MEDIA_DOCUMENT_BYTES / (1024 * 1024));
+
+function UploadMediaDocumentDialog({ organizationId }: { organizationId: string }) {
+  const [state, setState] = useState<MediaDocumentFormState>(initialDocumentState);
+  const [pending, startTransition] = useTransition();
+  const [open, setOpen] = useState(false);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [clientError, setClientError] = useState<string | undefined>();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const error = clientError ?? state.error;
+
+  function handleSubmit(formData: FormData) {
+    startTransition(async () => {
+      const result = await uploadMediaDocument(state, formData);
+      setState(result);
+      if (result.success) setOpen(false);
+    });
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) {
+          setState(initialDocumentState);
+          setClientError(undefined);
+          setFileName(null);
+        }
+      }}
+    >
+      <DialogTrigger
+        render={
+          <Button type="button">
+            <Plus className="size-4" />
+            Upload document
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Upload a document</DialogTitle>
+          <DialogDescription>Share a file with the media team — PDFs, Office docs, images, and more.</DialogDescription>
+        </DialogHeader>
+        <form action={handleSubmit} className="space-y-4">
+          <input type="hidden" name="organizationId" value={organizationId} />
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <div className="space-y-2">
+            <Label htmlFor="media-document-title">Title</Label>
+            <Input id="media-document-title" name="title" placeholder="Camera settings guide" required />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="media-document-file">File</Label>
+            <input
+              ref={inputRef}
+              id="media-document-file"
+              name="file"
+              type="file"
+              accept={ALLOWED_MEDIA_DOCUMENT_TYPES.join(",")}
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+
+                if (!ALLOWED_MEDIA_DOCUMENT_TYPES.includes(file.type)) {
+                  setClientError("That file type isn't supported.");
+                  e.target.value = "";
+                  setFileName(null);
+                  return;
+                }
+                if (file.size > MAX_MEDIA_DOCUMENT_BYTES) {
+                  setClientError(`File must be smaller than ${MAX_MEDIA_DOCUMENT_MB}MB.`);
+                  e.target.value = "";
+                  setFileName(null);
+                  return;
+                }
+
+                setClientError(undefined);
+                setFileName(file.name);
+              }}
+            />
+            <Button type="button" variant="outline" onClick={() => inputRef.current?.click()} className="w-full">
+              <Upload className="size-4" />
+              {fileName ?? "Choose a file"}
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Uploading..." : "Upload"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MediaDocumentCard({ document, canManage }: { document: DocumentRow; canManage: boolean }) {
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-2">
+          <div className="flex items-center gap-2">
+            <FileText className="size-4 shrink-0 text-muted-foreground" />
+            <h3 className="font-heading text-base font-bold">{document.title}</h3>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <Badge variant="secondary">{mediaDocumentTypeLabel(document.file_type)}</Badge>
+            <span>{formatBytes(document.file_size)}</span>
+            {document.profiles && (
+              <span>
+                Uploaded by {document.profiles.first_name} {document.profiles.last_name}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            nativeButton={false}
+            render={<a href={document.url} target="_blank" rel="noreferrer" />}
+          >
+            <Download className="size-3.5" />
+            Open
+          </Button>
+          {canManage && (
+            <form action={deleteMediaDocument}>
+              <input type="hidden" name="id" value={document.id} />
+              <input type="hidden" name="path" value={document.file_path} />
+              <Button type="submit" variant="ghost" size="sm">
+                <Trash2 className="size-3.5" />
+              </Button>
+            </form>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function MediaDocumentsTab({
+  organizationId,
+  documents,
+  canManage,
+}: {
+  organizationId: string;
+  documents: DocumentRow[];
+  canManage: boolean;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">Manuals, guidelines, and other files for the media team.</p>
+        {canManage && <UploadMediaDocumentDialog organizationId={organizationId} />}
+      </div>
+      {documents.length === 0 ? (
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">No documents yet.</CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {documents.map((document) => (
+            <MediaDocumentCard key={document.id} document={document} canManage={canManage} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Root
 // ---------------------------------------------------------------------------
 
@@ -857,6 +1045,7 @@ export function MediaManager({
   teamMembers,
   equipment,
   socialAccounts,
+  documents,
   canManage,
 }: {
   organizationId: string;
@@ -864,6 +1053,7 @@ export function MediaManager({
   teamMembers: TeamMemberRow[];
   equipment: EquipmentRow[];
   socialAccounts: SocialAccountRow[];
+  documents: DocumentRow[];
   canManage: boolean;
 }) {
   return (
@@ -873,6 +1063,7 @@ export function MediaManager({
         <TabsTab value="team">Team</TabsTab>
         <TabsTab value="equipment">Equipment</TabsTab>
         <TabsTab value="social">Social Media</TabsTab>
+        <TabsTab value="documents">Documents</TabsTab>
       </TabsList>
       <TabsPanel value="team">
         <MediaTeamTab
@@ -897,6 +1088,9 @@ export function MediaManager({
           socialAccounts={socialAccounts}
           canManage={canManage}
         />
+      </TabsPanel>
+      <TabsPanel value="documents">
+        <MediaDocumentsTab organizationId={organizationId} documents={documents} canManage={canManage} />
       </TabsPanel>
     </Tabs>
   );

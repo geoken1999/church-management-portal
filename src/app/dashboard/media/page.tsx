@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getMembers } from "@/lib/members/dal";
-import { getMediaTeamMembers, getMediaEquipment, getMediaSocialAccounts } from "@/lib/media/dal";
+import { getMediaTeamMembers, getMediaEquipment, getMediaSocialAccounts, getMediaDocuments } from "@/lib/media/dal";
+import { createClient } from "@/lib/supabase/server";
 import { MediaManager } from "@/components/media/MediaManager";
 
 export const metadata: Metadata = {
@@ -13,12 +14,19 @@ export default async function MediaPage() {
   const canManage = membership.role === "owner" || membership.role === "admin";
   const organizationId = membership.organization.id;
 
-  const [members, teamMembers, equipment, socialAccounts] = await Promise.all([
+  const [members, teamMembers, equipment, socialAccounts, documents] = await Promise.all([
     getMembers(organizationId),
     getMediaTeamMembers(organizationId),
     getMediaEquipment(organizationId),
     getMediaSocialAccounts(organizationId),
+    getMediaDocuments(organizationId),
   ]);
+
+  const supabase = await createClient();
+  const documentsWithUrls = documents.map((document) => ({
+    ...document,
+    url: supabase.storage.from("media-documents").getPublicUrl(document.file_path).data.publicUrl,
+  }));
 
   // Pending join requests haven't been approved yet, so they aren't
   // eligible to be assigned a media role.
@@ -41,6 +49,7 @@ export default async function MediaPage() {
         teamMembers={teamMembers}
         equipment={equipment}
         socialAccounts={socialAccounts}
+        documents={documentsWithUrls}
         canManage={canManage}
       />
     </div>

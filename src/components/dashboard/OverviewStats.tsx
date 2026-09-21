@@ -1,26 +1,42 @@
-import { Users, CalendarCheck, HandCoins, Church } from "lucide-react";
+import { Users, CalendarCheck, UserCog, MapPin } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { getDashboardOverviewStats } from "@/lib/dashboard/dal";
 
-// Placeholder numbers — nothing here reads from real data yet (there's no
-// members/attendance/giving module). Swap these for real queries once those
-// modules land; the layout/shape is what's being built now.
-const STATS = [
-  { label: "Total members", value: "248", trend: "+12 this month", icon: Users },
-  { label: "Attendance last Sunday", value: "182", trend: "+4% vs. prior week", icon: CalendarCheck },
-  { label: "Giving this month", value: "$14,320", trend: "+8% vs. last month", icon: HandCoins },
-  { label: "Active ministries", value: "9", trend: "2 new this quarter", icon: Church },
-];
+export async function OverviewStats({ organizationId }: { organizationId: string }) {
+  const stats = await getDashboardOverviewStats(organizationId);
 
-export function OverviewStats() {
+  const cards = [
+    {
+      label: "Total members",
+      value: stats.totalMembers.toLocaleString(),
+      trend: `${stats.newMembersThisMonth > 0 ? "+" : ""}${stats.newMembersThisMonth} this month`,
+      icon: Users,
+    },
+    {
+      label: "Upcoming events",
+      value: stats.upcomingEvents.toLocaleString(),
+      trend: `${stats.eventsThisWeek} this week`,
+      icon: CalendarCheck,
+    },
+    {
+      label: "Team members",
+      value: stats.teamMembers.toLocaleString(),
+      trend: `${stats.teamAdmins} ${stats.teamAdmins === 1 ? "admin" : "admins"}`,
+      icon: UserCog,
+    },
+    {
+      label: "Branches",
+      value: stats.branches.toLocaleString(),
+      trend: stats.branches === 1 ? "1 location" : `${stats.branches} locations`,
+      icon: MapPin,
+    },
+  ];
+
   return (
     <div>
-      <div className="mb-3 flex items-center gap-2">
-        <h2 className="font-heading text-lg font-bold">Overview</h2>
-        <Badge variant="secondary">Sample data</Badge>
-      </div>
+      <h2 className="mb-3 font-heading text-lg font-bold">Overview</h2>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {STATS.map((stat) => (
+        {cards.map((stat) => (
           <Card key={stat.label}>
             <CardContent className="space-y-2">
               <div className="flex items-center justify-between">

@@ -15,6 +15,7 @@ import {
   MAX_LOGO_BYTES,
   ALLOWED_LOGO_TYPES,
 } from "@/lib/organizations/validation";
+import { checkStorageQuota } from "@/lib/plans/dal";
 import type { MemberCountRange } from "@/types/database";
 
 export interface CreateOrganizationState {
@@ -260,6 +261,11 @@ export async function updateOrganizationLogo(
   }
   if (file.size > MAX_LOGO_BYTES) {
     return { error: "Logo must be smaller than 10MB." };
+  }
+
+  const quotaError = await checkStorageQuota(organizationId, file.size);
+  if (quotaError) {
+    return { error: quotaError };
   }
 
   const supabase = await createClient();

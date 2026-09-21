@@ -209,6 +209,7 @@ export async function updateOrganizationDetails(
   const organizationId = String(formData.get("organizationId") ?? "");
   const memberCountRange = String(formData.get("memberCountRange") ?? "");
   const branchCountRaw = String(formData.get("branchCount") ?? "");
+  const country = String(formData.get("country") ?? "").trim();
 
   const fieldErrors: UpdateOrganizationDetailsState["fieldErrors"] = {};
   if (!isMemberCountRange(memberCountRange)) {
@@ -225,9 +226,11 @@ export async function updateOrganizationDetails(
   const { error } = await supabase
     .from("organizations")
     // Runtime-validated above via isMemberCountRange/validateBranchCount.
+    // country is optional — a blank string here just clears it.
     .update({
       member_count_range: memberCountRange as MemberCountRange,
       branch_count: Number(branchCountRaw),
+      country: country || null,
     })
     .eq("id", organizationId);
 

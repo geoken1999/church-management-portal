@@ -18,6 +18,7 @@ function readBranchFields(formData: FormData) {
     memberCount: String(formData.get("memberCount") ?? ""),
     leaderName: String(formData.get("leaderName") ?? "").trim(),
     leaderPhone: String(formData.get("leaderPhone") ?? "").trim(),
+    country: String(formData.get("country") ?? "").trim(),
   };
 }
 
@@ -28,7 +29,7 @@ export async function createBranch(
   await requireUser();
 
   const organizationId = String(formData.get("organizationId") ?? "");
-  const { name, location, memberCount, leaderName, leaderPhone } = readBranchFields(formData);
+  const { name, location, memberCount, leaderName, leaderPhone, country } = readBranchFields(formData);
 
   const fieldErrors = validateBranch({ name, memberCount, leaderPhone });
   if (Object.values(fieldErrors).some(Boolean)) {
@@ -43,6 +44,7 @@ export async function createBranch(
     member_count: memberCount.trim() ? Number(memberCount) : null,
     leader_name: leaderName || null,
     leader_phone: leaderPhone || null,
+    country: country || null,
   });
 
   if (error) {
@@ -60,7 +62,7 @@ export async function updateBranch(
   await requireUser();
 
   const branchId = String(formData.get("branchId") ?? "");
-  const { name, location, memberCount, leaderName, leaderPhone } = readBranchFields(formData);
+  const { name, location, memberCount, leaderName, leaderPhone, country } = readBranchFields(formData);
 
   const fieldErrors = validateBranch({ name, memberCount, leaderPhone });
   if (Object.values(fieldErrors).some(Boolean)) {
@@ -76,6 +78,7 @@ export async function updateBranch(
       member_count: memberCount.trim() ? Number(memberCount) : null,
       leader_name: leaderName || null,
       leader_phone: leaderPhone || null,
+      country: country || null,
     })
     .eq("id", branchId);
 

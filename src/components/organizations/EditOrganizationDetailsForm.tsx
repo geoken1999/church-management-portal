@@ -6,6 +6,7 @@ import {
   type UpdateOrganizationDetailsState,
 } from "@/lib/organizations/actions";
 import { MEMBER_COUNT_OPTIONS } from "@/lib/organizations/validation";
+import { getCountryOptions } from "@/lib/phone/countries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,18 +21,28 @@ export function EditOrganizationDetailsForm({
   organizationId,
   memberCountRange: initialMemberCountRange,
   branchCount: initialBranchCount,
+  country: initialCountry,
 }: {
   organizationId: string;
   memberCountRange: MemberCountRange | null;
   branchCount: number | null;
+  country: string | null;
 }) {
   const [state, formAction, pending] = useActionState(updateOrganizationDetails, initialState);
   const [memberCountRange, setMemberCountRange] = useState(initialMemberCountRange ?? "");
+  const [country, setCountry] = useState(initialCountry ?? "");
+  // Controlled (not defaultValue) for the same reason as the two fields
+  // above: after a successful save, revalidatePath() causes this
+  // already-mounted form to receive a new `branchCount` prop from the
+  // server, and an uncontrolled Input's defaultValue changing post-mount
+  // is exactly what triggers Base UI's "uncontrolled FieldControl" warning.
+  const [branchCount, setBranchCount] = useState(String(initialBranchCount ?? ""));
 
   return (
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="organizationId" value={organizationId} />
       <input type="hidden" name="memberCountRange" value={memberCountRange} />
+      <input type="hidden" name="country" value={country} />
 
       {state.success && (
         <Alert>
@@ -78,12 +89,36 @@ export function EditOrganizationDetailsForm({
           inputMode="numeric"
           min={1}
           step={1}
-          defaultValue={initialBranchCount ?? undefined}
+          value={branchCount}
+          onChange={(e) => setBranchCount(e.target.value)}
           placeholder="e.g. 1"
           aria-invalid={Boolean(state.fieldErrors?.branchCount)}
           aria-describedby={state.fieldErrors?.branchCount ? "branchCount-error" : undefined}
         />
         <FieldError id="branchCount-error" message={state.fieldErrors?.branchCount} />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="country">Country</Label>
+        <Select value={country} onValueChange={(value) => setCountry(value ?? "")}>
+          <SelectTrigger id="country" className="w-full">
+            <SelectValue placeholder="Select a country">
+              {(value: string | null) =>
+                getCountryOptions().find((o) => o.code === value)?.name ?? "Select a country"
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {getCountryOptions().map((option) => (
+              <SelectItem key={option.code} value={option.code}>
+                {option.name} (+{option.callingCode})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Used to interpret member phone numbers for SMS, for any branch that doesn&apos;t set its own country.
+        </p>
       </div>
 
       <Button type="submit" disabled={pending}>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Pencil, Trash2, MapPin, Users, UserRound, Phone } from "lucide-react";
+import { Plus, Pencil, Trash2, MapPin, Users, UserRound, Phone, Globe } from "lucide-react";
 import {
   createBranch,
   updateBranch,
@@ -9,12 +9,14 @@ import {
   type BranchFormState,
 } from "@/lib/branches/actions";
 import type { Branch } from "@/types/database";
+import { getCountryOptions, countryName } from "@/lib/phone/countries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
   DialogTrigger,
@@ -95,6 +97,22 @@ function BranchFields({
           aria-describedby={errors?.leaderPhone ? "leaderPhone-error" : undefined}
         />
         <FieldError id="leaderPhone-error" message={errors?.leaderPhone} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="country">Country</Label>
+        <Select name="country" defaultValue={branch?.country ?? undefined}>
+          <SelectTrigger id="country" className="w-full">
+            <SelectValue placeholder="Select a country" />
+          </SelectTrigger>
+          <SelectContent>
+            {getCountryOptions().map((option) => (
+              <SelectItem key={option.code} value={option.code}>
+                {option.name} (+{option.callingCode})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">Used to interpret member phone numbers for this branch when sending SMS.</p>
       </div>
     </div>
   );
@@ -243,6 +261,10 @@ function BranchCard({ branch, canManage }: { branch: Branch; canManage: boolean 
           <div className="flex items-center gap-2 text-muted-foreground">
             <Phone className="size-4 shrink-0" />
             <dd>{branch.leader_phone ?? "—"}</dd>
+          </div>
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Globe className="size-4 shrink-0" />
+            <dd>{countryName(branch.country) ?? "No country set"}</dd>
           </div>
         </dl>
       </CardContent>

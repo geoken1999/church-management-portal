@@ -9,8 +9,10 @@ export async function PlanUsageCard({ organizationId }: { organizationId: string
   const usage = await getPlanUsage(organizationId);
 
   const emailPercent = Math.min(100, Math.round((usage.emailsSentThisMonth / usage.plan.emailsPerMonth) * 100));
+  const smsPercent = Math.min(100, Math.round((usage.smsSentThisMonth / usage.plan.smsPerMonth) * 100));
   const storagePercent = Math.min(100, Math.round((usage.storageBytesUsed / usage.plan.storageBytes) * 100));
   const emailExhausted = usage.emailsRemaining <= 0;
+  const smsExhausted = usage.smsRemaining <= 0;
   const storageExhausted = usage.storageBytesRemaining <= 0;
 
   return (
@@ -23,7 +25,7 @@ export async function PlanUsageCard({ organizationId }: { organizationId: string
             {usage.plan.name}
           </Badge>
         </CardTitle>
-        <CardDescription>Shared email service and file storage, reset with your plan.</CardDescription>
+        <CardDescription>Shared email/SMS services and file storage, reset with your plan.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-1.5">
@@ -48,6 +50,25 @@ export async function PlanUsageCard({ organizationId }: { organizationId: string
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">SMS this month</span>
+            <span className={smsExhausted ? "font-medium text-destructive" : "font-medium"}>
+              {usage.smsSentThisMonth.toLocaleString()} / {usage.plan.smsPerMonth.toLocaleString()}
+            </span>
+          </div>
+          <Progress value={usage.smsSentThisMonth} max={usage.plan.smsPerMonth}>
+            <ProgressTrack>
+              <ProgressIndicator />
+            </ProgressTrack>
+          </Progress>
+          {smsExhausted && (
+            <p className="text-xs text-destructive">
+              You&apos;ve used this month&apos;s SMS limit — upgrade your plan to send more.
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Storage used</span>
             <span className={storageExhausted ? "font-medium text-destructive" : "font-medium"}>
               {formatBytes(usage.storageBytesUsed)} / {formatBytes(usage.plan.storageBytes)}
@@ -66,7 +87,7 @@ export async function PlanUsageCard({ organizationId }: { organizationId: string
           )}
         </div>
 
-        {(emailPercent >= 90 || storagePercent >= 90) && (
+        {(emailPercent >= 90 || smsPercent >= 90 || storagePercent >= 90) && (
           <p className="text-xs text-muted-foreground">
             Need more room? Visit the Email page to raise a ticket, or contact us to upgrade your plan.
           </p>

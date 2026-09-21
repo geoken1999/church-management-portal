@@ -30,6 +30,9 @@ export type Organization = {
   member_count_range: MemberCountRange | null;
   branch_count: number | null;
   plan: string;
+  // ISO 3166-1 alpha-2 (e.g. "US") — the default country code for
+  // resolving members' phone numbers when their branch has none set.
+  country: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -63,6 +66,9 @@ export type Branch = {
   member_count: number | null;
   leader_name: string | null;
   leader_phone: string | null;
+  // ISO 3166-1 alpha-2 (e.g. "US") — takes priority over the organization's
+  // country when resolving a member's phone number for SMS.
+  country: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -156,6 +162,20 @@ export type MediaDocument = {
   created_at: string;
 };
 
+export type Ministry = {
+  id: string;
+  organization_id: string;
+  title: string;
+  type: string | null;
+  managed_by: string | null;
+  vision: string | null;
+  mission: string | null;
+  started_on: string | null;
+  future_plans: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type InstagramConnection = {
   id: string;
   organization_id: string;
@@ -217,6 +237,21 @@ export type EmailCampaign = {
   failed_recipients: { email: string; error: string }[];
   status: EmailCampaignStatus;
   provider: EmailCampaignProvider;
+  sent_by: string | null;
+  created_at: string;
+};
+
+export type SmsCampaignStatus = "sent" | "partial_failure" | "failed";
+
+export type SmsCampaign = {
+  id: string;
+  organization_id: string;
+  body: string;
+  recipient_count: number;
+  sent_count: number;
+  failed_count: number;
+  failed_recipients: { phone: string; error: string }[];
+  status: SmsCampaignStatus;
   sent_by: string | null;
   created_at: string;
 };
@@ -538,6 +573,27 @@ export type Database = {
           },
         ];
       };
+      ministries: {
+        Row: Ministry;
+        Insert: Partial<Ministry> & Pick<Ministry, "organization_id" | "title">;
+        Update: Partial<Ministry>;
+        Relationships: [
+          {
+            foreignKeyName: "ministries_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ministries_managed_by_fkey";
+            columns: ["managed_by"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       worship_team_members: {
         Row: WorshipTeamMember;
         Insert: Partial<WorshipTeamMember> & Pick<WorshipTeamMember, "organization_id" | "member_id" | "role">;
@@ -693,6 +749,27 @@ export type Database = {
           },
           {
             foreignKeyName: "email_campaigns_sent_by_fkey";
+            columns: ["sent_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["auth_user_id"];
+          },
+        ];
+      };
+      sms_campaigns: {
+        Row: SmsCampaign;
+        Insert: Partial<SmsCampaign> & Pick<SmsCampaign, "organization_id" | "body" | "status">;
+        Update: Partial<SmsCampaign>;
+        Relationships: [
+          {
+            foreignKeyName: "sms_campaigns_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sms_campaigns_sent_by_fkey";
             columns: ["sent_by"];
             isOneToOne: false;
             referencedRelation: "profiles";

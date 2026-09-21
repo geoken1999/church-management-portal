@@ -17,6 +17,7 @@ import {
   MessageSquareText,
   Mail,
   ListTodo,
+  HeartHandshake,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { YouTubeIcon } from "@/components/icons/YouTubeIcon";
@@ -36,6 +37,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/team", label: "Team", icon: Users },
   { href: "/dashboard/branches", label: "Branches", icon: MapPin },
   { href: "/dashboard/members", label: "Members", icon: Contact },
+  { href: "/dashboard/ministries", label: "Ministries", icon: HeartHandshake },
   { href: "/dashboard/media", label: "Media", icon: Video },
   { href: "/dashboard/worship", label: "Worship", icon: Music },
   { href: "/dashboard/events", label: "Events", icon: CalendarDays },

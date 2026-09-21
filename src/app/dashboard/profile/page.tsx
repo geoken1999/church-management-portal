@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { MEMBER_COUNT_OPTIONS } from "@/lib/organizations/validation";
+import { countryName } from "@/lib/phone/countries";
 import { EditProfileForm } from "@/components/profile/EditProfileForm";
 import { ChangePasswordForm } from "@/components/profile/ChangePasswordForm";
 import { EditOrganizationDetailsForm } from "@/components/organizations/EditOrganizationDetailsForm";
@@ -96,6 +97,11 @@ export default async function ProfilePage() {
                         : "—"}
                     </dd>
                   </div>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <dt className="text-muted-foreground">Country</dt>
+                    <dd className="font-medium">{countryName(membership.organization.country) ?? "—"}</dd>
+                  </div>
                 </>
               )}
             </dl>
@@ -106,6 +112,7 @@ export default async function ProfilePage() {
                   organizationId={membership.organization.id}
                   memberCountRange={membership.organization.member_count_range}
                   branchCount={membership.organization.branch_count}
+                  country={membership.organization.country}
                 />
               </>
             )}

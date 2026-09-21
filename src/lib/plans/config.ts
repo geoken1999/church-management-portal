@@ -7,6 +7,7 @@ export interface PlanLimits {
   id: PlanId;
   name: string;
   emailsPerMonth: number;
+  smsPerMonth: number;
   storageBytes: number;
 }
 
@@ -15,6 +16,10 @@ export const PLANS: Record<PlanId, PlanLimits> = {
     id: "basic",
     name: "Basic",
     emailsPerMonth: 1000,
+    // Far smaller than the email quota — SMS costs real money per message
+    // sent through the shared Twilio account, unlike email's Resend free
+    // tier headroom.
+    smsPerMonth: 100,
     storageBytes: 2 * 1024 * 1024 * 1024, // 2GB
   },
 };

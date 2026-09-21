@@ -1104,6 +1104,7 @@ function SmtpSettingsCard({
 
 export function EmailManager({
   canManage,
+  canSend,
   emailAvailable,
   quotaExhausted,
   emailsRemaining,
@@ -1114,6 +1115,7 @@ export function EmailManager({
   campaigns,
 }: {
   canManage: boolean;
+  canSend: boolean;
   emailAvailable: boolean;
   quotaExhausted: boolean;
   emailsRemaining: number;
@@ -1130,7 +1132,7 @@ export function EmailManager({
     <div className="space-y-6">
       {canManage && <SmtpSettingsCard summary={smtpSummary} emailAvailable={emailAvailable} onChanged={refresh} />}
 
-      {canManage ? (
+      {canSend ? (
         <Composer
           members={members}
           branches={branches}
@@ -1151,7 +1153,7 @@ export function EmailManager({
       ) : (
         <Card>
           <CardContent className="py-6 text-center text-sm text-muted-foreground">
-            Only owners and admins can send email. You can still view what&apos;s been sent below.
+            You don&apos;t have permission to send email. You can still view what&apos;s been sent below.
           </CardContent>
         </Card>
       )}

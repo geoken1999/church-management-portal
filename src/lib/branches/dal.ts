@@ -7,7 +7,7 @@ export const getBranches = cache(async (organizationId: string) => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("branches")
-    .select("*, members(id, first_name, last_name, phone)")
+    .select("*, members!branches_managed_by_fkey(id, first_name, last_name, phone)")
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: true });
 

@@ -6,6 +6,7 @@ import { getSmsCampaigns, isSmsAvailable } from "@/lib/sms/dal";
 import { getPlanUsage } from "@/lib/plans/dal";
 import { resolvePhoneCountry } from "@/lib/sms/validation";
 import { SmsManager } from "@/components/sms/SmsManager";
+import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
 export const metadata: Metadata = {
   title: "SMS | KingdomFlow",
@@ -13,9 +14,12 @@ export const metadata: Metadata = {
 
 export default async function SmsPage() {
   const membership = await requireOrganization();
-  const canManage = membership.role === "owner" || membership.role === "admin";
   const organizationId = membership.organization.id;
   const orgCountry = membership.organization.country;
+
+  if (!membership.tabAccess.sms.read) {
+    return <AccessRestricted label="SMS" />;
+  }
 
   const [members, branches, campaigns, smsAvailable, planUsage] = await Promise.all([
     getMembers(organizationId),
@@ -54,7 +58,7 @@ export default async function SmsPage() {
       </div>
 
       <SmsManager
-        canManage={canManage}
+        canSend={membership.tabAccess.sms.write}
         smsAvailable={smsAvailable}
         smsRemaining={planUsage.smsRemaining}
         members={recipientOptions}

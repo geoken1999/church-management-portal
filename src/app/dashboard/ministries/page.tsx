@@ -3,6 +3,7 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { getLeaderMembers } from "@/lib/leaders/dal";
 import { getMinistries } from "@/lib/ministries/dal";
 import { MinistriesManager } from "@/components/ministries/MinistriesManager";
+import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
 export const metadata: Metadata = {
   title: "Ministries | KingdomFlow",
@@ -12,6 +13,10 @@ export default async function MinistriesPage() {
   const membership = await requireOrganization();
   const canManage = membership.role === "owner" || membership.role === "admin";
   const organizationId = membership.organization.id;
+
+  if (!membership.tabAccess.ministries.read) {
+    return <AccessRestricted label="Ministries" />;
+  }
 
   // Ministry managers are picked from Leaders, not the full members list
   // — see /dashboard/leaders.

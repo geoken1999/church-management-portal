@@ -3,6 +3,7 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { getYouTubeDashboardData } from "@/lib/youtube/dal";
 import { YouTubeManagerClient } from "@/components/youtube/YouTubeManagerClient";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
 export const metadata: Metadata = {
   title: "YouTube | KingdomFlow",
@@ -27,6 +28,10 @@ export default async function YouTubePage({
   const membership = await requireOrganization();
   const canManage = membership.role === "owner" || membership.role === "admin";
   const organizationId = membership.organization.id;
+
+  if (!membership.tabAccess.youtube.read) {
+    return <AccessRestricted label="YouTube" />;
+  }
 
   const data = await getYouTubeDashboardData(organizationId);
   const statusNotice = status ? STATUS_MESSAGES[status] : undefined;

@@ -4,6 +4,7 @@ import { getMembers } from "@/lib/members/dal";
 import { getWorshipTeamMembers, getWorshipDocuments } from "@/lib/worship/dal";
 import { getSiteUrl } from "@/lib/site-url";
 import { WorshipManager } from "@/components/worship/WorshipManager";
+import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
 export const metadata: Metadata = {
   title: "Worship | KingdomFlow",
@@ -13,6 +14,11 @@ export default async function WorshipPage() {
   const membership = await requireOrganization();
   const canManage = membership.role === "owner" || membership.role === "admin";
   const organizationId = membership.organization.id;
+
+  if (!membership.tabAccess.worship.read) {
+    return <AccessRestricted label="Worship" />;
+  }
+
   const siteUrl = getSiteUrl();
 
   const [members, teamMembers, documents] = await Promise.all([

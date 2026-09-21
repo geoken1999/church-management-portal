@@ -3,6 +3,7 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { getInstagramDashboardData } from "@/lib/instagram/dal";
 import { InstagramManagerClient } from "@/components/instagram/InstagramManagerClient";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
 export const metadata: Metadata = {
   title: "Instagram | KingdomFlow",
@@ -27,6 +28,10 @@ export default async function InstagramPage({
   const membership = await requireOrganization();
   const canManage = membership.role === "owner" || membership.role === "admin";
   const organizationId = membership.organization.id;
+
+  if (!membership.tabAccess.instagram.read) {
+    return <AccessRestricted label="Instagram" />;
+  }
 
   const data = await getInstagramDashboardData(organizationId);
   const statusNotice = status ? STATUS_MESSAGES[status] : undefined;

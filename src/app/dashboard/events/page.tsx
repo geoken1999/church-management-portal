@@ -4,6 +4,7 @@ import { getLeaderMembers } from "@/lib/leaders/dal";
 import { getBranches } from "@/lib/branches/dal";
 import { getEvents } from "@/lib/events/dal";
 import { EventsManagerClient } from "@/components/events/EventsManagerClient";
+import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
 export const metadata: Metadata = {
   title: "Events | KingdomFlow",
@@ -13,6 +14,10 @@ export default async function EventsPage() {
   const membership = await requireOrganization();
   const canManage = membership.role === "owner" || membership.role === "admin";
   const organizationId = membership.organization.id;
+
+  if (!membership.tabAccess.events.read) {
+    return <AccessRestricted label="Events" />;
+  }
 
   // Event managers are picked from Leaders, not the full members list —
   // see /dashboard/leaders.

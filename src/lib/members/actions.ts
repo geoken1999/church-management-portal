@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
+import { checkTabAccess } from "@/lib/permissions/dal";
 import {
   validateFieldDefinition,
   validateMemberBasics,
@@ -33,6 +35,28 @@ function readMemberDetails(formData: FormData) {
   const maritalStatus = String(formData.get("maritalStatus") ?? "").trim();
   const weddingDate = String(formData.get("weddingDate") ?? "").trim();
   return { dateOfBirth, maritalStatus, weddingDate };
+}
+
+// Checked ahead of insert/update so the form can show a friendly, field-level
+// error; the DB's unique index (see migration 0039) is the backstop against
+// races between two concurrent submissions.
+async function findMemberWithPhone(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  phone: string,
+  excludeMemberId?: string,
+): Promise<boolean> {
+  if (!phone) return false;
+
+  let query = supabase
+    .from("members")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("phone", phone);
+  if (excludeMemberId) query = query.neq("id", excludeMemberId);
+
+  const { count } = await query;
+  return Boolean(count && count > 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -192,6 +216,11 @@ export async function createMember(
   const user = await requireUser();
   const organizationId = String(formData.get("organizationId") ?? "");
 
+  const access = await checkTabAccess(organizationId, "members", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
+
   const firstName = String(formData.get("firstName") ?? "");
   const lastName = String(formData.get("lastName") ?? "");
   const email = String(formData.get("email") ?? "").trim();
@@ -213,6 +242,10 @@ export async function createMember(
 
   const fieldErrors: MemberFieldErrors = { ...basicErrors, ...detailErrors };
   if (Object.keys(customErrors).length > 0) fieldErrors.custom = customErrors;
+
+  if (phone && (await findMemberWithPhone(supabase, organizationId, phone))) {
+    fieldErrors.phone = "Another member already has this phone number.";
+  }
 
   if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
@@ -234,6 +267,9 @@ export async function createMember(
   });
 
   if (error) {
+    if (error.code === "23505") {
+      return { fieldErrors: { phone: "Another member already has this phone number." } };
+    }
     return { error: "Couldn't add that member. Please try again." };
   }
 
@@ -248,6 +284,11 @@ export async function updateMember(
   await requireUser();
   const memberId = String(formData.get("memberId") ?? "");
   const organizationId = String(formData.get("organizationId") ?? "");
+
+  const access = await checkTabAccess(organizationId, "members", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
 
   const firstName = String(formData.get("firstName") ?? "");
   const lastName = String(formData.get("lastName") ?? "");
@@ -270,6 +311,10 @@ export async function updateMember(
 
   const fieldErrors: MemberFieldErrors = { ...basicErrors, ...detailErrors };
   if (Object.keys(customErrors).length > 0) fieldErrors.custom = customErrors;
+
+  if (phone && (await findMemberWithPhone(supabase, organizationId, phone, memberId))) {
+    fieldErrors.phone = "Another member already has this phone number.";
+  }
 
   if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
@@ -292,6 +337,9 @@ export async function updateMember(
     .eq("id", memberId);
 
   if (error) {
+    if (error.code === "23505") {
+      return { fieldErrors: { phone: "Another member already has this phone number." } };
+    }
     return { error: "Couldn't save those changes. Please try again." };
   }
 
@@ -299,12 +347,28 @@ export async function updateMember(
   return { success: true };
 }
 
+// memberId-only forms (delete/approve/bulk actions below) don't carry
+// organizationId in the submitted form, so the org has to be looked up from
+// the record itself before a permission check is possible.
+async function organizationIdForMembers(memberIds: string[]): Promise<string | null> {
+  if (memberIds.length === 0) return null;
+  const admin = createAdminClient();
+  const { data } = await admin.from("members").select("organization_id").in("id", memberIds);
+  const orgIds = new Set((data ?? []).map((row) => row.organization_id));
+  return orgIds.size === 1 ? [...orgIds][0] : null;
+}
+
 export async function deleteMember(formData: FormData) {
   await requireUser();
   const memberId = String(formData.get("memberId") ?? "");
 
-  const supabase = await createClient();
-  await supabase.from("members").delete().eq("id", memberId);
+  const organizationId = await organizationIdForMembers([memberId]);
+  if (!organizationId) return;
+  const access = await checkTabAccess(organizationId, "members", "delete");
+  if (!access.ok) return;
+
+  const admin = createAdminClient();
+  await admin.from("members").delete().eq("id", memberId);
 
   revalidatePath("/dashboard/members");
 }
@@ -314,6 +378,11 @@ export async function deleteMember(formData: FormData) {
 export async function approveMember(formData: FormData) {
   await requireUser();
   const memberId = String(formData.get("memberId") ?? "");
+
+  const organizationId = await organizationIdForMembers([memberId]);
+  if (!organizationId) return;
+  const access = await checkTabAccess(organizationId, "members", "write");
+  if (!access.ok) return;
 
   const supabase = await createClient();
   await supabase.from("members").update({ status: "active" }).eq("id", memberId);
@@ -336,6 +405,11 @@ export async function bulkUpdateMemberStatus(formData: FormData) {
   const status = readMemberStatus(formData);
   if (memberIds.length === 0) return;
 
+  const organizationId = await organizationIdForMembers(memberIds);
+  if (!organizationId) return;
+  const access = await checkTabAccess(organizationId, "members", "write");
+  if (!access.ok) return;
+
   const supabase = await createClient();
   await supabase.from("members").update({ status }).in("id", memberIds);
 
@@ -347,10 +421,13 @@ export async function bulkDeleteMembers(formData: FormData) {
   const memberIds = readMemberIds(formData);
   if (memberIds.length === 0) return;
 
-  const supabase = await createClient();
-  // RLS restricts this to admins; a non-admin's request simply deletes
-  // nothing rather than erroring.
-  await supabase.from("members").delete().in("id", memberIds);
+  const organizationId = await organizationIdForMembers(memberIds);
+  if (!organizationId) return;
+  const access = await checkTabAccess(organizationId, "members", "delete");
+  if (!access.ok) return;
+
+  const admin = createAdminClient();
+  await admin.from("members").delete().in("id", memberIds);
 
   revalidatePath("/dashboard/members");
 }

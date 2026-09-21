@@ -7,6 +7,7 @@ import { OverviewStats } from "@/components/dashboard/OverviewStats";
 import { UpcomingCelebrations } from "@/components/dashboard/UpcomingCelebrations";
 import { UpcomingTodos } from "@/components/dashboard/UpcomingTodos";
 import { PlanUsageCard } from "@/components/dashboard/PlanUsageCard";
+import { FinanceOverview } from "@/components/dashboard/FinanceOverview";
 import { MEMBER_COUNT_OPTIONS } from "@/lib/organizations/validation";
 
 export const metadata: Metadata = {
@@ -38,6 +39,15 @@ export default async function DashboardPage() {
       </div>
 
       <OverviewStats organizationId={membership.organization.id} />
+
+      <FinanceOverview
+        organizationId={membership.organization.id}
+        access={{
+          offerings: membership.tabAccess.offerings,
+          donations: membership.tabAccess.donations,
+          fundraisers: membership.tabAccess.fundraisers,
+        }}
+      />
 
       <UpcomingCelebrations organizationId={membership.organization.id} />
 

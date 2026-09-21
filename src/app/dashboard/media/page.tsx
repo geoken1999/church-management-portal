@@ -4,6 +4,7 @@ import { getMembers } from "@/lib/members/dal";
 import { getMediaTeamMembers, getMediaEquipment, getMediaSocialAccounts, getMediaDocuments } from "@/lib/media/dal";
 import { createClient } from "@/lib/supabase/server";
 import { MediaManager } from "@/components/media/MediaManager";
+import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
 export const metadata: Metadata = {
   title: "Media | KingdomFlow",
@@ -13,6 +14,10 @@ export default async function MediaPage() {
   const membership = await requireOrganization();
   const canManage = membership.role === "owner" || membership.role === "admin";
   const organizationId = membership.organization.id;
+
+  if (!membership.tabAccess.media.read) {
+    return <AccessRestricted label="Media" />;
+  }
 
   const [members, teamMembers, equipment, socialAccounts, documents] = await Promise.all([
     getMembers(organizationId),

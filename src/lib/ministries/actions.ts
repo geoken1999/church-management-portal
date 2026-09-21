@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
+import { checkTabAccess } from "@/lib/permissions/dal";
 import { validateMinistry, type MinistryFieldErrors } from "@/lib/ministries/validation";
 
 const MINISTRIES_PATH = "/dashboard/ministries";
@@ -25,6 +26,19 @@ function readMinistryFields(formData: FormData) {
   };
 }
 
+// updateMinistry/deleteMinistry forms only carry ministryId, not
+// organizationId — looked up from the record itself before a permission
+// check is possible.
+async function organizationIdForMinistry(ministryId: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data } = await admin.from("ministries").select("organization_id").eq("id", ministryId).maybeSingle();
+  return data?.organization_id ?? null;
+}
+
+// Ministries are RLS-restricted to admins by default (see migration 0036)
+// — the admin client performs the actual write so a "member" role granted
+// write/delete via the tab permissions matrix can still perform it; the
+// checkTabAccess call is what actually gates who gets here.
 export async function createMinistry(
   _prevState: MinistryFormState,
   formData: FormData,
@@ -32,6 +46,11 @@ export async function createMinistry(
   await requireUser();
 
   const organizationId = String(formData.get("organizationId") ?? "");
+  const access = await checkTabAccess(organizationId, "ministries", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
+
   const { title, type, managedBy, vision, mission, startedOn, futurePlans } = readMinistryFields(formData);
 
   const fieldErrors = validateMinistry({ title });
@@ -39,8 +58,8 @@ export async function createMinistry(
     return { fieldErrors };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("ministries").insert({
+  const admin = createAdminClient();
+  const { error } = await admin.from("ministries").insert({
     organization_id: organizationId,
     title: title.trim(),
     type: type || null,
@@ -66,6 +85,15 @@ export async function updateMinistry(
   await requireUser();
 
   const ministryId = String(formData.get("ministryId") ?? "");
+  const organizationId = await organizationIdForMinistry(ministryId);
+  if (!organizationId) {
+    return { error: "That ministry could not be found." };
+  }
+  const access = await checkTabAccess(organizationId, "ministries", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
+
   const { title, type, managedBy, vision, mission, startedOn, futurePlans } = readMinistryFields(formData);
 
   const fieldErrors = validateMinistry({ title });
@@ -73,8 +101,8 @@ export async function updateMinistry(
     return { fieldErrors };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase
+  const admin = createAdminClient();
+  const { error } = await admin
     .from("ministries")
     .update({
       title: title.trim(),
@@ -99,8 +127,13 @@ export async function deleteMinistry(formData: FormData) {
   await requireUser();
   const ministryId = String(formData.get("ministryId") ?? "");
 
-  const supabase = await createClient();
-  await supabase.from("ministries").delete().eq("id", ministryId);
+  const organizationId = await organizationIdForMinistry(ministryId);
+  if (!organizationId) return;
+  const access = await checkTabAccess(organizationId, "ministries", "delete");
+  if (!access.ok) return;
+
+  const admin = createAdminClient();
+  await admin.from("ministries").delete().eq("id", ministryId);
 
   revalidatePath(MINISTRIES_PATH);
 }

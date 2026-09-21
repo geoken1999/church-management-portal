@@ -37,12 +37,20 @@ export type Organization = {
   updated_at: string;
 };
 
+// Per-tab access for a "member"-role user — ignored for owner/admin, who
+// always have full access regardless of what's stored here. Keyed by the
+// tab keys in src/lib/permissions/tabs.ts (a loosely-typed Record since a
+// stored row may predate a tab that was added later).
+export type TabAccess = { read: boolean; write: boolean; delete: boolean };
+export type TabPermissions = Record<string, TabAccess>;
+
 export type OrganizationMember = {
   id: string;
   organization_id: string;
   auth_user_id: string;
   role: OrganizationRole;
   title: string | null;
+  tab_permissions: TabPermissions | null;
   created_at: string;
 };
 
@@ -369,6 +377,54 @@ export type Event = {
   updated_at: string;
 };
 
+export type FundraiserStatus = "active" | "completed" | "cancelled";
+
+export type Fundraiser = {
+  id: string;
+  organization_id: string;
+  title: string;
+  description: string | null;
+  goal_amount: number;
+  branch_id: string | null;
+  managed_by: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  status: FundraiserStatus;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Offering = {
+  id: string;
+  organization_id: string;
+  category: string;
+  amount: number;
+  collected_on: string;
+  branch_id: string | null;
+  notes: string | null;
+  recorded_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DonationMethod = "cash" | "check" | "bank_transfer" | "online" | "other";
+
+export type Donation = {
+  id: string;
+  organization_id: string;
+  member_id: string | null;
+  donor_name: string | null;
+  amount: number;
+  donated_on: string;
+  method: DonationMethod;
+  fundraiser_id: string | null;
+  notes: string | null;
+  recorded_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type NotificationType =
   | "member_request"
   | "youtube_video_uploaded"
@@ -622,6 +678,83 @@ export type Database = {
             columns: ["managed_by"];
             isOneToOne: false;
             referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      fundraisers: {
+        Row: Fundraiser;
+        Insert: Partial<Fundraiser> & Pick<Fundraiser, "organization_id" | "title" | "goal_amount">;
+        Update: Partial<Fundraiser>;
+        Relationships: [
+          {
+            foreignKeyName: "fundraisers_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "fundraisers_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "fundraisers_managed_by_fkey";
+            columns: ["managed_by"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      offerings: {
+        Row: Offering;
+        Insert: Partial<Offering> & Pick<Offering, "organization_id" | "category" | "amount" | "collected_on">;
+        Update: Partial<Offering>;
+        Relationships: [
+          {
+            foreignKeyName: "offerings_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "offerings_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      donations: {
+        Row: Donation;
+        Insert: Partial<Donation> & Pick<Donation, "organization_id" | "amount" | "donated_on">;
+        Update: Partial<Donation>;
+        Relationships: [
+          {
+            foreignKeyName: "donations_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "donations_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "donations_fundraiser_id_fkey";
+            columns: ["fundraiser_id"];
+            isOneToOne: false;
+            referencedRelation: "fundraisers";
             referencedColumns: ["id"];
           },
         ];

@@ -13,6 +13,8 @@ export interface PlanUsage {
   smsRemaining: number;
   storageBytesUsed: number;
   storageBytesRemaining: number;
+  additionalTeamMembers: number;
+  additionalTeamMembersRemaining: number;
 }
 
 // cache()-wrapped so the several call sites in one request (dashboard
@@ -26,28 +28,36 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  const [{ data: emailCampaigns }, { data: smsCampaigns }, { data: storageBytes }] = await Promise.all([
-    // Only 'shared' sends count against the quota — an org's own SMTP
-    // (provider: 'smtp') doesn't touch our Resend account at all.
-    supabase
-      .from("email_campaigns")
-      .select("sent_count")
-      .eq("organization_id", organizationId)
-      .eq("provider", "shared")
-      .gte("created_at", startOfMonth.toISOString()),
-    // SMS has no per-org "bring your own Twilio" option, so every
-    // campaign counts against the quota.
-    supabase
-      .from("sms_campaigns")
-      .select("sent_count")
-      .eq("organization_id", organizationId)
-      .gte("created_at", startOfMonth.toISOString()),
-    supabase.rpc("get_organization_storage_bytes", { target_org_id: organizationId }),
-  ]);
+  const [{ data: emailCampaigns }, { data: smsCampaigns }, { data: storageBytes }, { count: teamMemberCount }] =
+    await Promise.all([
+      // Only 'shared' sends count against the quota — an org's own SMTP
+      // (provider: 'smtp') doesn't touch our Resend account at all.
+      supabase
+        .from("email_campaigns")
+        .select("sent_count")
+        .eq("organization_id", organizationId)
+        .eq("provider", "shared")
+        .gte("created_at", startOfMonth.toISOString()),
+      // SMS has no per-org "bring your own Twilio" option, so every
+      // campaign counts against the quota.
+      supabase
+        .from("sms_campaigns")
+        .select("sent_count")
+        .eq("organization_id", organizationId)
+        .gte("created_at", startOfMonth.toISOString()),
+      supabase.rpc("get_organization_storage_bytes", { target_org_id: organizationId }),
+      // The owner's own seat doesn't count against the added-members limit.
+      supabase
+        .from("organization_members")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .neq("role", "owner"),
+    ]);
 
   const emailsSentThisMonth = (emailCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0);
   const smsSentThisMonth = (smsCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0);
   const storageBytesUsed = storageBytes ?? 0;
+  const additionalTeamMembers = teamMemberCount ?? 0;
 
   return {
     plan,
@@ -57,6 +67,8 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
     smsRemaining: Math.max(0, plan.smsPerMonth - smsSentThisMonth),
     storageBytesUsed,
     storageBytesRemaining: Math.max(0, plan.storageBytes - storageBytesUsed),
+    additionalTeamMembers,
+    additionalTeamMembersRemaining: Math.max(0, plan.maxAdditionalTeamMembers - additionalTeamMembers),
   };
 });
 
@@ -76,6 +88,15 @@ export async function checkSmsQuota(organizationId: string, recipientCount: numb
   const usage = await getPlanUsage(organizationId);
   if (recipientCount > usage.smsRemaining) {
     return `Sending to ${recipientCount} recipients would exceed your ${usage.plan.name} plan's ${usage.plan.smsPerMonth.toLocaleString()}/month SMS limit (${usage.smsRemaining.toLocaleString()} remaining). Upgrade your plan to send more.`;
+  }
+  return null;
+}
+
+// Called right before a new login is issued (see createMemberLogin).
+export async function checkTeamMemberQuota(organizationId: string): Promise<string | null> {
+  const usage = await getPlanUsage(organizationId);
+  if (usage.additionalTeamMembersRemaining <= 0) {
+    return `Your ${usage.plan.name} plan allows up to ${usage.plan.maxAdditionalTeamMembers} added team members. Remove someone or upgrade your plan to add more.`;
   }
   return null;
 }

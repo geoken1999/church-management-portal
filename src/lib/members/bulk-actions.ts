@@ -72,9 +72,18 @@ export async function bulkImportMembers(organizationId: string, formData: FormDa
   const rowErrors: { row: number; message: string }[] = [...parsed.errors];
   let imported = 0;
 
+  // Phone numbers already seen this import — catches duplicates within the
+  // uploaded file itself, before they'd otherwise collide in the DB.
+  const seenPhones = new Set<string>();
+
   // Row by row (not a bulk insert) so one bad row can't fail the whole
   // batch — the roster is small enough that N inserts is not a real cost.
   for (const row of parsed.rows) {
+    if (row.phone && seenPhones.has(row.phone)) {
+      rowErrors.push({ row: row.rowNumber, message: "This phone number is used by another row in this file." });
+      continue;
+    }
+
     const { error } = await supabase.from("members").insert({
       organization_id: organizationId,
       first_name: row.firstName,
@@ -91,8 +100,13 @@ export async function bulkImportMembers(organizationId: string, formData: FormDa
     });
 
     if (error) {
-      rowErrors.push({ row: row.rowNumber, message: "Couldn't save this row. Please try again." });
+      const message =
+        error.code === "23505"
+          ? "Another member already has this phone number."
+          : "Couldn't save this row. Please try again.";
+      rowErrors.push({ row: row.rowNumber, message });
     } else {
+      if (row.phone) seenPhones.add(row.phone);
       imported += 1;
     }
   }

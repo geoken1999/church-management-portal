@@ -9,6 +9,10 @@ export interface PlanLimits {
   emailsPerMonth: number;
   smsPerMonth: number;
   storageBytes: number;
+  // How many logins an owner/admin can add beyond themselves (invited
+  // members, and now manually-issued logins) — the org creator's own seat
+  // doesn't count against this.
+  maxAdditionalTeamMembers: number;
 }
 
 export const PLANS: Record<PlanId, PlanLimits> = {
@@ -21,6 +25,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
     // tier headroom.
     smsPerMonth: 100,
     storageBytes: 2 * 1024 * 1024 * 1024, // 2GB
+    maxAdditionalTeamMembers: 3,
   },
 };
 

@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
+import { checkTabAccess } from "@/lib/permissions/dal";
 import {
   validateMediaTeamMember,
   validateMediaEquipment,
@@ -17,6 +18,22 @@ import {
 import { checkStorageQuota } from "@/lib/plans/dal";
 
 const MEDIA_PATH = "/dashboard/media";
+
+// Forms identifying an existing row only carry its id, not organizationId —
+// looked up from the record itself before a permission check is possible.
+// Media's three sub-tables (team/equipment/social) plus documents are all
+// RLS-restricted to admins by default (see migrations 0014, 0033); the
+// admin client performs the actual write so a "member" role granted
+// write/delete via the tab permissions matrix can still perform it — the
+// checkTabAccess call is what actually gates who gets here.
+async function organizationIdForRow(
+  table: "media_team_members" | "media_equipment" | "media_social_accounts" | "media_documents",
+  id: string,
+): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data } = await admin.from(table).select("organization_id").eq("id", id).maybeSingle();
+  return data?.organization_id ?? null;
+}
 
 // ---------------------------------------------------------------------------
 // Media team
@@ -43,6 +60,11 @@ export async function createMediaTeamMember(
   await requireUser();
 
   const organizationId = String(formData.get("organizationId") ?? "");
+  const access = await checkTabAccess(organizationId, "media", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
+
   const { memberId, role, notes } = readTeamMemberFields(formData);
 
   const fieldErrors = validateMediaTeamMember({ memberId, role });
@@ -50,8 +72,8 @@ export async function createMediaTeamMember(
     return { fieldErrors };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("media_team_members").insert({
+  const admin = createAdminClient();
+  const { error } = await admin.from("media_team_members").insert({
     organization_id: organizationId,
     member_id: memberId,
     role: role.trim(),
@@ -73,6 +95,15 @@ export async function updateMediaTeamMember(
   await requireUser();
 
   const id = String(formData.get("id") ?? "");
+  const organizationId = await organizationIdForRow("media_team_members", id);
+  if (!organizationId) {
+    return { error: "That team member could not be found." };
+  }
+  const access = await checkTabAccess(organizationId, "media", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
+
   const { memberId, role, notes } = readTeamMemberFields(formData);
 
   const fieldErrors = validateMediaTeamMember({ memberId, role });
@@ -80,8 +111,8 @@ export async function updateMediaTeamMember(
     return { fieldErrors };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase
+  const admin = createAdminClient();
+  const { error } = await admin
     .from("media_team_members")
     .update({ member_id: memberId, role: role.trim(), notes: notes || null })
     .eq("id", id);
@@ -98,8 +129,13 @@ export async function deleteMediaTeamMember(formData: FormData) {
   await requireUser();
   const id = String(formData.get("id") ?? "");
 
-  const supabase = await createClient();
-  await supabase.from("media_team_members").delete().eq("id", id);
+  const organizationId = await organizationIdForRow("media_team_members", id);
+  if (!organizationId) return;
+  const access = await checkTabAccess(organizationId, "media", "delete");
+  if (!access.ok) return;
+
+  const admin = createAdminClient();
+  await admin.from("media_team_members").delete().eq("id", id);
 
   revalidatePath(MEDIA_PATH);
 }
@@ -129,6 +165,11 @@ export async function createMediaEquipment(
   await requireUser();
 
   const organizationId = String(formData.get("organizationId") ?? "");
+  const access = await checkTabAccess(organizationId, "media", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
+
   const { name, managedBy, notes } = readEquipmentFields(formData);
 
   const fieldErrors = validateMediaEquipment({ name });
@@ -136,8 +177,8 @@ export async function createMediaEquipment(
     return { fieldErrors };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("media_equipment").insert({
+  const admin = createAdminClient();
+  const { error } = await admin.from("media_equipment").insert({
     organization_id: organizationId,
     name: name.trim(),
     managed_by: managedBy || null,
@@ -159,6 +200,15 @@ export async function updateMediaEquipment(
   await requireUser();
 
   const id = String(formData.get("id") ?? "");
+  const organizationId = await organizationIdForRow("media_equipment", id);
+  if (!organizationId) {
+    return { error: "That equipment record could not be found." };
+  }
+  const access = await checkTabAccess(organizationId, "media", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
+
   const { name, managedBy, notes } = readEquipmentFields(formData);
 
   const fieldErrors = validateMediaEquipment({ name });
@@ -166,8 +216,8 @@ export async function updateMediaEquipment(
     return { fieldErrors };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase
+  const admin = createAdminClient();
+  const { error } = await admin
     .from("media_equipment")
     .update({ name: name.trim(), managed_by: managedBy || null, notes: notes || null })
     .eq("id", id);
@@ -184,8 +234,13 @@ export async function deleteMediaEquipment(formData: FormData) {
   await requireUser();
   const id = String(formData.get("id") ?? "");
 
-  const supabase = await createClient();
-  await supabase.from("media_equipment").delete().eq("id", id);
+  const organizationId = await organizationIdForRow("media_equipment", id);
+  if (!organizationId) return;
+  const access = await checkTabAccess(organizationId, "media", "delete");
+  if (!access.ok) return;
+
+  const admin = createAdminClient();
+  await admin.from("media_equipment").delete().eq("id", id);
 
   revalidatePath(MEDIA_PATH);
 }
@@ -216,6 +271,11 @@ export async function createMediaSocialAccount(
   await requireUser();
 
   const organizationId = String(formData.get("organizationId") ?? "");
+  const access = await checkTabAccess(organizationId, "media", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
+
   const { platform, handle, managedBy, notes } = readSocialAccountFields(formData);
 
   const fieldErrors = validateMediaSocialAccount({ platform });
@@ -223,8 +283,8 @@ export async function createMediaSocialAccount(
     return { fieldErrors };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("media_social_accounts").insert({
+  const admin = createAdminClient();
+  const { error } = await admin.from("media_social_accounts").insert({
     organization_id: organizationId,
     platform: platform.trim(),
     handle: handle || null,
@@ -247,6 +307,15 @@ export async function updateMediaSocialAccount(
   await requireUser();
 
   const id = String(formData.get("id") ?? "");
+  const organizationId = await organizationIdForRow("media_social_accounts", id);
+  if (!organizationId) {
+    return { error: "That account could not be found." };
+  }
+  const access = await checkTabAccess(organizationId, "media", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
+
   const { platform, handle, managedBy, notes } = readSocialAccountFields(formData);
 
   const fieldErrors = validateMediaSocialAccount({ platform });
@@ -254,8 +323,8 @@ export async function updateMediaSocialAccount(
     return { fieldErrors };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase
+  const admin = createAdminClient();
+  const { error } = await admin
     .from("media_social_accounts")
     .update({ platform: platform.trim(), handle: handle || null, managed_by: managedBy || null, notes: notes || null })
     .eq("id", id);
@@ -272,8 +341,13 @@ export async function deleteMediaSocialAccount(formData: FormData) {
   await requireUser();
   const id = String(formData.get("id") ?? "");
 
-  const supabase = await createClient();
-  await supabase.from("media_social_accounts").delete().eq("id", id);
+  const organizationId = await organizationIdForRow("media_social_accounts", id);
+  if (!organizationId) return;
+  const access = await checkTabAccess(organizationId, "media", "delete");
+  if (!access.ok) return;
+
+  const admin = createAdminClient();
+  await admin.from("media_social_accounts").delete().eq("id", id);
 
   revalidatePath(MEDIA_PATH);
 }
@@ -294,6 +368,11 @@ export async function uploadMediaDocument(
   const user = await requireUser();
 
   const organizationId = String(formData.get("organizationId") ?? "");
+  const access = await checkTabAccess(organizationId, "media", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
+
   const title = String(formData.get("title") ?? "").trim();
   const file = formData.get("file");
 
@@ -318,8 +397,8 @@ export async function uploadMediaDocument(
   const documentId = crypto.randomUUID();
   const path = `${organizationId}/${documentId}${mediaDocumentExtension(file.type)}`;
 
-  const supabase = await createClient();
-  const { error: uploadError } = await supabase.storage
+  const admin = createAdminClient();
+  const { error: uploadError } = await admin.storage
     .from("media-documents")
     .upload(path, file, { contentType: file.type });
 
@@ -327,7 +406,7 @@ export async function uploadMediaDocument(
     return { error: "Couldn't upload that file. You may not have permission to manage media." };
   }
 
-  const { error: insertError } = await supabase.from("media_documents").insert({
+  const { error: insertError } = await admin.from("media_documents").insert({
     id: documentId,
     organization_id: organizationId,
     title,
@@ -338,7 +417,7 @@ export async function uploadMediaDocument(
   });
 
   if (insertError) {
-    await supabase.storage.from("media-documents").remove([path]);
+    await admin.storage.from("media-documents").remove([path]);
     return { error: "Couldn't save that document. Please try again." };
   }
 
@@ -351,10 +430,15 @@ export async function deleteMediaDocument(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const path = String(formData.get("path") ?? "");
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("media_documents").delete().eq("id", id);
+  const organizationId = await organizationIdForRow("media_documents", id);
+  if (!organizationId) return;
+  const access = await checkTabAccess(organizationId, "media", "delete");
+  if (!access.ok) return;
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("media_documents").delete().eq("id", id);
   if (!error && path) {
-    await supabase.storage.from("media-documents").remove([path]);
+    await admin.storage.from("media-documents").remove([path]);
   }
 
   revalidatePath(MEDIA_PATH);

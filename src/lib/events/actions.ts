@@ -2,9 +2,20 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
+import { checkTabAccess } from "@/lib/permissions/dal";
 import { validateEvent, type EventFieldErrors } from "@/lib/events/validation";
 import type { EventMeetingMode, EventRecurrenceFrequency } from "@/types/database";
+
+// updateEvent/deleteEvent forms only carry the event id, not
+// organizationId — looked up from the record itself before a permission
+// check is possible.
+async function organizationIdForEvent(id: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data } = await admin.from("events").select("organization_id").eq("id", id).maybeSingle();
+  return data?.organization_id ?? null;
+}
 
 const EVENTS_PATH = "/dashboard/events";
 
@@ -38,6 +49,12 @@ function readEventFields(formData: FormData) {
 export async function createEvent(_prevState: EventFormState, formData: FormData): Promise<EventFormState> {
   const user = await requireUser();
   const organizationId = String(formData.get("organizationId") ?? "");
+
+  const access = await checkTabAccess(organizationId, "events", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
+
   const fields = readEventFields(formData);
 
   const fieldErrors = validateEvent(fields);
@@ -73,6 +90,16 @@ export async function createEvent(_prevState: EventFormState, formData: FormData
 export async function updateEvent(_prevState: EventFormState, formData: FormData): Promise<EventFormState> {
   await requireUser();
   const id = String(formData.get("id") ?? "");
+
+  const organizationId = await organizationIdForEvent(id);
+  if (!organizationId) {
+    return { error: "That event could not be found." };
+  }
+  const access = await checkTabAccess(organizationId, "events", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
+
   const fields = readEventFields(formData);
 
   const fieldErrors = validateEvent(fields);
@@ -110,8 +137,17 @@ export async function deleteEvent(formData: FormData) {
   await requireUser();
   const id = String(formData.get("id") ?? "");
 
-  const supabase = await createClient();
-  await supabase.from("events").delete().eq("id", id);
+  const organizationId = await organizationIdForEvent(id);
+  if (!organizationId) return;
+  const access = await checkTabAccess(organizationId, "events", "delete");
+  if (!access.ok) return;
+
+  // Deleting an event is RLS-restricted to admins by default (see
+  // migration 0016) — the admin client performs the actual delete so a
+  // "member" role granted delete via the tab permissions matrix can still
+  // perform it.
+  const admin = createAdminClient();
+  await admin.from("events").delete().eq("id", id);
 
   revalidatePath(EVENTS_PATH);
 }

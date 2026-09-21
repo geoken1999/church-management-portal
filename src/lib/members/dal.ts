@@ -18,7 +18,7 @@ export const getMembers = cache(async (organizationId: string) => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("members")
-    .select("*, branches(id, name)")
+    .select("*, branches!members_branch_id_fkey(id, name)")
     .eq("organization_id", organizationId)
     .order("last_name", { ascending: true });
 

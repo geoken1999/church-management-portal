@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { sendBulkSms } from "@/lib/sms/client";
@@ -22,8 +22,8 @@ export async function sendBulkSmsAction(formData: FormData): Promise<SendSmsStat
   const user = await requireUser();
   const membership = await requireOrganization();
 
-  if (membership.role !== "owner" && membership.role !== "admin") {
-    return { error: "Only owners and admins can send SMS." };
+  if (!membership.tabAccess.sms.write) {
+    return { error: "You don't have permission to send SMS." };
   }
 
   const body = String(formData.get("body") ?? "").trim();
@@ -80,8 +80,13 @@ export async function sendBulkSmsAction(formData: FormData): Promise<SendSmsStat
   const status: SmsCampaignStatus =
     result.failed.length === 0 ? "sent" : result.sentCount === 0 ? "failed" : "partial_failure";
 
-  const supabase = await createClient();
-  await supabase.from("sms_campaigns").insert({
+  // Recording the campaign is RLS-restricted to admins by default (see
+  // migration 0034) — the admin client performs the actual insert so a
+  // "member" role granted sms write via the tab permissions matrix can
+  // still send; the tabAccess check above is what actually gates who
+  // gets here.
+  const admin = createAdminClient();
+  await admin.from("sms_campaigns").insert({
     organization_id: membership.organization.id,
     body,
     recipient_count: recipients.length,

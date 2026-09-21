@@ -3,6 +3,7 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { getMembers } from "@/lib/members/dal";
 import { getYouths } from "@/lib/youth/dal";
 import { YouthManager } from "@/components/youth/YouthManager";
+import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
 export const metadata: Metadata = {
   title: "Youth | KingdomFlow",
@@ -12,6 +13,10 @@ export default async function YouthPage() {
   const membership = await requireOrganization();
   const canManage = membership.role === "owner" || membership.role === "admin";
   const organizationId = membership.organization.id;
+
+  if (!membership.tabAccess.youth.read) {
+    return <AccessRestricted label="Youth" />;
+  }
 
   const [members, youths] = await Promise.all([getMembers(organizationId), getYouths(organizationId)]);
 

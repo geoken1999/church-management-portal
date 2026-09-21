@@ -5,6 +5,7 @@ import { getBranches } from "@/lib/branches/dal";
 import { getEmailCampaigns, getEmailSmtpSummary, isEmailAvailable, getLatestEmailSetupRequest } from "@/lib/email/dal";
 import { getPlanUsage } from "@/lib/plans/dal";
 import { EmailManager } from "@/components/email/EmailManager";
+import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
 export const metadata: Metadata = {
   title: "Email | KingdomFlow",
@@ -14,6 +15,10 @@ export default async function EmailPage() {
   const membership = await requireOrganization();
   const canManage = membership.role === "owner" || membership.role === "admin";
   const organizationId = membership.organization.id;
+
+  if (!membership.tabAccess.email.read) {
+    return <AccessRestricted label="Email" />;
+  }
 
   const [members, branches, campaigns, smtpSummary, emailAvailable, setupRequest, planUsage] = await Promise.all([
     getMembers(organizationId),
@@ -50,6 +55,7 @@ export default async function EmailPage() {
 
       <EmailManager
         canManage={canManage}
+        canSend={membership.tabAccess.email.write}
         emailAvailable={emailAvailable}
         quotaExhausted={quotaExhausted}
         emailsRemaining={planUsage.emailsRemaining}

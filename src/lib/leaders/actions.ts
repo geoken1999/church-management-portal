@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
+import { checkTabAccess } from "@/lib/permissions/dal";
 import { validateLeader, type LeaderFieldErrors } from "@/lib/leaders/validation";
 
 const LEADERS_PATH = "/dashboard/leaders";
@@ -21,10 +22,27 @@ function readLeaderFields(formData: FormData) {
   };
 }
 
+// updateLeader/deleteLeader forms only carry leaderId, not organizationId —
+// looked up from the record itself before a permission check is possible.
+async function organizationIdForLeader(leaderId: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data } = await admin.from("leaders").select("organization_id").eq("id", leaderId).maybeSingle();
+  return data?.organization_id ?? null;
+}
+
+// Leaders are RLS-restricted to admins by default (see migration 0037) —
+// the admin client performs the actual write so a "member" role granted
+// write/delete via the tab permissions matrix can still perform it; the
+// checkTabAccess call is what actually gates who gets here.
 export async function createLeader(_prevState: LeaderFormState, formData: FormData): Promise<LeaderFormState> {
   await requireUser();
 
   const organizationId = String(formData.get("organizationId") ?? "");
+  const access = await checkTabAccess(organizationId, "leaders", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
+
   const { memberId, title, notes } = readLeaderFields(formData);
 
   const fieldErrors = validateLeader({ memberId });
@@ -32,8 +50,8 @@ export async function createLeader(_prevState: LeaderFormState, formData: FormDa
     return { fieldErrors };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("leaders").insert({
+  const admin = createAdminClient();
+  const { error } = await admin.from("leaders").insert({
     organization_id: organizationId,
     member_id: memberId,
     title: title || null,
@@ -55,10 +73,19 @@ export async function updateLeader(_prevState: LeaderFormState, formData: FormDa
   await requireUser();
 
   const leaderId = String(formData.get("leaderId") ?? "");
+  const organizationId = await organizationIdForLeader(leaderId);
+  if (!organizationId) {
+    return { error: "That leader could not be found." };
+  }
+  const access = await checkTabAccess(organizationId, "leaders", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
+
   const { title, notes } = readLeaderFields(formData);
 
-  const supabase = await createClient();
-  const { error } = await supabase
+  const admin = createAdminClient();
+  const { error } = await admin
     .from("leaders")
     .update({ title: title || null, notes: notes || null })
     .eq("id", leaderId);
@@ -75,8 +102,13 @@ export async function deleteLeader(formData: FormData) {
   await requireUser();
   const leaderId = String(formData.get("leaderId") ?? "");
 
-  const supabase = await createClient();
-  await supabase.from("leaders").delete().eq("id", leaderId);
+  const organizationId = await organizationIdForLeader(leaderId);
+  if (!organizationId) return;
+  const access = await checkTabAccess(organizationId, "leaders", "delete");
+  if (!access.ok) return;
+
+  const admin = createAdminClient();
+  await admin.from("leaders").delete().eq("id", leaderId);
 
   revalidatePath(LEADERS_PATH);
 }

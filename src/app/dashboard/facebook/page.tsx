@@ -3,6 +3,7 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { getFacebookDashboardData } from "@/lib/facebook/dal";
 import { FacebookManagerClient } from "@/components/facebook/FacebookManagerClient";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
 export const metadata: Metadata = {
   title: "Facebook | KingdomFlow",
@@ -28,6 +29,10 @@ export default async function FacebookPage({
   const membership = await requireOrganization();
   const canManage = membership.role === "owner" || membership.role === "admin";
   const organizationId = membership.organization.id;
+
+  if (!membership.tabAccess.facebook.read) {
+    return <AccessRestricted label="Facebook" />;
+  }
 
   const data = await getFacebookDashboardData(organizationId);
   const statusNotice = status && status !== "choose_page" ? STATUS_MESSAGES[status] : undefined;

@@ -428,7 +428,7 @@ function SmsHistory({ campaigns }: { campaigns: SmsCampaignRow[] }) {
 // ---------------------------------------------------------------------------
 
 export function SmsManager({
-  canManage,
+  canSend,
   smsAvailable,
   smsRemaining,
   members,
@@ -436,7 +436,7 @@ export function SmsManager({
   campaigns,
   orgCountryCode,
 }: {
-  canManage: boolean;
+  canSend: boolean;
   smsAvailable: boolean;
   smsRemaining: number;
   members: SmsRecipientOption[];
@@ -446,7 +446,7 @@ export function SmsManager({
 }) {
   return (
     <div className="space-y-6">
-      {canManage ? (
+      {canSend ? (
         <Composer
           members={members}
           branches={branches}
@@ -457,7 +457,7 @@ export function SmsManager({
       ) : (
         <Card>
           <CardContent className="py-6 text-center text-sm text-muted-foreground">
-            Only owners and admins can send SMS. You can still view what&apos;s been sent below.
+            You don&apos;t have permission to send SMS. You can still view what&apos;s been sent below.
           </CardContent>
         </Card>
       )}

@@ -3,6 +3,7 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { getOrganizationMembers } from "@/lib/organizations/dal";
 import { getTodos } from "@/lib/todos/dal";
 import { TodosManager } from "@/components/todos/TodosManager";
+import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
 export const metadata: Metadata = {
   title: "To Do | KingdomFlow",
@@ -11,6 +12,10 @@ export const metadata: Metadata = {
 export default async function TodosPage() {
   const membership = await requireOrganization();
   const organizationId = membership.organization.id;
+
+  if (!membership.tabAccess.todos.read) {
+    return <AccessRestricted label="To Do" />;
+  }
 
   const [todos, teamMembers] = await Promise.all([
     getTodos(organizationId),

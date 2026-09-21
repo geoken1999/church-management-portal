@@ -19,6 +19,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       canManage={canManage}
       memberships={memberships}
       notifications={notifications}
+      tabAccess={membership.tabAccess}
     >
       {children}
     </DashboardShell>

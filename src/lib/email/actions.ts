@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { sendBulkEmail } from "@/lib/email/client";
@@ -33,8 +34,8 @@ export async function sendBulkEmailAction(formData: FormData): Promise<SendEmail
   const user = await requireUser();
   const membership = await requireOrganization();
 
-  if (membership.role !== "owner" && membership.role !== "admin") {
-    return { error: "Only owners and admins can send email." };
+  if (!membership.tabAccess.email.write) {
+    return { error: "You don't have permission to send email." };
   }
 
   const subject = String(formData.get("subject") ?? "").trim();
@@ -140,8 +141,13 @@ export async function sendBulkEmailAction(formData: FormData): Promise<SendEmail
   const status: EmailCampaignStatus =
     result.failed.length === 0 ? "sent" : result.sentCount === 0 ? "failed" : "partial_failure";
 
-  const supabase = await createClient();
-  await supabase.from("email_campaigns").insert({
+  // Recording the campaign is RLS-restricted to admins by default (see
+  // migration 0026) — the admin client performs the actual insert so a
+  // "member" role granted email write via the tab permissions matrix can
+  // still send; the tabAccess check above is what actually gates who
+  // gets here.
+  const admin = createAdminClient();
+  await admin.from("email_campaigns").insert({
     organization_id: membership.organization.id,
     subject,
     body_html: cleanHtml,

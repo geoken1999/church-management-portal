@@ -4,11 +4,16 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthUser, getProfile } from "@/lib/auth/dal";
-import type { Organization, OrganizationRole } from "@/types/database";
+import { normalizeTabPermissions, allFullTabAccess, type TabKey } from "@/lib/permissions/tabs";
+import type { Organization, OrganizationRole, TabAccess } from "@/types/database";
 
 export interface OrganizationMembership {
   organization: Organization;
   role: OrganizationRole;
+  // Already resolved for the member's role — owner/admin always get full
+  // access here regardless of what's stored, so callers never need to
+  // special-case the role themselves.
+  tabAccess: Record<TabKey, TabAccess>;
 }
 
 // All organizations the current user belongs to (for the org switcher).
@@ -19,14 +24,21 @@ export const getUserOrganizations = cache(async (): Promise<OrganizationMembersh
   const supabase = await createClient();
   const { data } = await supabase
     .from("organization_members")
-    .select("role, organizations(*)")
+    .select("role, tab_permissions, organizations(*)")
     .eq("auth_user_id", user.id);
 
   if (!data) return [];
 
   return data
     .filter((row): row is typeof row & { organizations: Organization } => Boolean(row.organizations))
-    .map((row) => ({ organization: row.organizations, role: row.role }));
+    .map((row) => ({
+      organization: row.organizations,
+      role: row.role,
+      tabAccess:
+        row.role === "owner" || row.role === "admin"
+          ? allFullTabAccess()
+          : normalizeTabPermissions(row.tab_permissions),
+    }));
 });
 
 // The organization the user is currently working in. Self-heals if
@@ -82,21 +94,10 @@ export const getOrganizationMembers = cache(async (organizationId: string) => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("organization_members")
-    .select("id, role, title, auth_user_id, profiles!inner(first_name, last_name, email)")
+    .select("id, role, title, auth_user_id, tab_permissions, profiles!inner(first_name, last_name, email)")
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: true });
 
   return data ?? [];
 });
 
-export const getOrganizationInvitations = cache(async (organizationId: string) => {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("organization_invitations")
-    .select("*")
-    .eq("organization_id", organizationId)
-    .eq("status", "pending")
-    .order("created_at", { ascending: false });
-
-  return data ?? [];
-});

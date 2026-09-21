@@ -4,6 +4,7 @@ import { getMembers, getMemberFieldDefinitions } from "@/lib/members/dal";
 import { getBranches } from "@/lib/branches/dal";
 import { getSiteUrl } from "@/lib/site-url";
 import { MembersManager } from "@/components/members/MembersManager";
+import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
 export const metadata: Metadata = {
   title: "Members | KingdomFlow",
@@ -12,6 +13,10 @@ export const metadata: Metadata = {
 export default async function MembersPage() {
   const membership = await requireOrganization();
   const canManage = membership.role === "owner" || membership.role === "admin";
+
+  if (!membership.tabAccess.members.read) {
+    return <AccessRestricted label="Members" />;
+  }
 
   const [members, definitions, branches] = await Promise.all([
     getMembers(membership.organization.id),

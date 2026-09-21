@@ -18,6 +18,8 @@ import {
   Mail,
   ListTodo,
   HeartHandshake,
+  Crown,
+  GraduationCap,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { YouTubeIcon } from "@/components/icons/YouTubeIcon";
@@ -31,22 +33,52 @@ import { LogoutButton } from "@/components/auth/LogoutButton";
 import type { Notification, Organization } from "@/types/database";
 import type { OrganizationMembership } from "@/lib/organizations/dal";
 
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/profile", label: "Profile", icon: UserRound },
-  { href: "/dashboard/team", label: "Team", icon: Users },
-  { href: "/dashboard/branches", label: "Branches", icon: MapPin },
-  { href: "/dashboard/members", label: "Members", icon: Contact },
-  { href: "/dashboard/ministries", label: "Ministries", icon: HeartHandshake },
-  { href: "/dashboard/media", label: "Media", icon: Video },
-  { href: "/dashboard/worship", label: "Worship", icon: Music },
-  { href: "/dashboard/events", label: "Events", icon: CalendarDays },
-  { href: "/dashboard/todos", label: "To Do", icon: ListTodo },
-  { href: "/dashboard/email", label: "Email", icon: Mail },
-  { href: "/dashboard/instagram", label: "Instagram", icon: InstagramIcon },
-  { href: "/dashboard/youtube", label: "YouTube", icon: YouTubeIcon },
-  { href: "/dashboard/facebook", label: "Facebook", icon: FacebookIcon },
-  { href: "/dashboard/sms", label: "SMS", icon: MessageSquareText },
+const NAV_GROUPS = [
+  {
+    label: "Overview",
+    items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
+  },
+  {
+    label: "Organization",
+    items: [
+      { href: "/dashboard/profile", label: "Profile", icon: UserRound },
+      { href: "/dashboard/team", label: "Team", icon: Users },
+      { href: "/dashboard/branches", label: "Branches", icon: MapPin },
+    ],
+  },
+  {
+    label: "People",
+    items: [
+      { href: "/dashboard/members", label: "Members", icon: Contact },
+      { href: "/dashboard/leaders", label: "Leaders", icon: Crown },
+      { href: "/dashboard/youth", label: "Youth", icon: GraduationCap },
+    ],
+  },
+  {
+    label: "Ministry",
+    items: [
+      { href: "/dashboard/ministries", label: "Ministries", icon: HeartHandshake },
+      { href: "/dashboard/worship", label: "Worship", icon: Music },
+      { href: "/dashboard/media", label: "Media", icon: Video },
+      { href: "/dashboard/events", label: "Events", icon: CalendarDays },
+      { href: "/dashboard/todos", label: "To Do", icon: ListTodo },
+    ],
+  },
+  {
+    label: "Messaging",
+    items: [
+      { href: "/dashboard/email", label: "Email", icon: Mail },
+      { href: "/dashboard/sms", label: "SMS", icon: MessageSquareText },
+    ],
+  },
+  {
+    label: "Social Media",
+    items: [
+      { href: "/dashboard/instagram", label: "Instagram", icon: InstagramIcon },
+      { href: "/dashboard/youtube", label: "YouTube", icon: YouTubeIcon },
+      { href: "/dashboard/facebook", label: "Facebook", icon: FacebookIcon },
+    ],
+  },
 ];
 
 export function DashboardShell({
@@ -66,25 +98,30 @@ export function DashboardShell({
   const pathname = usePathname();
 
   const nav = (
-    <nav className="flex flex-col gap-1 p-3">
-      {NAV_ITEMS.map((item) => {
-        const active = pathname === item.href;
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={() => setMobileOpen(false)}
-            className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              active
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            }`}
-          >
-            <item.icon className="size-4" />
-            {item.label}
-          </Link>
-        );
-      })}
+    <nav className="flex flex-col gap-4 p-3">
+      {NAV_GROUPS.map((group) => (
+        <div key={group.label} className="flex flex-col gap-1">
+          <p className="px-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{group.label}</p>
+          {group.items.map((item) => {
+            const active = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileOpen(false)}
+                className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  active
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                }`}
+              >
+                <item.icon className="size-4" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      ))}
     </nav>
   );
 

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
-import { getMembers } from "@/lib/members/dal";
+import { getLeaderMembers } from "@/lib/leaders/dal";
 import { getMinistries } from "@/lib/ministries/dal";
 import { MinistriesManager } from "@/components/ministries/MinistriesManager";
 
@@ -13,13 +13,12 @@ export default async function MinistriesPage() {
   const canManage = membership.role === "owner" || membership.role === "admin";
   const organizationId = membership.organization.id;
 
-  const [members, ministries] = await Promise.all([getMembers(organizationId), getMinistries(organizationId)]);
-
-  // Pending join requests haven't been approved yet, so they aren't
-  // eligible to be assigned to manage a ministry.
-  const assignableMembers = members
-    .filter((member) => member.status !== "pending")
-    .map((member) => ({ id: member.id, first_name: member.first_name, last_name: member.last_name }));
+  // Ministry managers are picked from Leaders, not the full members list
+  // — see /dashboard/leaders.
+  const [leaderMembers, ministries] = await Promise.all([
+    getLeaderMembers(organizationId),
+    getMinistries(organizationId),
+  ]);
 
   return (
     <div className="space-y-8">
@@ -33,7 +32,7 @@ export default async function MinistriesPage() {
       <MinistriesManager
         organizationId={organizationId}
         ministries={ministries}
-        members={assignableMembers}
+        members={leaderMembers}
         canManage={canManage}
       />
     </div>

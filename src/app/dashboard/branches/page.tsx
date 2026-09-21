@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getBranches } from "@/lib/branches/dal";
+import { getLeaderMembers } from "@/lib/leaders/dal";
 import { BranchesManager } from "@/components/branches/BranchesManager";
 
 export const metadata: Metadata = {
@@ -10,7 +11,14 @@ export const metadata: Metadata = {
 export default async function BranchesPage() {
   const membership = await requireOrganization();
   const canManage = membership.role === "owner" || membership.role === "admin";
-  const branches = await getBranches(membership.organization.id);
+  const organizationId = membership.organization.id;
+
+  // Branch managers are picked from Leaders, not the full members list —
+  // see /dashboard/leaders.
+  const [branches, leaderMembers] = await Promise.all([
+    getBranches(organizationId),
+    getLeaderMembers(organizationId),
+  ]);
 
   return (
     <div className="space-y-8">
@@ -22,8 +30,9 @@ export default async function BranchesPage() {
       </div>
 
       <BranchesManager
-        organizationId={membership.organization.id}
+        organizationId={organizationId}
         branches={branches}
+        members={leaderMembers}
         canManage={canManage}
       />
     </div>

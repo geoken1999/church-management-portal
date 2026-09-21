@@ -64,8 +64,11 @@ export type Branch = {
   name: string;
   location: string | null;
   member_count: number | null;
+  // Free-text legacy fields — superseded by managed_by (a real Leader
+  // reference), kept only for existing data. New branches use managed_by.
   leader_name: string | null;
   leader_phone: string | null;
+  managed_by: string | null;
   // ISO 3166-1 alpha-2 (e.g. "US") — takes priority over the organization's
   // country when resolving a member's phone number for SMS.
   country: string | null;
@@ -172,6 +175,28 @@ export type Ministry = {
   mission: string | null;
   started_on: string | null;
   future_plans: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Leader = {
+  id: string;
+  organization_id: string;
+  member_id: string;
+  title: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Youth = {
+  id: string;
+  organization_id: string;
+  member_id: string;
+  grade: string | null;
+  guardian_name: string | null;
+  guardian_phone: string | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -436,6 +461,13 @@ export type Database = {
             referencedRelation: "organizations";
             referencedColumns: ["id"];
           },
+          {
+            foreignKeyName: "branches_managed_by_fkey";
+            columns: ["managed_by"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
         ];
       };
       member_field_definitions: {
@@ -588,6 +620,48 @@ export type Database = {
           {
             foreignKeyName: "ministries_managed_by_fkey";
             columns: ["managed_by"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      leaders: {
+        Row: Leader;
+        Insert: Partial<Leader> & Pick<Leader, "organization_id" | "member_id">;
+        Update: Partial<Leader>;
+        Relationships: [
+          {
+            foreignKeyName: "leaders_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "leaders_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      youths: {
+        Row: Youth;
+        Insert: Partial<Youth> & Pick<Youth, "organization_id" | "member_id">;
+        Update: Partial<Youth>;
+        Relationships: [
+          {
+            foreignKeyName: "youths_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "youths_member_id_fkey";
+            columns: ["member_id"];
             isOneToOne: false;
             referencedRelation: "members";
             referencedColumns: ["id"];

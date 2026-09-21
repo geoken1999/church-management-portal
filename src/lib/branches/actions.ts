@@ -16,8 +16,7 @@ function readBranchFields(formData: FormData) {
     name: String(formData.get("name") ?? ""),
     location: String(formData.get("location") ?? "").trim(),
     memberCount: String(formData.get("memberCount") ?? ""),
-    leaderName: String(formData.get("leaderName") ?? "").trim(),
-    leaderPhone: String(formData.get("leaderPhone") ?? "").trim(),
+    managedBy: String(formData.get("managedBy") ?? "").trim(),
     country: String(formData.get("country") ?? "").trim(),
   };
 }
@@ -29,9 +28,9 @@ export async function createBranch(
   await requireUser();
 
   const organizationId = String(formData.get("organizationId") ?? "");
-  const { name, location, memberCount, leaderName, leaderPhone, country } = readBranchFields(formData);
+  const { name, location, memberCount, managedBy, country } = readBranchFields(formData);
 
-  const fieldErrors = validateBranch({ name, memberCount, leaderPhone });
+  const fieldErrors = validateBranch({ name, memberCount });
   if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
   }
@@ -42,8 +41,7 @@ export async function createBranch(
     name: name.trim(),
     location: location || null,
     member_count: memberCount.trim() ? Number(memberCount) : null,
-    leader_name: leaderName || null,
-    leader_phone: leaderPhone || null,
+    managed_by: managedBy || null,
     country: country || null,
   });
 
@@ -62,9 +60,9 @@ export async function updateBranch(
   await requireUser();
 
   const branchId = String(formData.get("branchId") ?? "");
-  const { name, location, memberCount, leaderName, leaderPhone, country } = readBranchFields(formData);
+  const { name, location, memberCount, managedBy, country } = readBranchFields(formData);
 
-  const fieldErrors = validateBranch({ name, memberCount, leaderPhone });
+  const fieldErrors = validateBranch({ name, memberCount });
   if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
   }
@@ -76,8 +74,7 @@ export async function updateBranch(
       name: name.trim(),
       location: location || null,
       member_count: memberCount.trim() ? Number(memberCount) : null,
-      leader_name: leaderName || null,
-      leader_phone: leaderPhone || null,
+      managed_by: managedBy || null,
       country: country || null,
     })
     .eq("id", branchId);

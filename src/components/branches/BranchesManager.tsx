@@ -8,7 +8,7 @@ import {
   deleteBranch,
   type BranchFormState,
 } from "@/lib/branches/actions";
-import type { Branch } from "@/types/database";
+import type { Branch, Member } from "@/types/database";
 import { getCountryOptions, countryName } from "@/lib/phone/countries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,13 +27,31 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+// Leaders picker options — just what the Select needs (matches
+// getLeaderMembers()'s shape).
+type LeaderOption = Pick<Member, "id" | "first_name" | "last_name">;
+// The branch's own embedded manager (via getBranches()'s join), which
+// includes phone for the read-only card display.
+type ManagedMember = Pick<Member, "id" | "first_name" | "last_name" | "phone">;
+type BranchRow = Branch & { members: ManagedMember | null };
+
 const initialState: BranchFormState = {};
+
+function personName(member: LeaderOption | ManagedMember | null): string {
+  return member ? `${member.first_name} ${member.last_name}` : "Unassigned";
+}
 
 function BranchFields({
   branch,
+  members,
+  managedBy,
+  onManagedByChange,
   errors,
 }: {
   branch?: Branch;
+  members: LeaderOption[];
+  managedBy: string;
+  onManagedByChange: (value: string) => void;
   errors?: BranchFormState["fieldErrors"];
 }) {
   return (
@@ -77,26 +95,29 @@ function BranchFields({
         <FieldError id="memberCount-error" message={errors?.memberCount} />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="leaderName">Pastor / leader name</Label>
-        <Input
-          id="leaderName"
-          name="leaderName"
-          defaultValue={branch?.leader_name ?? ""}
-          placeholder="Rev. Jane Doe"
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="leaderPhone">Leader phone</Label>
-        <Input
-          id="leaderPhone"
-          name="leaderPhone"
-          type="tel"
-          defaultValue={branch?.leader_phone ?? ""}
-          placeholder="+1 555 000 1234"
-          aria-invalid={Boolean(errors?.leaderPhone)}
-          aria-describedby={errors?.leaderPhone ? "leaderPhone-error" : undefined}
-        />
-        <FieldError id="leaderPhone-error" message={errors?.leaderPhone} />
+        <Label htmlFor="managedBy">Branch manager</Label>
+        <Select value={managedBy} onValueChange={(v) => onManagedByChange(v ?? "")}>
+          <SelectTrigger id="managedBy" className="w-full">
+            <SelectValue placeholder="Unassigned">
+              {(v: string | null) => personName(members.find((m) => m.id === v) ?? null)}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">Unassigned</SelectItem>
+            {members.map((member) => (
+              <SelectItem key={member.id} value={member.id}>
+                {member.first_name} {member.last_name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Picked from{" "}
+          <a href="/dashboard/leaders" className="underline">
+            Leaders
+          </a>
+          . Add someone there first if they&apos;re not listed.
+        </p>
       </div>
       <div className="space-y-2">
         <Label htmlFor="country">Country</Label>
@@ -118,10 +139,11 @@ function BranchFields({
   );
 }
 
-function AddBranchDialog({ organizationId }: { organizationId: string }) {
+function AddBranchDialog({ organizationId, members }: { organizationId: string; members: LeaderOption[] }) {
   const [state, setState] = useState<BranchFormState>(initialState);
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
+  const [managedBy, setManagedBy] = useState("");
 
   function handleSubmit(formData: FormData) {
     startTransition(async () => {
@@ -136,7 +158,10 @@ function AddBranchDialog({ organizationId }: { organizationId: string }) {
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (next) setState(initialState);
+        if (next) {
+          setState(initialState);
+          setManagedBy("");
+        }
       }}
     >
       <DialogTrigger
@@ -154,12 +179,13 @@ function AddBranchDialog({ organizationId }: { organizationId: string }) {
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
+          <input type="hidden" name="managedBy" value={managedBy} />
           {state.error && (
             <Alert variant="destructive">
               <AlertDescription>{state.error}</AlertDescription>
             </Alert>
           )}
-          <BranchFields errors={state.fieldErrors} />
+          <BranchFields members={members} managedBy={managedBy} onManagedByChange={setManagedBy} errors={state.fieldErrors} />
           <DialogFooter>
             <Button type="submit" disabled={pending}>
               {pending ? "Adding..." : "Add branch"}
@@ -171,10 +197,11 @@ function AddBranchDialog({ organizationId }: { organizationId: string }) {
   );
 }
 
-function EditBranchDialog({ branch }: { branch: Branch }) {
+function EditBranchDialog({ branch, members }: { branch: Branch; members: LeaderOption[] }) {
   const [state, setState] = useState<BranchFormState>(initialState);
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
+  const [managedBy, setManagedBy] = useState(branch.managed_by ?? "");
 
   function handleSubmit(formData: FormData) {
     startTransition(async () => {
@@ -189,7 +216,10 @@ function EditBranchDialog({ branch }: { branch: Branch }) {
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (next) setState(initialState);
+        if (next) {
+          setState(initialState);
+          setManagedBy(branch.managed_by ?? "");
+        }
       }}
     >
       <DialogTrigger
@@ -207,12 +237,13 @@ function EditBranchDialog({ branch }: { branch: Branch }) {
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="branchId" value={branch.id} />
+          <input type="hidden" name="managedBy" value={managedBy} />
           {state.error && (
             <Alert variant="destructive">
               <AlertDescription>{state.error}</AlertDescription>
             </Alert>
           )}
-          <BranchFields branch={branch} errors={state.fieldErrors} />
+          <BranchFields branch={branch} members={members} managedBy={managedBy} onManagedByChange={setManagedBy} errors={state.fieldErrors} />
           <DialogFooter>
             <Button type="submit" disabled={pending}>
               {pending ? "Saving..." : "Save changes"}
@@ -224,7 +255,7 @@ function EditBranchDialog({ branch }: { branch: Branch }) {
   );
 }
 
-function BranchCard({ branch, canManage }: { branch: Branch; canManage: boolean }) {
+function BranchCard({ branch, members, canManage }: { branch: BranchRow; members: LeaderOption[]; canManage: boolean }) {
   return (
     <Card>
       <CardContent className="space-y-3">
@@ -232,7 +263,7 @@ function BranchCard({ branch, canManage }: { branch: Branch; canManage: boolean 
           <h3 className="font-heading text-base font-bold">{branch.name}</h3>
           {canManage && (
             <div className="flex items-center gap-1">
-              <EditBranchDialog branch={branch} />
+              <EditBranchDialog branch={branch} members={members} />
               <form action={deleteBranch}>
                 <input type="hidden" name="branchId" value={branch.id} />
                 <Button type="submit" variant="ghost" size="sm">
@@ -256,11 +287,11 @@ function BranchCard({ branch, canManage }: { branch: Branch; canManage: boolean 
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">
             <UserRound className="size-4 shrink-0" />
-            <dd>{branch.leader_name ?? "No leader assigned"}</dd>
+            <dd>{personName(branch.members)}</dd>
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">
             <Phone className="size-4 shrink-0" />
-            <dd>{branch.leader_phone ?? "—"}</dd>
+            <dd>{branch.members?.phone ?? "—"}</dd>
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">
             <Globe className="size-4 shrink-0" />
@@ -275,17 +306,19 @@ function BranchCard({ branch, canManage }: { branch: Branch; canManage: boolean 
 export function BranchesManager({
   organizationId,
   branches,
+  members,
   canManage,
 }: {
   organizationId: string;
-  branches: Branch[];
+  branches: BranchRow[];
+  members: LeaderOption[];
   canManage: boolean;
 }) {
   return (
     <div className="space-y-4">
       {canManage && (
         <div className="flex justify-end">
-          <AddBranchDialog organizationId={organizationId} />
+          <AddBranchDialog organizationId={organizationId} members={members} />
         </div>
       )}
 
@@ -298,7 +331,7 @@ export function BranchesManager({
       ) : (
         <div className="space-y-4">
           {branches.map((branch) => (
-            <BranchCard key={branch.id} branch={branch} canManage={canManage} />
+            <BranchCard key={branch.id} branch={branch} members={members} canManage={canManage} />
           ))}
         </div>
       )}

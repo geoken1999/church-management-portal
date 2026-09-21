@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
-import { getMembers } from "@/lib/members/dal";
+import { getLeaderMembers } from "@/lib/leaders/dal";
 import { getBranches } from "@/lib/branches/dal";
 import { getEvents } from "@/lib/events/dal";
 import { EventsManagerClient } from "@/components/events/EventsManagerClient";
@@ -14,17 +14,13 @@ export default async function EventsPage() {
   const canManage = membership.role === "owner" || membership.role === "admin";
   const organizationId = membership.organization.id;
 
-  const [members, branches, events] = await Promise.all([
-    getMembers(organizationId),
+  // Event managers are picked from Leaders, not the full members list —
+  // see /dashboard/leaders.
+  const [assignableMembers, branches, events] = await Promise.all([
+    getLeaderMembers(organizationId),
     getBranches(organizationId),
     getEvents(organizationId),
   ]);
-
-  // Pending join requests haven't been approved yet, so they aren't
-  // eligible to be assigned as an event manager.
-  const assignableMembers = members
-    .filter((member) => member.status !== "pending")
-    .map((member) => ({ id: member.id, first_name: member.first_name, last_name: member.last_name }));
 
   return (
     <div className="space-y-8">

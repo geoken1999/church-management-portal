@@ -27,6 +27,8 @@ import {
   CreditCard,
   BookOpen,
   LifeBuoy,
+  Users2,
+  FileText,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { YouTubeIcon } from "@/components/icons/YouTubeIcon";
@@ -67,6 +69,7 @@ const NAV_GROUPS = [
       { href: "/dashboard/members", label: "Members", icon: Contact, tab: "members" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/leaders", label: "Leaders", icon: Crown, tab: "leaders" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/youth", label: "Youth", icon: GraduationCap, tab: "youth" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/committee", label: "Committee", icon: Users2, tab: "committee" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
   {
@@ -77,6 +80,12 @@ const NAV_GROUPS = [
       { href: "/dashboard/media", label: "Media", icon: Video, tab: "media" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/events", label: "Events", icon: CalendarDays, tab: "events" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/todos", label: "To Do", icon: ListTodo, tab: "todos" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+    ],
+  },
+  {
+    label: "Tools",
+    items: [
+      { href: "/dashboard/forms", label: "Forms", icon: FileText, tab: "forms" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
   {

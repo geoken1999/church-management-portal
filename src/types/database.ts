@@ -227,6 +227,50 @@ export type Leader = {
   updated_at: string;
 };
 
+export type CommitteeMember = {
+  id: string;
+  organization_id: string;
+  member_id: string;
+  committee_name: string;
+  role: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FormFieldType = "text" | "textarea" | "number" | "email" | "phone" | "date" | "checkbox" | "select";
+
+export type FormField = {
+  key: string;
+  label: string;
+  field_type: FormFieldType;
+  options: string[] | null;
+  required: boolean;
+};
+
+export type FormStatus = "draft" | "published" | "closed";
+
+export type CustomForm = {
+  id: string;
+  organization_id: string;
+  title: string;
+  description: string | null;
+  slug: string;
+  fields: FormField[];
+  status: FormStatus;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FormResponse = {
+  id: string;
+  form_id: string;
+  organization_id: string;
+  answers: Record<string, string | number | boolean | null>;
+  created_at: string;
+};
+
 export type Youth = {
   id: string;
   organization_id: string;
@@ -862,6 +906,62 @@ export type Database = {
           },
         ];
       };
+      forms: {
+        Row: CustomForm;
+        Insert: Partial<CustomForm> & Pick<CustomForm, "organization_id" | "title" | "slug">;
+        Update: Partial<CustomForm>;
+        Relationships: [
+          {
+            foreignKeyName: "forms_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      form_responses: {
+        Row: FormResponse;
+        Insert: Partial<FormResponse> & Pick<FormResponse, "form_id" | "organization_id">;
+        Update: Partial<FormResponse>;
+        Relationships: [
+          {
+            foreignKeyName: "form_responses_form_id_fkey";
+            columns: ["form_id"];
+            isOneToOne: false;
+            referencedRelation: "forms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "form_responses_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      committee_members: {
+        Row: CommitteeMember;
+        Insert: Partial<CommitteeMember> & Pick<CommitteeMember, "organization_id" | "member_id" | "committee_name" | "role">;
+        Update: Partial<CommitteeMember>;
+        Relationships: [
+          {
+            foreignKeyName: "committee_members_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "committee_members_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       youths: {
         Row: Youth;
         Insert: Partial<Youth> & Pick<Youth, "organization_id" | "member_id">;
@@ -1168,6 +1268,19 @@ export type Database = {
       get_organization_storage_bytes: {
         Args: { target_org_id: string };
         Returns: number;
+      };
+      get_public_form: {
+        Args: { form_slug: string };
+        Returns: {
+          form_id: string;
+          title: string;
+          description: string | null;
+          fields: FormField[];
+        }[];
+      };
+      submit_form_response: {
+        Args: { form_slug: string; answers: Record<string, unknown> };
+        Returns: string;
       };
     };
     Enums: Record<string, never>;

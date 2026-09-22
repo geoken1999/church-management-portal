@@ -43,6 +43,13 @@ export const DOC_CATEGORIES: DocCategory[] = [
           "Members, Events, and Fund Raisers can all optionally be tied to a specific branch, which is how SMS/Email recipient lists and reports narrow down by location.",
         ],
       },
+      {
+        id: "finding-a-tab",
+        title: "Finding a tab quickly",
+        body: [
+          "With this many tabs in the sidebar, use the search box at the top of the nav to filter them by name instead of scrolling through every group — it only searches tabs you already have access to.",
+        ],
+      },
     ],
   },
   {
@@ -117,6 +124,41 @@ export const DOC_CATEGORIES: DocCategory[] = [
     ],
   },
   {
+    id: "tools",
+    title: "Tools",
+    articles: [
+      {
+        id: "folder",
+        title: "Folder — private documents & shareable links",
+        body: [
+          "Folder is a private, access-controlled document repository — unlike Worship and Media's document links, nothing here is public by default. Only people granted access to the Folder tab (Team → Permissions) can see or download what's uploaded.",
+          "Categories group documents together (e.g. \"Board\", \"Youth Ministry\"). Give a category its own shareable link from its badge, and anyone with that link can view and download every document in it without logging in.",
+          "Individual documents can also get their own one-off shareable link, turned on from the document's \"Share\" button. Turning a link off revokes it immediately — there's no expiry, so disabling is the only way to revoke a link that's been shared.",
+          "Shared links are served from a masked URL that never reveals the underlying storage path, the same approach Worship and Media already use for their document links.",
+        ],
+      },
+      {
+        id: "attendance",
+        title: "Attendance",
+        body: [
+          "Attendance records who was present at a service or gathering. A session is scoped to a branch (or \"All branches\") and can optionally be linked to a specific date of a calendar Event — useful since a recurring event like \"Sunday Service\" is one Events row, not one per week, so the session records which occurrence it was for.",
+          "Click \"Take attendance\" to start a session, then check off who was present from that branch's active members.",
+          "If someone attended who isn't on the default list — a visitor from another branch, for example — use \"Check in someone not listed below\" to search the full member directory and add them to that session.",
+          "You can also just record a total headcount instead of, or alongside, checking off individuals — useful for large services where a per-person checklist isn't practical.",
+        ],
+      },
+      {
+        id: "reports",
+        title: "Reports",
+        body: [
+          "Reports lets you filter and export the data behind five tabs — Members, Attendance, Events, Offerings, and Donations — without hunting for a separate export button inside each one.",
+          "A report is only available if you have read access to its underlying tab — having access to Reports itself doesn't widen what data you can pull through it.",
+          "Filter by date range, branch, or a report-specific filter (member status, donation method), click \"Run report\" to see the results on screen, then export to Excel or PDF.",
+        ],
+      },
+    ],
+  },
+  {
     id: "finance",
     title: "Finance",
     articles: [
@@ -150,6 +192,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
         title: "Social Media (Instagram, YouTube, Facebook)",
         body: [
           "Connect your church's Instagram, YouTube, and Facebook accounts to manage posts, comments, and messages without leaving the dashboard.",
+          "YouTube supports connecting more than one channel — use the channel switcher above the YouTube dashboard to add another channel or switch which one is active. Videos, comments, analytics, and live streaming controls all apply to whichever channel is currently active.",
           "Social Media is included on the Pro plan only. Connecting an account also requires an owner or admin.",
         ],
       },
@@ -197,6 +240,8 @@ export const DOC_CATEGORIES: DocCategory[] = [
           "- No self-serve mid-cycle plan or billing-interval switching — it's cancel-then-resubscribe for now.",
           "- Cancellation is immediate; there's no \"cancel at period end\" option or partial refund.",
           "- Only Donations (not Offerings) can be linked to a Fund Raiser's total.",
+          "- Reports currently covers five tabs (Members, Attendance, Events, Offerings, Donations) — not every module has a report yet.",
+          "- Attendance's manual \"check in someone not listed\" search only finds active members — congregants marked pending or left can't be checked in directly.",
           "- Trial length is fixed at 3 days and isn't extendable from within the app.",
           "- Support tickets (this Support tab) can currently be raised and viewed, but there's no in-app reply or status-tracking workflow yet — you'll be contacted separately about anything you raise.",
         ],

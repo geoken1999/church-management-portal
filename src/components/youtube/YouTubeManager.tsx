@@ -1822,7 +1822,15 @@ export function YouTubeManager({
   }
 
   return (
-    <div className="space-y-4">
+    // Keyed on the active channel so switching channels fully remounts
+    // everything below — YouTubeVideosTab/YouTubeCommentsTab seed their
+    // list state from initialVideos/initialComments via useState, which
+    // only runs on mount. Without this key, a prop update from
+    // router.refresh() after switching channels would re-render those
+    // components with the new channel's data available but their state
+    // stuck showing the previous channel's videos/comments until a full
+    // page reload remounted them from scratch.
+    <div key={data.channel.id} className="space-y-4">
       <ChannelSwitcher organizationId={organizationId} channels={channels} canManage={canManage} />
 
       <YouTubeHeader

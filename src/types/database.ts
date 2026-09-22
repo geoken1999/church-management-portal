@@ -33,6 +33,9 @@ export type Organization = {
   // ISO 3166-1 alpha-2 (e.g. "US") — the default country code for
   // resolving members' phone numbers when their branch has none set.
   country: string | null;
+  // Basic-tier access without a subscription until this passes — see
+  // getPlanAccess in src/lib/plans/dal.ts.
+  trial_ends_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -64,6 +67,30 @@ export type OrganizationInvitation = {
   status: InvitationStatus;
   created_at: string;
   expires_at: string;
+};
+
+export type SubscriptionStatus =
+  | "created"
+  | "authenticated"
+  | "active"
+  | "pending"
+  | "halted"
+  | "cancelled"
+  | "completed"
+  | "expired";
+
+export type OrganizationSubscription = {
+  id: string;
+  organization_id: string;
+  razorpay_customer_id: string | null;
+  razorpay_subscription_id: string | null;
+  plan_id: string;
+  status: SubscriptionStatus;
+  short_url: string | null;
+  current_start: string | null;
+  current_end: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type Branch = {
@@ -500,6 +527,20 @@ export type Database = {
             foreignKeyName: "organization_invitations_organization_id_fkey";
             columns: ["organization_id"];
             isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      organization_subscriptions: {
+        Row: OrganizationSubscription;
+        Insert: Partial<OrganizationSubscription> & Pick<OrganizationSubscription, "organization_id" | "plan_id">;
+        Update: Partial<OrganizationSubscription>;
+        Relationships: [
+          {
+            foreignKeyName: "organization_subscriptions_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: true;
             referencedRelation: "organizations";
             referencedColumns: ["id"];
           },

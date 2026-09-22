@@ -24,6 +24,7 @@
     "nextjs-toploader": "^3.9.17",
     "nodemailer": "^10.0.10",
     "qrcode": "^1.5.4",
+    "razorpay": "^2.9.8",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "resend": "^6.28.1",

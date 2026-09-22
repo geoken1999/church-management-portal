@@ -4,6 +4,8 @@ import { getInstagramDashboardData } from "@/lib/instagram/dal";
 import { InstagramManagerClient } from "@/components/instagram/InstagramManagerClient";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
+import { UpgradeRequired } from "@/components/dashboard/UpgradeRequired";
+import { getPlanUsage } from "@/lib/plans/dal";
 
 export const metadata: Metadata = {
   title: "Instagram | KingdomFlow",
@@ -28,6 +30,11 @@ export default async function InstagramPage({
   const membership = await requireOrganization();
   const canManage = membership.role === "owner" || membership.role === "admin";
   const organizationId = membership.organization.id;
+
+  const { plan } = await getPlanUsage(organizationId);
+  if (!plan.socialMediaEnabled) {
+    return <UpgradeRequired label="Instagram" plan={plan.name} />;
+  }
 
   if (!membership.tabAccess.instagram.read) {
     return <AccessRestricted label="Instagram" />;

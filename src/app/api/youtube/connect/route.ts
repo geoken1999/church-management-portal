@@ -5,6 +5,7 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { buildAuthorizeUrl } from "@/lib/youtube/client";
 import { getYouTubeEnv } from "@/lib/youtube/env";
 import { getSiteUrl } from "@/lib/site-url";
+import { getPlanUsage } from "@/lib/plans/dal";
 
 const STATE_COOKIE = "yt_oauth_state";
 
@@ -17,6 +18,11 @@ export async function GET() {
 
   if (membership.role !== "owner" && membership.role !== "admin") {
     return NextResponse.redirect(`${getSiteUrl()}/dashboard/youtube?status=forbidden`);
+  }
+
+  const { plan } = await getPlanUsage(membership.organization.id);
+  if (!plan.socialMediaEnabled) {
+    return NextResponse.redirect(`${getSiteUrl()}/dashboard/youtube`);
   }
 
   try {

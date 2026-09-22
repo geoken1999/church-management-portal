@@ -56,6 +56,8 @@ export default async function EmailPage() {
       <EmailManager
         canManage={canManage}
         canSend={membership.tabAccess.email.write}
+        customSmtpEnabled={planUsage.plan.customSmtpEnabled}
+        planName={planUsage.plan.name}
         emailAvailable={emailAvailable}
         quotaExhausted={quotaExhausted}
         emailsRemaining={planUsage.emailsRemaining}

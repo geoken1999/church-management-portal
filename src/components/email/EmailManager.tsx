@@ -1105,6 +1105,8 @@ function SmtpSettingsCard({
 export function EmailManager({
   canManage,
   canSend,
+  customSmtpEnabled,
+  planName,
   emailAvailable,
   quotaExhausted,
   emailsRemaining,
@@ -1116,6 +1118,8 @@ export function EmailManager({
 }: {
   canManage: boolean;
   canSend: boolean;
+  customSmtpEnabled: boolean;
+  planName: string;
   emailAvailable: boolean;
   quotaExhausted: boolean;
   emailsRemaining: number;
@@ -1130,7 +1134,19 @@ export function EmailManager({
 
   return (
     <div className="space-y-6">
-      {canManage && <SmtpSettingsCard summary={smtpSummary} emailAvailable={emailAvailable} onChanged={refresh} />}
+      {canManage &&
+        (customSmtpEnabled ? (
+          <SmtpSettingsCard summary={smtpSummary} emailAvailable={emailAvailable} onChanged={refresh} />
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Your own SMTP</CardTitle>
+              <CardDescription>
+                Sending from your own mail server isn&apos;t included on the {planName} plan — upgrade to unlock it.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        ))}
 
       {canSend ? (
         <Composer

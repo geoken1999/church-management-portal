@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getMembers } from "@/lib/members/dal";
 import { getDonations, getFundraiserOptions } from "@/lib/finance/dal";
+import { getPlanUsage } from "@/lib/plans/dal";
 import { DonationsManager } from "@/components/finance/DonationsManager";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
+import { UpgradeRequired } from "@/components/dashboard/UpgradeRequired";
 
 export const metadata: Metadata = {
   title: "Donation | KingdomFlow",
@@ -12,6 +14,11 @@ export const metadata: Metadata = {
 export default async function DonationsPage() {
   const membership = await requireOrganization();
   const organizationId = membership.organization.id;
+
+  const { plan } = await getPlanUsage(organizationId);
+  if (!plan.financeEnabled) {
+    return <UpgradeRequired label="Donation" plan={plan.name} />;
+  }
 
   if (!membership.tabAccess.donations.read) {
     return <AccessRestricted label="Donation" />;

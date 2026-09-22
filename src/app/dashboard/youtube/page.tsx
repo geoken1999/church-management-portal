@@ -4,6 +4,8 @@ import { getYouTubeDashboardData } from "@/lib/youtube/dal";
 import { YouTubeManagerClient } from "@/components/youtube/YouTubeManagerClient";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
+import { UpgradeRequired } from "@/components/dashboard/UpgradeRequired";
+import { getPlanUsage } from "@/lib/plans/dal";
 
 export const metadata: Metadata = {
   title: "YouTube | KingdomFlow",
@@ -28,6 +30,11 @@ export default async function YouTubePage({
   const membership = await requireOrganization();
   const canManage = membership.role === "owner" || membership.role === "admin";
   const organizationId = membership.organization.id;
+
+  const { plan } = await getPlanUsage(organizationId);
+  if (!plan.socialMediaEnabled) {
+    return <UpgradeRequired label="YouTube" plan={plan.name} />;
+  }
 
   if (!membership.tabAccess.youtube.read) {
     return <AccessRestricted label="YouTube" />;

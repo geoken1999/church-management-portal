@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getBranches } from "@/lib/branches/dal";
 import { getOfferings } from "@/lib/finance/dal";
+import { getPlanUsage } from "@/lib/plans/dal";
 import { OfferingsManager } from "@/components/finance/OfferingsManager";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
+import { UpgradeRequired } from "@/components/dashboard/UpgradeRequired";
 
 export const metadata: Metadata = {
   title: "Offering | KingdomFlow",
@@ -12,6 +14,11 @@ export const metadata: Metadata = {
 export default async function OfferingsPage() {
   const membership = await requireOrganization();
   const organizationId = membership.organization.id;
+
+  const { plan } = await getPlanUsage(organizationId);
+  if (!plan.financeEnabled) {
+    return <UpgradeRequired label="Offering" plan={plan.name} />;
+  }
 
   if (!membership.tabAccess.offerings.read) {
     return <AccessRestricted label="Offering" />;

@@ -3,8 +3,10 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { getBranches } from "@/lib/branches/dal";
 import { getLeaderMembers } from "@/lib/leaders/dal";
 import { getFundraisers } from "@/lib/finance/dal";
+import { getPlanUsage } from "@/lib/plans/dal";
 import { FundraisersManager } from "@/components/finance/FundraisersManager";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
+import { UpgradeRequired } from "@/components/dashboard/UpgradeRequired";
 
 export const metadata: Metadata = {
   title: "Fund Raiser | KingdomFlow",
@@ -13,6 +15,11 @@ export const metadata: Metadata = {
 export default async function FundraisersPage() {
   const membership = await requireOrganization();
   const organizationId = membership.organization.id;
+
+  const { plan } = await getPlanUsage(organizationId);
+  if (!plan.financeEnabled) {
+    return <UpgradeRequired label="Fund Raiser" plan={plan.name} />;
+  }
 
   if (!membership.tabAccess.fundraisers.read) {
     return <AccessRestricted label="Fund Raiser" />;

@@ -5,6 +5,7 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { buildAuthorizeUrl } from "@/lib/facebook/client";
 import { getFacebookEnv } from "@/lib/facebook/env";
 import { getSiteUrl } from "@/lib/site-url";
+import { getPlanUsage } from "@/lib/plans/dal";
 
 const STATE_COOKIE = "fb_oauth_state";
 
@@ -17,6 +18,11 @@ export async function GET() {
 
   if (membership.role !== "owner" && membership.role !== "admin") {
     return NextResponse.redirect(`${getSiteUrl()}/dashboard/facebook?status=forbidden`);
+  }
+
+  const { plan } = await getPlanUsage(membership.organization.id);
+  if (!plan.socialMediaEnabled) {
+    return NextResponse.redirect(`${getSiteUrl()}/dashboard/facebook`);
   }
 
   try {

@@ -23,6 +23,8 @@ import {
   Target,
   HandCoins,
   Gift,
+  Lock,
+  CreditCard,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { YouTubeIcon } from "@/components/icons/YouTubeIcon";
@@ -38,59 +40,64 @@ import type { OrganizationMembership } from "@/lib/organizations/dal";
 import type { TabKey } from "@/lib/permissions/tabs";
 
 const NO_TAB = null as TabKey | null;
+type PlanFeature = "finance" | "socialMedia" | null;
+const NO_PLAN_FEATURE = null as PlanFeature;
 
 const NAV_GROUPS = [
   {
     label: "Overview",
-    items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, tab: NO_TAB }],
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+    ],
   },
   {
     label: "Organization",
     items: [
-      { href: "/dashboard/profile", label: "Profile", icon: UserRound, tab: NO_TAB },
-      { href: "/dashboard/team", label: "Team", icon: Users, tab: NO_TAB },
-      { href: "/dashboard/branches", label: "Branches", icon: MapPin, tab: "branches" as TabKey },
+      { href: "/dashboard/profile", label: "Profile", icon: UserRound, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/team", label: "Team", icon: Users, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/billing", label: "Billing", icon: CreditCard, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: true },
+      { href: "/dashboard/branches", label: "Branches", icon: MapPin, tab: "branches" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
   {
     label: "People",
     items: [
-      { href: "/dashboard/members", label: "Members", icon: Contact, tab: "members" as TabKey },
-      { href: "/dashboard/leaders", label: "Leaders", icon: Crown, tab: "leaders" as TabKey },
-      { href: "/dashboard/youth", label: "Youth", icon: GraduationCap, tab: "youth" as TabKey },
+      { href: "/dashboard/members", label: "Members", icon: Contact, tab: "members" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/leaders", label: "Leaders", icon: Crown, tab: "leaders" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/youth", label: "Youth", icon: GraduationCap, tab: "youth" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
   {
     label: "Ministry",
     items: [
-      { href: "/dashboard/ministries", label: "Ministries", icon: HeartHandshake, tab: "ministries" as TabKey },
-      { href: "/dashboard/worship", label: "Worship", icon: Music, tab: "worship" as TabKey },
-      { href: "/dashboard/media", label: "Media", icon: Video, tab: "media" as TabKey },
-      { href: "/dashboard/events", label: "Events", icon: CalendarDays, tab: "events" as TabKey },
-      { href: "/dashboard/todos", label: "To Do", icon: ListTodo, tab: "todos" as TabKey },
+      { href: "/dashboard/ministries", label: "Ministries", icon: HeartHandshake, tab: "ministries" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/worship", label: "Worship", icon: Music, tab: "worship" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/media", label: "Media", icon: Video, tab: "media" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/events", label: "Events", icon: CalendarDays, tab: "events" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/todos", label: "To Do", icon: ListTodo, tab: "todos" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
   {
     label: "Finance",
     items: [
-      { href: "/dashboard/fundraisers", label: "Fund Raiser", icon: Target, tab: "fundraisers" as TabKey },
-      { href: "/dashboard/offerings", label: "Offering", icon: HandCoins, tab: "offerings" as TabKey },
-      { href: "/dashboard/donations", label: "Donation", icon: Gift, tab: "donations" as TabKey },
+      { href: "/dashboard/fundraisers", label: "Fund Raiser", icon: Target, tab: "fundraisers" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },
+      { href: "/dashboard/offerings", label: "Offering", icon: HandCoins, tab: "offerings" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },
+      { href: "/dashboard/donations", label: "Donation", icon: Gift, tab: "donations" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },
     ],
   },
   {
     label: "Messaging",
     items: [
-      { href: "/dashboard/email", label: "Email", icon: Mail, tab: "email" as TabKey },
-      { href: "/dashboard/sms", label: "SMS", icon: MessageSquareText, tab: "sms" as TabKey },
+      { href: "/dashboard/email", label: "Email", icon: Mail, tab: "email" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/sms", label: "SMS", icon: MessageSquareText, tab: "sms" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
   {
     label: "Social Media",
     items: [
-      { href: "/dashboard/instagram", label: "Instagram", icon: InstagramIcon, tab: "instagram" as TabKey },
-      { href: "/dashboard/youtube", label: "YouTube", icon: YouTubeIcon, tab: "youtube" as TabKey },
-      { href: "/dashboard/facebook", label: "Facebook", icon: FacebookIcon, tab: "facebook" as TabKey },
+      { href: "/dashboard/instagram", label: "Instagram", icon: InstagramIcon, tab: "instagram" as TabKey, planFeature: "socialMedia" as PlanFeature, managerOnly: false },
+      { href: "/dashboard/youtube", label: "YouTube", icon: YouTubeIcon, tab: "youtube" as TabKey, planFeature: "socialMedia" as PlanFeature, managerOnly: false },
+      { href: "/dashboard/facebook", label: "Facebook", icon: FacebookIcon, tab: "facebook" as TabKey, planFeature: "socialMedia" as PlanFeature, managerOnly: false },
     ],
   },
 ];
@@ -101,6 +108,8 @@ export function DashboardShell({
   memberships,
   notifications,
   tabAccess,
+  planFeatures,
+  trialDaysRemaining,
   children,
 }: {
   organization: Organization;
@@ -108,6 +117,8 @@ export function DashboardShell({
   memberships: OrganizationMembership[];
   notifications: Notification[];
   tabAccess: Record<TabKey, TabAccess>;
+  planFeatures: { finance: boolean; socialMedia: boolean };
+  trialDaysRemaining: number | null;
   children: ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -115,7 +126,10 @@ export function DashboardShell({
 
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => !item.tab || tabAccess[item.tab]?.read),
+    items: group.items.filter((item) => {
+      if (item.managerOnly && !canManage) return false;
+      return !item.tab || tabAccess[item.tab]?.read;
+    }),
   })).filter((group) => group.items.length > 0);
 
   const nav = (
@@ -125,6 +139,10 @@ export function DashboardShell({
           <p className="px-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{group.label}</p>
           {group.items.map((item) => {
             const active = pathname === item.href;
+            // A plan-gated item still links through to its page — that's
+            // where the actual "upgrade to unlock" content lives — this
+            // just signals it's locked rather than hiding it outright.
+            const locked = Boolean(item.planFeature && !planFeatures[item.planFeature]);
             return (
               <Link
                 key={item.href}
@@ -133,11 +151,14 @@ export function DashboardShell({
                 className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                   active
                     ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    : locked
+                      ? "text-muted-foreground/60 hover:bg-accent hover:text-accent-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 }`}
               >
                 <item.icon className="size-4" />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {locked && <Lock className="size-3" />}
               </Link>
             );
           })}
@@ -208,6 +229,20 @@ export function DashboardShell({
             </div>
           </div>
         </header>
+        {trialDaysRemaining !== null && (
+          <div className="flex items-center justify-center gap-2 bg-accent px-4 py-2 text-center text-sm text-accent-foreground">
+            <span>
+              {trialDaysRemaining <= 0
+                ? "Your trial ends today."
+                : `${trialDaysRemaining} ${trialDaysRemaining === 1 ? "day" : "days"} left in your trial.`}
+            </span>
+            {canManage && (
+              <Link href="/dashboard/billing" className="font-medium underline underline-offset-2">
+                Subscribe now
+              </Link>
+            )}
+          </div>
+        )}
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6">{children}</main>
       </div>
     </div>

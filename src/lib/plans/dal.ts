@@ -2,11 +2,76 @@ import "server-only";
 
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { getPlanLimits, type PlanLimits } from "@/lib/plans/config";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { PLANS, isPlanId, type PlanLimits } from "@/lib/plans/config";
 import { formatBytes } from "@/lib/plans/format";
+
+// "trial": within the 3-day window after signup, no subscription needed
+// yet — full Basic-tier access. "active": a Razorpay subscription is
+// actually charging. "expired": trial ran out and there's no active
+// subscription — the dashboard layout blocks everything except Billing
+// (see src/app/dashboard/layout.tsx) until they subscribe.
+export type PlanAccessStatus = "trial" | "active" | "expired";
+
+export interface PlanAccess {
+  plan: PlanLimits;
+  accessStatus: PlanAccessStatus;
+  trialEndsAt: string | null;
+}
+
+// organizations.plan is the source of truth for which tier a *subscribed*
+// org is on — set by the Razorpay webhook when a subscription activates
+// (see src/app/api/razorpay/webhook). Before that (or after a
+// subscription lapses), trial_ends_at decides whether the org still gets
+// Basic-tier access for free or has to subscribe.
+export const getPlanAccess = cache(async (organizationId: string): Promise<PlanAccess> => {
+  const supabase = await createClient();
+  // organization_subscriptions' RLS only allows admins to read it (see
+  // migration 0043) — deliberately, so plain members can't see billing
+  // details via the API. But *whether* the org has an active subscription
+  // is an access-control fact every member's session needs, not just
+  // admins', so this specific read goes through the admin client to
+  // bypass that restriction rather than relaxing the policy itself.
+  const admin = createAdminClient();
+  const [{ data: org }, { data: subscription }] = await Promise.all([
+    supabase.from("organizations").select("plan, trial_ends_at").eq("id", organizationId).maybeSingle(),
+    admin.from("organization_subscriptions").select("status").eq("organization_id", organizationId).maybeSingle(),
+  ]);
+
+  if (subscription?.status === "active") {
+    const planId = org?.plan;
+    return {
+      plan: PLANS[planId && isPlanId(planId) ? planId : "basic"],
+      accessStatus: "active",
+      trialEndsAt: org?.trial_ends_at ?? null,
+    };
+  }
+
+  const trialEndsAt = org?.trial_ends_at ?? null;
+  const stillTrialing = trialEndsAt ? new Date(trialEndsAt) > new Date() : false;
+
+  return {
+    plan: PLANS.basic,
+    accessStatus: stillTrialing ? "trial" : "expired",
+    trialEndsAt,
+  };
+});
+
+// Kept as a thin wrapper — most call sites only ever need the plan
+// limits, not the trial/subscription status alongside them.
+export async function getPlanLimits(organizationId: string): Promise<PlanLimits> {
+  return (await getPlanAccess(organizationId)).plan;
+}
 
 export interface PlanUsage {
   plan: PlanLimits;
+  accessStatus: PlanAccessStatus;
+  trialEndsAt: string | null;
+  // Only meaningful while accessStatus is "trial" — null otherwise.
+  // Computed here (rather than inline where it's displayed) since that's
+  // a component render body, and Date.now() there would make the render
+  // impure.
+  trialDaysRemaining: number | null;
   emailsSentThisMonth: number;
   emailsRemaining: number;
   smsSentThisMonth: number;
@@ -21,7 +86,7 @@ export interface PlanUsage {
 // usage card, email/sms availability checks, quota checks before
 // send/upload) share one set of queries instead of re-fetching per call.
 export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUsage> => {
-  const plan = getPlanLimits(organizationId);
+  const { plan, accessStatus, trialEndsAt } = await getPlanAccess(organizationId);
   const supabase = await createClient();
 
   const startOfMonth = new Date();
@@ -59,8 +124,16 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
   const storageBytesUsed = storageBytes ?? 0;
   const additionalTeamMembers = teamMemberCount ?? 0;
 
+  const trialDaysRemaining =
+    accessStatus === "trial" && trialEndsAt
+      ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+      : null;
+
   return {
     plan,
+    accessStatus,
+    trialEndsAt,
+    trialDaysRemaining,
     emailsSentThisMonth,
     emailsRemaining: Math.max(0, plan.emailsPerMonth - emailsSentThisMonth),
     smsSentThisMonth,

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { UserRound, Church, Sparkles, KeyRound } from "lucide-react";
 import { requireUser, getProfile } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
+import { getPlanUsage } from "@/lib/plans/dal";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +21,7 @@ export default async function ProfilePage() {
   const user = await requireUser();
   const [profile, membership] = await Promise.all([getProfile(), requireOrganization()]);
   const canManage = membership.role === "owner" || membership.role === "admin";
+  const { plan, accessStatus, trialDaysRemaining } = await getPlanUsage(membership.organization.id);
 
   const memberCountLabel = MEMBER_COUNT_OPTIONS.find(
     (o) => o.value === membership.organization.member_count_range,
@@ -142,16 +145,30 @@ export default async function ProfilePage() {
             </CardTitle>
             <CardDescription>Your subscription</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             <div className="flex items-center justify-between text-sm">
               <div>
-                <p className="font-medium">Trial plan</p>
+                <p className="font-medium">{plan.name} plan</p>
                 <p className="text-muted-foreground">
-                  Billing and paid plans aren&apos;t set up yet — everyone is on a trial for now.
+                  {accessStatus === "trial"
+                    ? `Free trial — ${trialDaysRemaining} ${trialDaysRemaining === 1 ? "day" : "days"} left`
+                    : plan.priceLabel}
                 </p>
               </div>
-              <Badge variant="secondary">Trial</Badge>
+              <Badge variant="secondary">{accessStatus === "trial" ? "Trial" : plan.name}</Badge>
             </div>
+            <ul className="space-y-1 text-xs text-muted-foreground">
+              <li>{plan.emailsPerMonth.toLocaleString()} shared emails/month</li>
+              <li>{plan.smsPerMonth.toLocaleString()} SMS/month</li>
+              <li>Up to {plan.maxAdditionalTeamMembers} added team members</li>
+              <li>{plan.financeEnabled ? "Finance module included" : "Finance module not included"}</li>
+              <li>{plan.socialMediaEnabled ? "Social Media included" : "Social Media not included"}</li>
+            </ul>
+            {canManage && (
+              <Link href="/dashboard/billing" className="text-xs font-medium text-primary hover:underline">
+                Manage subscription →
+              </Link>
+            )}
           </CardContent>
         </Card>
       </div>

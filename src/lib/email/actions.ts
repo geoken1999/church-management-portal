@@ -16,7 +16,7 @@ import {
   MAX_ATTACHMENTS,
   MAX_TOTAL_ATTACHMENT_BYTES,
 } from "@/lib/email/validation";
-import { checkEmailQuota, checkStorageQuota } from "@/lib/plans/dal";
+import { checkEmailQuota, checkStorageQuota, getPlanUsage } from "@/lib/plans/dal";
 import type { EmailAttachment } from "@/lib/email/client";
 import type { EmailCampaignStatus, EmailCampaignProvider } from "@/types/database";
 
@@ -230,6 +230,11 @@ export async function saveEmailSmtpSettings(formData: FormData): Promise<SmtpSet
   const membership = await requireOrganization();
   if (membership.role !== "owner" && membership.role !== "admin") {
     return { error: "Only owners and admins can manage email settings." };
+  }
+
+  const { plan } = await getPlanUsage(membership.organization.id);
+  if (!plan.customSmtpEnabled) {
+    return { error: `Your own SMTP isn't included on the ${plan.name} plan.` };
   }
 
   const form = readSmtpForm(formData);

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
+import { getPlanUsage } from "@/lib/plans/dal";
 import {
   validateFundraiser,
   validateOffering,
@@ -35,6 +36,18 @@ async function organizationIdForRow(
   return data?.organization_id ?? null;
 }
 
+// The Finance module is gated by plan, on top of (and ahead of) the tab
+// permissions matrix — a plan gate applies to the whole org, including the
+// owner, whereas tab permissions only ever narrow what a "member" can do
+// within a feature the org already has.
+async function requireFinancePlan(organizationId: string): Promise<string | null> {
+  const { plan } = await getPlanUsage(organizationId);
+  if (!plan.financeEnabled) {
+    return `Finance isn't included on the ${plan.name} plan.`;
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Fund raisers
 // ---------------------------------------------------------------------------
@@ -64,6 +77,11 @@ export async function createFundraiser(
 ): Promise<FundraiserFormState> {
   const user = await requireUser();
   const organizationId = String(formData.get("organizationId") ?? "");
+
+  const planError = await requireFinancePlan(organizationId);
+  if (planError) {
+    return { error: planError };
+  }
 
   const access = await checkTabAccess(organizationId, "fundraisers", "write");
   if (!access.ok) {
@@ -111,6 +129,10 @@ export async function updateFundraiser(
   if (!organizationId) {
     return { error: "That fundraiser could not be found." };
   }
+  const planError = await requireFinancePlan(organizationId);
+  if (planError) {
+    return { error: planError };
+  }
   const access = await checkTabAccess(organizationId, "fundraisers", "write");
   if (!access.ok) {
     return { error: access.message };
@@ -153,6 +175,7 @@ export async function deleteFundraiser(formData: FormData) {
 
   const organizationId = await organizationIdForRow("fundraisers", id);
   if (!organizationId) return;
+  if (await requireFinancePlan(organizationId)) return;
   const access = await checkTabAccess(organizationId, "fundraisers", "delete");
   if (!access.ok) return;
 
@@ -188,6 +211,11 @@ export async function createOffering(
 ): Promise<OfferingFormState> {
   const user = await requireUser();
   const organizationId = String(formData.get("organizationId") ?? "");
+
+  const planError = await requireFinancePlan(organizationId);
+  if (planError) {
+    return { error: planError };
+  }
 
   const access = await checkTabAccess(organizationId, "offerings", "write");
   if (!access.ok) {
@@ -230,6 +258,10 @@ export async function updateOffering(
   if (!organizationId) {
     return { error: "That offering could not be found." };
   }
+  const planError = await requireFinancePlan(organizationId);
+  if (planError) {
+    return { error: planError };
+  }
   const access = await checkTabAccess(organizationId, "offerings", "write");
   if (!access.ok) {
     return { error: access.message };
@@ -267,6 +299,7 @@ export async function deleteOffering(formData: FormData) {
 
   const organizationId = await organizationIdForRow("offerings", id);
   if (!organizationId) return;
+  if (await requireFinancePlan(organizationId)) return;
   const access = await checkTabAccess(organizationId, "offerings", "delete");
   if (!access.ok) return;
 
@@ -304,6 +337,11 @@ export async function createDonation(
 ): Promise<DonationFormState> {
   const user = await requireUser();
   const organizationId = String(formData.get("organizationId") ?? "");
+
+  const planError = await requireFinancePlan(organizationId);
+  if (planError) {
+    return { error: planError };
+  }
 
   const access = await checkTabAccess(organizationId, "donations", "write");
   if (!access.ok) {
@@ -351,6 +389,10 @@ export async function updateDonation(
   if (!organizationId) {
     return { error: "That donation could not be found." };
   }
+  const planError = await requireFinancePlan(organizationId);
+  if (planError) {
+    return { error: planError };
+  }
   const access = await checkTabAccess(organizationId, "donations", "write");
   if (!access.ok) {
     return { error: access.message };
@@ -393,6 +435,7 @@ export async function deleteDonation(formData: FormData) {
 
   const organizationId = await organizationIdForRow("donations", id);
   if (!organizationId) return;
+  if (await requireFinancePlan(organizationId)) return;
   const access = await checkTabAccess(organizationId, "donations", "delete");
   if (!access.ok) return;
 

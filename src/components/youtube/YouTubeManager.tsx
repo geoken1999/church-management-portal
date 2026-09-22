@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition, type ChangeEvent } from "react";
+import { useRouter } from "next/navigation";
 import {
   Eye,
   ThumbsUp,
@@ -20,10 +21,12 @@ import {
   Check,
   Search,
   Upload,
+  Plus,
 } from "lucide-react";
 import { YouTubeIcon } from "@/components/icons/YouTubeIcon";
 import {
   disconnectYouTube,
+  switchYouTubeChannel,
   loadMoreYouTubeVideos,
   loadMoreYouTubeComments,
   replyToYouTubeComment,
@@ -39,7 +42,7 @@ import {
   updateYouTubeThumbnail,
   notifyYouTubeVideoUploaded,
 } from "@/lib/youtube/actions";
-import type { YouTubeConnectionSummary, YouTubeDashboardData } from "@/lib/youtube/dal";
+import type { YouTubeConnectionSummary, YouTubeDashboardData, YouTubeChannelOption } from "@/lib/youtube/dal";
 import { formatDuration } from "@/lib/youtube/format";
 import type {
   YouTubeVideo,
@@ -126,6 +129,82 @@ function ConnectYouTubeCard({ canManage }: { canManage: boolean }) {
 }
 
 // ---------------------------------------------------------------------------
+// Channel switcher
+// ---------------------------------------------------------------------------
+
+function ChannelSwitcher({
+  organizationId,
+  channels,
+  canManage,
+}: {
+  organizationId: string;
+  channels: YouTubeChannelOption[];
+  canManage: boolean;
+}) {
+  const router = useRouter();
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+
+  if (channels.length <= 1 && !canManage) return null;
+
+  function handleSwitch(channel: YouTubeChannelOption) {
+    if (channel.isActive || switchingId) return;
+    setError(null);
+    setSwitchingId(channel.id);
+    startTransition(async () => {
+      const result = await switchYouTubeChannel(organizationId, channel.id);
+      setSwitchingId(null);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {channels.map((channel) => (
+          <button
+            key={channel.id}
+            type="button"
+            onClick={() => handleSwitch(channel)}
+            disabled={switchingId !== null}
+            className={`flex items-center gap-2 rounded-full border px-2.5 py-1 text-sm transition-colors disabled:opacity-60 ${
+              channel.isActive
+                ? "border-primary bg-primary/5 font-medium text-foreground"
+                : "border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            }`}
+          >
+            {channel.thumbnailUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={channel.thumbnailUrl} alt={channel.channelTitle} className="size-5 shrink-0 rounded-full object-cover" />
+            ) : (
+              <YouTubeIcon className="size-4 shrink-0" />
+            )}
+            <span className="max-w-40 truncate">{channel.channelTitle}</span>
+            {switchingId === channel.id && <span className="text-xs text-muted-foreground">Switching...</span>}
+          </button>
+        ))}
+        {canManage && (
+          <Button type="button" variant="outline" size="sm" nativeButton={false} render={<a href="/api/youtube/connect" />}>
+            <Plus className="size-3.5" />
+            Add channel
+          </Button>
+        )}
+      </div>
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Header
 // ---------------------------------------------------------------------------
 
@@ -183,6 +262,7 @@ function YouTubeHeader({
             </Button>
             <form action={disconnectYouTube}>
               <input type="hidden" name="organizationId" value={organizationId} />
+              <input type="hidden" name="connectionId" value={channel.id} />
               <Button type="submit" variant="ghost" size="sm">
                 Disconnect
               </Button>
@@ -1730,10 +1810,12 @@ export function YouTubeManager({
   organizationId,
   canManage,
   data,
+  channels,
 }: {
   organizationId: string;
   canManage: boolean;
   data: YouTubeDashboardData;
+  channels: YouTubeChannelOption[];
 }) {
   if (!data.connected) {
     return <ConnectYouTubeCard canManage={canManage} />;
@@ -1741,6 +1823,8 @@ export function YouTubeManager({
 
   return (
     <div className="space-y-4">
+      <ChannelSwitcher organizationId={organizationId} channels={channels} canManage={canManage} />
+
       <YouTubeHeader
         organizationId={organizationId}
         channel={data.channel}

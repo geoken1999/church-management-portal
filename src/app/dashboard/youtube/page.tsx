@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
-import { getYouTubeDashboardData } from "@/lib/youtube/dal";
+import { getYouTubeDashboardData, getYouTubeConnections } from "@/lib/youtube/dal";
 import { YouTubeManagerClient } from "@/components/youtube/YouTubeManagerClient";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
@@ -40,7 +40,7 @@ export default async function YouTubePage({
     return <AccessRestricted label="YouTube" />;
   }
 
-  const data = await getYouTubeDashboardData(organizationId);
+  const [data, channels] = await Promise.all([getYouTubeDashboardData(organizationId), getYouTubeConnections(organizationId)]);
   const statusNotice = status ? STATUS_MESSAGES[status] : undefined;
 
   return (
@@ -58,7 +58,7 @@ export default async function YouTubePage({
         </Alert>
       )}
 
-      <YouTubeManagerClient organizationId={organizationId} canManage={canManage} data={data} />
+      <YouTubeManagerClient organizationId={organizationId} canManage={canManage} data={data} channels={channels} />
     </div>
   );
 }

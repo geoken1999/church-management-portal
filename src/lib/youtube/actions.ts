@@ -37,13 +37,69 @@ const YOUTUBE_PATH = "/dashboard/youtube";
 export async function disconnectYouTube(formData: FormData) {
   await requireUser();
   const organizationId = String(formData.get("organizationId") ?? "");
+  const connectionId = String(formData.get("connectionId") ?? "");
 
   const supabase = await createClient();
   // RLS restricts this to admins; a non-admin's request simply deletes
   // nothing rather than erroring.
-  await supabase.from("youtube_connections").delete().eq("organization_id", organizationId);
+  const { data: deleted } = await supabase
+    .from("youtube_connections")
+    .delete()
+    .eq("id", connectionId)
+    .eq("organization_id", organizationId)
+    .select("is_active")
+    .maybeSingle();
+
+  // Disconnecting the active channel leaves the org with zero active
+  // channels even if others are still connected — promote the
+  // longest-connected remaining one so the dashboard doesn't go blank
+  // until someone thinks to switch manually.
+  if (deleted?.is_active) {
+    const { data: nextChannel } = await supabase
+      .from("youtube_connections")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (nextChannel) {
+      await supabase.from("youtube_connections").update({ is_active: true }).eq("id", nextChannel.id);
+    }
+  }
 
   revalidatePath(YOUTUBE_PATH);
+}
+
+export interface SwitchChannelState {
+  error?: string;
+}
+
+export async function switchYouTubeChannel(organizationId: string, connectionId: string): Promise<SwitchChannelState> {
+  await requireUser();
+
+  const supabase = await createClient();
+  const { data: target } = await supabase
+    .from("youtube_connections")
+    .select("id")
+    .eq("id", connectionId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (!target) {
+    return { error: "That channel could not be found." };
+  }
+
+  // RLS scopes both writes to this org's admins already; sequential
+  // rather than a single statement since supabase-js has no multi-table
+  // transaction helper here — acceptable for an admin-driven, low-
+  // concurrency toggle like this one.
+  await supabase.from("youtube_connections").update({ is_active: false }).eq("organization_id", organizationId).eq("is_active", true);
+  const { error } = await supabase.from("youtube_connections").update({ is_active: true }).eq("id", connectionId);
+  if (error) {
+    return { error: "Couldn't switch channels. Please try again." };
+  }
+
+  revalidatePath(YOUTUBE_PATH);
+  return {};
 }
 
 // pageToken omitted refetches page 1 — used both for "Load more" and for

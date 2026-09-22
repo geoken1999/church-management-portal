@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { YouTubeDashboardData } from "@/lib/youtube/dal";
+import type { YouTubeDashboardData, YouTubeChannelOption } from "@/lib/youtube/dal";
 
 // YouTubeManager renders several locale-dependent dates (toLocaleString/
 // toLocaleDateString with the runtime's default locale) and "time ago" text
@@ -19,6 +19,7 @@ export function YouTubeManagerClient(props: {
   organizationId: string;
   canManage: boolean;
   data: YouTubeDashboardData;
+  channels: YouTubeChannelOption[];
 }) {
   return <YouTubeManager {...props} />;
 }

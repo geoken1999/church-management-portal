@@ -336,6 +336,7 @@ export type YouTubeConnection = {
   access_token: string;
   refresh_token: string;
   token_expires_at: string;
+  is_active: boolean;
   connected_by: string | null;
   created_at: string;
   updated_at: string;

@@ -52,6 +52,17 @@ export async function GET(request: Request) {
     const tokenExpiresAt = new Date(Date.now() + tokens.expiresInSeconds * 1000).toISOString();
 
     const supabase = await createClient();
+
+    // Connecting a channel — whether it's the first, a reconnect of an
+    // existing one, or an additional channel — always makes it the active
+    // one. Deactivate the rest first so the upsert below can't collide
+    // with the "one active channel per org" constraint.
+    await supabase
+      .from("youtube_connections")
+      .update({ is_active: false })
+      .eq("organization_id", membership.organization.id)
+      .eq("is_active", true);
+
     const { error } = await supabase.from("youtube_connections").upsert(
       {
         organization_id: membership.organization.id,
@@ -64,9 +75,10 @@ export async function GET(request: Request) {
         access_token: tokens.accessToken,
         refresh_token: tokens.refreshToken,
         token_expires_at: tokenExpiresAt,
+        is_active: true,
         connected_by: user.id,
       },
-      { onConflict: "organization_id" },
+      { onConflict: "organization_id,channel_id" },
     );
 
     if (error) {

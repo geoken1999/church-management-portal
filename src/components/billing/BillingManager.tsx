@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, X, CreditCard } from "lucide-react";
 import { startSubscriptionCheckout, cancelSubscription } from "@/lib/billing/actions";
-import { PLANS, type PlanId } from "@/lib/plans/config";
+import { PLANS, priceForInterval, type PlanId, type BillingInterval } from "@/lib/plans/config";
 import { PLAN_ORDER, planFeatureRows, planDescription } from "@/lib/plans/display";
 import type { OrganizationSubscription, SubscriptionStatus } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsList, TabsTab, TabsIndicator } from "@/components/ui/tabs";
 
 declare global {
   interface Window {
@@ -30,6 +31,8 @@ const STATUS_LABELS: Record<SubscriptionStatus, string> = {
   completed: "Completed",
   expired: "Expired",
 };
+
+const INTERVAL_LABELS: Record<BillingInterval, string> = { monthly: "Monthly", annual: "Annual" };
 
 const IN_PROGRESS_STATUSES: SubscriptionStatus[] = ["created", "authenticated", "active", "pending", "halted"];
 
@@ -66,6 +69,7 @@ export function BillingManager({
   prefill: { name: string; email: string; contact: string };
 }) {
   const router = useRouter();
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>(subscription?.billing_interval ?? "monthly");
   const [pendingPlanId, setPendingPlanId] = useState<PlanId | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +86,7 @@ export function BillingManager({
     setError(null);
     setPendingPlanId(planId);
 
-    const result = await startSubscriptionCheckout(planId);
+    const result = await startSubscriptionCheckout(planId, billingInterval);
     if (result.error || !result.subscriptionId || !result.keyId) {
       setError(result.error ?? "Couldn't start checkout.");
       setPendingPlanId(null);
@@ -99,7 +103,7 @@ export function BillingManager({
       key: result.keyId,
       subscription_id: result.subscriptionId,
       name: "KingdomFlow",
-      description: `${PLANS[planId].name} plan subscription`,
+      description: `${PLANS[planId].name} plan subscription (${INTERVAL_LABELS[billingInterval]})`,
       prefill: { name: prefill.name, email: prefill.email, contact: prefill.contact },
       theme: { color: "#6C47FF" },
       handler: () => {
@@ -156,7 +160,7 @@ export function BillingManager({
               </Badge>
             </div>
             <CardDescription>
-              {PLANS[currentPlanId].name} plan
+              {PLANS[currentPlanId].name} plan — {INTERVAL_LABELS[subscription.billing_interval]}
               {subscription.current_end && subscription.status === "active"
                 ? ` — renews ${new Date(subscription.current_end).toLocaleDateString()}`
                 : ""}
@@ -172,11 +176,31 @@ export function BillingManager({
         </Card>
       )}
 
+      <div className="flex justify-center">
+        <Tabs value={billingInterval} onValueChange={(v) => setBillingInterval((v as BillingInterval) ?? "monthly")}>
+          <TabsList>
+            <TabsIndicator />
+            <TabsTab value="monthly">Monthly</TabsTab>
+            <TabsTab value="annual">
+              Annual
+              <Badge variant="secondary" className="ml-1.5">
+                Save 10%
+              </Badge>
+            </TabsTab>
+          </TabsList>
+        </Tabs>
+      </div>
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {PLAN_ORDER.map((planId) => {
           const plan = PLANS[planId];
-          const isCurrent = planId === currentPlanId && subscription?.status === "active";
-          const blockedBySwitch = hasInProgressSubscription && subscription?.plan_id !== planId && !isCurrent;
+          const price = priceForInterval(plan, billingInterval);
+          const isCurrent =
+            planId === currentPlanId && subscription?.status === "active" && subscription.billing_interval === billingInterval;
+          const blockedBySwitch =
+            hasInProgressSubscription &&
+            !isCurrent &&
+            (subscription?.plan_id !== planId || subscription?.billing_interval !== billingInterval);
 
           return (
             <Card key={planId} className={isCurrent ? "border-primary shadow-lg" : undefined}>
@@ -185,7 +209,7 @@ export function BillingManager({
                   <CardTitle className="text-lg">{plan.name}</CardTitle>
                   {isCurrent && <Badge>Current plan</Badge>}
                 </div>
-                <p className="font-heading text-3xl font-bold">{plan.priceLabel}</p>
+                <p className="font-heading text-3xl font-bold">{price.label}</p>
                 <CardDescription>{planDescription(planId)}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">

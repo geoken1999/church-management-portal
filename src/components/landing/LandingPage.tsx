@@ -9,15 +9,12 @@ import {
   ShieldCheck,
   MapPin,
   Lock,
-  Check,
-  X,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { PLANS } from "@/lib/plans/config";
-import { PLAN_ORDER, planFeatureRows, planDescription } from "@/lib/plans/display";
+import { PricingSection } from "@/components/landing/PricingSection";
 
 const FEATURES = [
   {
@@ -143,43 +140,8 @@ export function LandingPage() {
               <h2 className="font-heading text-3xl font-bold tracking-tight">Simple, transparent pricing</h2>
               <p className="mt-3 text-muted-foreground">Start small. Upgrade as your church and ministry grow.</p>
             </div>
-            <div className="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-3">
-              {PLAN_ORDER.map((planId) => {
-                const plan = PLANS[planId];
-                const featured = planId === "premium";
-                return (
-                  <Card key={planId} className={featured ? "border-primary shadow-lg" : undefined}>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg">{plan.name}</CardTitle>
-                        {featured && <Badge>Most popular</Badge>}
-                      </div>
-                      <p className="font-heading text-3xl font-bold">{plan.priceLabel}</p>
-                      <CardDescription>{planDescription(planId)}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <ul className="space-y-2.5 text-sm">
-                        {planFeatureRows(plan).map((row) => (
-                          <li key={row.label} className="flex items-start gap-2">
-                            {row.included ? (
-                              <Check className="mt-0.5 size-4 shrink-0 text-primary" />
-                            ) : (
-                              <X className="mt-0.5 size-4 shrink-0 text-muted-foreground/50" />
-                            )}
-                            <span className={row.included ? "" : "text-muted-foreground/60"}>{row.label}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      <Button
-                        className="w-full"
-                        variant={featured ? "default" : "outline"}
-                        nativeButton={false}
-                        render={<Link href="/login">Get Started</Link>}
-                      />
-                    </CardContent>
-                  </Card>
-                );
-              })}
+            <div className="mt-12">
+              <PricingSection />
             </div>
             <p className="mt-8 text-center text-xs text-muted-foreground">
               Secure payments via Razorpay. Cancel anytime from your dashboard.

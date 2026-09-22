@@ -7,19 +7,24 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createRazorpayClient } from "@/lib/billing/razorpay";
 import { getRazorpayEnv, getRazorpayPlanId } from "@/lib/billing/env";
 import { getOrganizationSubscription } from "@/lib/billing/dal";
-import type { PlanId } from "@/lib/plans/config";
+import { isPlanId, isBillingInterval, type BillingInterval } from "@/lib/plans/config";
 
 const BILLING_PATH = "/dashboard/billing";
 
-function isPlanId(value: string): value is PlanId {
-  return value === "basic" || value === "premium" || value === "pro";
-}
-
 // A subscription in any of these states already has (or is in the
 // process of getting) a live mandate — a second checkout for the same
-// plan would create a duplicate, and switching plans mid-mandate isn't
-// supported yet (see cancelSubscription's doc comment).
+// plan+interval would create a duplicate, and switching plans or billing
+// interval mid-mandate isn't supported yet (see cancelSubscription's doc
+// comment).
 const IN_PROGRESS_STATUSES = ["created", "authenticated", "active", "pending"];
+
+// Razorpay requires a finite total_count; these approximate "until
+// cancelled" for each cadence — 120 monthly cycles (10 years) or 10
+// yearly cycles (also 10 years).
+const TOTAL_COUNT_BY_INTERVAL: Record<BillingInterval, number> = {
+  monthly: 120,
+  annual: 10,
+};
 
 export interface CheckoutState {
   error?: string;
@@ -27,7 +32,7 @@ export interface CheckoutState {
   keyId?: string;
 }
 
-export async function startSubscriptionCheckout(planId: string): Promise<CheckoutState> {
+export async function startSubscriptionCheckout(planId: string, billingInterval: string): Promise<CheckoutState> {
   await requireUser();
   const membership = await requireOrganization();
 
@@ -37,28 +42,31 @@ export async function startSubscriptionCheckout(planId: string): Promise<Checkou
   if (!isPlanId(planId)) {
     return { error: "Select a valid plan." };
   }
+  if (!isBillingInterval(billingInterval)) {
+    return { error: "Select a valid billing interval." };
+  }
 
   const existing = await getOrganizationSubscription(membership.organization.id);
 
   if (existing && IN_PROGRESS_STATUSES.includes(existing.status)) {
-    if (existing.status === "created" && existing.plan_id === planId && existing.razorpay_subscription_id) {
-      // An earlier checkout for this same plan was started but never
-      // completed (e.g. the customer closed the Razorpay popup) — reuse
-      // it rather than creating an orphaned duplicate subscription.
+    const samePlan = existing.plan_id === planId && existing.billing_interval === billingInterval;
+    if (existing.status === "created" && samePlan && existing.razorpay_subscription_id) {
+      // An earlier checkout for this same plan+interval was started but
+      // never completed (e.g. the customer closed the Razorpay popup) —
+      // reuse it rather than creating an orphaned duplicate subscription.
       return { subscriptionId: existing.razorpay_subscription_id, keyId: getRazorpayEnv().keyId };
     }
     return {
-      error:
-        existing.plan_id === planId
-          ? "You're already subscribed to this plan."
-          : "Cancel your current subscription before switching plans.",
+      error: samePlan
+        ? "You're already subscribed to this plan."
+        : "Cancel your current subscription before switching plans.",
     };
   }
 
   const razorpay = createRazorpayClient();
   let razorpayPlanId: string;
   try {
-    razorpayPlanId = getRazorpayPlanId(planId);
+    razorpayPlanId = getRazorpayPlanId(planId, billingInterval);
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Billing isn't configured yet." };
   }
@@ -68,10 +76,8 @@ export async function startSubscriptionCheckout(planId: string): Promise<Checkou
     subscription = await razorpay.subscriptions.create({
       plan_id: razorpayPlanId,
       customer_notify: 1,
-      // Razorpay requires a finite total_count — 120 monthly cycles (10
-      // years) is effectively "until cancelled" for this app's purposes.
-      total_count: 120,
-      notes: { organization_id: membership.organization.id, plan_id: planId },
+      total_count: TOTAL_COUNT_BY_INTERVAL[billingInterval],
+      notes: { organization_id: membership.organization.id, plan_id: planId, billing_interval: billingInterval },
     });
   } catch {
     return { error: "Couldn't start checkout. Please try again." };
@@ -83,6 +89,7 @@ export async function startSubscriptionCheckout(planId: string): Promise<Checkou
       organization_id: membership.organization.id,
       razorpay_subscription_id: subscription.id,
       plan_id: planId,
+      billing_interval: billingInterval,
       status: subscription.status,
       short_url: subscription.short_url,
     },

@@ -79,12 +79,15 @@ export type SubscriptionStatus =
   | "completed"
   | "expired";
 
+export type SubscriptionBillingInterval = "monthly" | "annual";
+
 export type OrganizationSubscription = {
   id: string;
   organization_id: string;
   razorpay_customer_id: string | null;
   razorpay_subscription_id: string | null;
   plan_id: string;
+  billing_interval: SubscriptionBillingInterval;
   status: SubscriptionStatus;
   short_url: string | null;
   current_start: string | null;

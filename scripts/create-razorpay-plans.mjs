@@ -1,16 +1,20 @@
-// One-time setup: creates the three Razorpay Plans that
-// startSubscriptionCheckout (src/lib/billing/actions.ts) creates
-// Subscriptions against. Plans are near-static (amount/period/interval
-// never change once billing is live), so they're provisioned once here
-// rather than created on demand at checkout.
+// One-time setup: creates the six Razorpay Plans (3 tiers × monthly/
+// annual) that startSubscriptionCheckout (src/lib/billing/actions.ts)
+// creates Subscriptions against. Plans are near-static (amount/period/
+// interval never change once billing is live), so they're provisioned
+// once here rather than created on demand at checkout. Annual is 10%
+// off 12× the monthly price (ANNUAL_DISCOUNT in src/lib/plans/config.ts).
 //
 // Usage (after setting RAZORPAY_KEY_ID/RAZORPAY_KEY_SECRET in .env.local):
 //   node --env-file=.env.local scripts/create-razorpay-plans.mjs
 //
-// Paste the three printed plan_xxxxx IDs into .env.local as
-// RAZORPAY_PLAN_ID_BASIC / _PREMIUM / _PRO. Safe to re-run — it always
-// creates new plans though, so only run it again if you intend to replace
-// all three (e.g. changing prices, since Razorpay plans are immutable).
+// Paste the printed plan_xxxxx IDs into .env.local. If you've already run
+// this before adding annual billing, your existing RAZORPAY_PLAN_ID_BASIC
+// / _PREMIUM / _PRO (monthly) still work as-is — you only need the new
+// _ANNUAL lines this run prints. Safe to re-run, but it always creates
+// new plans (Razorpay plans are immutable), so only take the lines for
+// whichever ones you actually need (new ones, or replacing a price
+// change).
 
 import Razorpay from "razorpay";
 
@@ -27,30 +31,49 @@ const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
 // Mirrors src/lib/plans/config.ts — kept as plain numbers here rather than
 // importing that module, since it's a TypeScript file with a
 // Next.js-specific "server-only" import this plain Node script can't load.
+const ANNUAL_DISCOUNT = 0.1;
 const TIERS = [
-  { envKey: "RAZORPAY_PLAN_ID_BASIC", name: "Basic", amountInRupees: 499 },
-  { envKey: "RAZORPAY_PLAN_ID_PREMIUM", name: "Premium", amountInRupees: 2499 },
-  { envKey: "RAZORPAY_PLAN_ID_PRO", name: "Pro", amountInRupees: 6999 },
+  { name: "Basic", monthlyRupees: 499, envPrefix: "RAZORPAY_PLAN_ID_BASIC" },
+  { name: "Premium", monthlyRupees: 2499, envPrefix: "RAZORPAY_PLAN_ID_PREMIUM" },
+  { name: "Pro", monthlyRupees: 6999, envPrefix: "RAZORPAY_PLAN_ID_PRO" },
 ];
+
+async function createPlan({ name, period, interval, amountInRupees, envKey }) {
+  const plan = await razorpay.plans.create({
+    period,
+    interval,
+    item: {
+      name: `KingdomFlow ${name} (${period})`,
+      amount: amountInRupees * 100, // Razorpay amounts are in paise
+      currency: "INR",
+      description: `KingdomFlow ${name} plan — ₹${amountInRupees}/${period === "monthly" ? "month" : "year"}`,
+    },
+  });
+  console.log(`${envKey}=${plan.id}`);
+}
 
 async function main() {
   console.log("Creating Razorpay plans...\n");
 
   for (const tier of TIERS) {
-    const plan = await razorpay.plans.create({
+    const annualRupees = Math.round(tier.monthlyRupees * 12 * (1 - ANNUAL_DISCOUNT));
+    await createPlan({
+      name: tier.name,
       period: "monthly",
       interval: 1,
-      item: {
-        name: `KingdomFlow ${tier.name}`,
-        amount: tier.amountInRupees * 100, // Razorpay amounts are in paise
-        currency: "INR",
-        description: `KingdomFlow ${tier.name} plan — ₹${tier.amountInRupees}/month`,
-      },
+      amountInRupees: tier.monthlyRupees,
+      envKey: tier.envPrefix,
     });
-    console.log(`${tier.envKey}=${plan.id}`);
+    await createPlan({
+      name: tier.name,
+      period: "yearly",
+      interval: 1,
+      amountInRupees: annualRupees,
+      envKey: `${tier.envPrefix}_ANNUAL`,
+    });
   }
 
-  console.log("\nPaste the lines above into .env.local, then restart the dev server.");
+  console.log("\nPaste whichever lines above you need into .env.local, then redeploy/restart.");
 }
 
 main().catch((err) => {

@@ -121,8 +121,15 @@ export async function createFieldDefinition(
 
   for (let attempt = 0; attempt < 3; attempt++) {
     const key = attempt === 0 ? baseKey : `${baseKey}_${attempt + 1}`;
+    // id/created_at/updated_at are real, valid values here (not left for
+    // the DB's own defaults to fill in) purely so this object satisfies
+    // MemberFieldDefinition's type for the backfillRequiredFieldDefault
+    // call below — Postgres would reject empty strings for a uuid/
+    // timestamptz column outright, which is what silently broke this
+    // before (surfacing as a misleading "permission" error).
+    const now = new Date().toISOString();
     const definition: MemberFieldDefinition = {
-      id: "",
+      id: crypto.randomUUID(),
       organization_id: organizationId,
       key,
       label: label.trim(),
@@ -130,8 +137,8 @@ export async function createFieldDefinition(
       options: fieldType === "select" ? options : null,
       required,
       sort_order: count ?? 0,
-      created_at: "",
-      updated_at: "",
+      created_at: now,
+      updated_at: now,
     };
     const { error } = await supabase.from("member_field_definitions").insert(definition);
 

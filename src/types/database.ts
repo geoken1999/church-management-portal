@@ -455,6 +455,23 @@ export type Donation = {
   updated_at: string;
 };
 
+export type SupportTicketCategory = "technical" | "billing" | "feature_request" | "account" | "other";
+export type SupportTicketUrgency = "low" | "medium" | "high" | "urgent";
+export type SupportTicketStatus = "open" | "in_progress" | "resolved" | "closed";
+
+export type SupportTicket = {
+  id: string;
+  organization_id: string;
+  created_by: string | null;
+  subject: string;
+  description: string;
+  category: SupportTicketCategory;
+  urgency: SupportTicketUrgency;
+  status: SupportTicketStatus;
+  created_at: string;
+  updated_at: string;
+};
+
 export type NotificationType =
   | "member_request"
   | "youtube_video_uploaded"
@@ -800,6 +817,27 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "fundraisers";
             referencedColumns: ["id"];
+          },
+        ];
+      };
+      support_tickets: {
+        Row: SupportTicket;
+        Insert: Partial<SupportTicket> & Pick<SupportTicket, "organization_id" | "subject" | "description" | "category">;
+        Update: Partial<SupportTicket>;
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "support_tickets_profile_fk";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["auth_user_id"];
           },
         ];
       };

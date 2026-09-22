@@ -25,6 +25,8 @@ import {
   Gift,
   Lock,
   CreditCard,
+  BookOpen,
+  LifeBuoy,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { YouTubeIcon } from "@/components/icons/YouTubeIcon";
@@ -98,6 +100,13 @@ const NAV_GROUPS = [
       { href: "/dashboard/instagram", label: "Instagram", icon: InstagramIcon, tab: "instagram" as TabKey, planFeature: "socialMedia" as PlanFeature, managerOnly: false },
       { href: "/dashboard/youtube", label: "YouTube", icon: YouTubeIcon, tab: "youtube" as TabKey, planFeature: "socialMedia" as PlanFeature, managerOnly: false },
       { href: "/dashboard/facebook", label: "Facebook", icon: FacebookIcon, tab: "facebook" as TabKey, planFeature: "socialMedia" as PlanFeature, managerOnly: false },
+    ],
+  },
+  {
+    label: "Help",
+    items: [
+      { href: "/dashboard/docs", label: "Documentation", icon: BookOpen, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/support", label: "Support", icon: LifeBuoy, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
 ];

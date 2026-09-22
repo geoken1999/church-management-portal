@@ -29,6 +29,7 @@ import {
   LifeBuoy,
   Users2,
   FileText,
+  FolderOpen,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { YouTubeIcon } from "@/components/icons/YouTubeIcon";
@@ -86,6 +87,7 @@ const NAV_GROUPS = [
     label: "Tools",
     items: [
       { href: "/dashboard/forms", label: "Forms", icon: FileText, tab: "forms" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/folder", label: "Folder", icon: FolderOpen, tab: "folder" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
   {

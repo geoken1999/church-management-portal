@@ -238,6 +238,31 @@ export type CommitteeMember = {
   updated_at: string;
 };
 
+export type FolderCategory = {
+  id: string;
+  organization_id: string;
+  name: string;
+  share_token: string;
+  share_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SharedDocument = {
+  id: string;
+  organization_id: string;
+  category_id: string | null;
+  title: string;
+  file_path: string;
+  file_type: string;
+  file_size: number;
+  share_token: string;
+  share_enabled: boolean;
+  uploaded_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type FormFieldType = "text" | "textarea" | "number" | "email" | "phone" | "date" | "checkbox" | "select";
 
 export type FormField = {
@@ -941,6 +966,48 @@ export type Database = {
           },
         ];
       };
+      shared_documents: {
+        Row: SharedDocument;
+        Insert: Partial<SharedDocument> & Pick<SharedDocument, "organization_id" | "title" | "file_path" | "file_type" | "file_size">;
+        Update: Partial<SharedDocument>;
+        Relationships: [
+          {
+            foreignKeyName: "shared_documents_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "shared_documents_profile_fk";
+            columns: ["uploaded_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["auth_user_id"];
+          },
+          {
+            foreignKeyName: "shared_documents_category_id_fkey";
+            columns: ["category_id"];
+            isOneToOne: false;
+            referencedRelation: "folder_categories";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      folder_categories: {
+        Row: FolderCategory;
+        Insert: Partial<FolderCategory> & Pick<FolderCategory, "organization_id" | "name">;
+        Update: Partial<FolderCategory>;
+        Relationships: [
+          {
+            foreignKeyName: "folder_categories_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       committee_members: {
         Row: CommitteeMember;
         Insert: Partial<CommitteeMember> & Pick<CommitteeMember, "organization_id" | "member_id" | "committee_name" | "role">;
@@ -1255,6 +1322,22 @@ export type Database = {
       };
       get_shared_worship_document: {
         Args: { token: string };
+        Returns: { title: string; file_path: string; file_type: string }[];
+      };
+      get_shared_document: {
+        Args: { token: string };
+        Returns: { title: string; file_path: string; file_type: string }[];
+      };
+      get_shared_category: {
+        Args: { token: string };
+        Returns: { id: string; name: string }[];
+      };
+      get_shared_category_documents: {
+        Args: { token: string };
+        Returns: { id: string; title: string; file_type: string; file_size: number; created_at: string }[];
+      };
+      get_shared_category_document: {
+        Args: { token: string; doc_id: string };
         Returns: { title: string; file_path: string; file_type: string }[];
       };
       delete_instagram_connection_by_ig_user: {

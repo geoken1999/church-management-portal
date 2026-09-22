@@ -6,6 +6,7 @@ import type { TabAccess, TabPermissions } from "@/types/database";
 export const TAB_KEYS = [
   "branches",
   "members",
+  "attendance",
   "leaders",
   "youth",
   "committee",
@@ -16,6 +17,7 @@ export const TAB_KEYS = [
   "todos",
   "forms",
   "folder",
+  "reports",
   "fundraisers",
   "offerings",
   "donations",
@@ -31,6 +33,7 @@ export type TabKey = (typeof TAB_KEYS)[number];
 export const TAB_LABELS: Record<TabKey, string> = {
   branches: "Branches",
   members: "Members",
+  attendance: "Attendance",
   leaders: "Leaders",
   youth: "Youth",
   committee: "Committee",
@@ -41,6 +44,7 @@ export const TAB_LABELS: Record<TabKey, string> = {
   todos: "To Do",
   forms: "Forms",
   folder: "Folder",
+  reports: "Reports",
   fundraisers: "Fund Raiser",
   offerings: "Offering",
   donations: "Donation",

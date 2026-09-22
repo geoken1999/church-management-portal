@@ -476,6 +476,28 @@ export type Event = {
   updated_at: string;
 };
 
+export type AttendanceSession = {
+  id: string;
+  organization_id: string;
+  branch_id: string | null;
+  event_id: string | null;
+  occurrence_date: string;
+  title: string;
+  notes: string | null;
+  headcount: number | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AttendanceRecord = {
+  id: string;
+  organization_id: string;
+  session_id: string;
+  member_id: string;
+  created_at: string;
+};
+
 export type FundraiserStatus = "active" | "completed" | "cancelled";
 
 export type Fundraiser = {
@@ -1022,6 +1044,62 @@ export type Database = {
           },
           {
             foreignKeyName: "committee_members_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      attendance_sessions: {
+        Row: AttendanceSession;
+        Insert: Partial<AttendanceSession> & Pick<AttendanceSession, "organization_id" | "occurrence_date" | "title">;
+        Update: Partial<AttendanceSession>;
+        Relationships: [
+          {
+            foreignKeyName: "attendance_sessions_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "attendance_sessions_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "attendance_sessions_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "events";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      attendance_records: {
+        Row: AttendanceRecord;
+        Insert: Partial<AttendanceRecord> & Pick<AttendanceRecord, "organization_id" | "session_id" | "member_id">;
+        Update: Partial<AttendanceRecord>;
+        Relationships: [
+          {
+            foreignKeyName: "attendance_records_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "attendance_records_session_id_fkey";
+            columns: ["session_id"];
+            isOneToOne: false;
+            referencedRelation: "attendance_sessions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "attendance_records_member_id_fkey";
             columns: ["member_id"];
             isOneToOne: false;
             referencedRelation: "members";

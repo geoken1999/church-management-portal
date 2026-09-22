@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Menu,
   X,
+  Search,
   LayoutDashboard,
   UserRound,
   Users,
@@ -30,11 +31,14 @@ import {
   Users2,
   FileText,
   FolderOpen,
+  ClipboardCheck,
+  FileBarChart,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { YouTubeIcon } from "@/components/icons/YouTubeIcon";
 import { FacebookIcon } from "@/components/icons/FacebookIcon";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { ChurchLogoUpload } from "@/components/organizations/ChurchLogoUpload";
 import { OrgSwitcher } from "@/components/organizations/OrgSwitcher";
@@ -88,6 +92,8 @@ const NAV_GROUPS = [
     items: [
       { href: "/dashboard/forms", label: "Forms", icon: FileText, tab: "forms" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/folder", label: "Folder", icon: FolderOpen, tab: "folder" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/attendance", label: "Attendance", icon: ClipboardCheck, tab: "attendance" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/reports", label: "Reports", icon: FileBarChart, tab: "reports" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
   {
@@ -142,6 +148,7 @@ export function DashboardShell({
   children: ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [navSearch, setNavSearch] = useState("");
   const pathname = usePathname();
 
   const visibleGroups = NAV_GROUPS.map((group) => ({
@@ -152,9 +159,30 @@ export function DashboardShell({
     }),
   })).filter((group) => group.items.length > 0);
 
+  const query = navSearch.trim().toLowerCase();
+  const filteredGroups = query
+    ? visibleGroups
+        .map((group) => ({ ...group, items: group.items.filter((item) => item.label.toLowerCase().includes(query)) }))
+        .filter((group) => group.items.length > 0)
+    : visibleGroups;
+
   const nav = (
     <nav className="flex flex-col gap-4 p-3">
-      {visibleGroups.map((group) => (
+      <div className="relative px-0.5">
+        <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          type="search"
+          placeholder="Search tabs..."
+          className="h-8 pl-8"
+          value={navSearch}
+          onChange={(event) => setNavSearch(event.target.value)}
+          aria-label="Search tabs"
+        />
+      </div>
+      {filteredGroups.length === 0 && (
+        <p className="px-3 text-sm text-muted-foreground">No tabs match &quot;{navSearch.trim()}&quot;.</p>
+      )}
+      {filteredGroups.map((group) => (
         <div key={group.label} className="flex flex-col gap-1">
           <p className="px-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{group.label}</p>
           {group.items.map((item) => {

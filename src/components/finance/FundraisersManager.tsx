@@ -1,15 +1,26 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Pencil, Trash2, Target, UserRound, MapPin, CalendarDays } from "lucide-react";
+import { Plus, Pencil, Trash2, Target, UserRound, MapPin, CalendarDays, Link2, Landmark, Wallet } from "lucide-react";
 import {
   createFundraiser,
   updateFundraiser,
   deleteFundraiser,
+  saveOwnRazorpayAccount,
+  removeOwnRazorpayAccount,
+  updateFundraiserPaymentSettings,
+  requestFundraiserPayout,
+  cancelFundraiserPayoutRequest,
   type FundraiserFormState,
+  type RazorpayAccountState,
+  type FundraiserPaymentSettingsState,
+  type PayoutRequestState,
 } from "@/lib/finance/actions";
 import { FUNDRAISER_STATUSES } from "@/lib/finance/validation";
-import type { Branch, Fundraiser, FundraiserStatus, Member } from "@/types/database";
+import { SHARED_SERVICE_FEE_RATE, sharedServiceFee, sharedServiceNetAmount } from "@/lib/finance/fees";
+import type { Branch, Fundraiser, FundraiserPaymentMode, FundraiserStatus, Member } from "@/types/database";
+
+const SHARED_SERVICE_FEE_PERCENT = `${(SHARED_SERVICE_FEE_RATE * 100).toString()}%`;
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,7 +43,14 @@ import {
 
 type MemberBasic = Pick<Member, "id" | "first_name" | "last_name">;
 type BranchBasic = Pick<Branch, "id" | "name">;
-type FundraiserRow = Fundraiser & { raisedAmount: number; branches: BranchBasic | null; members: MemberBasic | null };
+type FundraiserRow = Fundraiser & {
+  raisedAmount: number;
+  sharedCollected: number;
+  sharedOwed: number;
+  pendingPayoutRequest: { id: string; amount: number } | null;
+  branches: BranchBasic | null;
+  members: MemberBasic | null;
+};
 
 const initialState: FundraiserFormState = {};
 
@@ -60,6 +78,334 @@ function formatDate(iso: string | null): string {
   if (!iso) return "";
   const [year, month, day] = iso.split("-").map(Number);
   return new Date(year, month - 1, day).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function CopyLinkRow({ link }: { link: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="flex items-center gap-1.5">
+      <Input readOnly value={link} className="h-8 text-xs" onFocus={(event) => event.target.select()} />
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => {
+          navigator.clipboard.writeText(link);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        }}
+      >
+        {copied ? "Copied" : "Copy"}
+      </Button>
+    </div>
+  );
+}
+
+const razorpayAccountInitialState: RazorpayAccountState = {};
+
+function RazorpayAccountCard({ organizationId, connected }: { organizationId: string; connected: boolean }) {
+  const [state, setState] = useState<RazorpayAccountState>(razorpayAccountInitialState);
+  const [pending, startTransition] = useTransition();
+  const [open, setOpen] = useState(false);
+
+  function handleSubmit(formData: FormData) {
+    startTransition(async () => {
+      const result = await saveOwnRazorpayAccount(state, formData);
+      setState(result);
+      if (result.success) setOpen(false);
+    });
+  }
+
+  return (
+    <Card>
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent">
+              <Landmark className="size-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-heading text-sm font-bold">Your Razorpay account</h3>
+              <p className="text-xs text-muted-foreground">
+                {connected
+                  ? "Connected — fundraisers set to \"Own account\" pay out straight to you."
+                  : "Connect your own Razorpay account to receive giving-link payments directly."}
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {!open && (
+              <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
+                {connected ? "Update" : "Connect"}
+              </Button>
+            )}
+            {connected && !open && (
+              <form action={removeOwnRazorpayAccount}>
+                <input type="hidden" name="organizationId" value={organizationId} />
+                <Button type="submit" size="sm" variant="ghost">
+                  Disconnect
+                </Button>
+              </form>
+            )}
+          </div>
+        </div>
+
+        {open && (
+          <form action={handleSubmit} className="space-y-3 border-t border-border pt-3">
+            <input type="hidden" name="organizationId" value={organizationId} />
+            {state.error && (
+              <Alert variant="destructive">
+                <AlertDescription>{state.error}</AlertDescription>
+              </Alert>
+            )}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="keyId" className="text-xs">
+                  Key ID
+                </Label>
+                <Input id="keyId" name="keyId" placeholder="rzp_live_xxxxxxxx" required />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="keySecret" className="text-xs">
+                  Key Secret
+                </Label>
+                <Input id="keySecret" name="keySecret" type="password" placeholder="••••••••••••" required />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Found under Settings → API Keys in your Razorpay Dashboard. Stored securely — never shown again after saving.
+            </p>
+            <div className="flex gap-2">
+              <Button type="submit" size="sm" disabled={pending}>
+                {pending ? "Saving..." : "Save"}
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+const paymentSettingsInitialState: FundraiserPaymentSettingsState = {};
+
+function GivingLinkSettings({
+  fundraiser,
+  siteUrl,
+  hasOwnAccount,
+  canWrite,
+}: {
+  fundraiser: Fundraiser;
+  siteUrl: string;
+  hasOwnAccount: boolean;
+  canWrite: boolean;
+}) {
+  const [state, setState] = useState<FundraiserPaymentSettingsState>(paymentSettingsInitialState);
+  const [pending, startTransition] = useTransition();
+  const [mode, setMode] = useState<FundraiserPaymentMode | "none">(fundraiser.payment_mode ?? "none");
+  const [enabled, setEnabled] = useState(fundraiser.payment_link_enabled);
+  const link = `${siteUrl}/give/${fundraiser.share_token}`;
+
+  function save(nextMode: FundraiserPaymentMode | "none", nextEnabled: boolean) {
+    setState(paymentSettingsInitialState);
+    const formData = new FormData();
+    formData.set("fundraiserId", fundraiser.id);
+    formData.set("paymentMode", nextMode);
+    if (nextEnabled) formData.set("enabled", "on");
+    startTransition(async () => {
+      const result = await updateFundraiserPaymentSettings(state, formData);
+      if (result.error) {
+        setState(result);
+        return;
+      }
+      setMode(nextMode);
+      setEnabled(nextEnabled && nextMode !== "none");
+    });
+  }
+
+  if (!canWrite) {
+    return enabled && mode !== "none" ? (
+      <div className="flex items-center gap-1.5 text-xs text-primary">
+        <Link2 className="size-3.5" />
+        Giving link enabled
+      </div>
+    ) : null;
+  }
+
+  return (
+    <div className="space-y-2 border-t border-border pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Label className="flex items-center gap-1.5 text-xs">
+          <Link2 className="size-3.5" />
+          Giving link
+        </Label>
+        <Select value={mode} onValueChange={(value) => save((value ?? "none") as FundraiserPaymentMode | "none", enabled)}>
+          <SelectTrigger size="sm" className="w-56">
+            <SelectValue>
+              {(value: string | null) =>
+                value === "own" ? "Own Razorpay account" : value === "shared" ? "Shared service" : "Off"
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Off</SelectItem>
+            <SelectItem value="shared">Shared service (KingdomFlow account)</SelectItem>
+            <SelectItem value="own" disabled={!hasOwnAccount}>
+              Own Razorpay account{!hasOwnAccount ? " (connect one above first)" : ""}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {mode === "shared" && (
+        <p className="text-xs text-muted-foreground">
+          KingdomFlow deducts a {SHARED_SERVICE_FEE_PERCENT} transaction fee from gifts collected this way before
+          paying it out to you — a donor giving ₹1,000 leaves {formatCurrency(sharedServiceNetAmount(1000))} owed to
+          your church.
+        </p>
+      )}
+
+      {state.error && (
+        <Alert variant="destructive">
+          <AlertDescription>{state.error}</AlertDescription>
+        </Alert>
+      )}
+
+      {mode !== "none" && (
+        <div className="flex items-center justify-between gap-2">
+          <Button type="button" size="sm" variant={enabled ? "outline" : "default"} onClick={() => save(mode, !enabled)} disabled={pending}>
+            {enabled ? "Disable link" : "Enable link"}
+          </Button>
+        </div>
+      )}
+
+      {mode !== "none" && enabled && <CopyLinkRow link={link} />}
+    </div>
+  );
+}
+
+const payoutRequestInitialState: PayoutRequestState = {};
+
+function formatCurrency(amount: number): string {
+  return `₹${amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// Only relevant for 'shared'-mode fundraisers — the church's own account
+// (payment_mode: 'own') never has money sitting on the platform to begin
+// with, so there's nothing to request. Rendered as one row per fundraiser
+// inside the wallet dialog below.
+function PayoutRequestRow({
+  fundraiserId,
+  fundraiserTitle,
+  sharedCollected,
+  sharedOwed,
+  pendingPayoutRequest,
+}: {
+  fundraiserId: string;
+  fundraiserTitle: string;
+  sharedCollected: number;
+  sharedOwed: number;
+  pendingPayoutRequest: { id: string; amount: number } | null;
+}) {
+  const [state, setState] = useState<PayoutRequestState>(payoutRequestInitialState);
+  const [pending, startTransition] = useTransition();
+
+  function handleRequest() {
+    setState(payoutRequestInitialState);
+    const formData = new FormData();
+    formData.set("fundraiserId", fundraiserId);
+    startTransition(async () => {
+      const result = await requestFundraiserPayout(state, formData);
+      setState(result);
+    });
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border border-border p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium">{fundraiserTitle}</p>
+          <p className="text-xs text-muted-foreground">
+            {formatCurrency(sharedCollected)} collected · {SHARED_SERVICE_FEE_PERCENT} fee ({formatCurrency(sharedServiceFee(sharedCollected))}) ·{" "}
+            {formatCurrency(sharedOwed)} owed to you
+          </p>
+        </div>
+        {pendingPayoutRequest ? (
+          <form action={cancelFundraiserPayoutRequest} className="flex items-center gap-2">
+            <input type="hidden" name="requestId" value={pendingPayoutRequest.id} />
+            <Badge variant="secondary">Requested — {formatCurrency(pendingPayoutRequest.amount)}</Badge>
+            <Button type="submit" size="sm" variant="ghost">
+              Cancel
+            </Button>
+          </form>
+        ) : sharedOwed > 0 ? (
+          <Button type="button" size="sm" variant="outline" onClick={handleRequest} disabled={pending}>
+            {pending ? "Requesting..." : "Request payout"}
+          </Button>
+        ) : sharedCollected > 0 ? (
+          <Badge variant="secondary">Fully paid out</Badge>
+        ) : (
+          <Badge variant="secondary">No gifts yet</Badge>
+        )}
+      </div>
+      {state.error && (
+        <Alert variant="destructive">
+          <AlertDescription>{state.error}</AlertDescription>
+        </Alert>
+      )}
+    </div>
+  );
+}
+
+function WalletBalanceButton({ fundraisers }: { fundraisers: FundraiserRow[] }) {
+  // Shows as soon as a fundraiser is set to shared mode, not only once
+  // something's actually been collected — otherwise the wallet is
+  // invisible exactly when someone's checking whether it's working.
+  const sharedFundraisers = fundraisers.filter((f) => f.payment_mode === "shared");
+  const totalOwed = sharedFundraisers.reduce((sum, f) => sum + f.sharedOwed, 0);
+  const hasPendingRequest = sharedFundraisers.some((f) => f.pendingPayoutRequest);
+
+  if (sharedFundraisers.length === 0) return null;
+
+  return (
+    <Dialog>
+      <DialogTrigger
+        render={
+          <Button type="button" variant="outline" className="gap-2">
+            <Wallet className="size-4 text-primary" />
+            <span className="font-heading font-bold">{formatCurrency(totalOwed)}</span>
+            <span className="text-muted-foreground">available</span>
+            {hasPendingRequest && <Badge variant="secondary">Requested</Badge>}
+          </Button>
+        }
+      />
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Shared service balance</DialogTitle>
+          <DialogDescription>
+            Money collected through KingdomFlow&apos;s shared Razorpay account, waiting to be wired to you — a{" "}
+            {SHARED_SERVICE_FEE_PERCENT} transaction fee is deducted before payout. Request a payout per campaign
+            below.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          {sharedFundraisers.map((fundraiser) => (
+            <PayoutRequestRow
+              key={fundraiser.id}
+              fundraiserId={fundraiser.id}
+              fundraiserTitle={fundraiser.title}
+              sharedCollected={fundraiser.sharedCollected}
+              sharedOwed={fundraiser.sharedOwed}
+              pendingPayoutRequest={fundraiser.pendingPayoutRequest}
+            />
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 type FieldErrorsProp = FundraiserFormState["fieldErrors"];
@@ -360,12 +706,16 @@ function FundraiserCard({
   fundraiser,
   branches,
   members,
+  siteUrl,
+  hasOwnAccount,
   canWrite,
   canDelete,
 }: {
   fundraiser: FundraiserRow;
   branches: BranchBasic[];
   members: MemberBasic[];
+  siteUrl: string;
+  hasOwnAccount: boolean;
   canWrite: boolean;
   canDelete: boolean;
 }) {
@@ -427,7 +777,9 @@ function FundraiserCard({
           <p className="text-xs text-muted-foreground">{percent.toFixed(0)}% of goal</p>
         </div>
 
-        {fundraiser.description && <p className="border-t border-border pt-3 text-sm text-muted-foreground">{fundraiser.description}</p>}
+        {fundraiser.description && <p className="text-sm text-muted-foreground">{fundraiser.description}</p>}
+
+        <GivingLinkSettings fundraiser={fundraiser} siteUrl={siteUrl} hasOwnAccount={hasOwnAccount} canWrite={canWrite} />
       </CardContent>
     </Card>
   );
@@ -438,6 +790,9 @@ export function FundraisersManager({
   fundraisers,
   branches,
   members,
+  siteUrl,
+  isOrgAdmin,
+  hasOwnAccount,
   canWrite,
   canDelete,
 }: {
@@ -445,13 +800,19 @@ export function FundraisersManager({
   fundraisers: FundraiserRow[];
   branches: BranchBasic[];
   members: MemberBasic[];
+  siteUrl: string;
+  isOrgAdmin: boolean;
+  hasOwnAccount: boolean;
   canWrite: boolean;
   canDelete: boolean;
 }) {
   return (
     <div className="space-y-4">
+      {isOrgAdmin && <RazorpayAccountCard organizationId={organizationId} connected={hasOwnAccount} />}
+
       {canWrite && (
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <WalletBalanceButton fundraisers={fundraisers} />
           <AddFundraiserDialog organizationId={organizationId} branches={branches} members={members} />
         </div>
       )}
@@ -476,6 +837,8 @@ export function FundraisersManager({
               fundraiser={fundraiser}
               branches={branches}
               members={members}
+              siteUrl={siteUrl}
+              hasOwnAccount={hasOwnAccount}
               canWrite={canWrite}
               canDelete={canDelete}
             />

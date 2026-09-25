@@ -16,6 +16,7 @@ import {
   Music,
   CalendarDays,
   MessageSquareText,
+  MessageCircle,
   Mail,
   ListTodo,
   HeartHandshake,
@@ -33,6 +34,7 @@ import {
   FolderOpen,
   ClipboardCheck,
   FileBarChart,
+  Calculator,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { YouTubeIcon } from "@/components/icons/YouTubeIcon";
@@ -94,6 +96,7 @@ const NAV_GROUPS = [
       { href: "/dashboard/folder", label: "Folder", icon: FolderOpen, tab: "folder" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/attendance", label: "Attendance", icon: ClipboardCheck, tab: "attendance" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/reports", label: "Reports", icon: FileBarChart, tab: "reports" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/accounting", label: "Accounting", icon: Calculator, tab: "accounting" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },
     ],
   },
   {
@@ -109,6 +112,7 @@ const NAV_GROUPS = [
     items: [
       { href: "/dashboard/email", label: "Email", icon: Mail, tab: "email" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/sms", label: "SMS", icon: MessageSquareText, tab: "sms" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/whatsapp", label: "WhatsApp", icon: MessageCircle, tab: "whatsapp" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
   {
@@ -226,7 +230,7 @@ export function DashboardShell({
 
   return (
     <div className="min-h-screen bg-background lg:flex">
-      <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:border-r lg:border-border lg:bg-card">
+      <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:border-r lg:border-border lg:bg-card print:hidden">
         {orgHeader}
         <Separator />
         {nav}
@@ -259,7 +263,7 @@ export function DashboardShell({
       )}
 
       <div className="flex min-h-screen flex-1 flex-col">
-        <header className="border-b border-border bg-card">
+        <header className="border-b border-border bg-card print:hidden">
           <div className="flex items-center justify-between px-4 py-4 sm:px-6">
             <Button
               type="button"
@@ -278,7 +282,7 @@ export function DashboardShell({
           </div>
         </header>
         {trialDaysRemaining !== null && (
-          <div className="flex items-center justify-center gap-2 bg-accent px-4 py-2 text-center text-sm text-accent-foreground">
+          <div className="flex items-center justify-center gap-2 bg-accent px-4 py-2 text-center text-sm text-accent-foreground print:hidden">
             <span>
               {trialDaysRemaining <= 0
                 ? "Your trial ends today."
@@ -291,7 +295,7 @@ export function DashboardShell({
             )}
           </div>
         )}
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6">{children}</main>
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6 print:max-w-none print:p-0">{children}</main>
       </div>
     </div>
   );

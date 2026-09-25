@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getBranches } from "@/lib/branches/dal";
 import { getLeaderMembers } from "@/lib/leaders/dal";
-import { getFundraisers } from "@/lib/finance/dal";
+import { getFundraisers, getOrganizationRazorpayAccount } from "@/lib/finance/dal";
 import { getPlanUsage } from "@/lib/plans/dal";
+import { getSiteUrl } from "@/lib/site-url";
 import { FundraisersManager } from "@/components/finance/FundraisersManager";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 import { UpgradeRequired } from "@/components/dashboard/UpgradeRequired";
@@ -25,13 +26,15 @@ export default async function FundraisersPage() {
     return <AccessRestricted label="Fund Raiser" />;
   }
 
-  const [fundraisers, branches, leaderMembers] = await Promise.all([
+  const [fundraisers, branches, leaderMembers, razorpayAccount] = await Promise.all([
     getFundraisers(organizationId),
     getBranches(organizationId),
     getLeaderMembers(organizationId),
+    getOrganizationRazorpayAccount(organizationId),
   ]);
 
   const branchOptions = branches.map((branch) => ({ id: branch.id, name: branch.name }));
+  const isOrgAdmin = membership.role === "owner" || membership.role === "admin";
 
   return (
     <div className="space-y-8">
@@ -47,6 +50,9 @@ export default async function FundraisersPage() {
         fundraisers={fundraisers}
         branches={branchOptions}
         members={leaderMembers}
+        siteUrl={getSiteUrl()}
+        isOrgAdmin={isOrgAdmin}
+        hasOwnAccount={Boolean(razorpayAccount)}
         canWrite={membership.tabAccess.fundraisers.write}
         canDelete={membership.tabAccess.fundraisers.delete}
       />

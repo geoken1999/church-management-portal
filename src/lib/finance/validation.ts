@@ -106,3 +106,34 @@ export function validateDonation(input: {
 
   return errors;
 }
+
+// ---------------------------------------------------------------------------
+// Fund Raiser giving links
+// ---------------------------------------------------------------------------
+
+// ₹1 minimum matches Razorpay's own floor for an order (100 paise); no
+// maximum — a donor can give as much as they choose.
+const MIN_GIVING_AMOUNT = 1;
+
+export function validateGivingAmount(raw: string): string | undefined {
+  if (!raw.trim()) return "Enter an amount.";
+  const amount = Number(raw);
+  if (Number.isNaN(amount)) return "Enter a valid amount.";
+  if (amount < MIN_GIVING_AMOUNT) return `Enter at least ₹${MIN_GIVING_AMOUNT}.`;
+  return undefined;
+}
+
+export function validateDonorName(raw: string): string | undefined {
+  if (!raw.trim()) return "Enter your name.";
+  return undefined;
+}
+
+export function validateRazorpayKeyId(raw: string): string | undefined {
+  if (!raw.trim()) return "Enter your Razorpay Key ID.";
+  return undefined;
+}
+
+export function validateRazorpayKeySecret(raw: string): string | undefined {
+  if (!raw.trim()) return "Enter your Razorpay Key Secret.";
+  return undefined;
+}

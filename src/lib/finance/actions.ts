@@ -1,21 +1,25 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { getPlanUsage } from "@/lib/plans/dal";
+import { sharedServiceNetAmount } from "@/lib/finance/fees";
 import {
   validateFundraiser,
   validateOffering,
   validateDonation,
+  validateRazorpayKeyId,
+  validateRazorpayKeySecret,
   FUNDRAISER_STATUSES,
   DONATION_METHODS,
   type FundraiserFieldErrors,
   type OfferingFieldErrors,
   type DonationFieldErrors,
 } from "@/lib/finance/validation";
-import type { DonationMethod, FundraiserStatus } from "@/types/database";
+import type { DonationMethod, FundraiserPaymentMode, FundraiserStatus } from "@/types/database";
 
 const FUNDRAISERS_PATH = "/dashboard/fundraisers";
 const OFFERINGS_PATH = "/dashboard/offerings";
@@ -40,7 +44,22 @@ async function organizationIdForRow(
 // permissions matrix — a plan gate applies to the whole org, including the
 // owner, whereas tab permissions only ever narrow what a "member" can do
 // within a feature the org already has.
-async function requireFinancePlan(organizationId: string): Promise<string | null> {
+// Connecting/removing the org's own Razorpay credentials is gated to
+// owner/admin specifically — unlike ordinary fundraiser edits, this isn't
+// something the tab-permissions matrix should be able to delegate to a
+// regular staff login, since it controls where real donation money flows.
+async function requireOrgAdmin(organizationId: string, authUserId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("organization_members")
+    .select("role")
+    .eq("organization_id", organizationId)
+    .eq("auth_user_id", authUserId)
+    .maybeSingle();
+  return data?.role === "owner" || data?.role === "admin";
+}
+
+export async function requireFinancePlan(organizationId: string): Promise<string | null> {
   const { plan } = await getPlanUsage(organizationId);
   if (!plan.financeEnabled) {
     return `Finance isn't included on the ${plan.name} plan.`;
@@ -443,5 +462,226 @@ export async function deleteDonation(formData: FormData) {
   await admin.from("donations").delete().eq("id", id);
 
   revalidatePath(DONATIONS_PATH);
+  revalidatePath(FUNDRAISERS_PATH);
+}
+
+// ---------------------------------------------------------------------------
+// Fund Raiser giving links — the church's own Razorpay account, and
+// per-fundraiser payment mode
+// ---------------------------------------------------------------------------
+
+export interface RazorpayAccountState {
+  error?: string;
+  success?: boolean;
+}
+
+export async function saveOwnRazorpayAccount(
+  _prevState: RazorpayAccountState,
+  formData: FormData,
+): Promise<RazorpayAccountState> {
+  const user = await requireUser();
+  const organizationId = String(formData.get("organizationId") ?? "");
+
+  if (await requireFinancePlan(organizationId)) {
+    return { error: "Finance isn't included on your current plan." };
+  }
+  if (!(await requireOrgAdmin(organizationId, user.id))) {
+    return { error: "Only an owner or admin can connect a Razorpay account." };
+  }
+
+  const keyId = String(formData.get("keyId") ?? "").trim();
+  const keySecret = String(formData.get("keySecret") ?? "").trim();
+  const keyIdError = validateRazorpayKeyId(keyId);
+  if (keyIdError) return { error: keyIdError };
+  const keySecretError = validateRazorpayKeySecret(keySecret);
+  if (keySecretError) return { error: keySecretError };
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("organization_razorpay_accounts")
+    .upsert({ organization_id: organizationId, key_id: keyId, key_secret: keySecret, connected_by: user.id }, { onConflict: "organization_id" });
+
+  if (error) {
+    return { error: "Couldn't save that Razorpay account. Please try again." };
+  }
+
+  revalidatePath(FUNDRAISERS_PATH);
+  return { success: true };
+}
+
+export async function removeOwnRazorpayAccount(formData: FormData) {
+  const user = await requireUser();
+  const organizationId = String(formData.get("organizationId") ?? "");
+
+  if (await requireFinancePlan(organizationId)) return;
+  if (!(await requireOrgAdmin(organizationId, user.id))) return;
+
+  const admin = createAdminClient();
+  await admin.from("organization_razorpay_accounts").delete().eq("organization_id", organizationId);
+
+  // Any fundraiser relying on the account that just disappeared would
+  // otherwise keep a live public link that can never actually complete a
+  // payment — turn those off rather than leave a broken link standing.
+  await admin
+    .from("fundraisers")
+    .update({ payment_mode: null, payment_link_enabled: false })
+    .eq("organization_id", organizationId)
+    .eq("payment_mode", "own");
+
+  revalidatePath(FUNDRAISERS_PATH);
+}
+
+export interface FundraiserPaymentSettingsState {
+  error?: string;
+  success?: boolean;
+}
+
+export async function updateFundraiserPaymentSettings(
+  _prevState: FundraiserPaymentSettingsState,
+  formData: FormData,
+): Promise<FundraiserPaymentSettingsState> {
+  await requireUser();
+  const fundraiserId = String(formData.get("fundraiserId") ?? "");
+
+  const organizationId = await organizationIdForRow("fundraisers", fundraiserId);
+  if (!organizationId) {
+    return { error: "That fundraiser could not be found." };
+  }
+  if (await requireFinancePlan(organizationId)) {
+    return { error: "Finance isn't included on your current plan." };
+  }
+  const access = await checkTabAccess(organizationId, "fundraisers", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
+
+  const modeRaw = String(formData.get("paymentMode") ?? "none");
+  const enabled = formData.get("enabled") === "on";
+
+  if (modeRaw === "none") {
+    const admin = createAdminClient();
+    await admin.from("fundraisers").update({ payment_mode: null, payment_link_enabled: false }).eq("id", fundraiserId);
+    revalidatePath(FUNDRAISERS_PATH);
+    return { success: true };
+  }
+
+  if (modeRaw !== "own" && modeRaw !== "shared") {
+    return { error: "Choose a valid payment mode." };
+  }
+  const paymentMode = modeRaw as FundraiserPaymentMode;
+
+  if (paymentMode === "own") {
+    const admin = createAdminClient();
+    const { data: account } = await admin
+      .from("organization_razorpay_accounts")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    if (!account) {
+      return { error: "Connect your Razorpay account first." };
+    }
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("fundraisers")
+    .update({ payment_mode: paymentMode, payment_link_enabled: enabled })
+    .eq("id", fundraiserId);
+
+  if (error) {
+    return { error: "Couldn't save the payment link settings. Please try again." };
+  }
+
+  revalidatePath(FUNDRAISERS_PATH);
+  return { success: true };
+}
+
+export interface PayoutRequestState {
+  error?: string;
+  success?: boolean;
+}
+
+// Asks the platform to pay out a 'shared'-mode fundraiser's collected
+// balance — this only ever creates a request row; see
+// /platform-admin/payouts for where it's actually fulfilled (still a
+// manual bank transfer, recorded there once done).
+export async function requestFundraiserPayout(
+  _prevState: PayoutRequestState,
+  formData: FormData,
+): Promise<PayoutRequestState> {
+  const user = await requireUser();
+  const fundraiserId = String(formData.get("fundraiserId") ?? "");
+
+  const organizationId = await organizationIdForRow("fundraisers", fundraiserId);
+  if (!organizationId) {
+    return { error: "That fundraiser could not be found." };
+  }
+  if (await requireFinancePlan(organizationId)) {
+    return { error: "Finance isn't included on your current plan." };
+  }
+  const access = await checkTabAccess(organizationId, "fundraisers", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
+
+  const admin = createAdminClient();
+
+  // Computed fresh here rather than trusting a client-submitted amount —
+  // this is what actually gets requested from the platform.
+  const [{ data: fundraiser }, { data: donations }, { data: payouts }, { data: existingPending }] = await Promise.all([
+    admin.from("fundraisers").select("payment_mode").eq("id", fundraiserId).maybeSingle(),
+    admin.from("donations").select("amount").eq("fundraiser_id", fundraiserId).eq("payment_mode", "shared"),
+    admin.from("fundraiser_payouts").select("amount").eq("fundraiser_id", fundraiserId),
+    admin.from("fundraiser_payout_requests").select("id").eq("fundraiser_id", fundraiserId).eq("status", "pending").maybeSingle(),
+  ]);
+
+  if (!fundraiser || fundraiser.payment_mode !== "shared") {
+    return { error: "This fundraiser isn't using the shared service." };
+  }
+  if (existingPending) {
+    return { error: "A payout request is already pending for this fundraiser." };
+  }
+
+  const collected = (donations ?? []).reduce((sum, row) => sum + row.amount, 0);
+  const paidOut = (payouts ?? []).reduce((sum, row) => sum + row.amount, 0);
+  const owed = sharedServiceNetAmount(collected) - paidOut;
+
+  if (owed <= 0) {
+    return { error: "There's nothing owed to request a payout for." };
+  }
+
+  const { error } = await admin.from("fundraiser_payout_requests").insert({
+    organization_id: organizationId,
+    fundraiser_id: fundraiserId,
+    amount: owed,
+    requested_by: user.id,
+  });
+
+  if (error) {
+    return { error: "Couldn't submit that payout request. Please try again." };
+  }
+
+  revalidatePath(FUNDRAISERS_PATH);
+  return { success: true };
+}
+
+export async function cancelFundraiserPayoutRequest(formData: FormData) {
+  await requireUser();
+  const requestId = String(formData.get("requestId") ?? "");
+
+  const admin = createAdminClient();
+  const { data: request } = await admin
+    .from("fundraiser_payout_requests")
+    .select("organization_id, status")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (!request || request.status !== "pending") return;
+
+  if (await requireFinancePlan(request.organization_id)) return;
+  const access = await checkTabAccess(request.organization_id, "fundraisers", "write");
+  if (!access.ok) return;
+
+  await admin.from("fundraiser_payout_requests").update({ status: "cancelled" }).eq("id", requestId);
+
   revalidatePath(FUNDRAISERS_PATH);
 }

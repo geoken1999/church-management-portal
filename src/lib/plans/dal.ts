@@ -76,6 +76,8 @@ export interface PlanUsage {
   emailsRemaining: number;
   smsSentThisMonth: number;
   smsRemaining: number;
+  whatsappSentThisMonth: number;
+  whatsappRemaining: number;
   storageBytesUsed: number;
   storageBytesRemaining: number;
   additionalTeamMembers: number;
@@ -93,7 +95,7 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  const [{ data: emailCampaigns }, { data: smsCampaigns }, { data: storageBytes }, { count: teamMemberCount }] =
+  const [{ data: emailCampaigns }, { data: smsCampaigns }, { data: whatsappCampaigns }, { data: storageBytes }, { count: teamMemberCount }] =
     await Promise.all([
       // Only 'shared' sends count against the quota — an org's own SMTP
       // (provider: 'smtp') doesn't touch our Resend account at all.
@@ -110,6 +112,14 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
         .select("sent_count")
         .eq("organization_id", organizationId)
         .gte("created_at", startOfMonth.toISOString()),
+      // Same shared-vs-own split as email: only 'shared'-mode WhatsApp
+      // sends touch our Twilio account; 'own' mode is the org's own bill.
+      supabase
+        .from("whatsapp_campaigns")
+        .select("sent_count")
+        .eq("organization_id", organizationId)
+        .eq("mode", "shared")
+        .gte("created_at", startOfMonth.toISOString()),
       supabase.rpc("get_organization_storage_bytes", { target_org_id: organizationId }),
       // The owner's own seat doesn't count against the added-members limit.
       supabase
@@ -121,6 +131,7 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
 
   const emailsSentThisMonth = (emailCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0);
   const smsSentThisMonth = (smsCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0);
+  const whatsappSentThisMonth = (whatsappCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0);
   const storageBytesUsed = storageBytes ?? 0;
   const additionalTeamMembers = teamMemberCount ?? 0;
 
@@ -138,6 +149,8 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
     emailsRemaining: Math.max(0, plan.emailsPerMonth - emailsSentThisMonth),
     smsSentThisMonth,
     smsRemaining: Math.max(0, plan.smsPerMonth - smsSentThisMonth),
+    whatsappSentThisMonth,
+    whatsappRemaining: Math.max(0, plan.whatsappPerMonth - whatsappSentThisMonth),
     storageBytesUsed,
     storageBytesRemaining: Math.max(0, plan.storageBytes - storageBytesUsed),
     additionalTeamMembers,
@@ -161,6 +174,17 @@ export async function checkSmsQuota(organizationId: string, recipientCount: numb
   const usage = await getPlanUsage(organizationId);
   if (recipientCount > usage.smsRemaining) {
     return `Sending to ${recipientCount} recipients would exceed your ${usage.plan.name} plan's ${usage.plan.smsPerMonth.toLocaleString()}/month SMS limit (${usage.smsRemaining.toLocaleString()} remaining). Upgrade your plan to send more.`;
+  }
+  return null;
+}
+
+// Called right before a 'shared'-mode WhatsApp send — an org's own
+// connected Twilio account bypasses this entirely (see
+// sendBulkWhatsAppAction), same as SMTP does for email.
+export async function checkWhatsAppQuota(organizationId: string, recipientCount: number): Promise<string | null> {
+  const usage = await getPlanUsage(organizationId);
+  if (recipientCount > usage.whatsappRemaining) {
+    return `Sending to ${recipientCount} recipients would exceed your ${usage.plan.name} plan's ${usage.plan.whatsappPerMonth.toLocaleString()}/month WhatsApp limit (${usage.whatsappRemaining.toLocaleString()} remaining) on the shared number. Connect your own WhatsApp number, or upgrade your plan.`;
   }
   return null;
 }

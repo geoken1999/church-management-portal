@@ -2,10 +2,11 @@ import "server-only";
 
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { sharedServiceNetAmount } from "@/lib/finance/fees";
 
 export const getFundraisers = cache(async (organizationId: string) => {
   const supabase = await createClient();
-  const [{ data: fundraisers }, { data: donations }] = await Promise.all([
+  const [{ data: fundraisers }, { data: donations }, { data: payouts }, { data: payoutRequests }] = await Promise.all([
     supabase
       .from("fundraisers")
       .select("*, branches(id, name), members(id, first_name, last_name)")
@@ -16,21 +17,48 @@ export const getFundraisers = cache(async (organizationId: string) => {
     // avoids adding a database function for one derived number.
     supabase
       .from("donations")
-      .select("fundraiser_id, amount")
+      .select("fundraiser_id, amount, payment_mode")
       .eq("organization_id", organizationId)
       .not("fundraiser_id", "is", null),
+    supabase.from("fundraiser_payouts").select("fundraiser_id, amount").eq("organization_id", organizationId),
+    supabase
+      .from("fundraiser_payout_requests")
+      .select("id, fundraiser_id, amount, status")
+      .eq("organization_id", organizationId)
+      .eq("status", "pending"),
   ]);
 
   const raisedByFundraiser = new Map<string, number>();
+  const sharedCollectedByFundraiser = new Map<string, number>();
   for (const donation of donations ?? []) {
     if (!donation.fundraiser_id) continue;
     raisedByFundraiser.set(donation.fundraiser_id, (raisedByFundraiser.get(donation.fundraiser_id) ?? 0) + donation.amount);
+    if (donation.payment_mode === "shared") {
+      sharedCollectedByFundraiser.set(donation.fundraiser_id, (sharedCollectedByFundraiser.get(donation.fundraiser_id) ?? 0) + donation.amount);
+    }
   }
 
-  return (fundraisers ?? []).map((fundraiser) => ({
-    ...fundraiser,
-    raisedAmount: raisedByFundraiser.get(fundraiser.id) ?? 0,
-  }));
+  const paidOutByFundraiser = new Map<string, number>();
+  for (const payout of payouts ?? []) {
+    paidOutByFundraiser.set(payout.fundraiser_id, (paidOutByFundraiser.get(payout.fundraiser_id) ?? 0) + payout.amount);
+  }
+
+  const pendingRequestByFundraiser = new Map<string, { id: string; amount: number }>();
+  for (const request of payoutRequests ?? []) {
+    pendingRequestByFundraiser.set(request.fundraiser_id, { id: request.id, amount: request.amount });
+  }
+
+  return (fundraisers ?? []).map((fundraiser) => {
+    const sharedCollected = sharedCollectedByFundraiser.get(fundraiser.id) ?? 0;
+    const sharedPaidOut = paidOutByFundraiser.get(fundraiser.id) ?? 0;
+    return {
+      ...fundraiser,
+      raisedAmount: raisedByFundraiser.get(fundraiser.id) ?? 0,
+      sharedCollected,
+      sharedOwed: sharedServiceNetAmount(sharedCollected) - sharedPaidOut,
+      pendingPayoutRequest: pendingRequestByFundraiser.get(fundraiser.id) ?? null,
+    };
+  });
 });
 
 // Slim shape for the Donation form's "link to a fundraiser" picker.
@@ -65,6 +93,19 @@ export const getDonations = cache(async (organizationId: string) => {
     .order("donated_on", { ascending: false });
 
   return data ?? [];
+});
+
+// Only the key_id (safe to show — it's not secret) plus whether a
+// key_secret is on file. The secret itself never leaves this query.
+export const getOrganizationRazorpayAccount = cache(async (organizationId: string) => {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("organization_razorpay_accounts")
+    .select("key_id, created_at")
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  return data;
 });
 
 export interface FinanceOverviewStats {

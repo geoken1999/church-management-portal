@@ -23,6 +23,7 @@ export interface PlanLimits {
   priceLabelAnnual: string;
   emailsPerMonth: number;
   smsPerMonth: number;
+  whatsappPerMonth: number;
   storageBytes: number;
   // How many logins an owner/admin can add beyond themselves (invited
   // members, and now manually-issued logins) — the org creator's own seat
@@ -64,6 +65,9 @@ export const PLANS: Record<PlanId, PlanLimits> = {
     // sent through the shared Twilio account, unlike email's Resend free
     // tier headroom.
     smsPerMonth: 50,
+    // Same shared-Twilio cost reasoning as SMS — only counts 'shared'-mode
+    // WhatsApp sends; an org's own connected number is unmetered.
+    whatsappPerMonth: 50,
     storageBytes: 1 * 1024 * 1024 * 1024, // 1GB
     maxAdditionalTeamMembers: 3,
     financeEnabled: false,
@@ -73,6 +77,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
   premium: tier("premium", "Premium", 2499, {
     emailsPerMonth: 3000,
     smsPerMonth: 300,
+    whatsappPerMonth: 300,
     storageBytes: 10 * 1024 * 1024 * 1024, // 10GB
     maxAdditionalTeamMembers: 10,
     financeEnabled: true,
@@ -82,6 +87,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
   pro: tier("pro", "Pro", 6999, {
     emailsPerMonth: 10000,
     smsPerMonth: 1000,
+    whatsappPerMonth: 1000,
     storageBytes: 50 * 1024 * 1024 * 1024, // 50GB
     maxAdditionalTeamMembers: 50,
     financeEnabled: true,

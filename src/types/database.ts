@@ -389,6 +389,60 @@ export type SmsCampaign = {
   created_at: string;
 };
 
+export type WhatsAppMode = "own" | "shared";
+
+export type OrganizationWhatsAppAccount = {
+  id: string;
+  organization_id: string;
+  account_sid: string;
+  auth_token: string;
+  whatsapp_number: string;
+  connected_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WhatsAppCampaignStatus = "sent" | "partial_failure" | "failed";
+
+export type WhatsAppCampaign = {
+  id: string;
+  organization_id: string;
+  mode: WhatsAppMode;
+  body: string;
+  recipient_count: number;
+  sent_count: number;
+  failed_count: number;
+  failed_recipients: { phone: string; error: string }[];
+  status: WhatsAppCampaignStatus;
+  sent_by: string | null;
+  created_at: string;
+};
+
+export type WhatsAppConversation = {
+  id: string;
+  organization_id: string;
+  phone_number: string;
+  member_id: string | null;
+  last_message_at: string;
+  last_message_preview: string | null;
+  unread_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WhatsAppMessageDirection = "inbound" | "outbound";
+
+export type WhatsAppMessage = {
+  id: string;
+  conversation_id: string;
+  organization_id: string;
+  direction: WhatsAppMessageDirection;
+  body: string;
+  twilio_sid: string | null;
+  status: string | null;
+  created_at: string;
+};
+
 export type EmailSmtpSettings = {
   id: string;
   organization_id: string;
@@ -500,6 +554,7 @@ export type AttendanceRecord = {
 };
 
 export type FundraiserStatus = "active" | "completed" | "cancelled";
+export type FundraiserPaymentMode = "own" | "shared";
 
 export type Fundraiser = {
   id: string;
@@ -512,7 +567,63 @@ export type Fundraiser = {
   start_date: string | null;
   end_date: string | null;
   status: FundraiserStatus;
+  payment_mode: FundraiserPaymentMode | null;
+  payment_link_enabled: boolean;
+  share_token: string;
   created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OrganizationRazorpayAccount = {
+  id: string;
+  organization_id: string;
+  key_id: string;
+  key_secret: string;
+  connected_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FundraiserPaymentOrderStatus = "created" | "paid" | "failed";
+
+export type FundraiserPaymentOrder = {
+  id: string;
+  organization_id: string;
+  fundraiser_id: string;
+  razorpay_order_id: string;
+  amount: number;
+  payment_mode: FundraiserPaymentMode;
+  status: FundraiserPaymentOrderStatus;
+  razorpay_payment_id: string | null;
+  donor_name: string;
+  donor_email: string | null;
+  donor_phone: string | null;
+  donation_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FundraiserPayout = {
+  id: string;
+  organization_id: string;
+  fundraiser_id: string;
+  amount: number;
+  note: string | null;
+  paid_by: string | null;
+  created_at: string;
+};
+
+export type FundraiserPayoutRequestStatus = "pending" | "paid" | "cancelled";
+
+export type FundraiserPayoutRequest = {
+  id: string;
+  organization_id: string;
+  fundraiser_id: string;
+  amount: number;
+  status: FundraiserPayoutRequestStatus;
+  requested_by: string | null;
+  resolved_payout_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -530,6 +641,69 @@ export type Offering = {
   updated_at: string;
 };
 
+export type AccountingCategoryType = "income" | "expense";
+
+export type AccountingCategory = {
+  id: string;
+  organization_id: string;
+  name: string;
+  type: AccountingCategoryType;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ExpensePaymentMethod = "cash" | "check" | "bank_transfer" | "online" | "other";
+
+export type Expense = {
+  id: string;
+  organization_id: string;
+  category_id: string | null;
+  branch_id: string | null;
+  amount: number;
+  payee: string | null;
+  expense_date: string;
+  payment_method: ExpensePaymentMethod;
+  notes: string | null;
+  recorded_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type InvoiceStatus = "unpaid" | "paid" | "cancelled";
+
+export type Invoice = {
+  id: string;
+  organization_id: string;
+  invoice_number: string;
+  branch_id: string | null;
+  bill_to_name: string;
+  bill_to_email: string | null;
+  bill_to_address: string | null;
+  issue_date: string;
+  due_date: string | null;
+  notes: string | null;
+  status: InvoiceStatus;
+  subtotal: number;
+  tax_rate: number;
+  tax_amount: number;
+  total: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type InvoiceItem = {
+  id: string;
+  invoice_id: string;
+  organization_id: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  amount: number;
+  sort_order: number;
+  created_at: string;
+};
+
 export type DonationMethod = "cash" | "check" | "bank_transfer" | "online" | "other";
 
 export type Donation = {
@@ -541,6 +715,7 @@ export type Donation = {
   donated_on: string;
   method: DonationMethod;
   fundraiser_id: string | null;
+  payment_mode: FundraiserPaymentMode | null;
   notes: string | null;
   recorded_by: string | null;
   created_at: string;
@@ -908,6 +1083,182 @@ export type Database = {
             columns: ["fundraiser_id"];
             isOneToOne: false;
             referencedRelation: "fundraisers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      accounting_categories: {
+        Row: AccountingCategory;
+        Insert: Partial<AccountingCategory> & Pick<AccountingCategory, "organization_id" | "name" | "type">;
+        Update: Partial<AccountingCategory>;
+        Relationships: [
+          {
+            foreignKeyName: "accounting_categories_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      expenses: {
+        Row: Expense;
+        Insert: Partial<Expense> & Pick<Expense, "organization_id" | "amount" | "expense_date">;
+        Update: Partial<Expense>;
+        Relationships: [
+          {
+            foreignKeyName: "expenses_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "expenses_category_id_fkey";
+            columns: ["category_id"];
+            isOneToOne: false;
+            referencedRelation: "accounting_categories";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "expenses_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      invoices: {
+        Row: Invoice;
+        Insert: Partial<Invoice> & Pick<Invoice, "organization_id" | "invoice_number" | "bill_to_name" | "issue_date">;
+        Update: Partial<Invoice>;
+        Relationships: [
+          {
+            foreignKeyName: "invoices_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoices_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      invoice_items: {
+        Row: InvoiceItem;
+        Insert: Partial<InvoiceItem> & Pick<InvoiceItem, "invoice_id" | "organization_id" | "description" | "unit_price" | "amount">;
+        Update: Partial<InvoiceItem>;
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey";
+            columns: ["invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoice_items_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      organization_razorpay_accounts: {
+        Row: OrganizationRazorpayAccount;
+        Insert: Partial<OrganizationRazorpayAccount> & Pick<OrganizationRazorpayAccount, "organization_id" | "key_id" | "key_secret">;
+        Update: Partial<OrganizationRazorpayAccount>;
+        Relationships: [
+          {
+            foreignKeyName: "organization_razorpay_accounts_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: true;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      fundraiser_payment_orders: {
+        Row: FundraiserPaymentOrder;
+        Insert: Partial<FundraiserPaymentOrder> &
+          Pick<FundraiserPaymentOrder, "organization_id" | "fundraiser_id" | "razorpay_order_id" | "amount" | "payment_mode" | "donor_name">;
+        Update: Partial<FundraiserPaymentOrder>;
+        Relationships: [
+          {
+            foreignKeyName: "fundraiser_payment_orders_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "fundraiser_payment_orders_fundraiser_id_fkey";
+            columns: ["fundraiser_id"];
+            isOneToOne: false;
+            referencedRelation: "fundraisers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "fundraiser_payment_orders_donation_id_fkey";
+            columns: ["donation_id"];
+            isOneToOne: false;
+            referencedRelation: "donations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      fundraiser_payouts: {
+        Row: FundraiserPayout;
+        Insert: Partial<FundraiserPayout> & Pick<FundraiserPayout, "organization_id" | "fundraiser_id" | "amount">;
+        Update: Partial<FundraiserPayout>;
+        Relationships: [
+          {
+            foreignKeyName: "fundraiser_payouts_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "fundraiser_payouts_fundraiser_id_fkey";
+            columns: ["fundraiser_id"];
+            isOneToOne: false;
+            referencedRelation: "fundraisers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      fundraiser_payout_requests: {
+        Row: FundraiserPayoutRequest;
+        Insert: Partial<FundraiserPayoutRequest> & Pick<FundraiserPayoutRequest, "organization_id" | "fundraiser_id" | "amount">;
+        Update: Partial<FundraiserPayoutRequest>;
+        Relationships: [
+          {
+            foreignKeyName: "fundraiser_payout_requests_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "fundraiser_payout_requests_fundraiser_id_fkey";
+            columns: ["fundraiser_id"];
+            isOneToOne: false;
+            referencedRelation: "fundraisers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "fundraiser_payout_requests_resolved_payout_id_fkey";
+            columns: ["resolved_payout_id"];
+            isOneToOne: false;
+            referencedRelation: "fundraiser_payouts";
             referencedColumns: ["id"];
           },
         ];
@@ -1312,6 +1663,84 @@ export type Database = {
           },
         ];
       };
+      organization_whatsapp_accounts: {
+        Row: OrganizationWhatsAppAccount;
+        Insert: Partial<OrganizationWhatsAppAccount> &
+          Pick<OrganizationWhatsAppAccount, "organization_id" | "account_sid" | "auth_token" | "whatsapp_number">;
+        Update: Partial<OrganizationWhatsAppAccount>;
+        Relationships: [
+          {
+            foreignKeyName: "organization_whatsapp_accounts_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: true;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      whatsapp_campaigns: {
+        Row: WhatsAppCampaign;
+        Insert: Partial<WhatsAppCampaign> & Pick<WhatsAppCampaign, "organization_id" | "mode" | "body" | "status">;
+        Update: Partial<WhatsAppCampaign>;
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_campaigns_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "whatsapp_campaigns_sent_by_fkey";
+            columns: ["sent_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["auth_user_id"];
+          },
+        ];
+      };
+      whatsapp_conversations: {
+        Row: WhatsAppConversation;
+        Insert: Partial<WhatsAppConversation> & Pick<WhatsAppConversation, "organization_id" | "phone_number">;
+        Update: Partial<WhatsAppConversation>;
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_conversations_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "whatsapp_conversations_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      whatsapp_messages: {
+        Row: WhatsAppMessage;
+        Insert: Partial<WhatsAppMessage> & Pick<WhatsAppMessage, "conversation_id" | "organization_id" | "direction" | "body">;
+        Update: Partial<WhatsAppMessage>;
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_messages_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "whatsapp_conversations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "whatsapp_messages_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       email_smtp_settings: {
         Row: EmailSmtpSettings;
         Insert: Partial<EmailSmtpSettings> &
@@ -1406,6 +1835,19 @@ export type Database = {
       get_shared_document: {
         Args: { token: string };
         Returns: { title: string; file_path: string; file_type: string }[];
+      };
+      get_shared_fundraiser: {
+        Args: { token: string };
+        Returns: {
+          id: string;
+          organization_id: string;
+          organization_name: string;
+          title: string;
+          description: string | null;
+          goal_amount: number;
+          raised_amount: number;
+          payment_mode: FundraiserPaymentMode | null;
+        }[];
       };
       get_shared_category: {
         Args: { token: string };

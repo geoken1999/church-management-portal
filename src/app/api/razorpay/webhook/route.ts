@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Razorpay } from "@/lib/billing/razorpay";
 import { getRazorpayWebhookSecret } from "@/lib/billing/env";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { finalizeGivingOrderPayment } from "@/lib/finance/razorpay-giving";
 
 // The source of truth for plan changes — startSubscriptionCheckout's DB
 // write only records what checkout was *started*; this is what confirms
@@ -33,6 +34,20 @@ export async function POST(request: Request) {
   const payload = JSON.parse(rawBody);
   const event: string = payload.event ?? "";
   const subscriptionEntity = payload.payload?.subscription?.entity;
+  const paymentEntity = payload.payload?.payment?.entity;
+
+  // Backup confirmation path for 'shared'-mode fundraiser giving — this
+  // webhook is on the platform's own Razorpay account, the same one
+  // 'shared' mode uses, so its events cover those payments too. 'own'
+  // mode orders are created against a different (the church's own)
+  // account, which has no webhook pointed at this app, so they rely on
+  // the Checkout success callback alone (see confirmGivingPayment). The
+  // callback is normally faster; this just catches it if the browser
+  // closed before that callback fired.
+  if (event === "payment.captured" && paymentEntity?.notes?.kind === "fundraiser_giving" && paymentEntity.order_id) {
+    await finalizeGivingOrderPayment(paymentEntity.order_id, paymentEntity.id);
+    return NextResponse.json({ ok: true });
+  }
 
   if (!subscriptionEntity?.id) {
     // A payment/refund/other event this app doesn't act on — ack so

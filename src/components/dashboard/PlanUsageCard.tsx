@@ -10,10 +10,18 @@ export async function PlanUsageCard({ organizationId }: { organizationId: string
 
   const emailPercent = Math.min(100, Math.round((usage.emailsSentThisMonth / usage.plan.emailsPerMonth) * 100));
   const smsPercent = Math.min(100, Math.round((usage.smsSentThisMonth / usage.plan.smsPerMonth) * 100));
-  const storagePercent = Math.min(100, Math.round((usage.storageBytesUsed / usage.plan.storageBytes) * 100));
+  const storageCeiling = usage.plan.storageBytes + usage.addonStorageBytes;
+  const storagePercent = Math.min(100, Math.round((usage.storageBytesUsed / storageCeiling) * 100));
   const emailExhausted = usage.emailsRemaining <= 0;
   const smsExhausted = usage.smsRemaining <= 0;
   const storageExhausted = usage.storageBytesRemaining <= 0;
+  // A send can legitimately push emailsSentThisMonth/smsSentThisMonth past
+  // the plan's own monthly figure once add-on credits are covering the
+  // overage (see checkEmailQuota/checkSmsQuota in plans/dal.ts) — clamped
+  // here so the bar itself never renders past 100%; the exact numbers
+  // still show in the text next to it.
+  const emailBarValue = Math.min(usage.emailsSentThisMonth, usage.plan.emailsPerMonth);
+  const smsBarValue = Math.min(usage.smsSentThisMonth, usage.plan.smsPerMonth);
 
   return (
     <Card className="max-w-lg">
@@ -35,15 +43,18 @@ export async function PlanUsageCard({ organizationId }: { organizationId: string
               {usage.emailsSentThisMonth.toLocaleString()} / {usage.plan.emailsPerMonth.toLocaleString()}
             </span>
           </div>
-          <Progress value={usage.emailsSentThisMonth} max={usage.plan.emailsPerMonth}>
+          <Progress value={emailBarValue} max={usage.plan.emailsPerMonth}>
             <ProgressTrack>
               <ProgressIndicator />
             </ProgressTrack>
           </Progress>
+          {usage.addonEmailCredits > 0 && (
+            <p className="text-xs text-muted-foreground">+ {usage.addonEmailCredits.toLocaleString()} add-on credits available</p>
+          )}
           {emailExhausted && (
             <p className="text-xs text-destructive">
-              You&apos;ve used this month&apos;s shared email limit. Your own SMTP is unaffected — upgrade your plan
-              for more shared sends.
+              You&apos;ve used this month&apos;s shared email limit. Your own SMTP is unaffected — buy an add-on pack
+              or upgrade your plan for more shared sends.
             </p>
           )}
         </div>
@@ -55,14 +66,17 @@ export async function PlanUsageCard({ organizationId }: { organizationId: string
               {usage.smsSentThisMonth.toLocaleString()} / {usage.plan.smsPerMonth.toLocaleString()}
             </span>
           </div>
-          <Progress value={usage.smsSentThisMonth} max={usage.plan.smsPerMonth}>
+          <Progress value={smsBarValue} max={usage.plan.smsPerMonth}>
             <ProgressTrack>
               <ProgressIndicator />
             </ProgressTrack>
           </Progress>
+          {usage.addonSmsCredits > 0 && (
+            <p className="text-xs text-muted-foreground">+ {usage.addonSmsCredits.toLocaleString()} add-on credits available</p>
+          )}
           {smsExhausted && (
             <p className="text-xs text-destructive">
-              You&apos;ve used this month&apos;s SMS limit — upgrade your plan to send more.
+              You&apos;ve used this month&apos;s SMS limit — buy an add-on pack or upgrade your plan to send more.
             </p>
           )}
         </div>
@@ -71,18 +85,21 @@ export async function PlanUsageCard({ organizationId }: { organizationId: string
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Storage used</span>
             <span className={storageExhausted ? "font-medium text-destructive" : "font-medium"}>
-              {formatBytes(usage.storageBytesUsed)} / {formatBytes(usage.plan.storageBytes)}
+              {formatBytes(usage.storageBytesUsed)} / {formatBytes(storageCeiling)}
             </span>
           </div>
-          <Progress value={usage.storageBytesUsed} max={usage.plan.storageBytes}>
+          <Progress value={usage.storageBytesUsed} max={storageCeiling}>
             <ProgressTrack>
               <ProgressIndicator />
             </ProgressTrack>
           </Progress>
+          {usage.addonStorageBytes > 0 && (
+            <p className="text-xs text-muted-foreground">Includes +{formatBytes(usage.addonStorageBytes)} from add-on packs</p>
+          )}
           {storageExhausted && (
             <p className="text-xs text-destructive">
-              You&apos;re out of storage. Upgrade your plan or remove old files (logo, worship documents, email
-              images) to free up space.
+              You&apos;re out of storage. Buy a storage add-on pack, upgrade your plan, or remove old files (logo,
+              worship documents, email images) to free up space.
             </p>
           )}
         </div>

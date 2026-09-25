@@ -7,6 +7,7 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { sendBulkSms } from "@/lib/sms/client";
 import { normalizePhoneNumber } from "@/lib/sms/validation";
 import { checkSmsQuota } from "@/lib/plans/dal";
+import { logPlatformEvent } from "@/lib/platform-events/log";
 import type { SmsCampaignStatus } from "@/types/database";
 
 const SMS_PATH = "/dashboard/sms";
@@ -74,7 +75,15 @@ export async function sendBulkSmsAction(formData: FormData): Promise<SendSmsStat
   try {
     result = await sendBulkSms({ body, recipients });
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Couldn't send that message." };
+    const message = err instanceof Error ? err.message : "Couldn't send that message.";
+    await logPlatformEvent({
+      level: "error",
+      source: "sms_send",
+      message: `SMS send failed: ${message}`,
+      organizationId: membership.organization.id,
+      metadata: { recipientCount: recipients.length },
+    });
+    return { error: message };
   }
 
   const status: SmsCampaignStatus =

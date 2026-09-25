@@ -10,6 +10,7 @@ import {
   verifyGivingPaymentSignature,
   finalizeGivingOrderPayment,
 } from "@/lib/finance/razorpay-giving";
+import { logPlatformEvent } from "@/lib/platform-events/log";
 import type { FundraiserPaymentMode } from "@/types/database";
 
 const FUNDRAISERS_PATH = "/dashboard/fundraisers";
@@ -81,6 +82,13 @@ export async function createGivingOrder(
     });
   } catch (err) {
     console.error("fundraiser giving order creation failed:", err);
+    await logPlatformEvent({
+      level: "error",
+      source: "fundraiser_giving",
+      message: "Razorpay giving order creation failed",
+      organizationId: fundraiser.organization_id,
+      metadata: { fundraiserId: fundraiser.id, paymentMode },
+    });
     return { error: "Couldn't start the payment. Please try again." };
   }
 

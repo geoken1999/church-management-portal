@@ -17,6 +17,7 @@ import {
   MAX_TOTAL_ATTACHMENT_BYTES,
 } from "@/lib/email/validation";
 import { checkEmailQuota, checkStorageQuota, getPlanUsage } from "@/lib/plans/dal";
+import { logPlatformEvent } from "@/lib/platform-events/log";
 import type { EmailAttachment } from "@/lib/email/client";
 import type { EmailCampaignStatus, EmailCampaignProvider } from "@/types/database";
 
@@ -135,7 +136,15 @@ export async function sendBulkEmailAction(formData: FormData): Promise<SendEmail
           attachments,
         });
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Couldn't send that email." };
+    const message = err instanceof Error ? err.message : "Couldn't send that email.";
+    await logPlatformEvent({
+      level: "error",
+      source: "email_send",
+      message: `Email send failed: ${message}`,
+      organizationId: membership.organization.id,
+      metadata: { recipientCount: recipients.length, provider },
+    });
+    return { error: message };
   }
 
   const status: EmailCampaignStatus =

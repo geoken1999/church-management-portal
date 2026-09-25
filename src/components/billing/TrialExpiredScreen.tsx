@@ -41,7 +41,7 @@ export function TrialExpiredScreen({
           </div>
           <h1 className="font-heading text-2xl font-bold tracking-tight">Your trial has ended</h1>
           <p className="mt-2 text-muted-foreground">
-            {organizationName}&apos;s 3-day trial is over.{" "}
+            {organizationName}&apos;s 14-day trial is over.{" "}
             {canManage
               ? "Subscribe to a plan below to keep using KingdomFlow."
               : "Ask an owner or admin to subscribe to a plan to keep using KingdomFlow."}

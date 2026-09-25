@@ -36,8 +36,30 @@ export type Organization = {
   // Basic-tier access without a subscription until this passes — see
   // getPlanAccess in src/lib/plans/dal.ts.
   trial_ends_at: string | null;
+  // Add-on pack balances (see plans/config.ts ADDON_PACKS) — running
+  // totals topped up by organization_addon_orders, never auto-reset.
+  addon_sms_credits: number;
+  addon_email_credits: number;
+  addon_whatsapp_credits: number;
+  addon_storage_bytes: number;
   created_at: string;
   updated_at: string;
+};
+
+export type AddonOrderStatus = "created" | "paid";
+
+export type OrganizationAddonOrder = {
+  id: string;
+  organization_id: string;
+  addon_type: "sms" | "email" | "whatsapp" | "storage";
+  pack_id: string;
+  credits: number;
+  amount: number;
+  razorpay_order_id: string;
+  razorpay_payment_id: string | null;
+  status: AddonOrderStatus;
+  created_at: string;
+  paid_at: string | null;
 };
 
 // Per-tab access for a "member"-role user — ignored for owner/admin, who
@@ -233,6 +255,27 @@ export type CommitteeMember = {
   member_id: string;
   committee_name: string;
   role: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Family = {
+  id: string;
+  organization_id: string;
+  name: string;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FamilyMember = {
+  id: string;
+  family_id: string;
+  organization_id: string;
+  member_id: string;
+  relationship: string;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -440,6 +483,36 @@ export type WhatsAppMessage = {
   body: string;
   twilio_sid: string | null;
   status: string | null;
+  created_at: string;
+};
+
+export type WidgetPosition = "bottom-right" | "bottom-left";
+
+export type WebsiteWidget = {
+  id: string;
+  organization_id: string;
+  share_token: string;
+  enabled: boolean;
+  primary_color: string;
+  position: WidgetPosition;
+  button_label: string;
+  greeting_title: string;
+  greeting_message: string;
+  fields: FormField[];
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WidgetSubmissionStatus = "new" | "read" | "archived";
+
+export type WidgetSubmission = {
+  id: string;
+  widget_id: string;
+  organization_id: string;
+  answers: Record<string, string | number | boolean | null>;
+  page_url: string | null;
+  status: WidgetSubmissionStatus;
   created_at: string;
 };
 
@@ -739,6 +812,18 @@ export type SupportTicket = {
   updated_at: string;
 };
 
+export type PlatformEventLevel = "info" | "warning" | "error";
+
+export type PlatformEvent = {
+  id: string;
+  level: PlatformEventLevel;
+  source: string;
+  message: string;
+  organization_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
 export type NotificationType =
   | "member_request"
   | "youtube_video_uploaded"
@@ -828,6 +913,21 @@ export type Database = {
             foreignKeyName: "organization_subscriptions_organization_id_fkey";
             columns: ["organization_id"];
             isOneToOne: true;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      organization_addon_orders: {
+        Row: OrganizationAddonOrder;
+        Insert: Partial<OrganizationAddonOrder> &
+          Pick<OrganizationAddonOrder, "organization_id" | "addon_type" | "pack_id" | "credits" | "amount" | "razorpay_order_id">;
+        Update: Partial<OrganizationAddonOrder>;
+        Relationships: [
+          {
+            foreignKeyName: "organization_addon_orders_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
             referencedRelation: "organizations";
             referencedColumns: ["id"];
           },
@@ -1263,6 +1363,20 @@ export type Database = {
           },
         ];
       };
+      platform_events: {
+        Row: PlatformEvent;
+        Insert: Partial<PlatformEvent> & Pick<PlatformEvent, "level" | "source" | "message">;
+        Update: Partial<PlatformEvent>;
+        Relationships: [
+          {
+            foreignKeyName: "platform_events_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       support_tickets: {
         Row: SupportTicket;
         Insert: Partial<SupportTicket> & Pick<SupportTicket, "organization_id" | "subject" | "description" | "category">;
@@ -1396,6 +1510,48 @@ export type Database = {
           },
           {
             foreignKeyName: "committee_members_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      families: {
+        Row: Family;
+        Insert: Partial<Family> & Pick<Family, "organization_id" | "name">;
+        Update: Partial<Family>;
+        Relationships: [
+          {
+            foreignKeyName: "families_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      family_members: {
+        Row: FamilyMember;
+        Insert: Partial<FamilyMember> & Pick<FamilyMember, "family_id" | "organization_id" | "member_id" | "relationship">;
+        Update: Partial<FamilyMember>;
+        Relationships: [
+          {
+            foreignKeyName: "family_members_family_id_fkey";
+            columns: ["family_id"];
+            isOneToOne: false;
+            referencedRelation: "families";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "family_members_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "family_members_member_id_fkey";
             columns: ["member_id"];
             isOneToOne: false;
             referencedRelation: "members";
@@ -1741,6 +1897,41 @@ export type Database = {
           },
         ];
       };
+      website_widgets: {
+        Row: WebsiteWidget;
+        Insert: Partial<WebsiteWidget> & Pick<WebsiteWidget, "organization_id">;
+        Update: Partial<WebsiteWidget>;
+        Relationships: [
+          {
+            foreignKeyName: "website_widgets_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: true;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      widget_submissions: {
+        Row: WidgetSubmission;
+        Insert: Partial<WidgetSubmission> & Pick<WidgetSubmission, "widget_id" | "organization_id">;
+        Update: Partial<WidgetSubmission>;
+        Relationships: [
+          {
+            foreignKeyName: "widget_submissions_widget_id_fkey";
+            columns: ["widget_id"];
+            isOneToOne: false;
+            referencedRelation: "website_widgets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "widget_submissions_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       email_smtp_settings: {
         Row: EmailSmtpSettings;
         Insert: Partial<EmailSmtpSettings> &
@@ -1884,6 +2075,22 @@ export type Database = {
       };
       submit_form_response: {
         Args: { form_slug: string; answers: Record<string, unknown> };
+        Returns: string;
+      };
+      get_public_widget: {
+        Args: { token: string };
+        Returns: {
+          widget_id: string;
+          primary_color: string;
+          position: WidgetPosition;
+          button_label: string;
+          greeting_title: string;
+          greeting_message: string;
+          fields: FormField[];
+        }[];
+      };
+      submit_widget_response: {
+        Args: { token: string; answers: Record<string, unknown>; page_url?: string | null };
         Returns: string;
       };
     };

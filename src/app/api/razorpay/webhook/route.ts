@@ -3,6 +3,8 @@ import { Razorpay } from "@/lib/billing/razorpay";
 import { getRazorpayWebhookSecret } from "@/lib/billing/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { finalizeGivingOrderPayment } from "@/lib/finance/razorpay-giving";
+import { finalizeAddonOrderPayment } from "@/lib/billing/addon-actions";
+import { logPlatformEvent } from "@/lib/platform-events/log";
 
 // The source of truth for plan changes — startSubscriptionCheckout's DB
 // write only records what checkout was *started*; this is what confirms
@@ -28,6 +30,7 @@ export async function POST(request: Request) {
   }
 
   if (!Razorpay.validateWebhookSignature(rawBody, signature, secret)) {
+    await logPlatformEvent({ level: "warning", source: "razorpay_webhook", message: "Invalid Razorpay webhook signature" });
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
@@ -46,6 +49,14 @@ export async function POST(request: Request) {
   // closed before that callback fired.
   if (event === "payment.captured" && paymentEntity?.notes?.kind === "fundraiser_giving" && paymentEntity.order_id) {
     await finalizeGivingOrderPayment(paymentEntity.order_id, paymentEntity.id);
+    return NextResponse.json({ ok: true });
+  }
+
+  // Backup confirmation path for add-on pack purchases, same reasoning as
+  // fundraiser_giving above — these are always on the platform's own
+  // account, so this webhook covers them too.
+  if (event === "payment.captured" && paymentEntity?.notes?.kind === "addon_purchase" && paymentEntity.order_id) {
+    await finalizeAddonOrderPayment(paymentEntity.order_id, paymentEntity.id);
     return NextResponse.json({ ok: true });
   }
 

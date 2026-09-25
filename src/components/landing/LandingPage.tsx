@@ -30,7 +30,7 @@ import { DashboardPreview } from "@/components/landing/DashboardPreview";
 
 const STATS = [
   { value: "20+", label: "built-in modules" },
-  { value: "3-day", label: "free trial, no card" },
+  { value: "14-day", label: "free trial, no card" },
   { value: "Multi-branch", label: "ready from day one" },
   { value: "Row-level", label: "security by Supabase" },
 ];
@@ -39,7 +39,7 @@ const STEPS = [
   {
     icon: Sparkles,
     title: "Create your church's account",
-    description: "Set your church's name, congregation size, branches, and country — done in under two minutes, with a 3-day full-access trial started automatically.",
+    description: "Set your church's name, congregation size, branches, and country — done in under two minutes, with a 14-day full-access trial started automatically.",
   },
   {
     icon: UserPlus,
@@ -173,7 +173,7 @@ const SECURITY_POINTS = [
 const FAQS = [
   {
     question: "Is there a free trial?",
-    answer: "Yes — every new organization gets 3 days of full Basic-plan access with no credit card required.",
+    answer: "Yes — every new organization gets 14 days of full Basic-plan access with no credit card required.",
   },
   {
     question: "What happens when the trial ends?",
@@ -240,7 +240,7 @@ export function LandingPage() {
               <Button size="lg" nativeButton={false} render={<Link href="/login">Get Started<ArrowRight className="size-4" /></Link>} />
               <Button size="lg" variant="outline" nativeButton={false} render={<a href="#pricing">See pricing</a>} />
             </div>
-            <p className="mt-4 text-xs text-muted-foreground">No credit card required · 3-day free trial · Cancel anytime</p>
+            <p className="mt-4 text-xs text-muted-foreground">No credit card required · 14-day free trial · Cancel anytime</p>
           </div>
 
           <div className="mt-16 sm:mt-20">

@@ -6,6 +6,7 @@ import { getPlanUsage } from "@/lib/plans/dal";
 import { getOrganizationSubscription } from "@/lib/billing/dal";
 import { isRazorpayConfigured } from "@/lib/billing/env";
 import { BillingManager } from "@/components/billing/BillingManager";
+import { AddonsManager } from "@/components/billing/AddonsManager";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export const metadata: Metadata = {
@@ -52,6 +53,21 @@ export default async function BillingPage() {
           name: profile ? `${profile.first_name} ${profile.last_name}`.trim() : membership.organization.name,
           email: user.email ?? "",
           contact: profile?.phone ?? "",
+        }}
+      />
+
+      <AddonsManager
+        razorpayConfigured={isRazorpayConfigured()}
+        prefill={{
+          name: profile ? `${profile.first_name} ${profile.last_name}`.trim() : membership.organization.name,
+          email: user.email ?? "",
+          contact: profile?.phone ?? "",
+        }}
+        balances={{
+          sms: planUsage.addonSmsCredits,
+          email: planUsage.addonEmailCredits,
+          whatsapp: planUsage.addonWhatsappCredits,
+          storage: planUsage.addonStorageBytes,
         }}
       />
     </div>

@@ -5,8 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PLANS, isPlanId, type PlanLimits } from "@/lib/plans/config";
 import { formatBytes } from "@/lib/plans/format";
+import { logPlatformEvent } from "@/lib/platform-events/log";
 
-// "trial": within the 3-day window after signup, no subscription needed
+// "trial": within the 14-day window after signup, no subscription needed
 // yet — full Basic-tier access. "active": a Razorpay subscription is
 // actually charging. "expired": trial ran out and there's no active
 // subscription — the dashboard layout blocks everything except Billing
@@ -17,6 +18,12 @@ export interface PlanAccess {
   plan: PlanLimits;
   accessStatus: PlanAccessStatus;
   trialEndsAt: string | null;
+  // Add-on pack balances (see plans/config.ts ADDON_PACKS) — a running
+  // total that never auto-resets monthly, unlike the plan's own quotas.
+  addonSmsCredits: number;
+  addonEmailCredits: number;
+  addonWhatsappCredits: number;
+  addonStorageBytes: number;
 }
 
 // organizations.plan is the source of truth for which tier a *subscribed*
@@ -34,9 +41,20 @@ export const getPlanAccess = cache(async (organizationId: string): Promise<PlanA
   // bypass that restriction rather than relaxing the policy itself.
   const admin = createAdminClient();
   const [{ data: org }, { data: subscription }] = await Promise.all([
-    supabase.from("organizations").select("plan, trial_ends_at").eq("id", organizationId).maybeSingle(),
+    supabase
+      .from("organizations")
+      .select("plan, trial_ends_at, addon_sms_credits, addon_email_credits, addon_whatsapp_credits, addon_storage_bytes")
+      .eq("id", organizationId)
+      .maybeSingle(),
     admin.from("organization_subscriptions").select("status").eq("organization_id", organizationId).maybeSingle(),
   ]);
+
+  const addonBalances = {
+    addonSmsCredits: org?.addon_sms_credits ?? 0,
+    addonEmailCredits: org?.addon_email_credits ?? 0,
+    addonWhatsappCredits: org?.addon_whatsapp_credits ?? 0,
+    addonStorageBytes: org?.addon_storage_bytes ?? 0,
+  };
 
   if (subscription?.status === "active") {
     const planId = org?.plan;
@@ -44,6 +62,7 @@ export const getPlanAccess = cache(async (organizationId: string): Promise<PlanA
       plan: PLANS[planId && isPlanId(planId) ? planId : "basic"],
       accessStatus: "active",
       trialEndsAt: org?.trial_ends_at ?? null,
+      ...addonBalances,
     };
   }
 
@@ -54,6 +73,7 @@ export const getPlanAccess = cache(async (organizationId: string): Promise<PlanA
     plan: PLANS.basic,
     accessStatus: stillTrialing ? "trial" : "expired",
     trialEndsAt,
+    ...addonBalances,
   };
 });
 
@@ -82,13 +102,20 @@ export interface PlanUsage {
   storageBytesRemaining: number;
   additionalTeamMembers: number;
   additionalTeamMembersRemaining: number;
+  // Add-on pack balances included in the *Remaining totals above — broken
+  // out separately too since the Billing page displays them on their own.
+  addonSmsCredits: number;
+  addonEmailCredits: number;
+  addonWhatsappCredits: number;
+  addonStorageBytes: number;
 }
 
 // cache()-wrapped so the several call sites in one request (dashboard
 // usage card, email/sms availability checks, quota checks before
 // send/upload) share one set of queries instead of re-fetching per call.
 export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUsage> => {
-  const { plan, accessStatus, trialEndsAt } = await getPlanAccess(organizationId);
+  const { plan, accessStatus, trialEndsAt, addonSmsCredits, addonEmailCredits, addonWhatsappCredits, addonStorageBytes } =
+    await getPlanAccess(organizationId);
   const supabase = await createClient();
 
   const startOfMonth = new Date();
@@ -146,25 +173,66 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
     trialEndsAt,
     trialDaysRemaining,
     emailsSentThisMonth,
-    emailsRemaining: Math.max(0, plan.emailsPerMonth - emailsSentThisMonth),
+    emailsRemaining: Math.max(0, plan.emailsPerMonth - emailsSentThisMonth) + addonEmailCredits,
     smsSentThisMonth,
-    smsRemaining: Math.max(0, plan.smsPerMonth - smsSentThisMonth),
+    smsRemaining: Math.max(0, plan.smsPerMonth - smsSentThisMonth) + addonSmsCredits,
     whatsappSentThisMonth,
-    whatsappRemaining: Math.max(0, plan.whatsappPerMonth - whatsappSentThisMonth),
+    whatsappRemaining: Math.max(0, plan.whatsappPerMonth - whatsappSentThisMonth) + addonWhatsappCredits,
     storageBytesUsed,
-    storageBytesRemaining: Math.max(0, plan.storageBytes - storageBytesUsed),
+    storageBytesRemaining: Math.max(0, plan.storageBytes + addonStorageBytes - storageBytesUsed),
     additionalTeamMembers,
     additionalTeamMembersRemaining: Math.max(0, plan.maxAdditionalTeamMembers - additionalTeamMembers),
+    addonSmsCredits,
+    addonEmailCredits,
+    addonWhatsappCredits,
+    addonStorageBytes,
   };
 });
+
+// Add-on credits are a persistent balance (they don't reset monthly like
+// the plan quota does), so once a send dips into them they need to
+// actually be drawn down — otherwise the same purchased balance would
+// silently "renew" every month on top of the plan quota forever. Called
+// only from the three checkXQuota functions below, each of which is
+// itself called exactly once, immediately before its module's actual send
+// — so folding the decrement in here (rather than a separate call the
+// caller would have to remember) can't double-consume. Like the rest of
+// this app's quota bookkeeping (e.g. team member counts), this is a soft
+// read-then-write with no transactional lock around it.
+async function consumeAddonOverage(
+  organizationId: string,
+  column: "addon_sms_credits" | "addon_email_credits" | "addon_whatsapp_credits",
+  currentBalance: number,
+  overage: number,
+): Promise<void> {
+  if (overage <= 0) return;
+  const nextBalance = Math.max(0, currentBalance - overage);
+  const admin = createAdminClient();
+  const update =
+    column === "addon_sms_credits"
+      ? { addon_sms_credits: nextBalance }
+      : column === "addon_email_credits"
+        ? { addon_email_credits: nextBalance }
+        : { addon_whatsapp_credits: nextBalance };
+  await admin.from("organizations").update(update).eq("id", organizationId);
+}
 
 // Called right before a shared-provider send — an org's own SMTP bypasses
 // this check entirely (see sendBulkEmailAction).
 export async function checkEmailQuota(organizationId: string, recipientCount: number): Promise<string | null> {
   const usage = await getPlanUsage(organizationId);
   if (recipientCount > usage.emailsRemaining) {
-    return `Sending to ${recipientCount} recipients would exceed your ${usage.plan.name} plan's ${usage.plan.emailsPerMonth.toLocaleString()}/month email limit (${usage.emailsRemaining.toLocaleString()} remaining). Upgrade your plan to send more.`;
+    await logPlatformEvent({
+      level: "info",
+      source: "quota",
+      message: `Email quota exceeded on ${usage.plan.name} plan`,
+      organizationId,
+      metadata: { recipientCount, remaining: usage.emailsRemaining, planLimit: usage.plan.emailsPerMonth },
+    });
+    return `Sending to ${recipientCount} recipients would exceed your ${usage.plan.name} plan's ${usage.plan.emailsPerMonth.toLocaleString()}/month email limit plus your ${usage.addonEmailCredits.toLocaleString()} add-on credits (${usage.emailsRemaining.toLocaleString()} remaining). Buy an email add-on pack or upgrade your plan to send more.`;
   }
+  const planOnlyRemaining = Math.max(0, usage.plan.emailsPerMonth - usage.emailsSentThisMonth);
+  await consumeAddonOverage(organizationId, "addon_email_credits", usage.addonEmailCredits, recipientCount - planOnlyRemaining);
   return null;
 }
 
@@ -173,8 +241,17 @@ export async function checkEmailQuota(organizationId: string, recipientCount: nu
 export async function checkSmsQuota(organizationId: string, recipientCount: number): Promise<string | null> {
   const usage = await getPlanUsage(organizationId);
   if (recipientCount > usage.smsRemaining) {
-    return `Sending to ${recipientCount} recipients would exceed your ${usage.plan.name} plan's ${usage.plan.smsPerMonth.toLocaleString()}/month SMS limit (${usage.smsRemaining.toLocaleString()} remaining). Upgrade your plan to send more.`;
+    await logPlatformEvent({
+      level: "info",
+      source: "quota",
+      message: `SMS quota exceeded on ${usage.plan.name} plan`,
+      organizationId,
+      metadata: { recipientCount, remaining: usage.smsRemaining, planLimit: usage.plan.smsPerMonth },
+    });
+    return `Sending to ${recipientCount} recipients would exceed your ${usage.plan.name} plan's ${usage.plan.smsPerMonth.toLocaleString()}/month SMS limit plus your ${usage.addonSmsCredits.toLocaleString()} add-on credits (${usage.smsRemaining.toLocaleString()} remaining). Buy an SMS add-on pack or upgrade your plan to send more.`;
   }
+  const planOnlyRemaining = Math.max(0, usage.plan.smsPerMonth - usage.smsSentThisMonth);
+  await consumeAddonOverage(organizationId, "addon_sms_credits", usage.addonSmsCredits, recipientCount - planOnlyRemaining);
   return null;
 }
 
@@ -184,8 +261,17 @@ export async function checkSmsQuota(organizationId: string, recipientCount: numb
 export async function checkWhatsAppQuota(organizationId: string, recipientCount: number): Promise<string | null> {
   const usage = await getPlanUsage(organizationId);
   if (recipientCount > usage.whatsappRemaining) {
-    return `Sending to ${recipientCount} recipients would exceed your ${usage.plan.name} plan's ${usage.plan.whatsappPerMonth.toLocaleString()}/month WhatsApp limit (${usage.whatsappRemaining.toLocaleString()} remaining) on the shared number. Connect your own WhatsApp number, or upgrade your plan.`;
+    await logPlatformEvent({
+      level: "info",
+      source: "quota",
+      message: `WhatsApp quota exceeded on ${usage.plan.name} plan`,
+      organizationId,
+      metadata: { recipientCount, remaining: usage.whatsappRemaining, planLimit: usage.plan.whatsappPerMonth },
+    });
+    return `Sending to ${recipientCount} recipients would exceed your ${usage.plan.name} plan's ${usage.plan.whatsappPerMonth.toLocaleString()}/month WhatsApp limit plus your ${usage.addonWhatsappCredits.toLocaleString()} add-on credits (${usage.whatsappRemaining.toLocaleString()} remaining) on the shared number. Buy a WhatsApp add-on pack, connect your own WhatsApp number, or upgrade your plan.`;
   }
+  const planOnlyRemaining = Math.max(0, usage.plan.whatsappPerMonth - usage.whatsappSentThisMonth);
+  await consumeAddonOverage(organizationId, "addon_whatsapp_credits", usage.addonWhatsappCredits, recipientCount - planOnlyRemaining);
   return null;
 }
 
@@ -203,7 +289,15 @@ export async function checkTeamMemberQuota(organizationId: string): Promise<stri
 export async function checkStorageQuota(organizationId: string, additionalBytes: number): Promise<string | null> {
   const usage = await getPlanUsage(organizationId);
   if (additionalBytes > usage.storageBytesRemaining) {
-    return `This would exceed your ${usage.plan.name} plan's ${formatBytes(usage.plan.storageBytes)} storage limit (${formatBytes(usage.storageBytesRemaining)} remaining). Upgrade your plan or free up space.`;
+    const limitLabel = usage.addonStorageBytes > 0 ? formatBytes(usage.plan.storageBytes + usage.addonStorageBytes) : formatBytes(usage.plan.storageBytes);
+    await logPlatformEvent({
+      level: "info",
+      source: "quota",
+      message: `Storage quota exceeded on ${usage.plan.name} plan`,
+      organizationId,
+      metadata: { additionalBytes, remaining: usage.storageBytesRemaining },
+    });
+    return `This would exceed your ${usage.plan.name} plan's ${limitLabel} storage limit (${formatBytes(usage.storageBytesRemaining)} remaining). Buy a storage add-on pack, upgrade your plan, or free up space.`;
   }
   return null;
 }

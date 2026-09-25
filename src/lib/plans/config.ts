@@ -109,3 +109,42 @@ export function priceForInterval(plan: PlanLimits, interval: BillingInterval): {
     ? { amount: plan.priceInRupees, label: plan.priceLabel }
     : { amount: plan.priceInRupeesAnnual, label: plan.priceLabelAnnual };
 }
+
+// One-time top-ups on top of a plan's monthly quota/storage ceiling —
+// bought individually, not tied to a billing cycle. "credits" is a message
+// count for sms/email/whatsapp, or a byte count for storage.
+export type AddonType = "sms" | "email" | "whatsapp" | "storage";
+
+export interface AddonPack {
+  id: string;
+  addonType: AddonType;
+  label: string;
+  credits: number;
+  priceInRupees: number;
+}
+
+export const ADDON_TYPE_LABELS: Record<AddonType, string> = {
+  sms: "SMS",
+  email: "Email",
+  whatsapp: "WhatsApp",
+  storage: "Storage",
+};
+
+export const ADDON_PACKS: AddonPack[] = [
+  { id: "sms_500", addonType: "sms", label: "500 SMS credits", credits: 500, priceInRupees: 399 },
+  { id: "sms_2000", addonType: "sms", label: "2,000 SMS credits", credits: 2000, priceInRupees: 1399 },
+  { id: "email_2000", addonType: "email", label: "2,000 email credits", credits: 2000, priceInRupees: 199 },
+  { id: "email_10000", addonType: "email", label: "10,000 email credits", credits: 10000, priceInRupees: 799 },
+  { id: "whatsapp_500", addonType: "whatsapp", label: "500 WhatsApp credits", credits: 500, priceInRupees: 499 },
+  { id: "whatsapp_2000", addonType: "whatsapp", label: "2,000 WhatsApp credits", credits: 2000, priceInRupees: 1699 },
+  { id: "storage_5gb", addonType: "storage", label: "+5 GB storage", credits: 5 * 1024 * 1024 * 1024, priceInRupees: 249 },
+  { id: "storage_25gb", addonType: "storage", label: "+25 GB storage", credits: 25 * 1024 * 1024 * 1024, priceInRupees: 999 },
+];
+
+export function getAddonPack(packId: string): AddonPack | undefined {
+  return ADDON_PACKS.find((pack) => pack.id === packId);
+}
+
+export function addonPacksFor(addonType: AddonType): AddonPack[] {
+  return ADDON_PACKS.filter((pack) => pack.addonType === addonType);
+}

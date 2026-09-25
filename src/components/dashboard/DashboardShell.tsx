@@ -35,6 +35,8 @@ import {
   ClipboardCheck,
   FileBarChart,
   Calculator,
+  LayoutTemplate,
+  House,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { YouTubeIcon } from "@/components/icons/YouTubeIcon";
@@ -77,6 +79,7 @@ const NAV_GROUPS = [
       { href: "/dashboard/leaders", label: "Leaders", icon: Crown, tab: "leaders" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/youth", label: "Youth", icon: GraduationCap, tab: "youth" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/committee", label: "Committee", icon: Users2, tab: "committee" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/families", label: "Families", icon: House, tab: "families" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
   {
@@ -96,6 +99,7 @@ const NAV_GROUPS = [
       { href: "/dashboard/folder", label: "Folder", icon: FolderOpen, tab: "folder" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/attendance", label: "Attendance", icon: ClipboardCheck, tab: "attendance" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/reports", label: "Reports", icon: FileBarChart, tab: "reports" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/widget", label: "Widget", icon: LayoutTemplate, tab: "widget" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/accounting", label: "Accounting", icon: Calculator, tab: "accounting" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },
     ],
   },

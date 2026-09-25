@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import twilio from "twilio";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logPlatformEvent } from "@/lib/platform-events/log";
 
 // Inbound WhatsApp messages — 'own' mode only (see migration 0058). Each
 // org's own Twilio WhatsApp number is configured, by the church, to POST
@@ -38,6 +39,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
   const url = request.url;
 
   if (!signature || !twilio.validateRequest(account.auth_token, signature, url, paramsObject)) {
+    await logPlatformEvent({
+      level: "warning",
+      source: "whatsapp_webhook",
+      message: "Invalid WhatsApp webhook signature",
+      organizationId,
+    });
     return new NextResponse("Invalid signature", { status: 400 });
   }
 

@@ -23,7 +23,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
         title: "Setting up your church",
         body: [
           "When you first sign up, you'll create an organization for your church — its name, congregation size, number of branches, and country. Country matters: it sets the default phone country code used across Members, Branches, and SMS.",
-          "Every organization gets a free 3-day trial with full Basic-plan access, no card required. After that, an owner or admin needs to subscribe from the Billing page to keep using the app.",
+          "Every organization gets a free 14-day trial with full Basic-plan access, no card required. After that, an owner or admin needs to subscribe from the Billing page to keep using the app.",
         ],
       },
       {
@@ -72,6 +72,14 @@ export const DOC_CATEGORIES: DocCategory[] = [
         body: [
           "Leaders is a subset of your Members roster — designate someone as a Leader to make them selectable as a manager for Branches, Ministries, and Events.",
           "Youth is a separate roster for tracking minors in your congregation, with guardian name/phone fields alongside the usual member info.",
+        ],
+      },
+      {
+        id: "families",
+        title: "Families — grouping members into households",
+        body: [
+          "Families groups your congregation into household units. First click \"Create family\" and give it a name (e.g. \"The Smith Family\") and optional notes, then use \"Add member\" on that family to assign existing congregants to it, one at a time, along with their relationship within it (Head of household, Spouse, Child, Guardian, etc.).",
+          "A member can only be added to the same family once, but the same congregant could in principle be added to more than one family if needed (e.g. an in-law living between two households).",
         ],
       },
       {
@@ -128,6 +136,15 @@ export const DOC_CATEGORIES: DocCategory[] = [
     title: "Tools",
     articles: [
       {
+        id: "forms",
+        title: "Forms — custom registration forms & surveys",
+        body: [
+          "Forms is a builder for one-off registration forms or surveys, each with its own shareable public link and response collection — build it, publish it, and anyone with the link can fill it out without logging in.",
+          "Add fields one at a time (short text, long text, number, email, phone, date, yes/no, or dropdown), mark any of them required, and reorder them with the arrows.",
+          "A form only accepts responses while it's Published — Draft forms aren't live yet, and Closed forms stop accepting new responses without deleting what's already been collected.",
+        ],
+      },
+      {
         id: "folder",
         title: "Folder — private documents & shareable links",
         body: [
@@ -156,6 +173,25 @@ export const DOC_CATEGORIES: DocCategory[] = [
           "Filter by date range, branch, or a report-specific filter (member status, donation method), click \"Run report\" to see the results on screen, then export to Excel or PDF.",
         ],
       },
+      {
+        id: "widget",
+        title: "Widget — an embeddable form for your website",
+        body: [
+          "Widget designs a small chat-bubble form you embed on your own church website to capture visitor queries — name, email, phone, and a message by default, though the fields are fully customizable like a form's.",
+          "Set a brand color, corner position (bottom-left or bottom-right), and the greeting text on the Design tab, then copy the snippet from the Embed tab and paste it once on your site, right before the closing </body> tag — it works on any website, not just pages hosted by this app.",
+          "Every submission shows up in the Submissions tab, where you can mark it read, archive it, or delete it. Disabling the widget (Embed tab) stops it from accepting new messages immediately without you having to remove the embed code from your site.",
+          "There's one widget per organization — the field layout and branding are shared across every page it's embedded on, there's no per-page variant.",
+        ],
+      },
+      {
+        id: "accounting",
+        title: "Accounting — income, expenses, ledger & invoices",
+        body: [
+          "Accounting tracks income and expenses by category (e.g. \"Tithes\", \"Utilities\"), with a chart comparing income vs. expense bucketed by day, week, or month depending on the date range you pick, and everything filterable by branch.",
+          "Ledger gives you a running, printable record of transactions for a period. Invoices let you create a line-itemed invoice for a person or organization and print it directly from the browser — both are meant to be handed to someone, not just viewed on screen.",
+          "Accounting is included on the Premium and Pro plans, not Basic — same gate as the rest of Finance.",
+        ],
+      },
     ],
   },
   {
@@ -172,6 +208,15 @@ export const DOC_CATEGORIES: DocCategory[] = [
           "The Finance module is included on the Premium and Pro plans, not Basic.",
         ],
       },
+      {
+        id: "fundraiser-payment-links",
+        title: "Fund Raiser online giving links",
+        body: [
+          "Any Fund Raiser can turn on an online payment link, letting a donor enter their own amount and pay by card/UPI/etc. through Razorpay — no need to record every gift by hand.",
+          "Choose either your own Razorpay account (connected from the Fund Raiser page) or our shared service, which needs no setup on your end. A shared-service donation is charged a 2.5% transaction fee, shown up front on both the giving page and your Fund Raiser dashboard, before it's paid out to you — your own account has no such fee since the money goes straight to you.",
+          "For shared-service fundraisers, the wallet balance shown at the top right of the Fund Raiser page is what you've collected (after the fee) and haven't been paid out yet. Click it to open a payout request, which we process manually — it isn't instant.",
+        ],
+      },
     ],
   },
   {
@@ -185,6 +230,14 @@ export const DOC_CATEGORIES: DocCategory[] = [
           "Send bulk email newsletters or SMS announcements to your congregation from the Email and SMS tabs. Both use a shared sending account by default, metered by your plan's monthly quota.",
           "Premium and Pro plans can connect their own SMTP server for unmetered email sending — SMS has no equivalent \"bring your own\" option.",
           "SMS recipients' country codes are resolved from their branch (or the church's country as a fallback) — this only works correctly if that's set.",
+        ],
+      },
+      {
+        id: "whatsapp",
+        title: "WhatsApp campaigns and chat",
+        body: [
+          "WhatsApp works like SMS: send a one-off campaign to a chosen set of recipients, either through the shared service (metered by your plan's monthly quota) or your own connected Twilio WhatsApp number, with no quota.",
+          "Connecting your own number (Team → WhatsApp → Connect) also unlocks two-way Chat — replies from congregants land in the Chat tab, threaded by phone number, so you can answer queries as they come in. The shared service is broadcast-only; there's no dedicated number for replies to arrive on, so it has no Chat tab.",
         ],
       },
       {
@@ -212,10 +265,20 @@ export const DOC_CATEGORIES: DocCategory[] = [
       },
       {
         id: "trial",
-        title: "The 3-day trial",
+        title: "The 14-day trial",
         body: [
-          "New organizations get 3 days of full Basic-plan access with no subscription required — you'll see a countdown banner across the dashboard during this period.",
+          "New organizations get 14 days of full Basic-plan access with no subscription required — you'll see a countdown banner across the dashboard during this period.",
           "Once the trial ends, the app is locked to a \"subscribe now\" screen until an owner or admin picks a plan. Other team members will see a message asking them to contact an owner/admin.",
+        ],
+      },
+      {
+        id: "addon-packs",
+        title: "Add-on packs — topping up SMS, Email, WhatsApp, or storage",
+        body: [
+          "Running low on shared SMS, email, or WhatsApp sends before your next billing cycle — or need more storage — without wanting to upgrade the whole plan? Buy an add-on pack from the Billing page instead. Each pack is a one-time purchase.",
+          "SMS, Email, and WhatsApp add-on credits are a running balance that carries over indefinitely — they're only drawn on once you've used up that month's plan quota, and never expire or reset at the start of a new month.",
+          "Storage add-on packs permanently raise your storage ceiling — there's nothing to \"use up\" separately, since storage is already a running total rather than something that resets monthly.",
+          "Add-on purchases go through the same Razorpay checkout as plan subscriptions, and only an owner or admin can buy one.",
         ],
       },
       {
@@ -242,7 +305,11 @@ export const DOC_CATEGORIES: DocCategory[] = [
           "- Only Donations (not Offerings) can be linked to a Fund Raiser's total.",
           "- Reports currently covers five tabs (Members, Attendance, Events, Offerings, Donations) — not every module has a report yet.",
           "- Attendance's manual \"check in someone not listed\" search only finds active members — congregants marked pending or left can't be checked in directly.",
-          "- Trial length is fixed at 3 days and isn't extendable from within the app.",
+          "- There's one Widget per organization — the same design and fields are shared across every page/site it's embedded on.",
+          "- WhatsApp two-way chat only works for organizations using their own connected Twilio number — the shared service is campaigns only.",
+          "- Fund Raiser payout requests (shared-service giving) are processed manually on our end, not instantly.",
+          "- Ledger and Invoices are print-only right now — there's no built-in emailing or PDF download, just \"print to PDF\" from the browser's print dialog.",
+          "- Trial length is fixed at 14 days and isn't extendable from within the app.",
           "- Support tickets (this Support tab) can currently be raised and viewed, but there's no in-app reply or status-tracking workflow yet — you'll be contacted separately about anything you raise.",
         ],
       },

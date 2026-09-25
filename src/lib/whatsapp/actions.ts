@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { checkWhatsAppQuota } from "@/lib/plans/dal";
+import { logPlatformEvent } from "@/lib/platform-events/log";
 import { sendBulkWhatsApp, sendWhatsAppMessage } from "@/lib/whatsapp/client";
 import { resolveWhatsAppCredentials } from "@/lib/whatsapp/credentials";
 import {
@@ -162,7 +163,15 @@ export async function sendBulkWhatsAppAction(formData: FormData): Promise<SendWh
   try {
     result = await sendBulkWhatsApp({ credentials, body, recipients });
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Couldn't send that message." };
+    const message = err instanceof Error ? err.message : "Couldn't send that message.";
+    await logPlatformEvent({
+      level: "error",
+      source: "whatsapp_send",
+      message: `WhatsApp send failed: ${message}`,
+      organizationId,
+      metadata: { recipientCount: recipients.length, mode },
+    });
+    return { error: message };
   }
 
   const status: WhatsAppCampaignStatus =

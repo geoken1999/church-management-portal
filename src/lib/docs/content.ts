@@ -293,6 +293,21 @@ export const DOC_CATEGORIES: DocCategory[] = [
     ],
   },
   {
+    id: "help",
+    title: "Help & Support",
+    articles: [
+      {
+        id: "support-tickets",
+        title: "Raising and replying to support tickets",
+        body: [
+          "Support → \"Raise a ticket\" if you run into a problem or have a question — set a category and urgency so it's easy to triage, and it's visible to your whole team, not just you.",
+          "Once raised, the conversation continues right on the ticket: reply to add more detail, and any reply from KingdomFlow support shows up in the same thread — you'll also get a notification (bell icon) when support replies.",
+          "You (the ticket's creator) or an org admin can close a ticket once it's resolved, or reopen a closed one — support itself moves a ticket through \"In progress\" and \"Resolved\" as they work on it.",
+        ],
+      },
+    ],
+  },
+  {
     id: "limitations",
     title: "Known Limitations",
     articles: [
@@ -310,7 +325,6 @@ export const DOC_CATEGORIES: DocCategory[] = [
           "- Fund Raiser payout requests (shared-service giving) are processed manually on our end, not instantly.",
           "- Ledger and Invoices are print-only right now — there's no built-in emailing or PDF download, just \"print to PDF\" from the browser's print dialog.",
           "- Trial length is fixed at 14 days and isn't extendable from within the app.",
-          "- Support tickets (this Support tab) can currently be raised and viewed, but there's no in-app reply or status-tracking workflow yet — you'll be contacted separately about anything you raise.",
         ],
       },
     ],

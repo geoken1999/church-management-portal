@@ -169,3 +169,62 @@ export async function updateSupportTicketStatus(formData: FormData) {
 
   revalidatePath(SUPPORT_PATH);
 }
+
+export interface AddPlatformSupportReplyState {
+  error?: string;
+  success?: boolean;
+}
+
+// Platform admin's reply — written via the service-role client (bypasses
+// RLS, so author_type: 'admin' is safe to set directly, unlike the org
+// side's own addSupportTicketMessage which RLS restricts to author_type:
+// 'org'). Also notifies the org so its members see the reply without
+// having to keep checking back.
+export async function addPlatformSupportReply(
+  _prevState: AddPlatformSupportReplyState,
+  formData: FormData,
+): Promise<AddPlatformSupportReplyState> {
+  const platformAdmin = await requirePlatformAdmin();
+  const ticketId = String(formData.get("ticketId") ?? "");
+  const body = String(formData.get("body") ?? "").trim();
+
+  if (!body) {
+    return { error: "Write a reply before sending." };
+  }
+
+  const admin = createAdminClient();
+  const { data: ticket } = await admin.from("support_tickets").select("organization_id, subject").eq("id", ticketId).maybeSingle();
+  if (!ticket) {
+    return { error: "That ticket could not be found." };
+  }
+
+  const { error } = await admin.from("support_ticket_messages").insert({
+    ticket_id: ticketId,
+    organization_id: ticket.organization_id,
+    author_type: "admin",
+    body,
+  });
+
+  if (error) {
+    return { error: "Couldn't send that reply. Please try again." };
+  }
+
+  await admin.from("notifications").insert({
+    organization_id: ticket.organization_id,
+    type: "support_ticket_reply",
+    title: "Support replied to your ticket",
+    body: `Re: ${ticket.subject}`,
+    link: "/dashboard/support",
+  });
+
+  await logPlatformEvent({
+    level: "info",
+    source: "platform_admin",
+    message: `Platform admin (${platformAdmin.email ?? "unknown"}) replied to a support ticket`,
+    organizationId: ticket.organization_id,
+    metadata: { ticketId },
+  });
+
+  revalidatePath(SUPPORT_PATH);
+  return { success: true };
+}

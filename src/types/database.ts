@@ -812,6 +812,18 @@ export type SupportTicket = {
   updated_at: string;
 };
 
+export type SupportTicketMessageAuthorType = "org" | "admin";
+
+export type SupportTicketMessage = {
+  id: string;
+  ticket_id: string;
+  organization_id: string;
+  author_type: SupportTicketMessageAuthorType;
+  author_id: string | null;
+  body: string;
+  created_at: string;
+};
+
 export type PlatformEventLevel = "info" | "warning" | "error";
 
 export type PlatformEvent = {
@@ -830,7 +842,8 @@ export type NotificationType =
   | "youtube_video_updated"
   | "youtube_live_started"
   | "facebook_post_created"
-  | "facebook_post_updated";
+  | "facebook_post_updated"
+  | "support_ticket_reply";
 
 export type Notification = {
   id: string;
@@ -1392,6 +1405,34 @@ export type Database = {
           {
             foreignKeyName: "support_tickets_profile_fk";
             columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["auth_user_id"];
+          },
+        ];
+      };
+      support_ticket_messages: {
+        Row: SupportTicketMessage;
+        Insert: Partial<SupportTicketMessage> & Pick<SupportTicketMessage, "ticket_id" | "organization_id" | "author_type" | "body">;
+        Update: Partial<SupportTicketMessage>;
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_messages_ticket_id_fkey";
+            columns: ["ticket_id"];
+            isOneToOne: false;
+            referencedRelation: "support_tickets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "support_ticket_messages_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "support_ticket_messages_profile_fk";
+            columns: ["author_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["auth_user_id"];

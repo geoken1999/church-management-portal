@@ -203,6 +203,14 @@ export async function getPlatformOverview(): Promise<PlatformOverview> {
 // where that's added, platform-side.
 // ---------------------------------------------------------------------------
 
+export interface SupportTicketMessageRow {
+  id: string;
+  authorType: "org" | "admin";
+  authorName: string | null;
+  body: string;
+  createdAt: string;
+}
+
 export interface SupportTicketRow {
   id: string;
   organizationId: string;
@@ -215,16 +223,37 @@ export interface SupportTicketRow {
   createdByName: string | null;
   createdByEmail: string | null;
   createdAt: string;
+  messages: SupportTicketMessageRow[];
 }
 
 export async function getAllSupportTickets(): Promise<SupportTicketRow[]> {
   const admin = createAdminClient();
-  const { data } = await admin
-    .from("support_tickets")
-    .select("*, organizations(name), profiles(first_name, last_name, email)")
-    .order("created_at", { ascending: false });
+  const [{ data: tickets }, { data: messages }] = await Promise.all([
+    admin
+      .from("support_tickets")
+      .select("*, organizations(name), profiles(first_name, last_name, email)")
+      .order("created_at", { ascending: false }),
+    admin
+      .from("support_ticket_messages")
+      .select("*, profiles(first_name, last_name)")
+      .order("created_at", { ascending: true }),
+  ]);
 
-  return (data ?? []).map((ticket) => {
+  const messagesByTicket = new Map<string, SupportTicketMessageRow[]>();
+  for (const message of messages ?? []) {
+    const profile = message.profiles as { first_name: string; last_name: string } | null;
+    const list = messagesByTicket.get(message.ticket_id) ?? [];
+    list.push({
+      id: message.id,
+      authorType: message.author_type,
+      authorName: message.author_type === "admin" ? "KingdomFlow Support" : profile ? `${profile.first_name} ${profile.last_name}`.trim() : null,
+      body: message.body,
+      createdAt: message.created_at,
+    });
+    messagesByTicket.set(message.ticket_id, list);
+  }
+
+  return (tickets ?? []).map((ticket) => {
     const org = ticket.organizations as { name: string } | null;
     const profile = ticket.profiles as { first_name: string; last_name: string; email: string } | null;
     return {
@@ -239,9 +268,11 @@ export async function getAllSupportTickets(): Promise<SupportTicketRow[]> {
       createdByName: profile ? `${profile.first_name} ${profile.last_name}`.trim() : null,
       createdByEmail: profile?.email ?? null,
       createdAt: ticket.created_at,
+      messages: messagesByTicket.get(ticket.id) ?? [],
     };
   });
 }
+
 
 // ---------------------------------------------------------------------------
 // Health — which app-wide integrations are configured, purely by env var

@@ -1,6 +1,7 @@
-import type { EventRecurrenceFrequency } from "@/types/database";
+import type { EventRecurrenceFrequency, EventStatus } from "@/types/database";
 
 export const RECURRENCE_FREQUENCIES: EventRecurrenceFrequency[] = ["daily", "weekly", "monthly", "yearly"];
+export const EVENT_STATUSES: EventStatus[] = ["pending", "active", "cancelled", "completed"];
 
 export interface EventFieldErrors {
   title?: string;
@@ -9,6 +10,8 @@ export interface EventFieldErrors {
   recurrenceFrequency?: string;
   recurrenceEndDate?: string;
   meetingLink?: string;
+  mapLink?: string;
+  status?: string;
 }
 
 export function validateEvent(input: {
@@ -20,8 +23,14 @@ export function validateEvent(input: {
   recurrenceEndDate: string;
   meetingMode: string;
   meetingLink: string;
+  mapLink: string;
+  status: string;
 }): EventFieldErrors {
   const errors: EventFieldErrors = {};
+
+  if (!EVENT_STATUSES.includes(input.status as EventStatus)) {
+    errors.status = "Choose a valid status.";
+  }
 
   if (!input.title.trim()) {
     errors.title = "Title is required.";
@@ -61,6 +70,10 @@ export function validateEvent(input: {
     if (!/^https?:\/\//i.test(input.meetingLink.trim())) {
       errors.meetingLink = "Enter a full link starting with http:// or https://.";
     }
+  }
+
+  if (input.mapLink && !/^https?:\/\//i.test(input.mapLink.trim())) {
+    errors.mapLink = "Enter a full link starting with http:// or https://.";
   }
 
   return errors;

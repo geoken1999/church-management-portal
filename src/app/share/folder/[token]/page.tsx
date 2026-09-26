@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import { FileText, FolderOpen, Download } from "lucide-react";
+import { FileText, Download } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { formatBytes } from "@/lib/plans/format";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PublicBrandHeader, PublicPoweredByFooter } from "@/components/PublicBrandHeader";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -43,12 +44,10 @@ export default async function SharedFolderPage({ params }: { params: Promise<{ t
 
   return (
     <div className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-6 px-4 py-12 sm:px-6">
-      <div className="flex flex-col items-center gap-3 text-center">
-        <div className="flex size-12 items-center justify-center rounded-xl bg-accent">
-          <FolderOpen className="size-6 text-primary" />
-        </div>
-        <div>
-          <h1 className="font-heading text-xl font-bold">{category.name}</h1>
+      <div>
+        <PublicBrandHeader logoUrl={category.organization_logo_url} name={category.organization_name} />
+        <div className="text-center">
+          <h2 className="font-heading text-xl font-bold">{category.name}</h2>
           <p className="text-sm text-muted-foreground">Documents shared with you.</p>
         </div>
       </div>
@@ -89,6 +88,8 @@ export default async function SharedFolderPage({ params }: { params: Promise<{ t
           ))}
         </div>
       )}
+
+      <PublicPoweredByFooter />
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { validateEvent, type EventFieldErrors } from "@/lib/events/validation";
-import type { EventMeetingMode, EventRecurrenceFrequency } from "@/types/database";
+import type { EventMeetingMode, EventRecurrenceFrequency, EventStatus } from "@/types/database";
 
 // updateEvent/deleteEvent forms only carry the event id, not
 // organizationId — looked up from the record itself before a permission
@@ -42,6 +42,11 @@ function readEventFields(formData: FormData) {
     branchId: String(formData.get("branchId") ?? "").trim(),
     meetingMode: String(formData.get("meetingMode") ?? "offline"),
     meetingLink: String(formData.get("meetingLink") ?? "").trim(),
+    status: String(formData.get("status") ?? "active"),
+    venue: String(formData.get("venue") ?? "").trim(),
+    mapLink: String(formData.get("mapLink") ?? "").trim(),
+    contactName: String(formData.get("contactName") ?? "").trim(),
+    contactPhone: String(formData.get("contactPhone") ?? "").trim(),
     managedBy: String(formData.get("managedBy") ?? "").trim(),
   };
 }
@@ -75,6 +80,11 @@ export async function createEvent(_prevState: EventFormState, formData: FormData
     branch_id: fields.branchId || null,
     meeting_mode: fields.meetingMode as EventMeetingMode,
     meeting_link: fields.meetingMode === "online" && fields.meetingLink ? fields.meetingLink : null,
+    status: fields.status as EventStatus,
+    venue: fields.venue || null,
+    map_link: fields.mapLink || null,
+    contact_name: fields.contactName || null,
+    contact_phone: fields.contactPhone || null,
     managed_by: fields.managedBy || null,
     created_by: user.id,
   });
@@ -121,6 +131,11 @@ export async function updateEvent(_prevState: EventFormState, formData: FormData
       branch_id: fields.branchId || null,
       meeting_mode: fields.meetingMode as EventMeetingMode,
       meeting_link: fields.meetingMode === "online" && fields.meetingLink ? fields.meetingLink : null,
+      status: fields.status as EventStatus,
+      venue: fields.venue || null,
+      map_link: fields.mapLink || null,
+      contact_name: fields.contactName || null,
+      contact_phone: fields.contactPhone || null,
       managed_by: fields.managedBy || null,
     })
     .eq("id", id);

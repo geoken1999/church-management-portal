@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { PublicJoinForm } from "@/components/members/PublicJoinForm";
-
-const DEFAULT_LOGO = "/default_church_logo.png";
+import { DEFAULT_CHURCH_LOGO, PublicPoweredByFooter } from "@/components/PublicBrandHeader";
 
 export async function generateMetadata({
   params,
@@ -42,7 +41,7 @@ export default async function PublicJoinPage({ params }: { params: Promise<{ slu
             depend on next.config.ts's remotePatterns matching exactly. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={data.organization_logo_url ?? DEFAULT_LOGO}
+          src={data.organization_logo_url ?? DEFAULT_CHURCH_LOGO}
           alt={data.organization_name}
           width={64}
           height={64}
@@ -69,6 +68,8 @@ export default async function PublicJoinPage({ params }: { params: Promise<{ slu
           />
         </CardContent>
       </Card>
+
+      <PublicPoweredByFooter />
     </div>
   );
 }

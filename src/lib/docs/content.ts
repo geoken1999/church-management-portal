@@ -120,6 +120,14 @@ export const DOC_CATEGORIES: DocCategory[] = [
         title: "Events calendar",
         body: [
           "Events supports one-off and recurring events (daily/weekly/monthly/yearly), online or in-person with a meeting link, and can be tied to a specific branch and manager.",
+          "Every event has a status: Pending, Active, Cancelled, or Completed. The registration link only accepts new registrants while an event is Active — the other three statuses close it regardless of capacity or the closing date/time, and the public page shows a matching message (\"cancelled,\" \"already taken place,\" or \"isn't open yet\").",
+          "For an in-person event, add a venue (e.g. \"Main Sanctuary, 123 Church St\") and a map link, plus an event contact — all three show up on the emailed registration pass, with the location as a tappable pin that opens the map. For an online event, the pass instead shows a tappable \"Join online\" link straight to the meeting.",
+          "Click \"Registration\" on any event to turn on a public registration form for it — customize the fields (Name, Email, and Phone by default, editable like a Form's), set an optional capacity and closing time, then share the link or QR code from the Settings tab.",
+          "Every registrant is emailed a confirmation pass with a QR code, a calendar (.ics) invite they can add straight to their calendar app, and a short backup code in case a phone won't scan — from the Registrants tab, mark someone checked in or cancel their registration. Use the search box there to find someone by name, email, phone, or confirmation code.",
+          "The Name, Email, and Phone fields are permanent — the field editor won't let you remove them, and their \"Required\" toggle and field type are locked on, since registration, the emailed pass, and duplicate-prevention all depend on them staying exactly as they are. Email and Phone are each checked for duplicates per event automatically; any custom field you add can opt into the same check with its own \"No duplicates allowed\" toggle.",
+          "In Settings, design the registration pass: upload a banner image (exactly 1200x350px — the field editor tells you if a chosen file doesn't match, and won't upload it), pick a pass color, and add an optional personal message — the confirmation email shows the registrant's name, event details, confirmation code, and QR code as a single ticket-style card. Use \"Preview pass\" to see a sample before you save.",
+          "Registration closes itself automatically the moment any one of three things happens: capacity is reached, the closing date/time you set passes, or (for a one-time event) the event is 1 hour away — whichever comes first. There's no need to remember to turn it off. Recurring events aren't auto-closed 1 hour before a specific date, since there's no single event start for that to mean.",
+          "Click \"Add to Attendance\" on an event to create (or jump straight to) its Attendance session — for a recurring event this is always today's occurrence. That session's \"Registered attendees\" checklist is exactly the Registrants list, so check-in works the same from either place.",
         ],
       },
       {
@@ -142,6 +150,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
           "Forms is a builder for one-off registration forms or surveys, each with its own shareable public link and response collection — build it, publish it, and anyone with the link can fill it out without logging in.",
           "Add fields one at a time (short text, long text, number, email, phone, date, yes/no, or dropdown), mark any of them required, and reorder them with the arrows.",
           "A form only accepts responses while it's Published — Draft forms aren't live yet, and Closed forms stop accepting new responses without deleting what's already been collected.",
+          "Every public page like this one — Forms, Event registration, Give, Join, and a shared Folder — shows your own church logo and name at the top (set it under Profile), with \"Powered by KingdomFlow\" kept as a small attribution at the bottom.",
         ],
       },
       {
@@ -162,6 +171,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
           "Click \"Take attendance\" to start a session, then check off who was present from that branch's active members.",
           "If someone attended who isn't on the default list — a visitor from another branch, for example — use \"Check in someone not listed below\" to search the full member directory and add them to that session.",
           "You can also just record a total headcount instead of, or alongside, checking off individuals — useful for large services where a per-person checklist isn't practical.",
+          "If the session is linked to an event that has online registration turned on, a \"Registered attendees\" checklist appears alongside the member roster — check off registrants as they arrive, separately from the member checklist, since a registrant isn't necessarily an existing Member.",
         ],
       },
       {
@@ -261,6 +271,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
         body: [
           "The three plans differ in email/SMS quotas, storage, added team logins, and whether Finance, Social Media, and your own SMTP are included — see the Billing page for the full comparison.",
           "Every plan is available billed Monthly, or Annually at 10% off (toggle on the Billing page or the pricing page).",
+          "Your organization's owner and admins get an email whenever a subscription is activated, renewed, or cancelled, and whenever an add-on pack is purchased — sent to every owner/admin, not just whoever made the change.",
         ],
       },
       {

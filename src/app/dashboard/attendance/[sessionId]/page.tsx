@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getAttendanceSession, getAttendanceRoster, getAttendanceRecords } from "@/lib/attendance/dal";
+import { getEventRegistrations } from "@/lib/events/registration-dal";
 import { AttendanceSessionDetail } from "@/components/attendance/AttendanceSessionDetail";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
@@ -26,13 +27,18 @@ export default async function AttendanceSessionPage({ params }: { params: Promis
     notFound();
   }
 
-  const [roster, presentMemberIds, directory] = await Promise.all([
+  const [roster, presentMemberIds, directory, eventRegistrations] = await Promise.all([
     getAttendanceRoster(organizationId, session.branch_id),
     getAttendanceRecords(sessionId),
     // Only needed as a distinct fetch for branch-scoped sessions — an
     // org-wide session's roster already IS the full directory, so the
     // manual "check in someone not listed" search can reuse it directly.
     session.branch_id ? getAttendanceRoster(organizationId, null) : Promise.resolve(null),
+    // Only the linked event's own online registrants — not every Member —
+    // and only when that event actually has registration turned on.
+    session.events?.registration_enabled && session.event_id
+      ? getEventRegistrations(session.event_id).then((rows) => rows.filter((row) => row.status !== "cancelled"))
+      : Promise.resolve([]),
   ]);
 
   return (
@@ -47,6 +53,7 @@ export default async function AttendanceSessionPage({ params }: { params: Promis
         roster={roster}
         directory={directory ?? roster}
         presentMemberIds={presentMemberIds}
+        eventRegistrations={eventRegistrations}
         canWrite={membership.tabAccess.attendance.write}
       />
     </div>

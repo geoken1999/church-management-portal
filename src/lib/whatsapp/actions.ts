@@ -161,7 +161,7 @@ export async function sendBulkWhatsAppAction(formData: FormData): Promise<SendWh
 
   let result;
   try {
-    result = await sendBulkWhatsApp({ credentials, body, recipients });
+    result = await sendBulkWhatsApp({ credentials, body, recipients, organizationId, mode });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Couldn't send that message.";
     await logPlatformEvent({
@@ -241,7 +241,7 @@ export async function sendWhatsAppReplyAction(conversationId: string, body: stri
 
   let sid: string;
   try {
-    const result = await sendWhatsAppMessage({ credentials, to: conversation.phone_number, body });
+    const result = await sendWhatsAppMessage({ credentials, to: conversation.phone_number, body, organizationId: conversation.organization_id });
     sid = result.sid;
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Couldn't send that reply." };

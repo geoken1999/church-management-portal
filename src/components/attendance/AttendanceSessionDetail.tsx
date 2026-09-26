@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Search, MapPin, CalendarDays, Users, UserPlus } from "lucide-react";
-import { toggleAttendanceRecord, updateSessionHeadcount } from "@/lib/attendance/actions";
+import { Search, MapPin, CalendarDays, Users, UserPlus, Ticket } from "lucide-react";
+import { toggleAttendanceRecord, updateSessionHeadcount, toggleEventRegistrationCheckIn } from "@/lib/attendance/actions";
 import { validateHeadcount } from "@/lib/attendance/validation";
+import type { EventRegistration } from "@/types/database";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,47 @@ interface SessionInfo {
   notes: string | null;
   headcount: number | null;
   branches: { id: string; name: string } | null;
-  events: { id: string; title: string } | null;
+  events: { id: string; title: string; registration_enabled: boolean } | null;
+}
+
+function registrantName(registration: EventRegistration): string {
+  const name = registration.answers.name;
+  return typeof name === "string" && name.trim() ? name : registration.email;
+}
+
+function RegistrantRow({
+  registration,
+  sessionId,
+  canWrite,
+  onToggled,
+}: {
+  registration: EventRegistration;
+  sessionId: string;
+  canWrite: boolean;
+  onToggled: (registrationId: string, checkedIn: boolean) => void;
+}) {
+  const [pending, startTransition] = useTransition();
+  const checkedIn = registration.status === "checked_in";
+
+  function handleChange(next: boolean) {
+    onToggled(registration.id, next);
+    startTransition(async () => {
+      const result = await toggleEventRegistrationCheckIn(sessionId, registration.id, next);
+      if (result.error) {
+        onToggled(registration.id, !next);
+      }
+    });
+  }
+
+  return (
+    <label className="group flex items-center gap-3 rounded-lg border border-border px-3 py-2 has-data-checked:border-primary/40 has-data-checked:bg-primary/5">
+      <Checkbox checked={checkedIn} disabled={!canWrite || pending} onCheckedChange={(value) => handleChange(value === true)} />
+      <span className="min-w-0 flex-1 text-sm">
+        <span className="block truncate">{registrantName(registration)}</span>
+        <span className="block truncate font-mono text-xs text-muted-foreground">{registration.confirmation_code}</span>
+      </span>
+    </label>
+  );
 }
 
 function formatDate(iso: string): string {
@@ -192,16 +233,33 @@ export function AttendanceSessionDetail({
   roster,
   directory,
   presentMemberIds,
+  eventRegistrations,
   canWrite,
 }: {
   session: SessionInfo;
   roster: RosterMember[];
   directory: RosterMember[];
   presentMemberIds: string[];
+  eventRegistrations: EventRegistration[];
   canWrite: boolean;
 }) {
   const [search, setSearch] = useState("");
   const [presentSet, setPresentSet] = useState(() => new Set(presentMemberIds));
+  const [registrations, setRegistrations] = useState(eventRegistrations);
+  const [registrantSearch, setRegistrantSearch] = useState("");
+
+  function handleRegistrantToggled(registrationId: string, checkedIn: boolean) {
+    setRegistrations((current) =>
+      current.map((r) => (r.id === registrationId ? { ...r, status: checkedIn ? "checked_in" : "confirmed", checked_in_at: checkedIn ? new Date().toISOString() : null } : r)),
+    );
+  }
+
+  const checkedInCount = registrations.filter((r) => r.status === "checked_in").length;
+  const filteredRegistrations = useMemo(() => {
+    const query = registrantSearch.trim().toLowerCase();
+    if (!query) return registrations;
+    return registrations.filter((r) => registrantName(r).toLowerCase().includes(query) || r.email.toLowerCase().includes(query));
+  }, [registrations, registrantSearch]);
 
   function handleToggled(memberId: string, present: boolean) {
     setPresentSet((current) => {
@@ -247,6 +305,12 @@ export function AttendanceSessionDetail({
               <Users className="size-4" />
               {presentSet.size} of {displayRoster.length} present
             </span>
+            {registrations.length > 0 && (
+              <span className="flex items-center gap-1">
+                <Ticket className="size-4" />
+                {checkedInCount} of {registrations.length} registered attendees checked in
+              </span>
+            )}
             {session.events && <Badge variant="secondary">{session.events.title}</Badge>}
           </div>
           {session.notes && <p className="text-sm text-muted-foreground">{session.notes}</p>}
@@ -258,6 +322,35 @@ export function AttendanceSessionDetail({
         <Alert>
           <AlertDescription>You have read-only access to this tab, so check-ins are disabled.</AlertDescription>
         </Alert>
+      )}
+
+      {registrations.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Ticket className="size-4 text-primary" />
+            <h2 className="font-heading text-base font-bold">Registered attendees</h2>
+          </div>
+          <div className="relative">
+            <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search registered attendees..."
+              className="pl-8"
+              value={registrantSearch}
+              onChange={(event) => setRegistrantSearch(event.target.value)}
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredRegistrations.map((registration) => (
+              <RegistrantRow
+                key={registration.id}
+                registration={registration}
+                sessionId={session.id}
+                canWrite={canWrite}
+                onToggled={handleRegistrantToggled}
+              />
+            ))}
+          </div>
+        </div>
       )}
 
       {canWrite && (

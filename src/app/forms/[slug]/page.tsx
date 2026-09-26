@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
-import { FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { PublicFormFillForm } from "@/components/forms/PublicFormFillForm";
-import { Logo } from "@/components/Logo";
+import { PublicBrandHeader, PublicPoweredByFooter } from "@/components/PublicBrandHeader";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
@@ -53,12 +52,7 @@ export default async function PublicFormPage({ params }: { params: Promise<{ slu
       />
 
       <div className="relative w-full max-w-xl md:max-w-2xl lg:max-w-3xl">
-        <div className="mb-6 flex flex-col items-center gap-4 text-center">
-          <Logo size="sm" />
-          <div className="flex size-14 items-center justify-center rounded-full bg-accent shadow-sm">
-            <FileText className="size-6 text-primary" />
-          </div>
-        </div>
+        <PublicBrandHeader logoUrl={data.organization_logo_url} name={data.organization_name} />
 
         <Card size="lg" className="rounded-2xl shadow-lg md:[--card-spacing:--spacing(9)]">
           <CardHeader>
@@ -70,7 +64,7 @@ export default async function PublicFormPage({ params }: { params: Promise<{ slu
           </CardContent>
         </Card>
 
-        <p className="mt-6 text-center text-xs text-muted-foreground">Powered by KingdomFlow</p>
+        <PublicPoweredByFooter />
       </div>
     </div>
   );

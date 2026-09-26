@@ -294,7 +294,41 @@ export function getIntegrationStatuses(): IntegrationStatus[] {
     { name: "Instagram", configured: Boolean(process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET) },
     { name: "YouTube", configured: Boolean(process.env.YOUTUBE_CLIENT_ID && process.env.YOUTUBE_CLIENT_SECRET) },
     { name: "Facebook", configured: Boolean(process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) },
+    { name: "Vercel (deployment status)", configured: Boolean(process.env.VERCEL_API_TOKEN && process.env.VERCEL_PROJECT_ID) },
+    { name: "Supabase Management API", configured: Boolean(process.env.SUPABASE_MANAGEMENT_API_TOKEN) },
   ];
+}
+
+// This app runs on Vercel (serverless functions, not a fixed always-on
+// box) — there's no single "server" to read CPU usage or uptime off from
+// inside a request, since each invocation is its own short-lived
+// container. Real request/execution/CPU metrics live in Vercel's own
+// Observability dashboard, linked from the Health page instead of faked
+// here. What IS genuinely observable from in here: whether the database
+// actually responds, and how much it and file storage have grown.
+export interface DatabaseHealth {
+  reachable: boolean;
+  latencyMs: number | null;
+}
+
+export async function getDatabaseHealth(): Promise<DatabaseHealth> {
+  const admin = createAdminClient();
+  const start = Date.now();
+  const { error } = await admin.from("organizations").select("id").limit(1);
+  const latencyMs = Date.now() - start;
+  return { reachable: !error, latencyMs: error ? null : latencyMs };
+}
+
+export interface PlatformStorageStats {
+  fileStorageBytes: number;
+  databaseBytes: number;
+}
+
+export async function getPlatformStorageStats(): Promise<PlatformStorageStats | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("get_platform_storage_stats").maybeSingle();
+  if (error || !data) return null;
+  return { fileStorageBytes: data.file_storage_bytes, databaseBytes: data.database_bytes };
 }
 
 // ---------------------------------------------------------------------------

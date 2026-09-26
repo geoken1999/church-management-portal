@@ -73,7 +73,7 @@ export async function sendBulkSmsAction(formData: FormData): Promise<SendSmsStat
 
   let result;
   try {
-    result = await sendBulkSms({ body, recipients });
+    result = await sendBulkSms({ body, recipients, organizationId: membership.organization.id });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Couldn't send that message.";
     await logPlatformEvent({

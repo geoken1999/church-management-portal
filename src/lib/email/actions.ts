@@ -134,6 +134,7 @@ export async function sendBulkEmailAction(formData: FormData): Promise<SendEmail
           recipients,
           replyTo: user.email ?? undefined,
           attachments,
+          organizationId: membership.organization.id,
         });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Couldn't send that email.";

@@ -25,6 +25,71 @@ export interface CreateSessionState {
   sessionId?: string;
 }
 
+// The Events page's "Add to Attendance" shortcut — creates (or, if one
+// already exists for this event+date, just returns) an attendance session
+// for a single event without making the organizer go to Attendance and
+// pick it out of the event dropdown themselves. Once linked, that event's
+// online registrants show up as a checklist on the session automatically
+// (see AttendanceSessionDetail) — this is what makes that connection.
+export async function addEventToAttendance(eventId: string): Promise<CreateSessionState> {
+  const user = await requireUser();
+
+  const admin = createAdminClient();
+  const { data: event } = await admin
+    .from("events")
+    .select("organization_id, title, start_at, branch_id, is_recurring")
+    .eq("id", eventId)
+    .maybeSingle();
+
+  if (!event) {
+    return { error: "That event could not be found." };
+  }
+
+  const access = await checkTabAccess(event.organization_id, "attendance", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
+
+  // A recurring event (e.g. "Sunday Service") is one row, not one per
+  // occurrence — clicking this is assumed to mean "for today's
+  // occurrence," same reasoning the Attendance session's own
+  // occurrence_date field already relies on. A one-off event just uses
+  // its own start date.
+  const occurrenceDate = event.is_recurring ? new Date().toISOString().slice(0, 10) : new Date(event.start_at).toISOString().slice(0, 10);
+
+  const { data: existing } = await admin
+    .from("attendance_sessions")
+    .select("id")
+    .eq("event_id", eventId)
+    .eq("occurrence_date", occurrenceDate)
+    .maybeSingle();
+
+  if (existing) {
+    return { sessionId: existing.id };
+  }
+
+  const { data: created, error } = await admin
+    .from("attendance_sessions")
+    .insert({
+      organization_id: event.organization_id,
+      branch_id: event.branch_id,
+      event_id: eventId,
+      occurrence_date: occurrenceDate,
+      title: event.title,
+      created_by: user.id,
+    })
+    .select("id")
+    .single();
+
+  if (error || !created) {
+    console.error("addEventToAttendance insert failed:", error?.message);
+    return { error: "Couldn't create an attendance session for this event." };
+  }
+
+  revalidatePath(ATTENDANCE_PATH);
+  return { sessionId: created.id };
+}
+
 export async function createAttendanceSession(
   _prevState: CreateSessionState,
   formData: FormData,
@@ -150,6 +215,50 @@ export async function toggleAttendanceRecord(sessionId: string, memberId: string
 
   revalidatePath(`${ATTENDANCE_PATH}/${sessionId}`);
   return { present };
+}
+
+export interface ToggleRegistrationCheckInState {
+  error?: string;
+  checkedIn?: boolean;
+}
+
+// Checks in (or undoes checking in) someone who registered online for the
+// event this session is linked to — a separate action from
+// toggleAttendanceRecord because registrants aren't necessarily existing
+// Members (event_registrations has no member_id at all; someone could
+// register who's never set foot in the church before), so their presence
+// lives on event_registrations.status instead of attendance_records.
+// Gated by the Attendance tab's own permissions (not Events') since that's
+// the tab this is actually surfaced in.
+export async function toggleEventRegistrationCheckIn(
+  sessionId: string,
+  registrationId: string,
+  checkedIn: boolean,
+): Promise<ToggleRegistrationCheckInState> {
+  await requireUser();
+
+  const organizationId = await organizationIdForSession(sessionId);
+  if (!organizationId) {
+    return { error: "That session could not be found." };
+  }
+  const access = await checkTabAccess(organizationId, "attendance", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("event_registrations")
+    .update(checkedIn ? { status: "checked_in", checked_in_at: new Date().toISOString() } : { status: "confirmed", checked_in_at: null })
+    .eq("id", registrationId)
+    .eq("organization_id", organizationId);
+
+  if (error) {
+    return { error: "Couldn't update check-in status. Please try again." };
+  }
+
+  revalidatePath(`${ATTENDANCE_PATH}/${sessionId}`);
+  return { checkedIn };
 }
 
 export interface UpdateHeadcountState {

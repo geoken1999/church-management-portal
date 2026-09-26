@@ -16,6 +16,11 @@ export interface EmailAttachment {
   filename: string;
   content: Buffer;
   contentType?: string;
+  // Set to embed this attachment inline (referenced in `html` via
+  // `cid:<contentId>`) rather than only offering it as a separate
+  // downloadable file — Resend still keeps it as a real attachment either
+  // way, just also inline-renderable.
+  contentId?: string;
 }
 
 interface SendBulkEmailParams {
@@ -25,6 +30,13 @@ interface SendBulkEmailParams {
   recipients: string[];
   replyTo?: string;
   attachments?: EmailAttachment[];
+  // Carried through to Resend as a tag so the delivery-status webhook
+  // (src/app/api/resend/webhook) can attribute a later bounce/failure
+  // event back to the right org — Resend's webhooks are account-wide, not
+  // per-org, so there's no other way to know whose email a given event
+  // belongs to. Optional since not every caller (e.g. platform-admin's own
+  // notification emails) has an organization to attribute to.
+  organizationId?: string;
 }
 
 export async function sendBulkEmail(params: SendBulkEmailParams): Promise<SendBulkEmailResult> {
@@ -51,6 +63,7 @@ export async function sendBulkEmail(params: SendBulkEmailParams): Promise<SendBu
         subject: params.subject,
         html: params.html,
         replyTo: params.replyTo,
+        tags: params.organizationId ? [{ name: "organization_id", value: params.organizationId }] : undefined,
       })),
       // "permissive" lets valid recipients in a chunk send even if a few
       // addresses in the same chunk fail validation — without it, one bad
@@ -94,7 +107,9 @@ async function sendIndividually(
         filename: a.filename,
         content: a.content,
         contentType: a.contentType,
+        contentId: a.contentId,
       })),
+      tags: params.organizationId ? [{ name: "organization_id", value: params.organizationId }] : undefined,
     });
 
     if (error) failed.push({ email, error: error.message });

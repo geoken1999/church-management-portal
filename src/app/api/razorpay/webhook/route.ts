@@ -4,7 +4,9 @@ import { getRazorpayWebhookSecret } from "@/lib/billing/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { finalizeGivingOrderPayment } from "@/lib/finance/razorpay-giving";
 import { finalizeAddonOrderPayment } from "@/lib/billing/addon-actions";
+import { sendSubscriptionActivatedEmail, sendSubscriptionChargedEmail, sendSubscriptionCancelledEmail } from "@/lib/billing/receipts";
 import { logPlatformEvent } from "@/lib/platform-events/log";
+import { PLANS, isPlanId, isBillingInterval } from "@/lib/plans/config";
 
 // The source of truth for plan changes — startSubscriptionCheckout's DB
 // write only records what checkout was *started*; this is what confirms
@@ -69,7 +71,7 @@ export async function POST(request: Request) {
   const admin = createAdminClient();
   const { data: existing } = await admin
     .from("organization_subscriptions")
-    .select("organization_id, plan_id")
+    .select("organization_id, plan_id, billing_interval")
     .eq("razorpay_subscription_id", subscriptionEntity.id)
     .maybeSingle();
 
@@ -92,12 +94,22 @@ export async function POST(request: Request) {
     })
     .eq("razorpay_subscription_id", subscriptionEntity.id);
 
+  const planName = isPlanId(existing.plan_id) ? PLANS[existing.plan_id].name : existing.plan_id;
+
   if (event === "subscription.activated" || event === "subscription.charged") {
     await admin.from("organizations").update({ plan: existing.plan_id }).eq("id", existing.organization_id);
+
+    if (event === "subscription.activated") {
+      const interval = isBillingInterval(existing.billing_interval) ? existing.billing_interval : "monthly";
+      await sendSubscriptionActivatedEmail(existing.organization_id, planName, interval);
+    } else {
+      await sendSubscriptionChargedEmail(existing.organization_id, planName, paymentEntity?.amount ?? null);
+    }
   } else if (["subscription.cancelled", "subscription.completed", "subscription.expired"].includes(event)) {
     // Basic is the floor plan everyone falls back to — there's no
     // free/suspended tier below it yet.
     await admin.from("organizations").update({ plan: "basic" }).eq("id", existing.organization_id);
+    await sendSubscriptionCancelledEmail(existing.organization_id, planName);
   }
 
   return NextResponse.json({ ok: true });

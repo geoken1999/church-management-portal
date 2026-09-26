@@ -8,6 +8,7 @@ import { createRazorpayClient } from "@/lib/billing/razorpay";
 import { getRazorpayEnv } from "@/lib/billing/env";
 import { getAddonPack } from "@/lib/plans/config";
 import { verifyGivingPaymentSignature } from "@/lib/finance/razorpay-giving";
+import { sendAddonPurchaseEmail } from "@/lib/billing/receipts";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import type { AddonType } from "@/lib/plans/config";
 
@@ -124,7 +125,7 @@ export async function finalizeAddonOrderPayment(razorpayOrderId: string, razorpa
   const admin = createAdminClient();
   const { data: order } = await admin
     .from("organization_addon_orders")
-    .select("id, organization_id, addon_type, credits, status")
+    .select("id, organization_id, addon_type, pack_id, credits, amount, status")
     .eq("razorpay_order_id", razorpayOrderId)
     .maybeSingle();
 
@@ -167,6 +168,8 @@ export async function finalizeAddonOrderPayment(razorpayOrderId: string, razorpa
           : { addon_storage_bytes: (org?.addon_storage_bytes ?? 0) + order.credits };
 
   await admin.from("organizations").update(update).eq("id", order.organization_id);
+
+  await sendAddonPurchaseEmail(order.organization_id, getAddonPack(order.pack_id)?.label ?? order.addon_type, order.amount);
 
   return { success: true };
 }

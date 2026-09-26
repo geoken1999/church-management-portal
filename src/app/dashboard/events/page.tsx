@@ -3,6 +3,7 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { getLeaderMembers } from "@/lib/leaders/dal";
 import { getBranches } from "@/lib/branches/dal";
 import { getEvents } from "@/lib/events/dal";
+import { getSiteUrl } from "@/lib/site-url";
 import { EventsManagerClient } from "@/components/events/EventsManagerClient";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
@@ -42,6 +43,7 @@ export default async function EventsPage() {
         branches={branches}
         events={events}
         canManage={canManage}
+        siteUrl={getSiteUrl()}
       />
     </div>
   );

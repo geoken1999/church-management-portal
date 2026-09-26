@@ -584,6 +584,13 @@ export type Todo = {
 
 export type EventRecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
 export type EventMeetingMode = "offline" | "online";
+export type EventStatus = "pending" | "active" | "cancelled" | "completed";
+
+// A superset of FormField, not the shared type itself — Forms and the
+// Widget have no concept of per-field uniqueness, so `unique` stays
+// specific to event registration rather than polluting the type every
+// other field-driven feature also uses.
+export type EventRegistrationField = FormField & { unique?: boolean };
 
 export type Event = {
   id: string;
@@ -598,10 +605,38 @@ export type Event = {
   branch_id: string | null;
   meeting_mode: EventMeetingMode;
   meeting_link: string | null;
+  status: EventStatus;
+  venue: string | null;
+  map_link: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
   managed_by: string | null;
   created_by: string | null;
+  registration_enabled: boolean;
+  registration_share_token: string;
+  registration_fields: EventRegistrationField[];
+  registration_capacity: number | null;
+  registration_closes_at: string | null;
+  registration_pass_color: string;
+  registration_pass_message: string | null;
+  registration_pass_background_url: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type EventRegistrationStatus = "confirmed" | "cancelled" | "checked_in";
+
+export type EventRegistration = {
+  id: string;
+  event_id: string;
+  organization_id: string;
+  email: string;
+  phone: string | null;
+  answers: Record<string, string | number | boolean | null>;
+  confirmation_code: string;
+  status: EventRegistrationStatus;
+  checked_in_at: string | null;
+  created_at: string;
 };
 
 export type AttendanceSession = {
@@ -834,6 +869,21 @@ export type PlatformEvent = {
   organization_id: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
+};
+
+export type MessageDeliveryChannel = "sms" | "whatsapp" | "email";
+
+export type MessageDeliveryEvent = {
+  id: string;
+  organization_id: string | null;
+  channel: MessageDeliveryChannel;
+  provider_id: string;
+  recipient: string | null;
+  status: string;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type NotificationType =
@@ -1390,6 +1440,20 @@ export type Database = {
           },
         ];
       };
+      message_delivery_events: {
+        Row: MessageDeliveryEvent;
+        Insert: Partial<MessageDeliveryEvent> & Pick<MessageDeliveryEvent, "channel" | "provider_id" | "status">;
+        Update: Partial<MessageDeliveryEvent>;
+        Relationships: [
+          {
+            foreignKeyName: "message_delivery_events_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       support_tickets: {
         Row: SupportTicket;
         Insert: Partial<SupportTicket> & Pick<SupportTicket, "organization_id" | "subject" | "description" | "category">;
@@ -1741,6 +1805,27 @@ export type Database = {
           },
         ];
       };
+      event_registrations: {
+        Row: EventRegistration;
+        Insert: Partial<EventRegistration> & Pick<EventRegistration, "event_id" | "organization_id" | "email" | "confirmation_code">;
+        Update: Partial<EventRegistration>;
+        Relationships: [
+          {
+            foreignKeyName: "event_registrations_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "event_registrations_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       todos: {
         Row: Todo;
         Insert: Partial<Todo> & Pick<Todo, "organization_id" | "title">;
@@ -2074,6 +2159,7 @@ export type Database = {
           id: string;
           organization_id: string;
           organization_name: string;
+          organization_logo_url: string | null;
           title: string;
           description: string | null;
           goal_amount: number;
@@ -2083,7 +2169,7 @@ export type Database = {
       };
       get_shared_category: {
         Args: { token: string };
-        Returns: { id: string; name: string }[];
+        Returns: { id: string; name: string; organization_name: string; organization_logo_url: string | null }[];
       };
       get_shared_category_documents: {
         Args: { token: string };
@@ -2105,6 +2191,10 @@ export type Database = {
         Args: { target_org_id: string };
         Returns: number;
       };
+      get_platform_storage_stats: {
+        Args: Record<string, never>;
+        Returns: { file_storage_bytes: number; database_bytes: number }[];
+      };
       get_public_form: {
         Args: { form_slug: string };
         Returns: {
@@ -2112,6 +2202,8 @@ export type Database = {
           title: string;
           description: string | null;
           fields: FormField[];
+          organization_name: string;
+          organization_logo_url: string | null;
         }[];
       };
       submit_form_response: {
@@ -2133,6 +2225,27 @@ export type Database = {
       submit_widget_response: {
         Args: { token: string; answers: Record<string, unknown>; page_url?: string | null };
         Returns: string;
+      };
+      get_public_event_registration: {
+        Args: { token: string };
+        Returns: {
+          event_id: string;
+          title: string;
+          description: string | null;
+          start_at: string;
+          end_at: string | null;
+          registration_fields: EventRegistrationField[];
+          registration_closes_at: string | null;
+          spots_remaining: number | null;
+          is_open: boolean;
+          status: EventStatus;
+          organization_name: string;
+          organization_logo_url: string | null;
+        }[];
+      };
+      submit_event_registration: {
+        Args: { token: string; answers: Record<string, unknown> };
+        Returns: { registration_id: string; confirmation_code: string }[];
       };
     };
     Enums: Record<string, never>;

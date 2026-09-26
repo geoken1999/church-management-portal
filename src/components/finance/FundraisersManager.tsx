@@ -43,11 +43,13 @@ import {
 
 type MemberBasic = Pick<Member, "id" | "first_name" | "last_name">;
 type BranchBasic = Pick<Branch, "id" | "name">;
+type PayoutHistoryEntry = { amount: number; note: string | null; createdAt: string };
 type FundraiserRow = Fundraiser & {
   raisedAmount: number;
   sharedCollected: number;
   sharedOwed: number;
   pendingPayoutRequest: { id: string; amount: number } | null;
+  payoutHistory: PayoutHistoryEntry[];
   branches: BranchBasic | null;
   members: MemberBasic | null;
 };
@@ -293,6 +295,36 @@ function formatCurrency(amount: number): string {
   return `₹${amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+// The actual payout ledger (migration 0054) — one row per amount a
+// platform operator has wired to the church so far, oldest last. Kept
+// collapsed by default since most fundraisers will have zero or one
+// entry; it only matters once there's a real history to look back on.
+function PayoutHistoryList({ payouts }: { payouts: PayoutHistoryEntry[] }) {
+  const [open, setOpen] = useState(false);
+  if (payouts.length === 0) return null;
+
+  return (
+    <div className="border-t border-border pt-2">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="text-xs font-medium text-primary hover:underline">
+        {open ? "Hide" : "Show"} payout history ({payouts.length})
+      </button>
+      {open && (
+        <div className="mt-2 space-y-1.5">
+          {payouts.map((payout, index) => (
+            <div key={index} className="flex items-start justify-between gap-2 text-xs">
+              <div className="min-w-0">
+                <p className="text-muted-foreground">{new Date(payout.createdAt).toLocaleDateString(undefined, { dateStyle: "medium" })}</p>
+                {payout.note && <p className="truncate text-muted-foreground italic">{payout.note}</p>}
+              </div>
+              <span className="shrink-0 font-medium">{formatCurrency(payout.amount)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Only relevant for 'shared'-mode fundraisers — the church's own account
 // (payment_mode: 'own') never has money sitting on the platform to begin
 // with, so there's nothing to request. Rendered as one row per fundraiser
@@ -303,12 +335,14 @@ function PayoutRequestRow({
   sharedCollected,
   sharedOwed,
   pendingPayoutRequest,
+  payoutHistory,
 }: {
   fundraiserId: string;
   fundraiserTitle: string;
   sharedCollected: number;
   sharedOwed: number;
   pendingPayoutRequest: { id: string; amount: number } | null;
+  payoutHistory: PayoutHistoryEntry[];
 }) {
   const [state, setState] = useState<PayoutRequestState>(payoutRequestInitialState);
   const [pending, startTransition] = useTransition();
@@ -356,6 +390,7 @@ function PayoutRequestRow({
           <AlertDescription>{state.error}</AlertDescription>
         </Alert>
       )}
+      <PayoutHistoryList payouts={payoutHistory} />
     </div>
   );
 }
@@ -400,6 +435,7 @@ function WalletBalanceButton({ fundraisers }: { fundraisers: FundraiserRow[] }) 
               sharedCollected={fundraiser.sharedCollected}
               sharedOwed={fundraiser.sharedOwed}
               pendingPayoutRequest={fundraiser.pendingPayoutRequest}
+              payoutHistory={fundraiser.payoutHistory}
             />
           ))}
         </div>

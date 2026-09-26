@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
 import { isPlanId } from "@/lib/plans/config";
 import { logPlatformEvent } from "@/lib/platform-events/log";
+import { notifyOrgOfSupportReply } from "@/lib/support/notify-org";
 import type { SupportTicketStatus } from "@/types/database";
 
 const PAYOUTS_PATH = "/platform-admin/payouts";
@@ -216,6 +217,8 @@ export async function addPlatformSupportReply(
     body: `Re: ${ticket.subject}`,
     link: "/dashboard/support",
   });
+
+  await notifyOrgOfSupportReply({ organizationId: ticket.organization_id, ticketSubject: ticket.subject, replyBody: body });
 
   await logPlatformEvent({
     level: "info",

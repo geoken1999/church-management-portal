@@ -3,6 +3,14 @@
     {
       "path": "/api/instagram/cron/refresh-tokens",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/daily-health-report",
+      "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/event-reminders",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

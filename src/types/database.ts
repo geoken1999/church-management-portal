@@ -585,6 +585,7 @@ export type Todo = {
 export type EventRecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
 export type EventMeetingMode = "offline" | "online";
 export type EventStatus = "pending" | "active" | "cancelled" | "completed";
+export type EventReminderOffset = "24h" | "1h" | "morning_of";
 
 // A superset of FormField, not the shared type itself — Forms and the
 // Widget have no concept of per-field uniqueness, so `unique` stays
@@ -620,6 +621,7 @@ export type Event = {
   registration_pass_color: string;
   registration_pass_message: string | null;
   registration_pass_background_url: string | null;
+  reminder_offset: EventReminderOffset | null;
   created_at: string;
   updated_at: string;
 };
@@ -636,6 +638,8 @@ export type EventRegistration = {
   confirmation_code: string;
   status: EventRegistrationStatus;
   checked_in_at: string | null;
+  last_reminder_occurrence_date: string | null;
+  last_reminder_sent_at: string | null;
   created_at: string;
 };
 

@@ -20,6 +20,7 @@ import {
   ALLOWED_LOGO_TYPES,
 } from "@/lib/organizations/validation";
 import { checkStorageQuota, checkTeamMemberQuota } from "@/lib/plans/dal";
+import { sendWelcomeEmail } from "@/lib/organizations/welcome-email";
 import type { MemberCountRange, OrganizationRole, TabPermissions } from "@/types/database";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -66,7 +67,7 @@ export async function createOrganization(
   _prevState: CreateOrganizationState,
   formData: FormData,
 ): Promise<CreateOrganizationState> {
-  await requireUser();
+  const user = await requireUser();
 
   const name = String(formData.get("name") ?? "");
   const memberCountRange = String(formData.get("memberCountRange") ?? "");
@@ -102,7 +103,7 @@ export async function createOrganization(
   // collision rather than surfacing a raw database error to the user.
   for (let attempt = 0; attempt < 3; attempt++) {
     const slug = attempt === 0 ? baseSlug : `${baseSlug}-${randomSlugSuffix()}`;
-    const { error } = await supabase.rpc("create_organization", {
+    const { data, error } = await supabase.rpc("create_organization", {
       org_name: name.trim(),
       org_slug: slug,
       member_count_range: memberCountRange,
@@ -111,6 +112,10 @@ export async function createOrganization(
     });
 
     if (!error) {
+      if (data && user.email) {
+        const firstName = typeof user.user_metadata?.first_name === "string" ? user.user_metadata.first_name : null;
+        await sendWelcomeEmail({ organizationId: data.id, organizationName: data.name, recipientEmail: user.email, recipientFirstName: firstName });
+      }
       redirect("/dashboard");
     }
 

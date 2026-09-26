@@ -1,35 +1,19 @@
 import "server-only";
 
-import { createAdminClient } from "@/lib/supabase/admin";
 import { sendBulkEmail } from "@/lib/email/client";
 import { isEmailConfigured } from "@/lib/email/env";
 import { logPlatformEvent } from "@/lib/platform-events/log";
-
-// Billing communications go to whoever can actually manage billing for
-// that org (owner + admins — the same role check startSubscriptionCheckout
-// already enforces before letting anyone start a checkout), not every
-// member. This is a transactional/system email, not a campaign — it never
-// touches email_campaigns or the shared-email plan quota.
-async function getBillingRecipients(organizationId: string): Promise<string[]> {
-  const admin = createAdminClient();
-  const { data } = await admin
-    .from("organization_members")
-    .select("profiles!inner(email)")
-    .eq("organization_id", organizationId)
-    .in("role", ["owner", "admin"]);
-
-  return (data ?? [])
-    .map((row) => (row.profiles as { email: string } | null)?.email)
-    .filter((email): email is string => Boolean(email));
-}
+import { getOrgAdminEmails } from "@/lib/organizations/admin-emails";
 
 // Best-effort — never allowed to break the webhook/action it's called
 // from, so failures are logged (not thrown) and a missing/unconfigured
-// shared email account just skips silently.
+// shared email account just skips silently. This is a transactional/
+// system email, not a campaign — it never touches email_campaigns or the
+// shared-email plan quota.
 async function sendBillingEmail(organizationId: string, subject: string, bodyHtml: string): Promise<void> {
   if (!isEmailConfigured()) return;
 
-  const recipients = await getBillingRecipients(organizationId);
+  const recipients = await getOrgAdminEmails(organizationId);
   if (recipients.length === 0) return;
 
   try {

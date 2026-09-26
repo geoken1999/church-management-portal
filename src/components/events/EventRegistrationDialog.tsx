@@ -12,7 +12,14 @@ import {
   fetchEventRegistrations,
   type RegistrationSettingsState,
 } from "@/lib/events/registration-actions";
-import { FORM_FIELD_TYPES, sanitizeRegistrationFields, isProtectedField, isTypeLockedField } from "@/lib/events/registration-validation";
+import {
+  FORM_FIELD_TYPES,
+  sanitizeRegistrationFields,
+  isProtectedField,
+  isTypeLockedField,
+  EVENT_REMINDER_OFFSETS,
+  EVENT_REMINDER_OFFSET_LABELS,
+} from "@/lib/events/registration-validation";
 import { slugifyFieldKey, validateFormField } from "@/lib/forms/validation";
 import { QrCodeDialog } from "@/components/members/QrCodeDialog";
 import { EventPassBackgroundUpload } from "@/components/events/EventPassBackgroundUpload";
@@ -170,6 +177,7 @@ function SettingsTab({ event, siteUrl }: { event: Event; siteUrl: string }) {
   const [passColor, setPassColor] = useState(event.registration_pass_color);
   const [passMessage, setPassMessage] = useState(event.registration_pass_message ?? "");
   const [backgroundPreviewUrl, setBackgroundPreviewUrl] = useState(event.registration_pass_background_url);
+  const [reminderOffset, setReminderOffset] = useState(event.reminder_offset ?? "");
   const [state, setState] = useState<RegistrationSettingsState>(settingsInitialState);
   const [fieldErrors, setFieldErrors] = useState<Record<number, { label?: string; options?: string }>>({});
   const [pending, startTransition] = useTransition();
@@ -323,6 +331,30 @@ function SettingsTab({ event, siteUrl }: { event: Event; siteUrl: string }) {
             />
             <FieldError id="closesAt-error" message={state.fieldErrors?.closesAt} />
           </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="reminderOffset">Reminder email (optional)</Label>
+          <input type="hidden" name="reminderOffset" value={reminderOffset} />
+          <Select value={reminderOffset || "none"} onValueChange={(v) => setReminderOffset(v === "none" ? "" : (v ?? ""))}>
+            <SelectTrigger id="reminderOffset" className="w-full" aria-invalid={Boolean(state.fieldErrors?.reminderOffset)}>
+              <SelectValue>
+                {(v: string | null) => (!v || v === "none" ? "No reminder" : EVENT_REMINDER_OFFSET_LABELS[v as keyof typeof EVENT_REMINDER_OFFSET_LABELS])}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No reminder</SelectItem>
+              {EVENT_REMINDER_OFFSETS.map((offset) => (
+                <SelectItem key={offset} value={offset}>
+                  {EVENT_REMINDER_OFFSET_LABELS[offset]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <FieldError id="reminderOffset-error" message={state.fieldErrors?.reminderOffset} />
+          <p className="text-xs text-muted-foreground">
+            Sends a reminder email to every registrant before the event — for a recurring event, before each occurrence.
+          </p>
         </div>
 
         <div className="space-y-3 rounded-md border border-border p-4">

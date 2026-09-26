@@ -20,7 +20,11 @@ export const getFundraisers = cache(async (organizationId: string) => {
       .select("fundraiser_id, amount, payment_mode")
       .eq("organization_id", organizationId)
       .not("fundraiser_id", "is", null),
-    supabase.from("fundraiser_payouts").select("fundraiser_id, amount").eq("organization_id", organizationId),
+    supabase
+      .from("fundraiser_payouts")
+      .select("fundraiser_id, amount, note, created_at")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false }),
     supabase
       .from("fundraiser_payout_requests")
       .select("id, fundraiser_id, amount, status")
@@ -39,8 +43,12 @@ export const getFundraisers = cache(async (organizationId: string) => {
   }
 
   const paidOutByFundraiser = new Map<string, number>();
+  const payoutHistoryByFundraiser = new Map<string, { amount: number; note: string | null; createdAt: string }[]>();
   for (const payout of payouts ?? []) {
     paidOutByFundraiser.set(payout.fundraiser_id, (paidOutByFundraiser.get(payout.fundraiser_id) ?? 0) + payout.amount);
+    const history = payoutHistoryByFundraiser.get(payout.fundraiser_id) ?? [];
+    history.push({ amount: payout.amount, note: payout.note, createdAt: payout.created_at });
+    payoutHistoryByFundraiser.set(payout.fundraiser_id, history);
   }
 
   const pendingRequestByFundraiser = new Map<string, { id: string; amount: number }>();
@@ -57,6 +65,7 @@ export const getFundraisers = cache(async (organizationId: string) => {
       sharedCollected,
       sharedOwed: sharedServiceNetAmount(sharedCollected) - sharedPaidOut,
       pendingPayoutRequest: pendingRequestByFundraiser.get(fundraiser.id) ?? null,
+      payoutHistory: payoutHistoryByFundraiser.get(fundraiser.id) ?? [],
     };
   });
 });

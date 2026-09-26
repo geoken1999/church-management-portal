@@ -16,7 +16,7 @@ import {
   type RegistrationSettingsErrors,
 } from "@/lib/events/registration-validation";
 import { getImageDimensions } from "@/lib/events/image-dimensions";
-import type { EventRegistration } from "@/types/database";
+import type { EventRegistration, EventReminderOffset } from "@/types/database";
 
 const EVENTS_PATH = "/dashboard/events";
 
@@ -120,8 +120,9 @@ export async function updateEventRegistrationSettings(
   const closesAt = String(formData.get("closesAt") ?? "");
   const passColor = String(formData.get("passColor") ?? "#7c3aed");
   const passMessage = String(formData.get("passMessage") ?? "").trim();
+  const reminderOffset = String(formData.get("reminderOffset") ?? "").trim();
 
-  const fieldErrors = validateRegistrationSettings({ fields, capacity, closesAt, passColor });
+  const fieldErrors = validateRegistrationSettings({ fields, capacity, closesAt, passColor, reminderOffset });
   if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
   }
@@ -135,6 +136,7 @@ export async function updateEventRegistrationSettings(
       registration_closes_at: closesAt.trim() ? new Date(closesAt).toISOString() : null,
       registration_pass_color: passColor.trim(),
       registration_pass_message: passMessage || null,
+      reminder_offset: (reminderOffset || null) as EventReminderOffset | null,
     })
     .eq("id", eventId);
 

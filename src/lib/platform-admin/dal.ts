@@ -275,29 +275,14 @@ export async function getAllSupportTickets(): Promise<SupportTicketRow[]> {
 
 
 // ---------------------------------------------------------------------------
-// Health — which app-wide integrations are configured, purely by env var
-// presence (this doesn't verify the credentials actually work, just that
-// they're set).
+// Health — database/storage metrics. Per-integration health (Twilio,
+// Resend, Razorpay, Instagram, Facebook, YouTube) lives in
+// src/lib/platform-admin/integration-health.ts, which actually pings each
+// provider rather than just checking env var presence; Vercel and the
+// Supabase Management API each have their own dedicated live check
+// (src/lib/platform-admin/vercel.ts, supabase-management.ts).
 // ---------------------------------------------------------------------------
 
-export interface IntegrationStatus {
-  name: string;
-  configured: boolean;
-}
-
-export function getIntegrationStatuses(): IntegrationStatus[] {
-  return [
-    { name: "Razorpay (billing & giving)", configured: Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) },
-    { name: "Twilio SMS", configured: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) },
-    { name: "Twilio WhatsApp (shared)", configured: Boolean(process.env.TWILIO_WHATSAPP_FROM_NUMBER) },
-    { name: "Resend (email)", configured: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM_ADDRESS) },
-    { name: "Instagram", configured: Boolean(process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET) },
-    { name: "YouTube", configured: Boolean(process.env.YOUTUBE_CLIENT_ID && process.env.YOUTUBE_CLIENT_SECRET) },
-    { name: "Facebook", configured: Boolean(process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) },
-    { name: "Vercel (deployment status)", configured: Boolean(process.env.VERCEL_API_TOKEN && process.env.VERCEL_PROJECT_ID) },
-    { name: "Supabase Management API", configured: Boolean(process.env.SUPABASE_MANAGEMENT_API_TOKEN) },
-  ];
-}
 
 // This app runs on Vercel (serverless functions, not a fixed always-on
 // box) — there's no single "server" to read CPU usage or uptime off from
@@ -336,11 +321,14 @@ export async function getPlatformStorageStats(): Promise<PlatformStorageStats | 
 // src/lib/platform-events/log.ts).
 // ---------------------------------------------------------------------------
 
-export async function getPlatformEvents(filter: { level?: PlatformEventLevel; limit?: number } = {}): Promise<PlatformEvent[]> {
+export async function getPlatformEvents(filter: { level?: PlatformEventLevel; limit?: number; since?: string } = {}): Promise<PlatformEvent[]> {
   const admin = createAdminClient();
   let query = admin.from("platform_events").select("*").order("created_at", { ascending: false }).limit(filter.limit ?? 100);
   if (filter.level) {
     query = query.eq("level", filter.level);
+  }
+  if (filter.since) {
+    query = query.gte("created_at", filter.since);
   }
   const { data } = await query;
   return data ?? [];

@@ -24,6 +24,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
         body: [
           "When you first sign up, you'll create an organization for your church — its name, congregation size, number of branches, and country. Country matters: it sets the default phone country code used across Members, Branches, and SMS.",
           "Every organization gets a free 14-day trial with full Basic-plan access, no card required. After that, an owner or admin needs to subscribe from the Billing page to keep using the app.",
+          "You'll get a welcome email as soon as your church's account is created, with a few suggested first steps and a link straight back to your dashboard.",
         ],
       },
       {
@@ -127,6 +128,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
           "The Name, Email, and Phone fields are permanent — the field editor won't let you remove them, and their \"Required\" toggle and field type are locked on, since registration, the emailed pass, and duplicate-prevention all depend on them staying exactly as they are. Email and Phone are each checked for duplicates per event automatically; any custom field you add can opt into the same check with its own \"No duplicates allowed\" toggle.",
           "In Settings, design the registration pass: upload a banner image (exactly 1200x350px — the field editor tells you if a chosen file doesn't match, and won't upload it), pick a pass color, and add an optional personal message — the confirmation email shows the registrant's name, event details, confirmation code, and QR code as a single ticket-style card. Use \"Preview pass\" to see a sample before you save.",
           "Registration closes itself automatically the moment any one of three things happens: capacity is reached, the closing date/time you set passes, or (for a one-time event) the event is 1 hour away — whichever comes first. There's no need to remember to turn it off. Recurring events aren't auto-closed 1 hour before a specific date, since there's no single event start for that to mean.",
+          "Turn on a reminder email in Settings — 24 hours before, 1 hour before, or the morning of — and every registrant gets a nudge with the event details and their confirmation code. For a recurring event, it's sent again before each occurrence, not just once.",
           "Click \"Add to Attendance\" on an event to create (or jump straight to) its Attendance session — for a recurring event this is always today's occurrence. That session's \"Registered attendees\" checklist is exactly the Registrants list, so check-in works the same from either place.",
         ],
       },
@@ -180,7 +182,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
         body: [
           "Reports lets you filter and export the data behind five tabs — Members, Attendance, Events, Offerings, and Donations — without hunting for a separate export button inside each one.",
           "A report is only available if you have read access to its underlying tab — having access to Reports itself doesn't widen what data you can pull through it.",
-          "Filter by date range, branch, or a report-specific filter (member status, donation method), click \"Run report\" to see the results on screen, then export to Excel or PDF.",
+          "Filter by date range, branch, or a report-specific filter (member status, donation method), click \"Run report\" to see the results on screen, then export to Excel or PDF, or click \"Email report\" to have the Excel file sent straight to your own inbox instead.",
         ],
       },
       {
@@ -222,9 +224,9 @@ export const DOC_CATEGORIES: DocCategory[] = [
         id: "fundraiser-payment-links",
         title: "Fund Raiser online giving links",
         body: [
-          "Any Fund Raiser can turn on an online payment link, letting a donor enter their own amount and pay by card/UPI/etc. through Razorpay — no need to record every gift by hand.",
+          "Any Fund Raiser can turn on an online payment link, letting a donor enter their own amount and pay by card/UPI/etc. through Razorpay — no need to record every gift by hand. If the donor entered an email address, they're automatically emailed a receipt once the payment goes through.",
           "Choose either your own Razorpay account (connected from the Fund Raiser page) or our shared service, which needs no setup on your end. A shared-service donation is charged a 2.5% transaction fee, shown up front on both the giving page and your Fund Raiser dashboard, before it's paid out to you — your own account has no such fee since the money goes straight to you.",
-          "For shared-service fundraisers, the wallet balance shown at the top right of the Fund Raiser page is what you've collected (after the fee) and haven't been paid out yet. Click it to open a payout request, which we process manually — it isn't instant.",
+          "For shared-service fundraisers, the wallet balance shown at the top right of the Fund Raiser page is what you've collected (after the fee) and haven't been paid out yet — it drops automatically once we record a payout on our end. Click it to open a payout request, which we process manually — it isn't instant. Each campaign's row also has a \"Show payout history\" link listing every payout you've received for it, with date, amount, and our note.",
         ],
       },
     ],
@@ -312,7 +314,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
         title: "Raising and replying to support tickets",
         body: [
           "Support → \"Raise a ticket\" if you run into a problem or have a question — set a category and urgency so it's easy to triage, and it's visible to your whole team, not just you.",
-          "Once raised, the conversation continues right on the ticket: reply to add more detail, and any reply from KingdomFlow support shows up in the same thread — you'll also get a notification (bell icon) when support replies.",
+          "Once raised, the conversation continues right on the ticket: reply to add more detail, and any reply from KingdomFlow support shows up in the same thread — you'll also get a notification (bell icon) and an email to your org's owner/admins when support replies.",
           "You (the ticket's creator) or an org admin can close a ticket once it's resolved, or reopen a closed one — support itself moves a ticket through \"In progress\" and \"Resolved\" as they work on it.",
         ],
       },

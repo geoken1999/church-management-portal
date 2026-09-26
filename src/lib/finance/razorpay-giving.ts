@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import { Razorpay } from "@/lib/billing/razorpay";
 import { getRazorpayEnv } from "@/lib/billing/env";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendGivingReceiptEmail } from "@/lib/finance/giving-receipt";
 import type { FundraiserPaymentMode } from "@/types/database";
 
 export interface GivingCredentials {
@@ -73,7 +74,9 @@ export async function finalizeGivingOrderPayment(razorpayOrderId: string, razorp
   const admin = createAdminClient();
   const { data: order } = await admin
     .from("fundraiser_payment_orders")
-    .select("id, organization_id, fundraiser_id, amount, payment_mode, donor_name, status, donation_id")
+    .select(
+      "id, organization_id, fundraiser_id, amount, payment_mode, donor_name, donor_email, status, donation_id, fundraisers(title), organizations(name)",
+    )
     .eq("razorpay_order_id", razorpayOrderId)
     .maybeSingle();
 
@@ -104,13 +107,14 @@ export async function finalizeGivingOrderPayment(razorpayOrderId: string, razorp
     return { success: true };
   }
 
+  const donatedOn = new Date().toISOString().slice(0, 10);
   const { data: donation, error: donationError } = await admin
     .from("donations")
     .insert({
       organization_id: order.organization_id,
       fundraiser_id: order.fundraiser_id,
       amount: order.amount,
-      donated_on: new Date().toISOString().slice(0, 10),
+      donated_on: donatedOn,
       method: "online",
       payment_mode: order.payment_mode,
       donor_name: order.donor_name,
@@ -125,6 +129,17 @@ export async function finalizeGivingOrderPayment(razorpayOrderId: string, razorp
   }
 
   await admin.from("fundraiser_payment_orders").update({ donation_id: donation.id }).eq("id", order.id);
+
+  await sendGivingReceiptEmail({
+    organizationId: order.organization_id,
+    organizationName: (order.organizations as { name: string } | null)?.name ?? "Your church",
+    fundraiserTitle: (order.fundraisers as { title: string } | null)?.title ?? "General fund",
+    donorEmail: order.donor_email,
+    donorName: order.donor_name,
+    amount: order.amount,
+    paymentId: razorpayPaymentId,
+    donatedOn,
+  });
 
   return { success: true };
 }

@@ -1,7 +1,14 @@
-import type { EventRegistrationField, FormFieldType } from "@/types/database";
+import type { EventRegistrationField, EventReminderOffset, FormFieldType } from "@/types/database";
 import { FORM_FIELD_TYPES } from "@/lib/forms/validation";
 
 export { FORM_FIELD_TYPES } from "@/lib/forms/validation";
+
+export const EVENT_REMINDER_OFFSETS: EventReminderOffset[] = ["24h", "1h", "morning_of"];
+export const EVENT_REMINDER_OFFSET_LABELS: Record<EventReminderOffset, string> = {
+  "24h": "24 hours before",
+  "1h": "1 hour before",
+  morning_of: "Morning of (8 AM)",
+};
 
 // A fresh registration form's starting fields — Name, Email, and Phone,
 // the minimum needed to actually run a registration, email a pass, and
@@ -117,6 +124,7 @@ export interface RegistrationSettingsErrors {
   capacity?: string;
   closesAt?: string;
   passColor?: string;
+  reminderOffset?: string;
 }
 
 export function validateRegistrationSettings(input: {
@@ -124,8 +132,13 @@ export function validateRegistrationSettings(input: {
   capacity: string;
   closesAt: string;
   passColor?: string;
+  reminderOffset?: string;
 }): RegistrationSettingsErrors {
   const errors: RegistrationSettingsErrors = {};
+
+  if (input.reminderOffset && !EVENT_REMINDER_OFFSETS.includes(input.reminderOffset as EventReminderOffset)) {
+    errors.reminderOffset = "Choose a valid reminder timing.";
+  }
 
   const keys = new Set(input.fields.map((f) => f.key));
   const missing: string[] = [];

@@ -1,16 +1,11 @@
 import type { Metadata } from "next";
-import { CheckCircle2, XCircle, Database, HardDrive, ExternalLink, AlertTriangle, Rocket, Gauge } from "lucide-react";
+import { CheckCircle2, XCircle, Database, HardDrive, ExternalLink, AlertTriangle, Rocket, Gauge, AlertOctagon } from "lucide-react";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
-import {
-  getIntegrationStatuses,
-  getPlatformOverview,
-  getPlatformEvents,
-  getDatabaseHealth,
-  getPlatformStorageStats,
-} from "@/lib/platform-admin/dal";
+import { getPlatformOverview, getPlatformEvents, getDatabaseHealth, getPlatformStorageStats } from "@/lib/platform-admin/dal";
 import { getLatestProductionDeployment } from "@/lib/platform-admin/vercel";
 import { getSupabaseProjectStatus } from "@/lib/platform-admin/supabase-management";
 import { getPortalResponseTime } from "@/lib/platform-admin/portal-speed";
+import { getIntegrationHealth, type IntegrationHealthStatus } from "@/lib/platform-admin/integration-health";
 import { formatBytes } from "@/lib/plans/format";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,10 +25,24 @@ const DEPLOYMENT_STATE_VARIANTS: Record<string, "default" | "secondary" | "destr
   BLOCKED: "destructive",
 };
 
+const INTEGRATION_STATUS_VARIANTS: Record<IntegrationHealthStatus, "default" | "secondary" | "destructive" | "outline"> = {
+  operational: "default",
+  degraded: "secondary",
+  down: "destructive",
+  unconfigured: "outline",
+};
+
+const INTEGRATION_STATUS_LABELS: Record<IntegrationHealthStatus, string> = {
+  operational: "Operational",
+  degraded: "Degraded",
+  down: "Down",
+  unconfigured: "Not set",
+};
+
 export default async function PlatformAdminHealthPage() {
   await requirePlatformAdmin();
   const [integrations, overview, recentErrors, dbHealth, storageStats, deployment, supabaseStatus, portalSpeed] = await Promise.all([
-    getIntegrationStatuses(),
+    getIntegrationHealth(),
     getPlatformOverview(),
     getPlatformEvents({ level: "error", limit: 10 }),
     getDatabaseHealth(),
@@ -52,8 +61,8 @@ export default async function PlatformAdminHealthPage() {
       <div>
         <h1 className="font-heading text-3xl font-bold tracking-tight">Health</h1>
         <p className="mt-1 text-muted-foreground">
-          Production deployment status, database and storage, which app-wide integrations are configured, and errors
-          from the last 10 logged.
+          Production deployment status, database and storage, live health for every app-wide module and integration,
+          and errors from the last 10 logged.
         </p>
       </div>
 
@@ -214,25 +223,25 @@ export default async function PlatformAdminHealthPage() {
 
       <Card>
         <CardContent className="space-y-3">
-          <p className="text-sm font-medium">Integrations</p>
+          <p className="text-sm font-medium">Module &amp; integration health</p>
           <p className="text-xs text-muted-foreground">
-            This only checks that the required environment variables are set, not that the credentials actually work.
+            Most rows are live-checked (an actual authenticated call to the provider, not just an env var check) — YouTube
+            has no cheap way to verify its OAuth client without a per-tenant token already in hand, so it only reports
+            whether it&apos;s configured.
           </p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {integrations.map((integration) => (
-              <div key={integration.name} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
-                <span className="text-sm">{integration.name}</span>
-                {integration.configured ? (
-                  <span className="flex items-center gap-1 text-xs font-medium text-primary">
-                    <CheckCircle2 className="size-3.5" />
-                    Configured
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-xs font-medium text-destructive">
-                    <XCircle className="size-3.5" />
-                    Not set
-                  </span>
-                )}
+              <div key={integration.name} className="flex items-start justify-between gap-3 rounded-lg border border-border p-3">
+                <div className="min-w-0">
+                  <span className="text-sm">{integration.name}</span>
+                  {integration.detail && <p className="mt-0.5 truncate text-xs text-muted-foreground">{integration.detail}</p>}
+                </div>
+                <Badge variant={INTEGRATION_STATUS_VARIANTS[integration.status]} className="shrink-0">
+                  {integration.status === "operational" && <CheckCircle2 className="size-3" />}
+                  {integration.status === "down" && <XCircle className="size-3" />}
+                  {integration.status === "degraded" && <AlertOctagon className="size-3" />}
+                  {INTEGRATION_STATUS_LABELS[integration.status]}
+                </Badge>
               </div>
             ))}
           </div>

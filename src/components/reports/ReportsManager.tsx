@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { FileBarChart, FileSpreadsheet, FileDown, Play } from "lucide-react";
-import { runReport, exportReport } from "@/lib/reports/actions";
+import { FileBarChart, FileSpreadsheet, FileDown, Play, Mail } from "lucide-react";
+import { runReport, exportReport, emailReport } from "@/lib/reports/actions";
 import type { ReportDefinition, ReportFilters, ReportId } from "@/lib/reports/registry";
 import type { Branch } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -171,9 +171,11 @@ export function ReportsManager({
   const [filters, setFilters] = useState<ReportFilters>({});
   const [rows, setRows] = useState<Record<string, string>[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const [runPending, startRun] = useTransition();
   const [exportingFormat, setExportingFormat] = useState<"excel" | "pdf" | null>(null);
   const [, startExport] = useTransition();
+  const [emailPending, startEmail] = useTransition();
 
   const definition = useMemo(() => reports.find((report) => report.id === selectedId), [reports, selectedId]);
 
@@ -182,6 +184,7 @@ export function ReportsManager({
     setFilters({});
     setRows(null);
     setError(null);
+    setSentTo(null);
   }
 
   function handleRun() {
@@ -201,6 +204,7 @@ export function ReportsManager({
   function handleExport(format: "excel" | "pdf") {
     if (!definition) return;
     setError(null);
+    setSentTo(null);
     setExportingFormat(format);
     startExport(async () => {
       const result = await exportReport(organizationId, definition.id, filters, format);
@@ -210,6 +214,20 @@ export function ReportsManager({
         return;
       }
       downloadFile(result.base64, result.mimeType, result.filename);
+    });
+  }
+
+  function handleEmail() {
+    if (!definition) return;
+    setError(null);
+    setSentTo(null);
+    startEmail(async () => {
+      const result = await emailReport(organizationId, definition.id, filters, "excel");
+      if (result.error || !result.sentTo) {
+        setError(result.error ?? "Couldn't send that email.");
+        return;
+      }
+      setSentTo(result.sentTo);
     });
   }
 
@@ -279,8 +297,13 @@ export function ReportsManager({
                       <FileDown className="size-3.5" />
                       {exportingFormat === "pdf" ? "Preparing..." : "Export PDF"}
                     </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={handleEmail} disabled={emailPending}>
+                      <Mail className="size-3.5" />
+                      {emailPending ? "Sending..." : "Email report"}
+                    </Button>
                   </div>
                 </div>
+                {sentTo && <p className="text-xs text-primary">Sent to {sentTo}.</p>}
                 <ReportTable definition={definition} rows={rows} />
               </>
             )}

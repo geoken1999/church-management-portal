@@ -20,6 +20,12 @@ import {
   UserPlus,
   Users,
   LayoutDashboard,
+  MessageCircle,
+  MessagesSquare,
+  LifeBuoy,
+  Calculator,
+  QrCode,
+  Palette,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -29,7 +35,7 @@ import { PricingSection } from "@/components/landing/PricingSection";
 import { DashboardPreview } from "@/components/landing/DashboardPreview";
 
 const STATS = [
-  { value: "20+", label: "built-in modules" },
+  { value: "25+", label: "built-in modules" },
   { value: "14-day", label: "free trial, no card" },
   { value: "Multi-branch", label: "ready from day one" },
   { value: "Row-level", label: "security by Supabase" },
@@ -76,6 +82,11 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
         description: "A full congregation roster with a dedicated Leaders list and a separate Youth roster with guardian details, plus a public join link for self-signup.",
       },
       {
+        icon: Users,
+        title: "Family households",
+        description: "Create a family and add existing members to it with their relationship — spouse, child, guardian — so households are tracked, not just individuals.",
+      },
+      {
         icon: MapPin,
         title: "Multi-branch support",
         description: "Manage every campus from one account, each with its own leader, country, and phone-number formatting.",
@@ -83,7 +94,7 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
       {
         icon: ClipboardCheck,
         title: "Attendance",
-        description: "Take attendance by branch and link a session to a specific date of a calendar event — with a manual check-in for anyone not on the default list.",
+        description: "Take attendance by branch and link a session to a specific date of a calendar event, with a manual check-in for anyone not on the default list — including registrants from that event's own sign-up page.",
       },
       {
         icon: ShieldCheck,
@@ -103,8 +114,8 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
       },
       {
         icon: CalendarDays,
-        title: "Events calendar",
-        description: "One-off and recurring events — daily, weekly, monthly, or yearly — online or in-person, scoped to a branch and a manager.",
+        title: "Events with public registration",
+        description: "One-off and recurring events, online or in-person, each with an optional public sign-up page — capacity limits, custom fields, and rules that close registration automatically.",
       },
       {
         icon: ListTodo,
@@ -132,6 +143,16 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
         title: "Forms",
         description: "Build custom public forms and collect responses directly into your dashboard — no separate form tool to manage.",
       },
+      {
+        icon: MessageCircle,
+        title: "Website widget",
+        description: "Embed a small, brandable chat-style form on your own church website to capture visitor inquiries — works on any site, no code changes beyond one snippet.",
+      },
+      {
+        icon: LifeBuoy,
+        title: "Help & Support",
+        description: "Raise a support ticket right from the dashboard and get replies in the same thread, with a notification the moment our team responds.",
+      },
     ],
   },
   {
@@ -141,7 +162,12 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
       {
         icon: HandCoins,
         title: "Fund Raiser, Offering & Donation",
-        description: "Run campaigns toward a goal, log offerings collected during services, and record donations — the raised total updates automatically as donations come in.",
+        description: "Run campaigns toward a goal and accept online giving by card or UPI through a shareable payment link — the raised total updates automatically as gifts come in, online or logged by hand.",
+      },
+      {
+        icon: Calculator,
+        title: "Accounting",
+        description: "Track income and expenses by category, a printable ledger, and line-itemed invoices — with a chart comparing income vs. expense over time.",
       },
     ],
   },
@@ -155,12 +181,24 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
         description: "Send bulk newsletters and text announcements from the app, metered by your plan or unmetered with your own SMTP server.",
       },
       {
+        icon: MessagesSquare,
+        title: "WhatsApp campaigns & chat",
+        description: "Send WhatsApp broadcasts through our shared service, or connect your own number for two-way chat with congregants, threaded right in your dashboard.",
+      },
+      {
         icon: Share2,
         title: "Social media hub",
         description: "Manage Instagram, YouTube, and Facebook without leaving your dashboard — connect and switch between multiple YouTube channels from one place.",
       },
     ],
   },
+];
+
+const REGISTRATION_POINTS = [
+  "Turn any event into a public sign-up page — set which fields are required, an optional capacity, and let it close itself automatically by date, headcount, or an hour before start.",
+  "Every registrant gets a branded confirmation pass by email: a QR code for check-in, a calendar invite, and your own banner image, color, and personal message.",
+  "For an in-person event the pass shows a tappable pin that opens the map and your event contact; for an online one, a tappable link straight to the meeting.",
+  "Check registrants in from the event's own Registrants list or right alongside your Attendance roster — search by name, email, phone, or confirmation code.",
 ];
 
 const SECURITY_POINTS = [
@@ -320,6 +358,56 @@ export function LandingPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="px-4 py-20 sm:px-6">
+          <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 lg:grid-cols-2">
+            <div className="relative order-2 lg:order-1">
+              <div
+                className="pointer-events-none absolute -inset-8 -z-10 rounded-[3rem] bg-[radial-gradient(ellipse_60%_60%_at_50%_50%,var(--color-accent),transparent)] opacity-60 blur-2xl"
+                aria-hidden
+              />
+              <Card size="lg" className="mx-auto max-w-sm gap-0 pt-0">
+                <div className="h-24 bg-gradient-to-br from-primary to-primary/40" />
+                <CardContent className="space-y-3 pt-4">
+                  <div>
+                    <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">Grace Community Church</p>
+                    <p className="font-heading text-base font-bold">Youth Camp 2026</p>
+                    <p className="text-xs text-muted-foreground">Sat, Mar 14 &middot; Main Sanctuary</p>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+                    <div>
+                      <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">Confirmation code</p>
+                      <p className="font-heading text-lg font-bold text-primary">7K2QX9LM</p>
+                    </div>
+                    <div className="flex size-14 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/40">
+                      <QrCode className="size-7 text-muted-foreground" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            <div className="order-1 lg:order-2">
+              <Badge variant="secondary" className="mb-4">
+                <Palette className="size-3" />
+                Event registration
+              </Badge>
+              <h2 className="font-heading text-3xl font-bold tracking-tight text-balance">
+                A full registration desk, built into every event
+              </h2>
+              <p className="mt-3 text-muted-foreground">
+                Not just a calendar entry — a public sign-up page, a branded pass, and check-in, all in one place.
+              </p>
+              <ul className="mt-8 space-y-4">
+                {REGISTRATION_POINTS.map((point) => (
+                  <li key={point} className="flex items-start gap-3">
+                    <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-primary" />
+                    <span className="text-sm text-muted-foreground">{point}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </section>

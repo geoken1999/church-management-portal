@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -37,6 +37,7 @@ import {
   Calculator,
   LayoutTemplate,
   House,
+  Compass,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { YouTubeIcon } from "@/components/icons/YouTubeIcon";
@@ -47,6 +48,9 @@ import { Separator } from "@/components/ui/separator";
 import { ChurchLogoUpload } from "@/components/organizations/ChurchLogoUpload";
 import { OrgSwitcher } from "@/components/organizations/OrgSwitcher";
 import { NotificationBell } from "@/components/dashboard/NotificationBell";
+import { WelcomeTour } from "@/components/dashboard/WelcomeTour";
+import { SpotlightTour, type SpotlightStep } from "@/components/dashboard/SpotlightTour";
+import { completeTour } from "@/lib/organizations/actions";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import type { Notification, Organization, TabAccess } from "@/types/database";
 import type { OrganizationMembership } from "@/lib/organizations/dal";
@@ -136,6 +140,21 @@ const NAV_GROUPS = [
   },
 ];
 
+// Chained onto the end of WelcomeTour (see handleTourFinish below) — a
+// handful of real sidebar buttons, not all ~28 modules, since more stops
+// than this stops being a "quick tour" and starts being a chore. A step
+// whose target isn't in the DOM (this login lacks read access to that tab,
+// e.g. Billing for a non-manager) is skipped automatically by
+// SpotlightTour itself.
+const SPOTLIGHT_STEPS: SpotlightStep[] = [
+  { target: "/dashboard/members", title: "Members", description: "Your congregation roster — add people one at a time or bulk-import from Excel." },
+  { target: "/dashboard/events", title: "Events", description: "One-off or recurring events, with an optional public registration page and QR check-in passes." },
+  { target: "/dashboard/attendance", title: "Attendance", description: "Take attendance by branch, or check in registrants from a linked event." },
+  { target: "/dashboard/email", title: "Messaging", description: "Email, SMS, and WhatsApp campaigns all live in this section of the sidebar." },
+  { target: "/dashboard/reports", title: "Reports", description: "Filter and export (or email) data across Members, Attendance, Events, Offerings, and Donations." },
+  { target: "/dashboard/billing", title: "Billing", description: "Check your trial status, manage your plan, and see what each tier includes." },
+];
+
 export function DashboardShell({
   organization,
   canManage,
@@ -156,8 +175,39 @@ export function DashboardShell({
   children: ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Lazily seeded from the org's own completion state rather than always
+  // false, so a brand-new organization's first dashboard visit auto-opens
+  // it — see WelcomeTour's own doc comment for why this is mounted once
+  // here rather than inside `nav`, which is itself rendered twice.
+  const [tourOpen, setTourOpen] = useState(organization.tour_completed_at === null);
+  const [spotlightOpen, setSpotlightOpen] = useState(false);
+  const [, startTourTransition] = useTransition();
   const [navSearch, setNavSearch] = useState("");
   const pathname = usePathname();
+
+  function markTourDone() {
+    startTourTransition(() => {
+      completeTour(organization.id);
+    });
+  }
+
+  // Skipping the modal (at any step, or dismissing it via Escape/backdrop)
+  // ends the whole onboarding experience right away — it shouldn't feel
+  // like skipping one popup just opens another. Finishing it normally
+  // chains into the spotlight walk, but only on a wide-enough viewport to
+  // actually show the sidebar it points at (see SpotlightTour's own doc
+  // comment) — on mobile this just marks the tour done directly.
+  function handleTourSkip() {
+    markTourDone();
+  }
+
+  function handleTourFinish() {
+    if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+      setSpotlightOpen(true);
+    } else {
+      markTourDone();
+    }
+  }
 
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
@@ -203,6 +253,7 @@ export function DashboardShell({
               <Link
                 key={item.href}
                 href={item.href}
+                data-tour-target={item.href}
                 onClick={() => setMobileOpen(false)}
                 className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                   active
@@ -220,6 +271,14 @@ export function DashboardShell({
           })}
         </div>
       ))}
+      <button
+        type="button"
+        onClick={() => setTourOpen(true)}
+        className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+      >
+        <Compass className="size-4" />
+        <span className="flex-1">Take the tour</span>
+      </button>
     </nav>
   );
 
@@ -301,6 +360,16 @@ export function DashboardShell({
         )}
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6 print:max-w-none print:p-0">{children}</main>
       </div>
+
+      <WelcomeTour open={tourOpen} onOpenChange={setTourOpen} onSkip={handleTourSkip} onFinish={handleTourFinish} />
+      <SpotlightTour
+        steps={SPOTLIGHT_STEPS}
+        open={spotlightOpen}
+        onDone={() => {
+          setSpotlightOpen(false);
+          markTourDone();
+        }}
+      />
     </div>
   );
 }

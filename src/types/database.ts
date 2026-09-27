@@ -42,6 +42,9 @@ export type Organization = {
   addon_email_credits: number;
   addon_whatsapp_credits: number;
   addon_storage_bytes: number;
+  // null until the welcome tour (src/components/dashboard/WelcomeTour.tsx)
+  // is completed or skipped — that's also what triggers it to auto-show.
+  tour_completed_at: string | null;
   created_at: string;
   updated_at: string;
 };

@@ -25,6 +25,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
           "When you first sign up, you'll create an organization for your church — its name, congregation size, number of branches, and country. Country matters: it sets the default phone country code used across Members, Branches, and SMS.",
           "Every organization gets a free 14-day trial with full Basic-plan access, no card required. After that, an owner or admin needs to subscribe from the Billing page to keep using the app.",
           "You'll get a welcome email as soon as your church's account is created, with a few suggested first steps and a link straight back to your dashboard.",
+          "A short welcome tour pops up automatically the first time your dashboard loads, pointing out where each area of the app lives. Skip it or click through it — either way it won't show again on its own, but you can replay it anytime from \"Take the tour\" at the bottom of the sidebar's Help section.",
         ],
       },
       {

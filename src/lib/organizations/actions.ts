@@ -402,3 +402,29 @@ export async function updateMemberPermissions(formData: FormData) {
 
   revalidatePath("/dashboard/team");
 }
+
+// Called on both "Finish" and "Skip" in the welcome tour
+// (src/components/dashboard/WelcomeTour.tsx) — skipping still marks it
+// done so it doesn't reappear on the next visit. Any org member can
+// dismiss it (not just owner/admin — it's shared UI state for the whole
+// org, not a permission-gated setting), so this checks plain membership
+// the same way switchOrganization does, then uses the admin client since
+// a "member"-role login otherwise has no RLS UPDATE grant on organizations.
+export async function completeTour(organizationId: string): Promise<void> {
+  const user = await requireUser();
+
+  const supabase = await createClient();
+  const { data: membership } = await supabase
+    .from("organization_members")
+    .select("organization_id")
+    .eq("organization_id", organizationId)
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+
+  if (!membership) return;
+
+  const admin = createAdminClient();
+  await admin.from("organizations").update({ tour_completed_at: new Date().toISOString() }).eq("id", organizationId);
+
+  revalidatePath("/dashboard");
+}

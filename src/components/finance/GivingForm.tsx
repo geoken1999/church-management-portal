@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { createGivingOrder, confirmGivingPayment } from "@/lib/finance/giving-actions";
+import { useLocale } from "@/lib/i18n/LocaleContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,6 +42,7 @@ function loadCheckoutScript(): Promise<void> {
 const QUICK_AMOUNTS = [500, 1000, 2500, 5000];
 
 export function GivingForm({ shareToken, organizationName }: { shareToken: string; organizationName: string }) {
+  const { t } = useLocale();
   const [amount, setAmount] = useState("");
   const [donorName, setDonorName] = useState("");
   const [donorEmail, setDonorEmail] = useState("");
@@ -53,15 +55,15 @@ export function GivingForm({ shareToken, organizationName }: { shareToken: strin
   useEffect(() => {
     loadCheckoutScript()
       .then(() => setScriptReady(true))
-      .catch(() => setError("Couldn't load the payment form. Please refresh and try again."));
-  }, []);
+      .catch(() => setError(t.publicGive.paymentFormLoadError));
+  }, [t.publicGive.paymentFormLoadError]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
 
     if (!scriptReady || !window.Razorpay) {
-      setError("The payment form is still loading — try again in a moment.");
+      setError(t.publicGive.paymentFormStillLoading);
       return;
     }
 
@@ -108,10 +110,8 @@ export function GivingForm({ shareToken, organizationName }: { shareToken: strin
         <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
           <CheckCircle2 className="size-10 text-primary" />
           <div>
-            <h3 className="font-heading text-lg font-bold">Thank you for your gift!</h3>
-            <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-              Your payment was received. {organizationName} appreciates your generosity.
-            </p>
+            <h3 className="font-heading text-lg font-bold">{t.publicGive.successTitle}</h3>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">{t.publicGive.successDescription(organizationName)}</p>
           </div>
         </CardContent>
       </Card>
@@ -129,13 +129,13 @@ export function GivingForm({ shareToken, organizationName }: { shareToken: strin
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="amount">Amount (₹)</Label>
+            <Label htmlFor="amount">{t.publicGive.amountLabel}</Label>
             <Input
               id="amount"
               type="number"
               min={1}
               step="1"
-              placeholder="e.g. 1000"
+              placeholder={t.publicGive.amountPlaceholder}
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
               required
@@ -150,23 +150,23 @@ export function GivingForm({ shareToken, organizationName }: { shareToken: strin
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="donorName">Your name</Label>
+            <Label htmlFor="donorName">{t.publicGive.yourName}</Label>
             <Input id="donorName" value={donorName} onChange={(event) => setDonorName(event.target.value)} required />
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="donorEmail">Email (optional)</Label>
+              <Label htmlFor="donorEmail">{t.publicGive.emailOptional}</Label>
               <Input id="donorEmail" type="email" value={donorEmail} onChange={(event) => setDonorEmail(event.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="donorPhone">Phone (optional)</Label>
+              <Label htmlFor="donorPhone">{t.publicGive.phoneOptional}</Label>
               <Input id="donorPhone" type="tel" value={donorPhone} onChange={(event) => setDonorPhone(event.target.value)} />
             </div>
           </div>
 
           <Button type="submit" className="w-full" disabled={submitting || !scriptReady}>
-            {submitting ? "Processing..." : `Give ₹${amount || "0"}`}
+            {submitting ? t.publicGive.processing : t.publicGive.give(amount || "0")}
           </Button>
         </form>
       </CardContent>

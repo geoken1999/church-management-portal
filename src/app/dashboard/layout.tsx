@@ -7,6 +7,7 @@ import { getOrganizationSubscription } from "@/lib/billing/dal";
 import { isRazorpayConfigured } from "@/lib/billing/env";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { TrialExpiredScreen } from "@/components/billing/TrialExpiredScreen";
+import { toAppLocale } from "@/lib/i18n/config";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const user = await requireUser();
@@ -48,6 +49,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       tabAccess={membership.tabAccess}
       planFeatures={{ finance: planUsage.plan.financeEnabled, socialMedia: planUsage.plan.socialMediaEnabled }}
       trialDaysRemaining={planUsage.trialDaysRemaining}
+      initialLocale={toAppLocale(profile?.locale)}
     >
       {children}
     </DashboardShell>

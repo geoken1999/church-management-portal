@@ -1,3 +1,7 @@
+"use client";
+
+import { useLocale } from "@/lib/i18n/LocaleContext";
+
 export const DEFAULT_CHURCH_LOGO = "/default_church_logo.png";
 
 // The header every public, unauthenticated page (Forms, Event
@@ -17,5 +21,6 @@ export function PublicBrandHeader({ logoUrl, name }: { logoUrl: string | null; n
 }
 
 export function PublicPoweredByFooter() {
-  return <p className="mt-6 text-center text-xs text-muted-foreground">Powered by KingdomFlow</p>;
+  const { t } = useLocale();
+  return <p className="mt-6 text-center text-xs text-muted-foreground">{t.poweredBy}</p>;
 }

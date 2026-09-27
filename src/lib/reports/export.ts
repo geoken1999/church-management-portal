@@ -5,7 +5,14 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { ReportDefinition } from "@/lib/reports/registry";
 
-export function buildReportWorkbook(definition: ReportDefinition, rows: Record<string, string>[]): ArrayBuffer {
+// Only `label` and `columns` are actually used below — widened to a Pick
+// (rather than the full ReportDefinition, which also carries an org-tab
+// permission gate that only makes sense for the org-level Reports feature)
+// so a platform-admin report (no org tab to gate on) can build the exact
+// same Excel/PDF without a fake/unused `tab` value.
+type ExportableReport = Pick<ReportDefinition, "label" | "columns">;
+
+export function buildReportWorkbook(definition: ExportableReport, rows: Record<string, string>[]): ArrayBuffer {
   const headers = definition.columns.map((column) => column.label);
   const body = rows.map((row) => definition.columns.map((column) => row[column.key] ?? ""));
 
@@ -17,7 +24,7 @@ export function buildReportWorkbook(definition: ReportDefinition, rows: Record<s
   return XLSX.write(workbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
 }
 
-export function buildReportPdf(definition: ReportDefinition, rows: Record<string, string>[], organizationName: string): ArrayBuffer {
+export function buildReportPdf(definition: ExportableReport, rows: Record<string, string>[], organizationName: string): ArrayBuffer {
   const doc = new jsPDF({ orientation: definition.columns.length > 5 ? "landscape" : "portrait" });
 
   doc.setFontSize(14);

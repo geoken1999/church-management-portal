@@ -150,6 +150,168 @@ export const getAllTenants = async (): Promise<TenantRow[]> => {
   });
 };
 
+export interface TenantUsage {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  country: string | null;
+  createdAt: string;
+  plan: string;
+  planName: string;
+  subscriptionStatus: string | null;
+  trialEndsAt: string | null;
+  congregationMembers: number;
+  branches: number;
+  branchCountClaimed: number | null;
+  teamLogins: number;
+  leaders: number;
+  youth: number;
+  families: number;
+  eventsCount: number;
+  activeFundraisers: number;
+  donationsTotalAllTime: number;
+  offeringsTotalAllTime: number;
+  supportTicketsCount: number;
+  emailsSentThisMonth: number;
+  emailsSentAllTime: number;
+  smsSentThisMonth: number;
+  smsSentAllTime: number;
+  whatsappSentThisMonth: number;
+  whatsappSentAllTime: number;
+  deliveryFailuresLast30Days: number;
+  storageBytesUsed: number;
+  storageBytesLimit: number;
+  addonSmsCredits: number;
+  addonEmailCredits: number;
+  addonWhatsappCredits: number;
+  addonStorageBytes: number;
+}
+
+// "This month" mirrors the exact quota-metering rules getPlanUsage
+// enforces (src/lib/plans/dal.ts) — email only counts the shared-service
+// provider (an org's own SMTP is unmetered), WhatsApp only counts shared
+// mode (an org's own Twilio number is unmetered), SMS has no
+// bring-your-own option so every send counts. "All time" instead sums
+// every row regardless of provider/mode, since that's the true send
+// volume a Super Admin would actually want to see, separate from what's
+// billable.
+function startOfMonthIso(): string {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+}
+
+// The org-facing getPlanUsage (src/lib/plans/dal.ts) can't be reused here —
+// it runs every query through the RLS-scoped, per-user client, and a
+// platform admin overseeing a tenant isn't a member of it. Everything
+// below re-implements the same aggregations against the service-role
+// client instead, one org at a time (not the whole-platform sweep
+// getAllTenants does), for the Super Admin tenant detail page.
+export async function getTenantUsage(organizationId: string): Promise<TenantUsage | null> {
+  const admin = createAdminClient();
+  const since = startOfMonthIso();
+  const failureSince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [
+    { data: organization },
+    { data: subscription },
+    { count: congregationMembers },
+    { count: branches },
+    { count: teamMembers },
+    { count: leaders },
+    { count: youth },
+    { count: families },
+    { count: events },
+    { count: fundraisers },
+    { data: donations },
+    { data: offerings },
+    { count: supportTickets },
+    { data: emailCampaigns },
+    { data: smsCampaigns },
+    { data: whatsappCampaigns },
+    { count: deliveryFailures },
+    { data: storageBytesUsed },
+  ] = await Promise.all([
+    admin
+      .from("organizations")
+      .select("id, name, slug, logo_url, country, plan, trial_ends_at, branch_count, created_at, addon_sms_credits, addon_email_credits, addon_whatsapp_credits, addon_storage_bytes")
+      .eq("id", organizationId)
+      .maybeSingle(),
+    admin.from("organization_subscriptions").select("status").eq("organization_id", organizationId).maybeSingle(),
+    admin.from("members").select("id", { count: "exact", head: true }).eq("organization_id", organizationId),
+    admin.from("branches").select("id", { count: "exact", head: true }).eq("organization_id", organizationId),
+    admin.from("organization_members").select("id", { count: "exact", head: true }).eq("organization_id", organizationId),
+    admin.from("leaders").select("id", { count: "exact", head: true }).eq("organization_id", organizationId),
+    admin.from("youths").select("id", { count: "exact", head: true }).eq("organization_id", organizationId),
+    admin.from("families").select("id", { count: "exact", head: true }).eq("organization_id", organizationId),
+    admin.from("events").select("id", { count: "exact", head: true }).eq("organization_id", organizationId),
+    admin.from("fundraisers").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).eq("status", "active"),
+    admin.from("donations").select("amount").eq("organization_id", organizationId),
+    admin.from("offerings").select("amount").eq("organization_id", organizationId),
+    admin.from("support_tickets").select("id", { count: "exact", head: true }).eq("organization_id", organizationId),
+    admin.from("email_campaigns").select("sent_count, provider, created_at").eq("organization_id", organizationId),
+    admin.from("sms_campaigns").select("sent_count, created_at").eq("organization_id", organizationId),
+    admin.from("whatsapp_campaigns").select("sent_count, mode, created_at").eq("organization_id", organizationId),
+    admin
+      .from("message_delivery_events")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .gte("created_at", failureSince)
+      .or("status.ilike.%fail%,status.ilike.%bounce%,status.ilike.%undeliver%"),
+    admin.rpc("get_tenant_storage_bytes", { target_org_id: organizationId }),
+  ]);
+
+  if (!organization) return null;
+
+  const planId = organization.plan && isPlanId(organization.plan) ? organization.plan : "basic";
+  const plan = PLANS[planId];
+
+  const sumSentCount = (rows: { sent_count: number }[] | null) => (rows ?? []).reduce((sum, r) => sum + r.sent_count, 0);
+  const sumAmount = (rows: { amount: number }[] | null) => (rows ?? []).reduce((sum, r) => sum + r.amount, 0);
+
+  const emailRows = emailCampaigns ?? [];
+  const smsRows = smsCampaigns ?? [];
+  const whatsappRows = whatsappCampaigns ?? [];
+
+  return {
+    id: organization.id,
+    name: organization.name,
+    slug: organization.slug,
+    logoUrl: organization.logo_url,
+    country: organization.country,
+    createdAt: organization.created_at,
+    plan: planId,
+    planName: plan.name,
+    subscriptionStatus: subscription?.status ?? null,
+    trialEndsAt: organization.trial_ends_at,
+    congregationMembers: congregationMembers ?? 0,
+    branches: branches ?? 0,
+    branchCountClaimed: organization.branch_count,
+    teamLogins: teamMembers ?? 0,
+    leaders: leaders ?? 0,
+    youth: youth ?? 0,
+    families: families ?? 0,
+    eventsCount: events ?? 0,
+    activeFundraisers: fundraisers ?? 0,
+    donationsTotalAllTime: sumAmount(donations),
+    offeringsTotalAllTime: sumAmount(offerings),
+    supportTicketsCount: supportTickets ?? 0,
+    emailsSentThisMonth: sumSentCount(emailRows.filter((r) => r.provider === "shared" && r.created_at >= since)),
+    emailsSentAllTime: sumSentCount(emailRows),
+    smsSentThisMonth: sumSentCount(smsRows.filter((r) => r.created_at >= since)),
+    smsSentAllTime: sumSentCount(smsRows),
+    whatsappSentThisMonth: sumSentCount(whatsappRows.filter((r) => r.mode === "shared" && r.created_at >= since)),
+    whatsappSentAllTime: sumSentCount(whatsappRows),
+    deliveryFailuresLast30Days: deliveryFailures ?? 0,
+    storageBytesUsed: typeof storageBytesUsed === "number" ? storageBytesUsed : 0,
+    storageBytesLimit: plan.storageBytes + organization.addon_storage_bytes,
+    addonSmsCredits: organization.addon_sms_credits,
+    addonEmailCredits: organization.addon_email_credits,
+    addonWhatsappCredits: organization.addon_whatsapp_credits,
+    addonStorageBytes: organization.addon_storage_bytes,
+  };
+}
+
 export interface PlatformOverview {
   totalTenants: number;
   activeSubscriptions: number;

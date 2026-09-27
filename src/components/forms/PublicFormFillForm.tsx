@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { submitPublicForm, type PublicFormState } from "@/lib/forms/public-actions";
+import { useLocale } from "@/lib/i18n/LocaleContext";
 import type { FormField, FormFieldType } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,6 +56,7 @@ function FieldLabel({ field }: { field: FormField }) {
 const fieldInputClassName = "h-11 rounded-xl px-3.5 text-base shadow-sm";
 
 function PublicFieldInput({ field }: { field: FormField }) {
+  const { t } = useLocale();
   const id = `field-${field.key}`;
 
   if (field.field_type === "checkbox") {
@@ -75,7 +77,7 @@ function PublicFieldInput({ field }: { field: FormField }) {
         <FieldLabel field={field} />
         <Select name={field.key}>
           <SelectTrigger id={id} className="h-11 w-full rounded-xl px-3.5 text-base shadow-sm">
-            <SelectValue placeholder="Select an option" />
+            <SelectValue placeholder={t.common.selectAnOption} />
           </SelectTrigger>
           <SelectContent>
             {(field.options ?? []).map((option) => (
@@ -118,6 +120,7 @@ function PublicFieldInput({ field }: { field: FormField }) {
 }
 
 export function PublicFormFillForm({ slug, fields }: { slug: string; fields: FormField[] }) {
+  const { t } = useLocale();
   const submitWithSlug = submitPublicForm.bind(null, slug);
   const [state, formAction, pending] = useActionState(submitWithSlug, initialState);
 
@@ -131,8 +134,8 @@ export function PublicFormFillForm({ slug, fields }: { slug: string; fields: For
           <CheckCircle2 className="size-9 text-primary" />
         </div>
         <div className="space-y-1">
-          <p className="font-heading text-lg font-bold">You&apos;re all set!</p>
-          <p className="text-sm text-muted-foreground">Your response was submitted successfully.</p>
+          <p className="font-heading text-lg font-bold">{t.publicForm.successTitle}</p>
+          <p className="text-sm text-muted-foreground">{t.publicForm.successDescription}</p>
         </div>
       </div>
     );
@@ -143,10 +146,7 @@ export function PublicFormFillForm({ slug, fields }: { slug: string; fields: For
       <input type="hidden" name="__fieldKeys" value={fields.map((f) => f.key).join(",")} />
       <input type="hidden" name="__checkboxKeys" value={checkboxKeys.join(",")} />
       {fields.length > 0 && (
-        <p className="text-xs text-muted-foreground">
-          {fields.length} {fields.length === 1 ? "question" : "questions"} · about {estimatedMinutes}{" "}
-          {estimatedMinutes === 1 ? "minute" : "minutes"}
-        </p>
+        <p className="text-xs text-muted-foreground">{t.publicForm.questionCount(fields.length, estimatedMinutes)}</p>
       )}
       {state.error && (
         <Alert variant="destructive">
@@ -162,10 +162,10 @@ export function PublicFormFillForm({ slug, fields }: { slug: string; fields: For
       </div>
       <Button type="submit" size="lg" className="w-full rounded-xl shadow-sm" disabled={pending}>
         {pending ? (
-          "Submitting..."
+          t.common.submitting
         ) : (
           <>
-            Submit
+            {t.common.submit}
             <Send className="size-4" />
           </>
         )}

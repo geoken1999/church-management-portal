@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { submitMemberRequest, type PublicJoinFormState } from "@/lib/members/public-actions";
+import { useLocale } from "@/lib/i18n/LocaleContext";
 import type { PublicFieldDefinition, Branch } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 const initialState: PublicJoinFormState = {};
 
 function PublicCustomFieldInput({ definition }: { definition: PublicFieldDefinition }) {
+  const { t } = useLocale();
   const name = `custom_${definition.key}`;
   const id = `custom-${definition.key}`;
 
@@ -36,7 +38,7 @@ function PublicCustomFieldInput({ definition }: { definition: PublicFieldDefinit
         </Label>
         <Select name={name}>
           <SelectTrigger id={id} className="w-full">
-            <SelectValue placeholder="Select an option" />
+            <SelectValue placeholder={t.common.selectAnOption} />
           </SelectTrigger>
           <SelectContent>
             {(definition.options ?? []).map((option) => (
@@ -75,6 +77,7 @@ export function PublicJoinForm({
   fieldDefinitions: PublicFieldDefinition[];
   branches: Pick<Branch, "id" | "name">[];
 }) {
+  const { t } = useLocale();
   const boundAction = submitMemberRequest.bind(null, orgSlug);
   const [state, formAction, pending] = useActionState(boundAction, initialState);
   const [maritalStatus, setMaritalStatus] = useState("");
@@ -82,9 +85,7 @@ export function PublicJoinForm({
   if (state.success) {
     return (
       <Alert>
-        <AlertDescription>
-          Thanks! Your request has been received and is pending approval from the church team.
-        </AlertDescription>
+        <AlertDescription>{t.publicJoin.successMessage}</AlertDescription>
       </Alert>
     );
   }
@@ -103,7 +104,7 @@ export function PublicJoinForm({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="firstName">
-            First name <span className="text-destructive">*</span>
+            {t.publicJoin.firstName} <span className="text-destructive">*</span>
           </Label>
           <Input
             id="firstName"
@@ -116,7 +117,7 @@ export function PublicJoinForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="lastName">
-            Last name <span className="text-destructive">*</span>
+            {t.publicJoin.lastName} <span className="text-destructive">*</span>
           </Label>
           <Input
             id="lastName"
@@ -130,7 +131,7 @@ export function PublicJoinForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">{t.publicJoin.email}</Label>
         <Input
           id="email"
           name="email"
@@ -143,7 +144,7 @@ export function PublicJoinForm({
 
       <div className="space-y-2">
         <Label htmlFor="phone">
-          Phone <span className="text-destructive">*</span>
+          {t.publicJoin.phone} <span className="text-destructive">*</span>
         </Label>
         <Input
           id="phone"
@@ -159,7 +160,7 @@ export function PublicJoinForm({
       {branches.length > 0 && (
         <div className="space-y-2">
           <Label htmlFor="branchId">
-            Branch <span className="text-destructive">*</span>
+            {t.publicJoin.branch} <span className="text-destructive">*</span>
           </Label>
           <Select name="branchId" required aria-invalid={Boolean(state.fieldErrors?.branchId)}>
             <SelectTrigger
@@ -167,8 +168,8 @@ export function PublicJoinForm({
               className="w-full"
               aria-describedby={state.fieldErrors?.branchId ? "branchId-error" : undefined}
             >
-              <SelectValue placeholder="Select a branch">
-                {(value: string | null) => branches.find((b) => b.id === value)?.name ?? "Select a branch"}
+              <SelectValue placeholder={t.publicJoin.selectABranch}>
+                {(value: string | null) => branches.find((b) => b.id === value)?.name ?? t.publicJoin.selectABranch}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -186,7 +187,7 @@ export function PublicJoinForm({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="dateOfBirth">
-            Date of birth <span className="text-destructive">*</span>
+            {t.publicJoin.dateOfBirth} <span className="text-destructive">*</span>
           </Label>
           <Input
             id="dateOfBirth"
@@ -201,7 +202,7 @@ export function PublicJoinForm({
 
         <div className="space-y-2">
           <Label htmlFor="maritalStatus">
-            Marital status <span className="text-destructive">*</span>
+            {t.publicJoin.maritalStatus} <span className="text-destructive">*</span>
           </Label>
           <input type="hidden" name="maritalStatus" value={maritalStatus} />
           <Select value={maritalStatus} onValueChange={(v) => setMaritalStatus(v ?? "")}>
@@ -210,15 +211,15 @@ export function PublicJoinForm({
               className="w-full"
               aria-invalid={Boolean(state.fieldErrors?.maritalStatus)}
             >
-              <SelectValue placeholder="Select">
+              <SelectValue placeholder={t.common.select}>
                 {(value: string | null) =>
-                  value === "married" ? "Married" : value === "unmarried" ? "Unmarried" : "Select"
+                  value === "married" ? t.publicJoin.married : value === "unmarried" ? t.publicJoin.unmarried : t.common.select
                 }
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="married">Married</SelectItem>
-              <SelectItem value="unmarried">Unmarried</SelectItem>
+              <SelectItem value="married">{t.publicJoin.married}</SelectItem>
+              <SelectItem value="unmarried">{t.publicJoin.unmarried}</SelectItem>
             </SelectContent>
           </Select>
           <FieldError id="maritalStatus-error" message={state.fieldErrors?.maritalStatus} />
@@ -228,7 +229,7 @@ export function PublicJoinForm({
       {maritalStatus === "married" && (
         <div className="space-y-2">
           <Label htmlFor="weddingDate">
-            Wedding date <span className="text-destructive">*</span>
+            {t.publicJoin.weddingDate} <span className="text-destructive">*</span>
           </Label>
           <Input
             id="weddingDate"
@@ -251,7 +252,7 @@ export function PublicJoinForm({
       )}
 
       <Button type="submit" disabled={pending} className="w-full">
-        {pending ? "Submitting..." : "Submit request"}
+        {pending ? t.common.submitting : t.publicJoin.submitRequest}
       </Button>
     </form>
   );

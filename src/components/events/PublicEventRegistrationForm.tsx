@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { registerForEvent, type PublicEventRegistrationState } from "@/lib/events/public-registration-actions";
+import { useLocale } from "@/lib/i18n/LocaleContext";
 import type { FormField } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ function FieldLabel({ field }: { field: FormField }) {
 }
 
 function PublicFieldInput({ field }: { field: FormField }) {
+  const { t } = useLocale();
   const id = `field-${field.key}`;
 
   if (field.field_type === "checkbox") {
@@ -44,7 +46,7 @@ function PublicFieldInput({ field }: { field: FormField }) {
         <FieldLabel field={field} />
         <Select name={field.key}>
           <SelectTrigger id={id} className="h-11 w-full rounded-xl px-3.5 text-base shadow-sm">
-            <SelectValue placeholder="Select an option" />
+            <SelectValue placeholder={t.common.selectAnOption} />
           </SelectTrigger>
           <SelectContent>
             {(field.options ?? []).map((option) => (
@@ -87,6 +89,7 @@ function PublicFieldInput({ field }: { field: FormField }) {
 }
 
 export function PublicEventRegistrationForm({ token, fields }: { token: string; fields: FormField[] }) {
+  const { t } = useLocale();
   const registerWithToken = registerForEvent.bind(null, token);
   const [state, formAction, pending] = useActionState(registerWithToken, initialState);
 
@@ -99,8 +102,8 @@ export function PublicEventRegistrationForm({ token, fields }: { token: string; 
           <CheckCircle2 className="size-9 text-primary" />
         </div>
         <div className="space-y-1">
-          <p className="font-heading text-lg font-bold">You&apos;re registered!</p>
-          <p className="text-sm text-muted-foreground">Check your email for your registration pass and QR code.</p>
+          <p className="font-heading text-lg font-bold">{t.publicEvent.successTitle}</p>
+          <p className="text-sm text-muted-foreground">{t.publicEvent.successDescription}</p>
         </div>
       </div>
     );
@@ -122,10 +125,10 @@ export function PublicEventRegistrationForm({ token, fields }: { token: string; 
       </div>
       <Button type="submit" size="lg" className="w-full rounded-xl shadow-sm" disabled={pending}>
         {pending ? (
-          "Registering..."
+          t.publicEvent.registering
         ) : (
           <>
-            Register
+            {t.publicEvent.register}
             <Send className="size-4" />
           </>
         )}

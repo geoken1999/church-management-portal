@@ -52,6 +52,15 @@ export const DOC_CATEGORIES: DocCategory[] = [
           "With this many tabs in the sidebar, use the search box at the top of the nav to filter them by name instead of scrolling through every group — it only searches tabs you already have access to.",
         ],
       },
+      {
+        id: "language",
+        title: "Changing the language",
+        body: [
+          "Click the globe icon next to the notification bell in the dashboard header to switch the app's language — English, Tamil, and Hindi are supported today, with more on the way. Your choice is saved to your profile, so it follows you the next time you sign in on any device.",
+          "The same switcher appears on every public link you share — Forms, Event registration, Give, Join, and shared Folders. There, each visitor picks their own language independently, and it's remembered on their browser for the next link they open.",
+          "Only the app's own screens (buttons, field labels, messages) are translated. Content your church has written yourself — event titles, custom form questions, your church's name — always appears exactly as you typed it.",
+        ],
+      },
     ],
   },
   {

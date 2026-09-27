@@ -52,6 +52,10 @@ import { WelcomeTour } from "@/components/dashboard/WelcomeTour";
 import { SpotlightTour, type SpotlightStep } from "@/components/dashboard/SpotlightTour";
 import { completeTour } from "@/lib/organizations/actions";
 import { LogoutButton } from "@/components/auth/LogoutButton";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { DashboardLocaleProvider } from "@/lib/i18n/DashboardLocaleProvider";
+import { useLocale } from "@/lib/i18n/LocaleContext";
+import type { AppLocale } from "@/lib/i18n/config";
 import type { Notification, Organization, TabAccess } from "@/types/database";
 import type { OrganizationMembership } from "@/lib/organizations/dal";
 import type { TabKey } from "@/lib/permissions/tabs";
@@ -60,82 +64,86 @@ const NO_TAB = null as TabKey | null;
 type PlanFeature = "finance" | "socialMedia" | null;
 const NO_PLAN_FEATURE = null as PlanFeature;
 
+// `itemKey`/`groupKey` (not display text) — the actual label is looked up
+// from the current locale's dictionary at render time (t.nav.groups/items),
+// so this array stays locale-agnostic. Keys match src/lib/i18n/
+// dictionaries/*.ts's nav.groups/nav.items exactly.
 const NAV_GROUPS = [
   {
-    label: "Overview",
+    groupKey: "overview" as const,
     items: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard", itemKey: "dashboard" as const, icon: LayoutDashboard, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
   {
-    label: "Organization",
+    groupKey: "organization" as const,
     items: [
-      { href: "/dashboard/profile", label: "Profile", icon: UserRound, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/team", label: "Team", icon: Users, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/billing", label: "Billing", icon: CreditCard, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: true },
-      { href: "/dashboard/branches", label: "Branches", icon: MapPin, tab: "branches" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/profile", itemKey: "profile" as const, icon: UserRound, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/team", itemKey: "team" as const, icon: Users, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/billing", itemKey: "billing" as const, icon: CreditCard, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: true },
+      { href: "/dashboard/branches", itemKey: "branches" as const, icon: MapPin, tab: "branches" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
   {
-    label: "People",
+    groupKey: "people" as const,
     items: [
-      { href: "/dashboard/members", label: "Members", icon: Contact, tab: "members" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/leaders", label: "Leaders", icon: Crown, tab: "leaders" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/youth", label: "Youth", icon: GraduationCap, tab: "youth" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/committee", label: "Committee", icon: Users2, tab: "committee" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/families", label: "Families", icon: House, tab: "families" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/members", itemKey: "members" as const, icon: Contact, tab: "members" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/leaders", itemKey: "leaders" as const, icon: Crown, tab: "leaders" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/youth", itemKey: "youth" as const, icon: GraduationCap, tab: "youth" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/committee", itemKey: "committee" as const, icon: Users2, tab: "committee" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/families", itemKey: "families" as const, icon: House, tab: "families" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
   {
-    label: "Ministry",
+    groupKey: "ministry" as const,
     items: [
-      { href: "/dashboard/ministries", label: "Ministries", icon: HeartHandshake, tab: "ministries" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/worship", label: "Worship", icon: Music, tab: "worship" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/media", label: "Media", icon: Video, tab: "media" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/events", label: "Events", icon: CalendarDays, tab: "events" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/todos", label: "To Do", icon: ListTodo, tab: "todos" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/ministries", itemKey: "ministries" as const, icon: HeartHandshake, tab: "ministries" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/worship", itemKey: "worship" as const, icon: Music, tab: "worship" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/media", itemKey: "media" as const, icon: Video, tab: "media" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/events", itemKey: "events" as const, icon: CalendarDays, tab: "events" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/todos", itemKey: "todos" as const, icon: ListTodo, tab: "todos" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
   {
-    label: "Tools",
+    groupKey: "tools" as const,
     items: [
-      { href: "/dashboard/forms", label: "Forms", icon: FileText, tab: "forms" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/folder", label: "Folder", icon: FolderOpen, tab: "folder" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/attendance", label: "Attendance", icon: ClipboardCheck, tab: "attendance" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/reports", label: "Reports", icon: FileBarChart, tab: "reports" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/widget", label: "Widget", icon: LayoutTemplate, tab: "widget" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/accounting", label: "Accounting", icon: Calculator, tab: "accounting" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },
+      { href: "/dashboard/forms", itemKey: "forms" as const, icon: FileText, tab: "forms" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/folder", itemKey: "folder" as const, icon: FolderOpen, tab: "folder" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/attendance", itemKey: "attendance" as const, icon: ClipboardCheck, tab: "attendance" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/reports", itemKey: "reports" as const, icon: FileBarChart, tab: "reports" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/widget", itemKey: "widget" as const, icon: LayoutTemplate, tab: "widget" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/accounting", itemKey: "accounting" as const, icon: Calculator, tab: "accounting" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },
     ],
   },
   {
-    label: "Finance",
+    groupKey: "finance" as const,
     items: [
-      { href: "/dashboard/fundraisers", label: "Fund Raiser", icon: Target, tab: "fundraisers" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },
-      { href: "/dashboard/offerings", label: "Offering", icon: HandCoins, tab: "offerings" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },
-      { href: "/dashboard/donations", label: "Donation", icon: Gift, tab: "donations" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },
+      { href: "/dashboard/fundraisers", itemKey: "fundraisers" as const, icon: Target, tab: "fundraisers" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },
+      { href: "/dashboard/offerings", itemKey: "offerings" as const, icon: HandCoins, tab: "offerings" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },
+      { href: "/dashboard/donations", itemKey: "donations" as const, icon: Gift, tab: "donations" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },
     ],
   },
   {
-    label: "Messaging",
+    groupKey: "messaging" as const,
     items: [
-      { href: "/dashboard/email", label: "Email", icon: Mail, tab: "email" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/sms", label: "SMS", icon: MessageSquareText, tab: "sms" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/whatsapp", label: "WhatsApp", icon: MessageCircle, tab: "whatsapp" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/email", itemKey: "email" as const, icon: Mail, tab: "email" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/sms", itemKey: "sms" as const, icon: MessageSquareText, tab: "sms" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/whatsapp", itemKey: "whatsapp" as const, icon: MessageCircle, tab: "whatsapp" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
   {
-    label: "Social Media",
+    groupKey: "socialMedia" as const,
     items: [
-      { href: "/dashboard/instagram", label: "Instagram", icon: InstagramIcon, tab: "instagram" as TabKey, planFeature: "socialMedia" as PlanFeature, managerOnly: false },
-      { href: "/dashboard/youtube", label: "YouTube", icon: YouTubeIcon, tab: "youtube" as TabKey, planFeature: "socialMedia" as PlanFeature, managerOnly: false },
-      { href: "/dashboard/facebook", label: "Facebook", icon: FacebookIcon, tab: "facebook" as TabKey, planFeature: "socialMedia" as PlanFeature, managerOnly: false },
+      { href: "/dashboard/instagram", itemKey: "instagram" as const, icon: InstagramIcon, tab: "instagram" as TabKey, planFeature: "socialMedia" as PlanFeature, managerOnly: false },
+      { href: "/dashboard/youtube", itemKey: "youtube" as const, icon: YouTubeIcon, tab: "youtube" as TabKey, planFeature: "socialMedia" as PlanFeature, managerOnly: false },
+      { href: "/dashboard/facebook", itemKey: "facebook" as const, icon: FacebookIcon, tab: "facebook" as TabKey, planFeature: "socialMedia" as PlanFeature, managerOnly: false },
     ],
   },
   {
-    label: "Help",
+    groupKey: "help" as const,
     items: [
-      { href: "/dashboard/docs", label: "Documentation", icon: BookOpen, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/support", label: "Support", icon: LifeBuoy, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/docs", itemKey: "documentation" as const, icon: BookOpen, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/support", itemKey: "support" as const, icon: LifeBuoy, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
 ];
@@ -155,7 +163,33 @@ const SPOTLIGHT_STEPS: SpotlightStep[] = [
   { target: "/dashboard/billing", title: "Billing", description: "Check your trial status, manage your plan, and see what each tier includes." },
 ];
 
-export function DashboardShell({
+// A thin wrapper so the locale context exists before DashboardShellInner
+// (below) renders — that inner component both provides the "Take the
+// tour"/nav labels via useLocale() and needs to already be inside the
+// provider it can't itself create, since a component can't consume a
+// context it's also the one wrapping its own return in.
+export function DashboardShell(
+  props: {
+    organization: Organization;
+    canManage: boolean;
+    memberships: OrganizationMembership[];
+    notifications: Notification[];
+    tabAccess: Record<TabKey, TabAccess>;
+    planFeatures: { finance: boolean; socialMedia: boolean };
+    trialDaysRemaining: number | null;
+    initialLocale: AppLocale;
+    children: ReactNode;
+  },
+) {
+  const { initialLocale, ...rest } = props;
+  return (
+    <DashboardLocaleProvider initialLocale={initialLocale}>
+      <DashboardShellInner {...rest} />
+    </DashboardLocaleProvider>
+  );
+}
+
+function DashboardShellInner({
   organization,
   canManage,
   memberships,
@@ -174,6 +208,7 @@ export function DashboardShell({
   trialDaysRemaining: number | null;
   children: ReactNode;
 }) {
+  const { t } = useLocale();
   const [mobileOpen, setMobileOpen] = useState(false);
   // Lazily seeded from the org's own completion state rather than always
   // false, so a brand-new organization's first dashboard visit auto-opens
@@ -220,7 +255,7 @@ export function DashboardShell({
   const query = navSearch.trim().toLowerCase();
   const filteredGroups = query
     ? visibleGroups
-        .map((group) => ({ ...group, items: group.items.filter((item) => item.label.toLowerCase().includes(query)) }))
+        .map((group) => ({ ...group, items: group.items.filter((item) => t.nav.items[item.itemKey].toLowerCase().includes(query)) }))
         .filter((group) => group.items.length > 0)
     : visibleGroups;
 
@@ -230,19 +265,17 @@ export function DashboardShell({
         <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="search"
-          placeholder="Search tabs..."
+          placeholder={t.nav.searchPlaceholder}
           className="h-8 pl-8"
           value={navSearch}
           onChange={(event) => setNavSearch(event.target.value)}
-          aria-label="Search tabs"
+          aria-label={t.nav.searchPlaceholder}
         />
       </div>
-      {filteredGroups.length === 0 && (
-        <p className="px-3 text-sm text-muted-foreground">No tabs match &quot;{navSearch.trim()}&quot;.</p>
-      )}
+      {filteredGroups.length === 0 && <p className="px-3 text-sm text-muted-foreground">{t.nav.noTabsMatch(navSearch.trim())}</p>}
       {filteredGroups.map((group) => (
-        <div key={group.label} className="flex flex-col gap-1">
-          <p className="px-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{group.label}</p>
+        <div key={group.groupKey} className="flex flex-col gap-1">
+          <p className="px-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{t.nav.groups[group.groupKey]}</p>
           {group.items.map((item) => {
             const active = pathname === item.href;
             // A plan-gated item still links through to its page — that's
@@ -264,7 +297,7 @@ export function DashboardShell({
                 }`}
               >
                 <item.icon className="size-4" />
-                <span className="flex-1">{item.label}</span>
+                <span className="flex-1">{t.nav.items[item.itemKey]}</span>
                 {locked && <Lock className="size-3" />}
               </Link>
             );
@@ -277,7 +310,7 @@ export function DashboardShell({
         className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
       >
         <Compass className="size-4" />
-        <span className="flex-1">Take the tour</span>
+        <span className="flex-1">{t.nav.takeTheTour}</span>
       </button>
     </nav>
   );
@@ -339,6 +372,7 @@ export function DashboardShell({
               <Menu className="size-5" />
             </Button>
             <div className="ml-auto flex items-center gap-2">
+              <LanguageSwitcher />
               <NotificationBell organizationId={organization.id} initialNotifications={notifications} />
               <LogoutButton />
             </div>

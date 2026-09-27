@@ -17,6 +17,9 @@ export type Profile = {
   avatar_url: string | null;
   status: ProfileStatus;
   active_organization_id: string | null;
+  // "en" | "ta" | "hi" for now — see src/lib/i18n/config.ts, the single
+  // source of truth for which locales the app actually supports.
+  locale: string;
   created_at: string;
   updated_at: string;
 };
@@ -2195,6 +2198,10 @@ export type Database = {
         Returns: undefined;
       };
       get_organization_storage_bytes: {
+        Args: { target_org_id: string };
+        Returns: number;
+      };
+      get_tenant_storage_bytes: {
         Args: { target_org_id: string };
         Returns: number;
       };

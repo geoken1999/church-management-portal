@@ -30,6 +30,12 @@ interface SendBulkEmailParams {
   recipients: string[];
   replyTo?: string;
   attachments?: EmailAttachment[];
+  // Overrides EMAIL_FROM_ADDRESS for this send only — the sending domain is
+  // verified with Resend as a whole (kingdomflow.in), so any local part on
+  // it (reset-password@, hello@, ...) works with no extra setup. Used for
+  // system emails that want a distinct, recognizable sender identity (e.g.
+  // password resets) rather than sharing the general "hello@" address.
+  fromAddress?: string;
   // Carried through to Resend as a tag so the delivery-status webhook
   // (src/app/api/resend/webhook) can attribute a later bounce/failure
   // event back to the right org — Resend's webhooks are account-wide, not
@@ -42,7 +48,7 @@ interface SendBulkEmailParams {
 export async function sendBulkEmail(params: SendBulkEmailParams): Promise<SendBulkEmailResult> {
   const { apiKey, fromAddress } = getEmailEnv();
   const resend = new Resend(apiKey);
-  const from = `${params.fromName} <${fromAddress}>`;
+  const from = `${params.fromName} <${params.fromAddress ?? fromAddress}>`;
 
   // Resend's batch endpoint explicitly doesn't support attachments — fall
   // back to one emails.send() call per recipient when there are any.

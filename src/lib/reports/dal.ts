@@ -3,6 +3,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { ReportFilters, ReportId } from "@/lib/reports/registry";
 import type { MemberStatus, DonationMethod } from "@/types/database";
+import { MEETING_MODE_LABELS } from "@/lib/events/location";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "";
@@ -84,7 +85,7 @@ export async function getReportRows(organizationId: string, reportId: ReportId, 
         title: row.title,
         date: formatDateTime(row.start_at),
         branch: row.branches?.name ?? "All branches",
-        mode: row.meeting_mode === "online" ? "Online" : "In-person",
+        mode: MEETING_MODE_LABELS[row.meeting_mode] ?? row.meeting_mode,
         recurrence: row.is_recurring ? (row.recurrence_frequency ?? "Recurring") : "One-time",
       }));
     }

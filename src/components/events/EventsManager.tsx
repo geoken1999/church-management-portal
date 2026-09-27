@@ -8,6 +8,7 @@ import { getOccurrencesInRange, occurrenceLabel } from "@/lib/events/recurrence"
 import { RECURRENCE_FREQUENCIES, EVENT_STATUSES } from "@/lib/events/validation";
 import { EventRegistrationDialog } from "@/components/events/EventRegistrationDialog";
 import { AddToAttendanceButton } from "@/components/events/AddToAttendanceButton";
+import { MEETING_MODE_LABELS } from "@/lib/events/location";
 import type { Branch, Event, EventMeetingMode, EventRecurrenceFrequency, EventStatus, Member } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,11 +41,6 @@ const FREQUENCY_LABELS: Record<EventRecurrenceFrequency, string> = {
   weekly: "Weekly",
   monthly: "Monthly",
   yearly: "Yearly",
-};
-
-const MEETING_MODE_LABELS: Record<EventMeetingMode, string> = {
-  offline: "Offline (in-person)",
-  online: "Online",
 };
 
 const EVENT_STATUS_LABELS: Record<EventStatus, string> = {
@@ -188,10 +184,11 @@ function MeetingModeField({
           <SelectContent>
             <SelectItem value="offline">{MEETING_MODE_LABELS.offline}</SelectItem>
             <SelectItem value="online">{MEETING_MODE_LABELS.online}</SelectItem>
+            <SelectItem value="hybrid">{MEETING_MODE_LABELS.hybrid}</SelectItem>
           </SelectContent>
         </Select>
       </div>
-      {meetingMode === "online" && (
+      {meetingMode !== "offline" && (
         <div className="space-y-2">
           <Label htmlFor="meetingLink">Meeting link (optional)</Label>
           <Input
@@ -206,7 +203,7 @@ function MeetingModeField({
           <FieldError id="meetingLink-error" message={errors?.meetingLink} />
         </div>
       )}
-      {meetingMode === "offline" && (
+      {meetingMode !== "online" && (
         <>
           <div className="space-y-2">
             <Label htmlFor="venue">Venue (optional)</Label>
@@ -677,7 +674,7 @@ function EventCard({
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Video className="size-3.5 shrink-0" />
             {MEETING_MODE_LABELS[event.meeting_mode]}
-            {event.meeting_mode === "online" && event.meeting_link && (
+            {event.meeting_mode !== "offline" && event.meeting_link && (
               <a
                 href={event.meeting_link}
                 target="_blank"

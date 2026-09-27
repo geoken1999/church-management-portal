@@ -48,7 +48,7 @@ export async function sendRegistrationPassEmail(input: {
   eventDescription: string | null;
   startAt: string;
   endAt: string | null;
-  locationLabel: string;
+  venueLabel: string | null;
   mapLink: string | null;
   joinLink: string | null;
   contactName: string | null;
@@ -79,7 +79,7 @@ export async function sendRegistrationPassEmail(input: {
     description: input.eventDescription,
     startAt: input.startAt,
     endAt: input.endAt,
-    location: input.locationLabel,
+    location: [input.venueLabel, input.joinLink].filter(Boolean).join(" · ") || null,
   });
 
   const startLabel = new Date(input.startAt).toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" });
@@ -98,18 +98,18 @@ export async function sendRegistrationPassEmail(input: {
   // or another image attachment — SVG is stripped by several major mail
   // clients (Gmail among them) and a data-URI image is unreliable in
   // Outlook's desktop renderer, while an emoji glyph renders consistently
-  // everywhere and needs no attachment at all. Exactly one of mapLink/
-  // joinLink is ever set (an event is either offline with a venue/map, or
-  // online with a meeting link — see public-registration-actions.ts), so
-  // whichever is present becomes the tappable target; "Join online" is
-  // shown instead of the raw meeting URL since that's already the link
-  // target, not something that needs repeating as visible text.
-  const pinTarget = input.mapLink || input.joinLink;
-  const pinText = input.joinLink ? "Join online" : input.locationLabel;
-  const pinIcon = input.joinLink ? "🔗" : "📍";
-  const locationHtml = pinTarget
-    ? `<a href="${escapeHtml(pinTarget)}" style="color: #555; text-decoration: none;">${pinIcon} ${escapeHtml(pinText)}</a>`
-    : `📍 ${escapeHtml(input.locationLabel)}`;
+  // everywhere and needs no attachment at all. venueLabel and joinLink are
+  // independent (a hybrid event has both), so each renders its own line
+  // when present, rather than assuming only one is ever set.
+  const venueHtml = input.venueLabel
+    ? input.mapLink
+      ? `<a href="${escapeHtml(input.mapLink)}" style="color: #555; text-decoration: none;">📍 ${escapeHtml(input.venueLabel)}</a>`
+      : `📍 ${escapeHtml(input.venueLabel)}`
+    : "";
+  const joinHtml = input.joinLink
+    ? `<a href="${escapeHtml(input.joinLink)}" style="color: #555; text-decoration: none;">🔗 Join online</a>`
+    : "";
+  const locationHtml = [venueHtml, joinHtml].filter(Boolean).join("<br />") || "📍 Location TBA";
 
   const contactParts: string[] = [];
   if (input.contactName) contactParts.push(escapeHtml(input.contactName));

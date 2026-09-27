@@ -1,6 +1,6 @@
 "use client";
 
-import { Globe, Check } from "lucide-react";
+import { Languages, Check } from "lucide-react";
 import { useLocale } from "@/lib/i18n/LocaleContext";
 import { SUPPORTED_LOCALES, LOCALE_LABELS } from "@/lib/i18n/config";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ export function LanguageSwitcher() {
       <PopoverTrigger
         render={
           <Button type="button" variant="ghost" size="icon" aria-label={t.languageSwitcher.label}>
-            <Globe className="size-4.5" />
+            <Languages className="size-4.5" />
           </Button>
         }
       />

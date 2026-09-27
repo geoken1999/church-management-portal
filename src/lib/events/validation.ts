@@ -66,7 +66,7 @@ export function validateEvent(input: {
     }
   }
 
-  if (input.meetingMode === "online" && input.meetingLink) {
+  if (input.meetingMode !== "offline" && input.meetingLink) {
     if (!/^https?:\/\//i.test(input.meetingLink.trim())) {
       errors.meetingLink = "Enter a full link starting with http:// or https://.";
     }

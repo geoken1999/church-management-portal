@@ -25,7 +25,7 @@ export async function sendRegistrationReminderEmail(input: {
   recipientName: string | null;
   eventTitle: string;
   startAt: string;
-  locationLabel: string;
+  venueLabel: string | null;
   mapLink: string | null;
   joinLink: string | null;
   confirmationCode: string;
@@ -37,12 +37,17 @@ export async function sendRegistrationReminderEmail(input: {
   const passColor = input.passColor || "#7c3aed";
   const greeting = input.recipientName ? `Hi ${escapeHtml(input.recipientName)},` : "Hi,";
 
-  const pinTarget = input.mapLink || input.joinLink;
-  const pinText = input.joinLink ? "Join online" : input.locationLabel;
-  const pinIcon = input.joinLink ? "🔗" : "📍";
-  const locationHtml = pinTarget
-    ? `<a href="${escapeHtml(pinTarget)}" style="color: #555; text-decoration: none;">${pinIcon} ${escapeHtml(pinText)}</a>`
-    : `📍 ${escapeHtml(input.locationLabel)}`;
+  // venueLabel and joinLink are independent (a hybrid event has both), so
+  // each gets its own row when present, same reasoning as
+  // registration-pass.ts's venueHtml/joinHtml split.
+  const venueHtml = input.venueLabel
+    ? input.mapLink
+      ? `<a href="${escapeHtml(input.mapLink)}" style="color: #555; text-decoration: none;">${escapeHtml(input.venueLabel)}</a>`
+      : escapeHtml(input.venueLabel)
+    : "";
+  const joinHtml = input.joinLink
+    ? `<a href="${escapeHtml(input.joinLink)}" style="color: #555; text-decoration: none;">Join online</a>`
+    : "";
 
   const html = `
     <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; color: #111;">
@@ -52,7 +57,8 @@ export async function sendRegistrationReminderEmail(input: {
         <p>${greeting} this is a reminder that you're registered for the event below.</p>
         <table role="presentation" cellpadding="0" cellspacing="0" style="width: 100%; margin: 16px 0; font-size: 14px;">
           <tr><td style="padding: 4px 0; color: #666;">When</td><td style="padding: 4px 0; text-align: right;">${startLabel}</td></tr>
-          <tr><td style="padding: 4px 0; color: #666;">Where</td><td style="padding: 4px 0; text-align: right;">${locationHtml}</td></tr>
+          ${venueHtml ? `<tr><td style="padding: 4px 0; color: #666;">Where</td><td style="padding: 4px 0; text-align: right;">${venueHtml}</td></tr>` : ""}
+          ${joinHtml ? `<tr><td style="padding: 4px 0; color: #666;">Online</td><td style="padding: 4px 0; text-align: right;">${joinHtml}</td></tr>` : ""}
         </table>
         <p style="margin-bottom: 4px; font-size: 13px; color: #666;">Your confirmation code</p>
         <p style="margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 2px; color: ${passColor};">${input.confirmationCode}</p>

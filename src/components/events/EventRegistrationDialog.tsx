@@ -21,6 +21,7 @@ import {
   EVENT_REMINDER_OFFSET_LABELS,
 } from "@/lib/events/registration-validation";
 import { slugifyFieldKey, validateFormField } from "@/lib/forms/validation";
+import { MEETING_MODE_LABELS } from "@/lib/events/location";
 import { QrCodeDialog } from "@/components/members/QrCodeDialog";
 import { EventPassBackgroundUpload } from "@/components/events/EventPassBackgroundUpload";
 import { EventPassPreview } from "@/components/events/EventPassPreview";
@@ -283,7 +284,7 @@ function SettingsTab({ event, siteUrl }: { event: Event; siteUrl: string }) {
           <EventPassPreview
             eventTitle={event.title}
             startAt={event.start_at}
-            locationLabel={event.meeting_mode === "online" ? "Online" : "In person"}
+            locationLabel={MEETING_MODE_LABELS[event.meeting_mode]}
             passColor={passColor}
             passMessage={passMessage}
             backgroundUrl={backgroundPreviewUrl}

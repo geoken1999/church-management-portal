@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOccurrencesInRange } from "@/lib/events/recurrence";
 import { sendRegistrationReminderEmail } from "@/lib/events/registration-reminder";
+import { eventVenueLabel, eventJoinLink } from "@/lib/events/location";
 
-const MEETING_MODE_LABELS: Record<string, string> = { offline: "In person", online: "Online" };
 const LOOKAHEAD_MS = 25 * 60 * 60 * 1000;
 const OFFSET_MS: Record<string, number> = { "24h": 24 * 60 * 60 * 1000, "1h": 60 * 60 * 1000 };
 
@@ -105,13 +105,12 @@ export async function GET(request: Request) {
     const pending = (registrations ?? []).filter((r) => r.last_reminder_occurrence_date !== occurrenceKey);
     if (pending.length === 0) continue;
 
-    const locationLabel =
-      event.meeting_mode === "online"
-        ? event.meeting_link
-          ? `Online — ${event.meeting_link}`
-          : "Online"
-        : (event.venue?.trim() || (event.branches as { name: string } | null)?.name || MEETING_MODE_LABELS[event.meeting_mode] || "In person");
-    const joinLink = event.meeting_mode === "online" ? event.meeting_link : null;
+    const venueLabel = eventVenueLabel({
+      meeting_mode: event.meeting_mode,
+      venue: event.venue,
+      branchName: (event.branches as { name: string } | null)?.name,
+    });
+    const joinLink = eventJoinLink(event);
     const organizationName = (event.organizations as { name: string } | null)?.name ?? "Your church";
 
     for (const registration of pending) {
@@ -125,7 +124,7 @@ export async function GET(request: Request) {
         recipientName,
         eventTitle: event.title,
         startAt: occurrenceDate.toISOString(),
-        locationLabel,
+        venueLabel,
         mapLink: event.map_link,
         joinLink,
         confirmationCode: registration.confirmation_code,

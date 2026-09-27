@@ -589,7 +589,7 @@ export type Todo = {
 };
 
 export type EventRecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
-export type EventMeetingMode = "offline" | "online";
+export type EventMeetingMode = "offline" | "online" | "hybrid";
 export type EventStatus = "pending" | "active" | "cancelled" | "completed";
 export type EventReminderOffset = "24h" | "1h" | "morning_of";
 

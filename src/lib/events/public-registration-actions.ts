@@ -3,13 +3,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendRegistrationPassEmail } from "@/lib/events/registration-pass";
+import { eventVenueLabel, eventJoinLink } from "@/lib/events/location";
+import type { EventMeetingMode } from "@/types/database";
 
 export interface PublicEventRegistrationState {
   error?: string;
   success?: boolean;
 }
-
-const MEETING_MODE_LABELS: Record<string, string> = { offline: "In person", online: "Online" };
 
 // Anonymous visitor submission from the public /events/register/[token]
 // page — no requireUser(), field validation happens server-side in the
@@ -74,7 +74,7 @@ export async function registerForEvent(
       description: string | null;
       start_at: string;
       end_at: string | null;
-      meeting_mode: string;
+      meeting_mode: EventMeetingMode;
       meeting_link: string | null;
       venue: string | null;
       map_link: string | null;
@@ -89,12 +89,8 @@ export async function registerForEvent(
     } | null;
 
     if (event) {
-      const locationLabel =
-        event.meeting_mode === "online"
-          ? event.meeting_link
-            ? `Online — ${event.meeting_link}`
-            : "Online"
-          : (event.venue?.trim() || event.branches?.name || MEETING_MODE_LABELS[event.meeting_mode] || "In person");
+      const venueLabel = eventVenueLabel({ meeting_mode: event.meeting_mode, venue: event.venue, branchName: event.branches?.name });
+      const joinLink = eventJoinLink(event);
 
       const answersRecord = registration.answers as Record<string, unknown>;
       const recipientName = typeof answersRecord.name === "string" ? answersRecord.name : null;
@@ -109,9 +105,9 @@ export async function registerForEvent(
         eventDescription: event.description,
         startAt: event.start_at,
         endAt: event.end_at,
-        locationLabel,
+        venueLabel,
         mapLink: event.map_link,
-        joinLink: event.meeting_mode === "online" ? event.meeting_link : null,
+        joinLink,
         contactName: event.contact_name,
         contactPhone: event.contact_phone,
         confirmationCode: data.confirmation_code,

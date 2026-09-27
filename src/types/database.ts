@@ -2209,6 +2209,24 @@ export type Database = {
         Args: Record<string, never>;
         Returns: { file_storage_bytes: number; database_bytes: number }[];
       };
+      get_active_sessions: {
+        Args: Record<string, never>;
+        Returns: {
+          session_id: string;
+          user_id: string;
+          user_email: string | null;
+          organization_names: string[];
+          created_at: string;
+          updated_at: string;
+          not_after: string | null;
+          user_agent: string | null;
+          ip: string | null;
+        }[];
+      };
+      admin_revoke_session: {
+        Args: { target_session_id: string };
+        Returns: undefined;
+      };
       get_public_form: {
         Args: { form_slug: string };
         Returns: {

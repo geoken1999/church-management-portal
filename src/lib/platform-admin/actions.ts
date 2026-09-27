@@ -11,6 +11,7 @@ import type { SupportTicketStatus } from "@/types/database";
 const PAYOUTS_PATH = "/platform-admin/payouts";
 const TENANTS_PATH = "/platform-admin/tenants";
 const SUPPORT_PATH = "/platform-admin/support";
+const SESSIONS_PATH = "/platform-admin/sessions";
 
 const SUPPORT_TICKET_STATUSES: SupportTicketStatus[] = ["open", "in_progress", "resolved", "closed"];
 
@@ -230,4 +231,27 @@ export async function addPlatformSupportReply(
 
   revalidatePath(SUPPORT_PATH);
   return { success: true };
+}
+
+// Force-signs-out one specific session (see migration 0083) — the killed
+// user's very next request fails re-authentication, since proxy.ts
+// revalidates via supabase.auth.getUser() (not the weaker getSession()) on
+// every request rather than trusting a locally-decoded, unexpired JWT.
+export async function revokeSession(formData: FormData) {
+  const platformAdmin = await requirePlatformAdmin();
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const userEmail = String(formData.get("userEmail") ?? "unknown");
+  if (!sessionId) return;
+
+  const admin = createAdminClient();
+  await admin.rpc("admin_revoke_session", { target_session_id: sessionId });
+
+  await logPlatformEvent({
+    level: "warning",
+    source: "platform_admin",
+    message: `Platform admin (${platformAdmin.email ?? "unknown"}) revoked a session for ${userEmail}`,
+    metadata: { sessionId, userEmail },
+  });
+
+  revalidatePath(SESSIONS_PATH);
 }

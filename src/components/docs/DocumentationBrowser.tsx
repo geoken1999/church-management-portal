@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Search, ChevronDown, BookOpen, X } from "lucide-react";
-import { DOC_CATEGORIES, type DocArticle } from "@/lib/docs/content";
+import { DOC_CATEGORIES, type DocArticle, type DocCategory } from "@/lib/docs/content";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -51,17 +51,32 @@ function ArticleRow({ article, query, defaultOpen }: { article: DocArticle; quer
   );
 }
 
-export function DocumentationBrowser() {
+export function DocumentationBrowser({
+  categories = DOC_CATEGORIES,
+  heroTitle = "How can we help?",
+  heroDescription = "Search how-to guides across every part of KingdomFlow, or browse by category below.",
+  searchPlaceholder = "Search documentation...",
+  // A plain template string, not a function — a Server Component (like
+  // PlatformAdminDocsPage) can't pass a function prop to this Client
+  // Component, only serializable values. "{query}" is replaced below.
+  emptyStateTemplate = 'No articles match "{query}". Try a different search, or raise a ticket from the Support tab.',
+}: {
+  categories?: DocCategory[];
+  heroTitle?: string;
+  heroDescription?: string;
+  searchPlaceholder?: string;
+  emptyStateTemplate?: string;
+}) {
   const [query, setQuery] = useState("");
   const normalizedQuery = query.trim().toLowerCase();
 
   const results = useMemo(() => {
-    if (!normalizedQuery) return DOC_CATEGORIES;
-    return DOC_CATEGORIES.map((category) => ({
+    if (!normalizedQuery) return categories;
+    return categories.map((category) => ({
       ...category,
       articles: category.articles.filter((article) => matches(article, normalizedQuery)),
     })).filter((category) => category.articles.length > 0);
-  }, [normalizedQuery]);
+  }, [normalizedQuery, categories]);
 
   const totalResults = results.reduce((sum, c) => sum + c.articles.length, 0);
 
@@ -77,17 +92,15 @@ export function DocumentationBrowser() {
             <BookOpen className="size-6 text-primary" />
           </div>
           <div>
-            <h2 className="font-heading text-2xl font-bold tracking-tight">How can we help?</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Search how-to guides across every part of KingdomFlow, or browse by category below.
-            </p>
+            <h2 className="font-heading text-2xl font-bold tracking-tight">{heroTitle}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{heroDescription}</p>
           </div>
           <div className="relative w-full">
             <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search documentation..."
+              placeholder={searchPlaceholder}
               className="h-12 rounded-xl pl-11 text-base shadow-sm"
               autoFocus
             />
@@ -114,7 +127,7 @@ export function DocumentationBrowser() {
       {results.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No articles match &ldquo;{query}&rdquo;. Try a different search, or raise a ticket from the Support tab.
+            {emptyStateTemplate.replace("{query}", query)}
           </CardContent>
         </Card>
       ) : (

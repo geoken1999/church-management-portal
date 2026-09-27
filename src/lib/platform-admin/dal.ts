@@ -495,3 +495,38 @@ export async function getPlatformEvents(filter: { level?: PlatformEventLevel; li
   const { data } = await query;
   return data ?? [];
 }
+
+// ---------------------------------------------------------------------------
+// Active sessions — see migration 0083. auth.sessions/auth.users aren't
+// PostgREST-exposed, so this goes through a security definer RPC rather
+// than a plain .from() query.
+// ---------------------------------------------------------------------------
+
+export interface ActiveSession {
+  sessionId: string;
+  userId: string;
+  userEmail: string;
+  organizationNames: string[];
+  createdAt: string;
+  updatedAt: string;
+  notAfter: string | null;
+  userAgent: string | null;
+  ip: string | null;
+}
+
+export async function getActiveSessions(): Promise<ActiveSession[]> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("get_active_sessions");
+  if (error || !data) return [];
+  return data.map((row) => ({
+    sessionId: row.session_id,
+    userId: row.user_id,
+    userEmail: row.user_email ?? "(no email)",
+    organizationNames: row.organization_names,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    notAfter: row.not_after,
+    userAgent: row.user_agent,
+    ip: row.ip,
+  }));
+}

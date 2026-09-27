@@ -40,6 +40,7 @@ export const hi: Dictionary = {
       team: "टीम",
       billing: "बिलिंग",
       branches: "शाखाएं",
+      mobileFeatures: "मोबाइल ऐप",
       members: "सदस्य",
       leaders: "नेता",
       youth: "युवा",

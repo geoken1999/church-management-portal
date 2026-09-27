@@ -40,6 +40,7 @@ export const ta: Dictionary = {
       team: "குழு",
       billing: "பில்லிங்",
       branches: "கிளைகள்",
+      mobileFeatures: "மொபைல் ஆப்",
       members: "உறுப்பினர்கள்",
       leaders: "தலைவர்கள்",
       youth: "இளைஞர்",

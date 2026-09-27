@@ -42,6 +42,7 @@ export const en = {
       team: "Team",
       billing: "Billing",
       branches: "Branches",
+      mobileFeatures: "Mobile App",
       members: "Members",
       leaders: "Leaders",
       youth: "Youth",

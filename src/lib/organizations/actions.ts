@@ -21,6 +21,7 @@ import {
 } from "@/lib/organizations/validation";
 import { checkStorageQuota, checkTeamMemberQuota } from "@/lib/plans/dal";
 import { sendWelcomeEmail } from "@/lib/organizations/welcome-email";
+import { MOBILE_FEATURE_LIMIT, VALID_MOBILE_FEATURE_KEYS } from "@/lib/organizations/mobile-features";
 import type { MemberCountRange, OrganizationRole, TabPermissions } from "@/types/database";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -427,4 +428,46 @@ export async function completeTour(organizationId: string): Promise<void> {
   await admin.from("organizations").update({ tour_completed_at: new Date().toISOString() }).eq("id", organizationId);
 
   revalidatePath("/dashboard");
+}
+
+export interface UpdateMobileFeaturesState {
+  error?: string;
+  success?: boolean;
+}
+
+// Owner/admin only — enforced twice: the page itself redirects a non-manager
+// away before this is ever reachable, and the RLS policy "Admins can update
+// their organization" (migration 0002) would reject the update either way,
+// same defense-in-depth as updateOrganizationDetails above. The DB's own
+// check constraints (migration 0084) are the real backstop on the 15-item
+// cap and the valid-key list — these two checks just give a friendly error
+// instead of a raw constraint-violation message.
+export async function updateMobileFeatures(
+  _prevState: UpdateMobileFeaturesState,
+  formData: FormData,
+): Promise<UpdateMobileFeaturesState> {
+  await requireUser();
+
+  const organizationId = String(formData.get("organizationId") ?? "");
+  const features = String(formData.get("features") ?? "")
+    .split(",")
+    .map((f) => f.trim())
+    .filter(Boolean);
+
+  if (features.length > MOBILE_FEATURE_LIMIT) {
+    return { error: `Choose at most ${MOBILE_FEATURE_LIMIT} features.` };
+  }
+  if (features.some((f) => !VALID_MOBILE_FEATURE_KEYS.includes(f))) {
+    return { error: "One of those isn't a recognized feature. Please try again." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("organizations").update({ mobile_features: features }).eq("id", organizationId);
+
+  if (error) {
+    return { error: "Couldn't save those changes. You may not have permission to edit this church." };
+  }
+
+  revalidatePath("/dashboard/mobile");
+  return { success: true };
 }

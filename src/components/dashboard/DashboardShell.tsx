@@ -38,6 +38,7 @@ import {
   LayoutTemplate,
   House,
   Compass,
+  Smartphone,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { YouTubeIcon } from "@/components/icons/YouTubeIcon";
@@ -82,6 +83,7 @@ const NAV_GROUPS = [
       { href: "/dashboard/team", itemKey: "team" as const, icon: Users, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/billing", itemKey: "billing" as const, icon: CreditCard, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: true },
       { href: "/dashboard/branches", itemKey: "branches" as const, icon: MapPin, tab: "branches" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/mobile", itemKey: "mobileFeatures" as const, icon: Smartphone, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: true },
     ],
   },
   {

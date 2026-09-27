@@ -46,6 +46,14 @@ export const DOC_CATEGORIES: DocCategory[] = [
         ],
       },
       {
+        id: "mobile-app",
+        title: "Choosing your mobile app features",
+        body: [
+          "Organization → Mobile App lets an owner or admin pick up to 15 of the dashboard's features to make available in KingdomFlow's dedicated mobile app — the same set for your whole team, not a per-person choice.",
+          "Uncheck a feature to free up a slot for a different one once you've picked 15; there's no separate save per feature, just one Save for the whole selection.",
+        ],
+      },
+      {
         id: "finding-a-tab",
         title: "Finding a tab quickly",
         body: [
@@ -56,7 +64,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
         id: "language",
         title: "Changing the language",
         body: [
-          "Click the globe icon next to the notification bell in the dashboard header to switch the app's language — English, Tamil, and Hindi are supported today, with more on the way. Your choice is saved to your profile, so it follows you the next time you sign in on any device.",
+          "Click the language icon next to the notification bell in the dashboard header to switch the app's language — English, Tamil, and Hindi are supported today, with more on the way. Your choice is saved to your profile, so it follows you the next time you sign in on any device.",
           "The same switcher appears on every public link you share — Forms, Event registration, Give, Join, and shared Folders. There, each visitor picks their own language independently, and it's remembered on their browser for the next link they open.",
           "Only the app's own screens (buttons, field labels, messages) are translated. Content your church has written yourself — event titles, custom form questions, your church's name — always appears exactly as you typed it.",
         ],

@@ -48,6 +48,11 @@ export type Organization = {
   // null until the welcome tour (src/components/dashboard/WelcomeTour.tsx)
   // is completed or skipped — that's also what triggers it to auto-show.
   tour_completed_at: string | null;
+  // Which of the dashboard's nav items (itemKey values — see NAV_GROUPS in
+  // DashboardShell.tsx) an owner/admin has chosen to make available in the
+  // future dedicated mobile app. Capped at 15 by a DB check constraint
+  // (migration 0084) — nothing reads this yet.
+  mobile_features: string[];
   created_at: string;
   updated_at: string;
 };

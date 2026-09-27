@@ -23,11 +23,22 @@ function istParts(date: Date): { dateKey: string; hour: number } {
   return { dateKey: `${get("year")}-${get("month")}-${get("day")}`, hour };
 }
 
-// Vercel Cron hits this every 15 minutes (see vercel.json) to send
-// registration reminder emails — no user session exists on a cron-
-// triggered request, so this checks CRON_SECRET (the same pattern as
-// src/app/api/instagram/cron/refresh-tokens) rather than
+// Vercel Cron hits this once a day at 2:45 UTC = 8:15 AM IST (see
+// vercel.json) to send registration reminder emails — no user session
+// exists on a cron-triggered request, so this checks CRON_SECRET (the same
+// pattern as src/app/api/instagram/cron/refresh-tokens) rather than
 // requirePlatformAdmin(), which needs a signed-in user.
+//
+// Once a day, not more often: Vercel's Hobby plan rejects any cron
+// schedule finer than daily at deploy time. This is why "1 hour before" is
+// a functionally weak option in the UI — it can only ever fire for an
+// event whose "1 hour before" moment happens to land within a few minutes
+// of THIS one fixed daily run, so in practice it almost never sends. "24
+// hours before" and "morning of" both still work well on a once-daily
+// schedule (a once-a-day check is naturally suited to a once-a-day
+// reminder). Upgrading to Vercel Pro (which allows sub-daily crons) would
+// let this run every 15 minutes again and make "1 hour before" reliable —
+// worth raising with whoever owns hosting if that option matters.
 //
 // Occurrence discovery reuses src/lib/events/recurrence.ts — the same
 // function the dashboard's own calendar view uses — rather than

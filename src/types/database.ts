@@ -589,7 +589,60 @@ export type Todo = {
   assigned_to: string | null;
   created_by: string | null;
   completed_at: string | null;
+  // Set by the daily /api/cron/todo-reminders digest after it notifies an
+  // assignee — dedupes so the same to-do isn't re-notified on the same day.
+  last_reminder_sent_at: string | null;
   created_at: string;
+  updated_at: string;
+};
+
+export type PlanStatus = "draft" | "active" | "completed";
+
+export type PlanItem = {
+  id: string;
+  text: string;
+  done: boolean;
+  // "HH:MM", 24-hour, no date — a time-of-day slot within the plan (e.g.
+  // "10:00"-"11:00" for a service's worship segment), not a full
+  // timestamp. Both null for a plain, unscheduled checklist step.
+  startTime: string | null;
+  endTime: string | null;
+  // A members.id (not profiles.auth_user_id) — a plan is assigned to a
+  // Leader, a congregation role, not necessarily someone with a team
+  // login. Resolved to a name client-side from the leaders list already
+  // fetched for the page, not stored redundantly here.
+  assignedTo: string | null;
+};
+
+export type Plan = {
+  id: string;
+  organization_id: string;
+  title: string;
+  notes: string | null;
+  status: PlanStatus;
+  target_date: string | null;
+  items: PlanItem[];
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DevicePlatform = "ios" | "android";
+
+export type DevicePushToken = {
+  id: string;
+  auth_user_id: string;
+  token: string;
+  platform: DevicePlatform;
+  created_at: string;
+  updated_at: string;
+};
+
+export type NotificationPreferences = {
+  auth_user_id: string;
+  event_new: boolean;
+  todo_assigned: boolean;
+  todo_due_soon: boolean;
   updated_at: string;
 };
 
@@ -1864,6 +1917,55 @@ export type Database = {
             foreignKeyName: "todos_created_by_fkey";
             columns: ["created_by"];
             isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["auth_user_id"];
+          },
+        ];
+      };
+      plans: {
+        Row: Plan;
+        Insert: Partial<Plan> & Pick<Plan, "organization_id" | "title">;
+        Update: Partial<Plan>;
+        Relationships: [
+          {
+            foreignKeyName: "plans_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "plans_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["auth_user_id"];
+          },
+        ];
+      };
+      device_push_tokens: {
+        Row: DevicePushToken;
+        Insert: Partial<DevicePushToken> & Pick<DevicePushToken, "auth_user_id" | "token" | "platform">;
+        Update: Partial<DevicePushToken>;
+        Relationships: [
+          {
+            foreignKeyName: "device_push_tokens_auth_user_id_fkey";
+            columns: ["auth_user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["auth_user_id"];
+          },
+        ];
+      };
+      notification_preferences: {
+        Row: NotificationPreferences;
+        Insert: Partial<NotificationPreferences> & Pick<NotificationPreferences, "auth_user_id">;
+        Update: Partial<NotificationPreferences>;
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_auth_user_id_fkey";
+            columns: ["auth_user_id"];
+            isOneToOne: true;
             referencedRelation: "profiles";
             referencedColumns: ["auth_user_id"];
           },

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { DM_Sans, Geist_Mono } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import "./globals.css";
@@ -21,6 +21,17 @@ export const metadata: Metadata = {
     template: "%s",
   },
   description: "KingdomFlow — a connected platform for church management.",
+};
+
+// Without this, mobile browsers have no width=device-width to go on and
+// fall back to rendering at a ~980px desktop-simulation viewport, then
+// scaling the whole page down to fit the screen — every page looks
+// uniformly "shrunk" and zoomed out on a phone, not just this one. Next.js
+// requires this as its own export (not metadata.viewport, which it no
+// longer reads) for the <meta name="viewport"> tag to be emitted at all.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

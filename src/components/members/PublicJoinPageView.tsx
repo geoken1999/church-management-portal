@@ -19,9 +19,9 @@ export interface PublicJoinPageData {
 function NotFoundCard() {
   const { t } = useLocale();
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-12 sm:px-6">
+    <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-3 py-12 sm:px-6">
       <Card size="lg">
-        <CardHeader>
+        <CardHeader className="px-4 sm:px-7">
           <CardTitle className="text-xl">{t.common.linkNotFound}</CardTitle>
           <CardDescription>{t.publicJoin.notFoundDescription}</CardDescription>
         </CardHeader>
@@ -33,7 +33,7 @@ function NotFoundCard() {
 function JoinContent({ slug, data }: { slug: string; data: PublicJoinPageData }) {
   const { t } = useLocale();
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-12 sm:px-6">
+    <div className="mx-auto flex min-h-screen w-full max-w-xl flex-col justify-center px-3 py-12 sm:px-6 md:max-w-2xl lg:max-w-3xl">
       <div className="mb-2 flex justify-end">
         <LanguageSwitcher />
       </div>
@@ -55,11 +55,11 @@ function JoinContent({ slug, data }: { slug: string; data: PublicJoinPageData })
       </div>
 
       <Card size="lg">
-        <CardHeader>
+        <CardHeader className="px-4 sm:px-7">
           <CardTitle className="text-lg">{t.publicJoin.joinHeading(data.organization_name)}</CardTitle>
           <CardDescription>{t.publicJoin.joinDescription}</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 sm:px-7">
           <PublicJoinForm orgSlug={slug} fieldDefinitions={data.field_definitions ?? []} branches={data.branches ?? []} />
         </CardContent>
       </Card>

@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { validateEvent, type EventFieldErrors } from "@/lib/events/validation";
+import { sendPushToUsers } from "@/lib/push/client";
 import type { EventMeetingMode, EventRecurrenceFrequency, EventStatus } from "@/types/database";
 
 // updateEvent/deleteEvent forms only carry the event id, not
@@ -68,33 +69,58 @@ export async function createEvent(_prevState: EventFormState, formData: FormData
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("events").insert({
-    organization_id: organizationId,
-    title: fields.title.trim(),
-    description: fields.description || null,
-    start_at: new Date(fields.startAt).toISOString(),
-    end_at: fields.endAt ? new Date(fields.endAt).toISOString() : null,
-    is_recurring: fields.isRecurring,
-    recurrence_frequency: fields.isRecurring ? (fields.recurrenceFrequency as EventRecurrenceFrequency) : null,
-    recurrence_end_date: fields.isRecurring && fields.recurrenceEndDate ? fields.recurrenceEndDate : null,
-    branch_id: fields.branchId || null,
-    meeting_mode: fields.meetingMode as EventMeetingMode,
-    meeting_link: fields.meetingMode !== "offline" && fields.meetingLink ? fields.meetingLink : null,
-    status: fields.status as EventStatus,
-    venue: fields.venue || null,
-    map_link: fields.mapLink || null,
-    contact_name: fields.contactName || null,
-    contact_phone: fields.contactPhone || null,
-    managed_by: fields.managedBy || null,
-    created_by: user.id,
-  });
+  const { data: created, error } = await supabase
+    .from("events")
+    .insert({
+      organization_id: organizationId,
+      title: fields.title.trim(),
+      description: fields.description || null,
+      start_at: new Date(fields.startAt).toISOString(),
+      end_at: fields.endAt ? new Date(fields.endAt).toISOString() : null,
+      is_recurring: fields.isRecurring,
+      recurrence_frequency: fields.isRecurring ? (fields.recurrenceFrequency as EventRecurrenceFrequency) : null,
+      recurrence_end_date: fields.isRecurring && fields.recurrenceEndDate ? fields.recurrenceEndDate : null,
+      branch_id: fields.branchId || null,
+      meeting_mode: fields.meetingMode as EventMeetingMode,
+      meeting_link: fields.meetingMode !== "offline" && fields.meetingLink ? fields.meetingLink : null,
+      status: fields.status as EventStatus,
+      venue: fields.venue || null,
+      map_link: fields.mapLink || null,
+      contact_name: fields.contactName || null,
+      contact_phone: fields.contactPhone || null,
+      managed_by: fields.managedBy || null,
+      created_by: user.id,
+    })
+    .select("id, title")
+    .single();
 
-  if (error) {
+  if (error || !created) {
     return { error: "Couldn't add that event. Please try again." };
   }
 
+  void notifyOrgOfNewEvent(organizationId, user.id, created.title);
+
   revalidatePath(EVENTS_PATH);
   return { success: true };
+}
+
+// Fire-and-forget (the `void` at the call site) — a push failure shouldn't
+// turn a successful event creation into an error response for the admin
+// who just created it.
+async function notifyOrgOfNewEvent(organizationId: string, creatorAuthUserId: string, eventTitle: string) {
+  const admin = createAdminClient();
+  const { data: members } = await admin
+    .from("organization_members")
+    .select("auth_user_id")
+    .eq("organization_id", organizationId)
+    .neq("auth_user_id", creatorAuthUserId);
+
+  const recipientIds = (members ?? []).map((m) => m.auth_user_id);
+  await sendPushToUsers(recipientIds, "event_new", {
+    title: "New event",
+    body: eventTitle,
+    data: { type: "event_new" },
+  });
 }
 
 export async function updateEvent(_prevState: EventFormState, formData: FormData): Promise<EventFormState> {

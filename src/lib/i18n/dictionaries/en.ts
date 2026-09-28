@@ -53,6 +53,7 @@ export const en = {
       media: "Media",
       events: "Events",
       todos: "To Do",
+      planner: "Planner",
       forms: "Forms",
       folder: "Folder",
       attendance: "Attendance",

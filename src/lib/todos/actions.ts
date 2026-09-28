@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { validateTodo, type TodoFieldErrors } from "@/lib/todos/validation";
+import { sendPushToUsers } from "@/lib/push/client";
 
 const TODOS_PATH = "/dashboard/todos";
 const DASHBOARD_PATH = "/dashboard";
@@ -62,13 +63,21 @@ export async function createTodo(_prevState: TodoFormState, formData: FormData):
     return { error: "Couldn't add that to-do. Please try again." };
   }
 
+  if (fields.assignedTo && fields.assignedTo !== user.id) {
+    void sendPushToUsers([fields.assignedTo], "todo_assigned", {
+      title: "New to-do assigned to you",
+      body: fields.title,
+      data: { type: "todo_assigned" },
+    });
+  }
+
   revalidatePath(TODOS_PATH);
   revalidatePath(DASHBOARD_PATH);
   return { success: true };
 }
 
 export async function updateTodo(_prevState: TodoFormState, formData: FormData): Promise<TodoFormState> {
-  await requireUser();
+  const user = await requireUser();
   const id = String(formData.get("id") ?? "");
 
   const organizationId = await organizationIdForTodo(id);
@@ -87,6 +96,13 @@ export async function updateTodo(_prevState: TodoFormState, formData: FormData):
   }
 
   const supabase = await createClient();
+
+  // Read the previous assignee first — only a change TO a new assignee
+  // should notify; re-saving the same assignment on every edit would spam
+  // them.
+  const { data: existing } = await supabase.from("todos").select("assigned_to").eq("id", id).maybeSingle();
+  const previousAssignedTo = existing?.assigned_to ?? null;
+
   const { error } = await supabase
     .from("todos")
     .update({
@@ -99,6 +115,15 @@ export async function updateTodo(_prevState: TodoFormState, formData: FormData):
 
   if (error) {
     return { error: "Couldn't save those changes. Please try again." };
+  }
+
+  const newAssignedTo = fields.assignedTo || null;
+  if (newAssignedTo && newAssignedTo !== previousAssignedTo && newAssignedTo !== user.id) {
+    void sendPushToUsers([newAssignedTo], "todo_assigned", {
+      title: "New to-do assigned to you",
+      body: fields.title,
+      data: { type: "todo_assigned" },
+    });
   }
 
   revalidatePath(TODOS_PATH);

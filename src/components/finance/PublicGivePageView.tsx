@@ -28,9 +28,9 @@ function formatMoney(amount: number): string {
 function NotFoundCard() {
   const { t } = useLocale();
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-12 sm:px-6">
+    <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-3 py-12 sm:px-6">
       <Card size="lg">
-        <CardHeader>
+        <CardHeader className="px-4 sm:px-7">
           <CardTitle className="text-xl">{t.common.linkNotFound}</CardTitle>
           <CardDescription>{t.publicGive.notFoundDescription}</CardDescription>
         </CardHeader>
@@ -44,7 +44,7 @@ function GiveContent({ token, fundraiser }: { token: string; fundraiser: PublicF
   const percent = fundraiser.goal_amount > 0 ? Math.min(100, (fundraiser.raised_amount / fundraiser.goal_amount) * 100) : 0;
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 px-4 py-12 sm:px-6">
+    <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-6 px-3 py-12 sm:px-6">
       <div className="flex justify-end">
         <LanguageSwitcher />
       </div>

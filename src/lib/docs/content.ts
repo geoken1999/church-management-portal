@@ -164,6 +164,18 @@ export const DOC_CATEGORIES: DocCategory[] = [
     title: "Tools",
     articles: [
       {
+        id: "planner",
+        title: "Planner — jot down and track an initiative",
+        body: [
+          "Planner is for a named initiative — \"Sunday Service,\" \"Building Renovation,\" a fundraising push — that's bigger than a single task. Give it a title, jot freeform notes, and add a checklist of steps as you think of them.",
+          "Checking off, adding, or removing a step happens right on the card — no need to open an edit screen for that. Edit the title, notes, status, or target date separately from the pencil icon.",
+          "Give any step a start and end time (e.g. 10:00–11:00 for a worship segment, 11:00–12:00 for the sermon) to turn the checklist into a running schedule — steps with a time automatically sort into chronological order, ahead of any plain, untimed steps. Times are optional per step, so a plan can mix a loose checklist with a tight schedule.",
+          "This is different from To Do: a To Do is one task assigned to one person with a due date, while a Plan is a shared initiative the whole team can see and add steps to.",
+          "Assign a step to one of your Leaders from the dropdown next to it — this draws from Organization → Leaders, not the full congregation, so a step is always handed to someone in a leadership role.",
+          "Status moves a plan through Draft, Active, and Completed — filter the list by any of those, or see everything at once under All. While a plan is Active, a PDF icon appears next to Edit — export it as a run sheet to print or hand to your team, with every step's time, text, and assignee.",
+        ],
+      },
+      {
         id: "forms",
         title: "Forms — custom registration forms & surveys",
         body: [

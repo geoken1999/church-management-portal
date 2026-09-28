@@ -19,7 +19,7 @@ export const MOBILE_FEATURE_GROUPS: { groupKey: NavGroupKey; itemKeys: NavItemKe
   { groupKey: "organization", itemKeys: ["profile", "team", "billing", "branches"] },
   { groupKey: "people", itemKeys: ["members", "leaders", "youth", "committee", "families"] },
   { groupKey: "ministry", itemKeys: ["ministries", "worship", "media", "events", "todos"] },
-  { groupKey: "tools", itemKeys: ["forms", "folder", "attendance", "reports", "widget", "accounting"] },
+  { groupKey: "tools", itemKeys: ["planner", "forms", "folder", "attendance", "reports", "widget", "accounting"] },
   { groupKey: "finance", itemKeys: ["fundraisers", "offerings", "donations"] },
   { groupKey: "messaging", itemKeys: ["email", "sms", "whatsapp"] },
   { groupKey: "socialMedia", itemKeys: ["instagram", "youtube", "facebook"] },

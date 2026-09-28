@@ -31,9 +31,9 @@ function formatDate(iso: string): string {
 function NotFoundCard() {
   const { t } = useLocale();
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-12 sm:px-6">
+    <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-3 py-12 sm:px-6">
       <Card size="lg">
-        <CardHeader>
+        <CardHeader className="px-4 sm:px-7">
           <CardTitle className="text-xl">{t.common.linkNotFound}</CardTitle>
           <CardDescription>{t.publicFolder.notFoundDescription}</CardDescription>
         </CardHeader>
@@ -53,7 +53,7 @@ function FolderContent({
 }) {
   const { t } = useLocale();
   return (
-    <div className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-6 px-4 py-12 sm:px-6">
+    <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center gap-6 px-3 py-12 sm:px-6">
       <div>
         <div className="mb-2 flex justify-end">
           <LanguageSwitcher />

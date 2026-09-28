@@ -51,6 +51,7 @@ export const hi: Dictionary = {
       media: "मीडिया",
       events: "कार्यक्रम",
       todos: "कार्य सूची",
+      planner: "योजनाकार",
       forms: "फ़ॉर्म",
       folder: "फ़ोल्डर",
       attendance: "उपस्थिति",

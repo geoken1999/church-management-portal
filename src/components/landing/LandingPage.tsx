@@ -541,6 +541,21 @@ export function LandingPage() {
             <Link href="/login" className="text-sm text-muted-foreground hover:text-foreground">
               Sign in
             </Link>
+            <Link href="/about" className="text-sm text-muted-foreground hover:text-foreground">
+              About Us
+            </Link>
+            <Link href="/privacy" className="text-sm text-muted-foreground hover:text-foreground">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="text-sm text-muted-foreground hover:text-foreground">
+              Terms of Use
+            </Link>
+            <Link href="/refund" className="text-sm text-muted-foreground hover:text-foreground">
+              Refund Policy
+            </Link>
+            <Link href="/contact" className="text-sm text-muted-foreground hover:text-foreground">
+              Contact Us
+            </Link>
           </nav>
           <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} KingdomFlow. All rights reserved.</p>
         </div>

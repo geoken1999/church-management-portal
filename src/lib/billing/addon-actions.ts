@@ -153,7 +153,7 @@ export async function finalizeAddonOrderPayment(razorpayOrderId: string, razorpa
 
   const { data: org } = await admin
     .from("organizations")
-    .select("addon_sms_credits, addon_email_credits, addon_whatsapp_credits, addon_storage_bytes")
+    .select("addon_sms_credits, addon_email_credits, addon_whatsapp_credits, addon_storage_bytes, addon_ai_credits")
     .eq("id", order.organization_id)
     .single();
 
@@ -165,7 +165,9 @@ export async function finalizeAddonOrderPayment(razorpayOrderId: string, razorpa
         ? { addon_email_credits: (org?.addon_email_credits ?? 0) + order.credits }
         : addonType === "whatsapp"
           ? { addon_whatsapp_credits: (org?.addon_whatsapp_credits ?? 0) + order.credits }
-          : { addon_storage_bytes: (org?.addon_storage_bytes ?? 0) + order.credits };
+          : addonType === "ai"
+            ? { addon_ai_credits: (org?.addon_ai_credits ?? 0) + order.credits }
+            : { addon_storage_bytes: (org?.addon_storage_bytes ?? 0) + order.credits };
 
   await admin.from("organizations").update(update).eq("id", order.organization_id);
 

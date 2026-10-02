@@ -131,7 +131,7 @@ export function priceForInterval(plan: PlanLimits, interval: BillingInterval): {
 // One-time top-ups on top of a plan's monthly quota/storage ceiling —
 // bought individually, not tied to a billing cycle. "credits" is a message
 // count for sms/email/whatsapp, or a byte count for storage.
-export type AddonType = "sms" | "email" | "whatsapp" | "storage";
+export type AddonType = "sms" | "email" | "whatsapp" | "storage" | "ai";
 
 export interface AddonPack {
   id: string;
@@ -146,6 +146,7 @@ export const ADDON_TYPE_LABELS: Record<AddonType, string> = {
   email: "Email",
   whatsapp: "WhatsApp",
   storage: "Storage",
+  ai: "AI Credits",
 };
 
 export const ADDON_PACKS: AddonPack[] = [
@@ -157,6 +158,8 @@ export const ADDON_PACKS: AddonPack[] = [
   { id: "whatsapp_2000", addonType: "whatsapp", label: "2,000 WhatsApp credits", credits: 2000, priceInRupees: 1699 },
   { id: "storage_5gb", addonType: "storage", label: "+5 GB storage", credits: 5 * 1024 * 1024 * 1024, priceInRupees: 249 },
   { id: "storage_25gb", addonType: "storage", label: "+25 GB storage", credits: 25 * 1024 * 1024 * 1024, priceInRupees: 999 },
+  { id: "ai_100", addonType: "ai", label: "100 AI credits", credits: 100, priceInRupees: 299 },
+  { id: "ai_500", addonType: "ai", label: "500 AI credits", credits: 500, priceInRupees: 1199 },
 ];
 
 export function getAddonPack(packId: string): AddonPack | undefined {

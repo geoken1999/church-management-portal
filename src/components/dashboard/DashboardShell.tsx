@@ -28,6 +28,7 @@ import {
   Lock,
   CreditCard,
   BookOpen,
+  Sparkles,
   LifeBuoy,
   Users2,
   FileText,
@@ -142,6 +143,12 @@ const NAV_GROUPS = [
       { href: "/dashboard/instagram", itemKey: "instagram" as const, icon: InstagramIcon, tab: "instagram" as TabKey, planFeature: "socialMedia" as PlanFeature, managerOnly: false },
       { href: "/dashboard/youtube", itemKey: "youtube" as const, icon: YouTubeIcon, tab: "youtube" as TabKey, planFeature: "socialMedia" as PlanFeature, managerOnly: false },
       { href: "/dashboard/facebook", itemKey: "facebook" as const, icon: FacebookIcon, tab: "facebook" as TabKey, planFeature: "socialMedia" as PlanFeature, managerOnly: false },
+    ],
+  },
+  {
+    groupKey: "aiTools" as const,
+    items: [
+      { href: "/dashboard/ask-aura", itemKey: "askAura" as const, icon: Sparkles, tab: "aitools" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
   {

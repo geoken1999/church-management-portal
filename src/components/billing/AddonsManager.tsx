@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MessageSquareText, Mail, MessageCircle, HardDrive } from "lucide-react";
+import { MessageSquareText, Mail, MessageCircle, HardDrive, Sparkles } from "lucide-react";
 import { createAddonOrder, confirmAddonPayment } from "@/lib/billing/addon-actions";
 import { ADDON_TYPE_LABELS, addonPacksFor, type AddonType, type AddonPack } from "@/lib/plans/config";
 import { formatBytes } from "@/lib/plans/format";
@@ -44,6 +44,7 @@ const ADDON_ICONS: Record<AddonType, typeof MessageSquareText> = {
   email: Mail,
   whatsapp: MessageCircle,
   storage: HardDrive,
+  ai: Sparkles,
 };
 
 function formatBalance(addonType: AddonType, value: number): string {
@@ -138,14 +139,14 @@ export function AddonsManager({
     }
   }, [razorpayConfigured]);
 
-  const types: AddonType[] = ["sms", "email", "whatsapp", "storage"];
+  const types: AddonType[] = ["sms", "email", "whatsapp", "storage", "ai"];
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Add-on packs</CardTitle>
         <CardDescription>
-          Running low before your next billing cycle? Top up SMS, Email, WhatsApp, or storage without changing your plan — credits carry over and never expire.
+          Running low before your next billing cycle? Top up SMS, Email, WhatsApp, storage, or AI credits without changing your plan — credits carry over and never expire.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

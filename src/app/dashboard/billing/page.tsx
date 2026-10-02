@@ -68,6 +68,7 @@ export default async function BillingPage() {
           email: planUsage.addonEmailCredits,
           whatsapp: planUsage.addonWhatsappCredits,
           storage: planUsage.addonStorageBytes,
+          ai: planUsage.addonAiCredits,
         }}
       />
     </div>

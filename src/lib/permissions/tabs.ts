@@ -31,6 +31,7 @@ export const TAB_KEYS = [
   "instagram",
   "youtube",
   "facebook",
+  "aitools",
 ] as const;
 
 export type TabKey = (typeof TAB_KEYS)[number];
@@ -63,6 +64,7 @@ export const TAB_LABELS: Record<TabKey, string> = {
   instagram: "Instagram",
   youtube: "YouTube",
   facebook: "Facebook",
+  aitools: "AI Tools",
 };
 
 export function fullTabAccess(): TabAccess {

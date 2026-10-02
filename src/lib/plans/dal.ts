@@ -338,6 +338,52 @@ export async function checkStorageQuota(organizationId: string, additionalBytes:
   return null;
 }
 
+// Called before generating an Ask Aura response — unlike the Instagram
+// webhook's *ForWebhook variants below, this runs inside a normal
+// authenticated Server Action, so it can reuse getPlanUsage's
+// session-scoped, request-cached read instead of re-querying via the admin
+// client.
+export async function checkAiCreditQuota(organizationId: string): Promise<string | null> {
+  const usage = await getPlanUsage(organizationId);
+  if (usage.aiRepliesRemaining <= 0) {
+    await logPlatformEvent({
+      level: "info",
+      source: "quota",
+      message: `AI credit quota exceeded on ${usage.plan.name} plan`,
+      organizationId,
+      metadata: { planLimit: usage.plan.aiRepliesPerMonth, addonAiCredits: usage.addonAiCredits },
+    });
+    return `You've used all ${usage.plan.aiRepliesPerMonth.toLocaleString()} AI credits included in your ${usage.plan.name} plan this month, plus your ${usage.addonAiCredits.toLocaleString()} add-on credits. Buy an AI credit add-on pack or upgrade your plan to keep going.`;
+  }
+  return null;
+}
+
+// Call only after a reply was actually generated and shown to the user —
+// shared by Instagram DM auto-replies and Ask Aura, tagged by `source` so
+// the two remain distinguishable for observability even though they draw
+// from the same pool. Writes go through the admin client rather than the
+// session client: ai_reply_usage has no authenticated insert policy (see
+// migration 0091) and the addon_ai_credits decrement on organizations hits
+// the same admin-only write path consumeAddonOverage above already uses —
+// the caller's own checkAiCreditQuota call just above is what stands in for
+// row-level authorization here.
+export async function recordAiReplyUsage(
+  organizationId: string,
+  source: "instagram" | "ask_aura",
+  participantId: string | null = null,
+): Promise<void> {
+  const usage = await getPlanUsage(organizationId);
+  const planOnlyRemaining = Math.max(0, usage.plan.aiRepliesPerMonth - usage.aiRepliesSentThisMonth);
+  const admin = createAdminClient();
+  if (planOnlyRemaining <= 0 && usage.addonAiCredits > 0) {
+    await admin
+      .from("organizations")
+      .update({ addon_ai_credits: Math.max(0, usage.addonAiCredits - 1) })
+      .eq("id", organizationId);
+  }
+  await admin.from("ai_reply_usage").insert({ organization_id: organizationId, participant_id: participantId, source });
+}
+
 // --- Webhook-side AI credit check below: the Instagram webhook that
 // generates and sends AI replies carries no user session, so it can't use
 // getPlanUsage/getPlanAccess above (both go through the request-scoped,

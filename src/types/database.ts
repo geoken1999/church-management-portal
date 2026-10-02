@@ -63,7 +63,7 @@ export type AddonOrderStatus = "created" | "paid";
 export type OrganizationAddonOrder = {
   id: string;
   organization_id: string;
-  addon_type: "sms" | "email" | "whatsapp" | "storage";
+  addon_type: "sms" | "email" | "whatsapp" | "storage" | "ai";
   pack_id: string;
   credits: number;
   amount: number;
@@ -441,6 +441,22 @@ export type AiReplyUsage = {
   id: string;
   organization_id: string;
   participant_id: string | null;
+  // 'instagram' (DM auto-replies) or 'ask_aura' (internal chat tool) — both
+  // draw from the same shared monthly quota/addon pool, tagged here purely
+  // for observability.
+  source: "instagram" | "ask_aura";
+  created_at: string;
+};
+
+// One row per Ask Aura chat message (both the user's question and the
+// assistant's answer) — scoped to the individual user, not the whole org,
+// since each team member gets their own conversation with Aura.
+export type AuraMessage = {
+  id: string;
+  organization_id: string;
+  auth_user_id: string;
+  role: "user" | "assistant";
+  content: string;
   created_at: string;
 };
 
@@ -2153,6 +2169,20 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "ai_reply_usage_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      aura_messages: {
+        Row: AuraMessage;
+        Insert: Partial<AuraMessage> & Pick<AuraMessage, "organization_id" | "auth_user_id" | "role" | "content">;
+        Update: Partial<AuraMessage>;
+        Relationships: [
+          {
+            foreignKeyName: "aura_messages_organization_id_fkey";
             columns: ["organization_id"];
             isOneToOne: false;
             referencedRelation: "organizations";

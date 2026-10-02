@@ -15,11 +15,14 @@ import {
   disconnectInstagram,
   loadMoreInstagramMedia,
   loadMoreInstagramConversations,
+  refreshInstagramConversations,
   getInstagramConversationMessages,
   sendInstagramReply,
+  markInstagramConversationRead,
 } from "@/lib/instagram/actions";
 import type { InstagramConnectionSummary, InstagramDashboardData } from "@/lib/instagram/dal";
 import type { InstagramMedia, InstagramInsightValue, InstagramConversation, InstagramMessage } from "@/lib/instagram/client";
+import { HUMAN_AGENT_WINDOW_MS, STANDARD_WINDOW_MS } from "@/lib/instagram/constants";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -69,6 +72,12 @@ function formatMessageTime(iso: string): string {
 function initial(name: string | null): string {
   return (name ?? "?").charAt(0).toUpperCase();
 }
+
+// This app has no push channel for Instagram messages (no stored data to
+// subscribe to — everything is fetched live from the Graph API on demand),
+// so "real-time" here means polling on a short interval instead.
+const CONVERSATION_LIST_POLL_MS = 20_000;
+const MESSAGE_THREAD_POLL_MS = 8_000;
 
 // ---------------------------------------------------------------------------
 // Not connected
@@ -317,6 +326,36 @@ function InstagramInsightsTab({
 // Messages
 // ---------------------------------------------------------------------------
 
+type WindowState = "open" | "taggable" | "closed" | "unknown";
+
+function getWindowState(lastInboundAt: string | null): WindowState {
+  if (!lastInboundAt) return "unknown";
+  const elapsed = Date.now() - new Date(lastInboundAt).getTime();
+  if (elapsed <= STANDARD_WINDOW_MS) return "open";
+  if (elapsed <= HUMAN_AGENT_WINDOW_MS) return "taggable";
+  return "closed";
+}
+
+function computeLastInboundAt(messages: InstagramMessage[], profileUsername: string): string | null {
+  const inbound = messages.filter((m) => m.fromUsername !== profileUsername);
+  if (inbound.length === 0) return null;
+  return inbound.reduce(
+    (latest, m) => (new Date(m.createdTime) > new Date(latest) ? m.createdTime : latest),
+    inbound[0].createdTime,
+  );
+}
+
+// Merges a freshly-polled first page into the existing (possibly
+// "load more"-extended) list: updates matching conversations in place and
+// prepends any that are brand new, without disturbing older pages.
+function mergeConversations(existing: InstagramConversation[], fresh: InstagramConversation[]): InstagramConversation[] {
+  const freshById = new Map(fresh.map((c) => [c.id, c]));
+  const existingIds = new Set(existing.map((c) => c.id));
+  const newOnes = fresh.filter((c) => !existingIds.has(c.id));
+  const merged = existing.map((c) => freshById.get(c.id) ?? c);
+  return [...newOnes, ...merged];
+}
+
 function ConversationListItem({
   conversation,
   active,
@@ -326,6 +365,8 @@ function ConversationListItem({
   active: boolean;
   onSelect: () => void;
 }) {
+  const awaitingReply = conversation.lastMessageFromOwner === false;
+
   return (
     <button
       type="button"
@@ -335,15 +376,33 @@ function ConversationListItem({
       }`}
     >
       {active && <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-primary" />}
-      <Avatar>
-        <AvatarFallback>{initial(conversation.participantUsername)}</AvatarFallback>
-      </Avatar>
+      <div className="relative shrink-0">
+        <Avatar>
+          <AvatarFallback>{initial(conversation.participantUsername)}</AvatarFallback>
+        </Avatar>
+        {conversation.unread && (
+          <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-primary ring-2 ring-background" />
+        )}
+      </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
-          <p className="truncate text-sm font-medium">{conversation.participantUsername ?? "Unknown"}</p>
+          <p className={`truncate text-sm ${conversation.unread ? "font-bold" : "font-medium"}`}>
+            {conversation.participantUsername ?? "Unknown"}
+          </p>
           <span className="shrink-0 text-xs text-muted-foreground">{timeAgo(conversation.updatedTime)}</span>
         </div>
-        {conversation.snippet && <p className="truncate text-xs text-muted-foreground">{conversation.snippet}</p>}
+        <div className="flex items-center gap-1.5">
+          {conversation.snippet && (
+            <p className={`truncate text-xs ${conversation.unread ? "text-foreground" : "text-muted-foreground"}`}>
+              {conversation.snippet}
+            </p>
+          )}
+          {awaitingReply && (
+            <Badge variant="outline" className="shrink-0 px-1.5 py-0 text-[10px]">
+              Needs reply
+            </Badge>
+          )}
+        </div>
       </div>
     </button>
   );
@@ -362,18 +421,27 @@ function ConversationThread({
 }) {
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState<InstagramMessage[]>([]);
+  const [lastInboundAt, setLastInboundAt] = useState(conversation.lastInboundAt);
   const [reply, setReply] = useState("");
   const [error, setError] = useState<string | undefined>();
   const [sending, startSending] = useTransition();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    getInstagramConversationMessages(organizationId, conversation.id)
-      .then(setMessages)
-      .finally(() => setLoading(false));
+    function load() {
+      getInstagramConversationMessages(organizationId, conversation.id).then((fetched) => {
+        setMessages(fetched);
+        setLoading(false);
+        const computed = computeLastInboundAt(fetched, profileUsername);
+        if (computed) setLastInboundAt(computed);
+      });
+    }
+    load();
+    const interval = setInterval(load, MESSAGE_THREAD_POLL_MS);
+    return () => clearInterval(interval);
     // ConversationThread is remounted (via `key`) whenever the selected
     // conversation changes, so initial state already covers loading/reply —
-    // this effect only needs to run the fetch once per mount.
+    // this effect only needs to run once per mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -381,15 +449,29 @@ function ConversationThread({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages, loading]);
 
+  useEffect(() => {
+    markInstagramConversationRead(organizationId, conversation.id);
+    // Only needs to fire once when the thread is opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const windowState = getWindowState(lastInboundAt);
+
   function handleSend() {
-    if (!conversation.participantId || !reply.trim()) return;
+    if (!conversation.participantId || !reply.trim() || windowState === "closed") return;
     const text = reply.trim();
     startSending(async () => {
-      const result = await sendInstagramReply(organizationId, conversation.participantId as string, text);
+      const result = await sendInstagramReply(
+        organizationId,
+        conversation.participantId as string,
+        text,
+        windowState === "taggable",
+      );
       if (result.error) {
         setError(result.error);
         return;
       }
+      setError(undefined);
       setMessages((prev) => [
         ...prev,
         { id: `local-${Date.now()}`, fromUsername: profileUsername, text, createdTime: new Date().toISOString() },
@@ -449,7 +531,25 @@ function ConversationThread({
         </div>
       )}
 
-      {conversation.participantId ? (
+      {windowState === "taggable" && (
+        <div className="px-4 pb-2">
+          <p className="text-xs text-muted-foreground">
+            It&apos;s been over 24 hours since their last message — this reply will be sent as a human-agent
+            response, which Instagram allows for up to 7 days.
+          </p>
+        </div>
+      )}
+
+      {!conversation.participantId ? (
+        <p className="border-t border-border p-3 text-xs text-muted-foreground">
+          Can&apos;t identify the recipient for this conversation — replying isn&apos;t available.
+        </p>
+      ) : windowState === "closed" ? (
+        <p className="border-t border-border p-3 text-xs text-muted-foreground">
+          It&apos;s been more than 7 days since {conversation.participantUsername ?? "they"} last messaged you —
+          Instagram no longer allows replying here. Reply to them directly in the Instagram app instead.
+        </p>
+      ) : (
         <div className="flex items-end gap-2 border-t border-border p-3">
           <Textarea
             value={reply}
@@ -463,10 +563,6 @@ function ConversationThread({
             <Send className="size-4" />
           </Button>
         </div>
-      ) : (
-        <p className="border-t border-border p-3 text-xs text-muted-foreground">
-          Can&apos;t identify the recipient for this conversation — replying isn&apos;t available.
-        </p>
       )}
     </div>
   );
@@ -488,6 +584,14 @@ function InstagramMessagesTab({
 
   const selected = items.find((c) => c.id === selectedId) ?? null;
 
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const page = await refreshInstagramConversations(organizationId);
+      setItems((prev) => mergeConversations(prev, page.items));
+    }, CONVERSATION_LIST_POLL_MS);
+    return () => clearInterval(interval);
+  }, [organizationId]);
+
   function loadMore() {
     if (!cursor) return;
     startTransition(async () => {
@@ -495,6 +599,14 @@ function InstagramMessagesTab({
       setItems((prev) => [...prev, ...page.items]);
       setCursor(page.nextCursor);
     });
+  }
+
+  function selectConversation(id: string) {
+    setSelectedId(id);
+    // Optimistic — ConversationThread also marks it read server-side on
+    // mount, but clearing the dot immediately reads better than waiting for
+    // the next poll to confirm it.
+    setItems((prev) => prev.map((c) => (c.id === id ? { ...c, unread: false } : c)));
   }
 
   if (items.length === 0) {
@@ -533,7 +645,7 @@ function InstagramMessagesTab({
                 key={conversation.id}
                 conversation={conversation}
                 active={conversation.id === selectedId}
-                onSelect={() => setSelectedId(conversation.id)}
+                onSelect={() => selectConversation(conversation.id)}
               />
             ))}
           </div>

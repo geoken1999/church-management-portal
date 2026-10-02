@@ -378,6 +378,13 @@ export type InstagramConnection = {
   updated_at: string;
 };
 
+export type InstagramConversationRead = {
+  id: string;
+  organization_id: string;
+  conversation_id: string;
+  last_read_at: string;
+};
+
 export type YouTubeConnection = {
   id: string;
   organization_id: string;
@@ -1981,6 +1988,20 @@ export type Database = {
             foreignKeyName: "instagram_connections_organization_id_fkey";
             columns: ["organization_id"];
             isOneToOne: true;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      instagram_conversation_reads: {
+        Row: InstagramConversationRead;
+        Insert: Partial<InstagramConversationRead> & Pick<InstagramConversationRead, "organization_id" | "conversation_id">;
+        Update: Partial<InstagramConversationRead>;
+        Relationships: [
+          {
+            foreignKeyName: "instagram_conversation_reads_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
             referencedRelation: "organizations";
             referencedColumns: ["id"];
           },

@@ -277,6 +277,15 @@ export interface InstagramConversation {
   participantUsername: string | null;
   updatedTime: string | null;
   snippet: string | null;
+  // The most recent message's sender/time, within the small window fetched
+  // alongside the conversation list — used to work out whether Instagram's
+  // 24-hour (or 7-day, tagged) reply window is still open, and whether the
+  // business has ever replied at all (a never-answered "request").
+  lastMessageFromOwner: boolean | null;
+  lastInboundAt: string | null;
+  // Always false here — Instagram's API has no read/unread field at all.
+  // Set by the dal/actions layer from this app's own read-tracking table.
+  unread: boolean;
 }
 
 interface RawParticipant {
@@ -284,11 +293,17 @@ interface RawParticipant {
   username?: string;
 }
 
+interface RawConversationMessage {
+  message?: string;
+  from?: { username?: string; id?: string };
+  created_time?: string;
+}
+
 interface RawConversation {
   id: string;
   updated_time?: string;
   participants?: { data: RawParticipant[] };
-  messages?: { data: { message?: string }[] };
+  messages?: { data: RawConversationMessage[] };
 }
 
 export async function fetchConversations(
@@ -298,7 +313,10 @@ export async function fetchConversations(
 ): Promise<{ items: InstagramConversation[]; nextCursor: string | null }> {
   const url = new URL(`${GRAPH_BASE}/me/conversations`);
   url.searchParams.set("platform", "instagram");
-  url.searchParams.set("fields", "id,updated_time,participants,messages.limit(1){message}");
+  // limit(5) rather than limit(1): the single most recent message might be
+  // our own reply, which says nothing about when the *other* person last
+  // wrote — need a short window of recent messages to find their last one.
+  url.searchParams.set("fields", "id,updated_time,participants,messages.limit(5){message,from,created_time}");
   url.searchParams.set("access_token", accessToken);
   if (after) url.searchParams.set("after", after);
 
@@ -317,12 +335,19 @@ export async function fetchConversations(
     // id from the profile endpoint) — same account, two different id
     // namespaces. Username is the one field that's consistent across both.
     const other = participants.find((p) => p.username !== ownerUsername) ?? participants[0];
+
+    const recentMessages = c.messages?.data ?? [];
+    const lastInbound = recentMessages.find((m) => m.from?.username !== ownerUsername);
+
     return {
       id: c.id,
       participantId: other?.id ?? null,
       participantUsername: other?.username ?? null,
       updatedTime: c.updated_time ?? null,
-      snippet: c.messages?.data?.[0]?.message ?? null,
+      snippet: recentMessages[0]?.message ?? null,
+      lastMessageFromOwner: recentMessages[0] ? recentMessages[0].from?.username === ownerUsername : null,
+      lastInboundAt: lastInbound?.created_time ?? null,
+      unread: false,
     };
   });
 
@@ -371,18 +396,28 @@ export async function fetchConversationMessages(
     .reverse();
 }
 
-// Instagram's messaging policy only allows replying within a 24-hour window
-// of the user's last message (outside a small set of tagged exceptions this
-// app doesn't use) — a send outside that window fails with a Graph API
-// error, which surfaces to the caller as a thrown Error.
-export async function sendMessage(accessToken: string, recipientId: string, text: string): Promise<void> {
+// Instagram's messaging policy only allows replying within 24 hours of the
+// user's last message — past that, a send fails unless tagged HUMAN_AGENT,
+// which Meta allows for up to 7 days specifically because a real person
+// (not a bot/automation) is responding. useHumanAgentTag is decided by the
+// caller from how long ago the user's last message was.
+export async function sendMessage(
+  accessToken: string,
+  recipientId: string,
+  text: string,
+  useHumanAgentTag?: boolean,
+): Promise<void> {
   const url = new URL(`${GRAPH_BASE}/me/messages`);
   url.searchParams.set("access_token", accessToken);
 
   const res = await fetch(url.toString(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
+    body: JSON.stringify({
+      recipient: { id: recipientId },
+      message: { text },
+      ...(useHumanAgentTag ? { tag: "HUMAN_AGENT" } : {}),
+    }),
   });
 
   if (!res.ok) {

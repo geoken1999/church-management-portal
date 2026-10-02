@@ -27,6 +27,32 @@ export const getInstagramConnection = cache(async (organizationId: string) => {
   return data;
 });
 
+// Overlays this app's own read-tracking table onto conversations fetched
+// from Instagram, since Instagram's API has no read/unread field of its
+// own. A conversation is unread when the other person's last message came
+// in after the org last viewed it (or was never viewed at all). Reads the
+// whole org's read state in one query rather than per-conversation — this
+// table stays small (one row per conversation ever opened).
+export async function attachReadState(
+  organizationId: string,
+  items: InstagramConversation[],
+): Promise<InstagramConversation[]> {
+  const supabase = await createClient();
+  const { data: reads } = await supabase
+    .from("instagram_conversation_reads")
+    .select("conversation_id, last_read_at")
+    .eq("organization_id", organizationId);
+
+  const lastReadByConversation = new Map((reads ?? []).map((r) => [r.conversation_id, r.last_read_at]));
+
+  return items.map((item) => {
+    if (!item.lastInboundAt) return item;
+    const lastReadAt = lastReadByConversation.get(item.id);
+    const unread = !lastReadAt || new Date(item.lastInboundAt) > new Date(lastReadAt);
+    return { ...item, unread };
+  });
+}
+
 export interface InstagramConnectionSummary {
   username: string;
   accountType: string | null;
@@ -71,6 +97,7 @@ export async function getInstagramDashboardData(organizationId: string): Promise
       fetchAccountInsights(accessToken),
       fetchConversations(accessToken, connection.username),
     ]);
+    conversations.items = await attachReadState(organizationId, conversations.items);
     return { connected: true, profile, media, insights, conversations, syncError: false };
   } catch {
     return {

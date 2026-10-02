@@ -231,7 +231,156 @@ function PostInsightsDialog({ media }: { media: InstagramMedia }) {
   );
 }
 
-function PostCard({ media }: { media: InstagramMedia }) {
+function PostAutomationDialog({
+  organizationId,
+  media,
+  canManage,
+  automations,
+  onAutomationsChange,
+}: {
+  organizationId: string;
+  media: InstagramMedia;
+  canManage: boolean;
+  automations: InstagramCommentAutomation[];
+  onAutomationsChange: (next: InstagramCommentAutomation[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [keyword, setKeyword] = useState("");
+  const [replyTemplate, setReplyTemplate] = useState("");
+  const [error, setError] = useState<string | undefined>();
+  const [saving, startSaving] = useTransition();
+
+  const rulesForThisPost = automations.filter((a) => a.media_id === media.id);
+
+  function handleCreate() {
+    if (!replyTemplate.trim()) {
+      setError("Reply message can't be empty.");
+      return;
+    }
+    startSaving(async () => {
+      const result = await addCommentAutomation(organizationId, {
+        mediaId: media.id,
+        keyword: keyword.trim() || null,
+        replyTemplate: replyTemplate.trim(),
+      });
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setError(undefined);
+      setKeyword("");
+      setReplyTemplate("");
+      onAutomationsChange(await listCommentAutomations(organizationId));
+    });
+  }
+
+  function handleToggle(automationId: string, enabled: boolean) {
+    onAutomationsChange(automations.map((a) => (a.id === automationId ? { ...a, enabled } : a)));
+    toggleCommentAutomation(organizationId, automationId, enabled);
+  }
+
+  function handleDelete(automationId: string) {
+    onAutomationsChange(automations.filter((a) => a.id !== automationId));
+    removeCommentAutomation(organizationId, automationId);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button type="button" variant="outline" size="sm">
+            <Zap className="size-3.5" />
+            Automation{rulesForThisPost.length > 0 ? ` (${rulesForThisPost.length})` : ""}
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Comment automation for this post</DialogTitle>
+          <DialogDescription>
+            When a comment on this post matches, the commenter gets an automatic DM.
+          </DialogDescription>
+        </DialogHeader>
+
+        {rulesForThisPost.length > 0 && (
+          <div className="divide-y divide-border rounded-lg border border-border">
+            {rulesForThisPost.map((automation) => (
+              <div key={automation.id} className="flex items-start justify-between gap-3 p-3">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <Badge variant="outline" className="text-[10px]">
+                    {automation.keyword ? `Keyword: "${automation.keyword}"` : "Any comment"}
+                  </Badge>
+                  <p className="text-sm text-muted-foreground">{automation.reply_template}</p>
+                </div>
+                {canManage && (
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Button
+                      type="button"
+                      variant={automation.enabled ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handleToggle(automation.id, !automation.enabled)}
+                    >
+                      {automation.enabled ? "On" : "Off"}
+                    </Button>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(automation.id)}>
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {canManage && (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor={`post-automation-keyword-${media.id}`}>Keyword (optional)</Label>
+              <Input
+                id={`post-automation-keyword-${media.id}`}
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                placeholder="e.g. LINK — leave blank to match any comment"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={`post-automation-reply-${media.id}`}>DM to send</Label>
+              <Textarea
+                id={`post-automation-reply-${media.id}`}
+                value={replyTemplate}
+                onChange={(e) => setReplyTemplate(e.target.value)}
+                placeholder="Thanks for your comment! Here's the link..."
+                rows={3}
+              />
+            </div>
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <Button type="button" onClick={handleCreate} disabled={saving}>
+              {saving ? "Saving..." : "Add rule for this post"}
+            </Button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PostCard({
+  media,
+  organizationId,
+  canManage,
+  automations,
+  onAutomationsChange,
+}: {
+  media: InstagramMedia;
+  organizationId: string;
+  canManage: boolean;
+  automations: InstagramCommentAutomation[];
+  onAutomationsChange: (next: InstagramCommentAutomation[]) => void;
+}) {
   const image = media.thumbnailUrl ?? media.mediaUrl;
 
   return (
@@ -255,7 +404,16 @@ function PostCard({ media }: { media: InstagramMedia }) {
           <Badge variant="outline">{media.mediaType}</Badge>
         </div>
         {media.caption && <p className="line-clamp-2 text-sm text-muted-foreground">{media.caption}</p>}
-        <PostInsightsDialog media={media} />
+        <div className="flex items-center gap-2">
+          <PostInsightsDialog media={media} />
+          <PostAutomationDialog
+            organizationId={organizationId}
+            media={media}
+            canManage={canManage}
+            automations={automations}
+            onAutomationsChange={onAutomationsChange}
+          />
+        </div>
       </CardContent>
     </Card>
   );
@@ -263,10 +421,16 @@ function PostCard({ media }: { media: InstagramMedia }) {
 
 function InstagramPostsTab({
   organizationId,
+  canManage,
   initialMedia,
+  automations,
+  onAutomationsChange,
 }: {
   organizationId: string;
+  canManage: boolean;
   initialMedia: { items: InstagramMedia[]; nextCursor: string | null };
+  automations: InstagramCommentAutomation[];
+  onAutomationsChange: (next: InstagramCommentAutomation[]) => void;
 }) {
   const [items, setItems] = useState(initialMedia.items);
   const [cursor, setCursor] = useState(initialMedia.nextCursor);
@@ -293,7 +457,14 @@ function InstagramPostsTab({
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((media) => (
-          <PostCard key={media.id} media={media} />
+          <PostCard
+            key={media.id}
+            media={media}
+            organizationId={organizationId}
+            canManage={canManage}
+            automations={automations}
+            onAutomationsChange={onAutomationsChange}
+          />
         ))}
       </div>
       {cursor && (
@@ -646,16 +817,28 @@ function ConversationThread({
   );
 }
 
-function InstagramMessagesTab({
+export function InstagramMessagesTab({
   organizationId,
   profileUsername,
   initialConversations,
   onPopOut,
+  onOpenFullWindow,
+  fullHeight,
 }: {
   organizationId: string;
   profileUsername: string;
   initialConversations: { items: InstagramConversation[]; nextCursor: string | null };
-  onPopOut: (conversation: InstagramConversation) => void;
+  // Omitted inside the standalone popup window itself — floating a
+  // conversation out of a window that's already dedicated to messaging
+  // would just be confusing.
+  onPopOut?: (conversation: InstagramConversation) => void;
+  // Omitted inside the popup window for the same reason — there's nothing
+  // further to open from there.
+  onOpenFullWindow?: () => void;
+  // The embedded tab is capped at a fixed height to fit inside the Card
+  // alongside Posts/Insights/Automation; the standalone popup window should
+  // instead fill the whole browser window.
+  fullHeight?: boolean;
 }) {
   const [items, setItems] = useState(initialConversations.items);
   const [cursor, setCursor] = useState(initialConversations.nextCursor);
@@ -706,18 +889,25 @@ function InstagramMessagesTab({
   }
 
   return (
-    <Card className="overflow-hidden py-0">
-      <div className="flex h-[34rem]">
+    <Card className={fullHeight ? "overflow-hidden rounded-none border-0 py-0 shadow-none" : "overflow-hidden py-0"}>
+      <div className={`flex ${fullHeight ? "h-dvh" : "h-[34rem]"}`}>
         <div
           className={`w-full flex-col border-border sm:w-80 sm:flex-none sm:border-r ${
             selected ? "hidden sm:flex" : "flex"
           }`}
         >
-          <div className="shrink-0 border-b border-border px-4 py-3">
-            <p className="font-heading text-sm font-bold">Messages</p>
-            <p className="text-xs text-muted-foreground">
-              {items.length} conversation{items.length === 1 ? "" : "s"}
-            </p>
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3">
+            <div>
+              <p className="font-heading text-sm font-bold">Messages</p>
+              <p className="text-xs text-muted-foreground">
+                {items.length} conversation{items.length === 1 ? "" : "s"}
+              </p>
+            </div>
+            {onOpenFullWindow && (
+              <Button type="button" variant="ghost" size="icon" onClick={onOpenFullWindow} title="Open in a new window">
+                <ExternalLink className="size-4" />
+              </Button>
+            )}
           </div>
           <div className="flex-1 divide-y divide-border/60 overflow-y-auto">
             {items.map((conversation) => (
@@ -753,10 +943,14 @@ function InstagramMessagesTab({
               conversation={selected}
               profileUsername={profileUsername}
               onBack={() => setSelectedId(null)}
-              onPopOut={() => {
-                onPopOut(selected);
-                setSelectedId(null);
-              }}
+              onPopOut={
+                onPopOut
+                  ? () => {
+                      onPopOut(selected);
+                      setSelectedId(null);
+                    }
+                  : undefined
+              }
             />
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
@@ -868,14 +1062,15 @@ function InstagramAutomationTab({
   organizationId,
   canManage,
   media,
-  initialAutomations,
+  automations,
+  onAutomationsChange,
 }: {
   organizationId: string;
   canManage: boolean;
   media: InstagramMedia[];
-  initialAutomations: InstagramCommentAutomation[];
+  automations: InstagramCommentAutomation[];
+  onAutomationsChange: (next: InstagramCommentAutomation[]) => void;
 }) {
-  const [automations, setAutomations] = useState(initialAutomations);
   const [mediaId, setMediaId] = useState<string>("any");
   const [keyword, setKeyword] = useState("");
   const [replyTemplate, setReplyTemplate] = useState("");
@@ -900,8 +1095,7 @@ function InstagramAutomationTab({
         return;
       }
       setError(undefined);
-      const refreshed = await listCommentAutomations(organizationId);
-      setAutomations(refreshed);
+      onAutomationsChange(await listCommentAutomations(organizationId));
       setMediaId("any");
       setKeyword("");
       setReplyTemplate("");
@@ -909,12 +1103,12 @@ function InstagramAutomationTab({
   }
 
   function handleToggle(automationId: string, enabled: boolean) {
-    setAutomations((prev) => prev.map((a) => (a.id === automationId ? { ...a, enabled } : a)));
+    onAutomationsChange(automations.map((a) => (a.id === automationId ? { ...a, enabled } : a)));
     toggleCommentAutomation(organizationId, automationId, enabled);
   }
 
   function handleDelete(automationId: string) {
-    setAutomations((prev) => prev.filter((a) => a.id !== automationId));
+    onAutomationsChange(automations.filter((a) => a.id !== automationId));
     removeCommentAutomation(organizationId, automationId);
   }
 
@@ -1021,6 +1215,9 @@ export function InstagramManager({
   data: InstagramDashboardData;
 }) {
   const [poppedOut, setPoppedOut] = useState<InstagramConversation | null>(null);
+  const [automations, setAutomations] = useState<InstagramCommentAutomation[]>(
+    data.connected ? data.automations : [],
+  );
 
   if (!data.connected) {
     return <ConnectInstagramCard canManage={canManage} />;
@@ -1044,7 +1241,13 @@ export function InstagramManager({
           <TabsTab value="automation">Automation</TabsTab>
         </TabsList>
         <TabsPanel value="posts">
-          <InstagramPostsTab organizationId={organizationId} initialMedia={data.media} />
+          <InstagramPostsTab
+            organizationId={organizationId}
+            canManage={canManage}
+            initialMedia={data.media}
+            automations={automations}
+            onAutomationsChange={setAutomations}
+          />
         </TabsPanel>
         <TabsPanel value="insights">
           <InstagramInsightsTab profile={data.profile} insights={data.insights} />
@@ -1055,6 +1258,13 @@ export function InstagramManager({
             profileUsername={data.profile.username}
             initialConversations={data.conversations}
             onPopOut={setPoppedOut}
+            onOpenFullWindow={() => {
+              window.open(
+                "/instagram-messages",
+                `instagram-messages-${organizationId}`,
+                "width=1000,height=700,noopener,noreferrer",
+              );
+            }}
           />
         </TabsPanel>
         <TabsPanel value="automation">
@@ -1062,7 +1272,8 @@ export function InstagramManager({
             organizationId={organizationId}
             canManage={canManage}
             media={data.media.items}
-            initialAutomations={data.automations}
+            automations={automations}
+            onAutomationsChange={setAutomations}
           />
         </TabsPanel>
       </Tabs>

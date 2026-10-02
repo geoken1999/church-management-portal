@@ -293,7 +293,7 @@ interface RawConversation {
 
 export async function fetchConversations(
   accessToken: string,
-  ownerId: string,
+  ownerUsername: string,
   after?: string | null,
 ): Promise<{ items: InstagramConversation[]; nextCursor: string | null }> {
   const url = new URL(`${GRAPH_BASE}/me/conversations`);
@@ -311,9 +311,12 @@ export async function fetchConversations(
   const items: InstagramConversation[] = data.data.map((c) => {
     const participants = c.participants?.data ?? [];
     // The API lists both sides of the DM, each with a username — this
-    // account's own profile is always included, so the "other" participant
-    // has to be picked out by id, not by "has a username" (both do).
-    const other = participants.find((p) => p.id !== ownerId) ?? participants[0];
+    // account's own profile is always included first. Can't pick out the
+    // "other" one by id: the id Instagram returns here for the connected
+    // account (a messaging-scoped id) doesn't match instagram_user_id (the
+    // id from the profile endpoint) — same account, two different id
+    // namespaces. Username is the one field that's consistent across both.
+    const other = participants.find((p) => p.username !== ownerUsername) ?? participants[0];
     return {
       id: c.id,
       participantId: other?.id ?? null,

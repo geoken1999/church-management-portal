@@ -47,7 +47,7 @@ export async function loadMoreInstagramConversations(
   if (!connection) return { items: [], nextCursor: null };
 
   const accessToken = await getValidAccessToken(connection);
-  return fetchConversations(accessToken, connection.instagram_user_id, after);
+  return fetchConversations(accessToken, connection.username, after);
 }
 
 export async function getInstagramConversationMessages(

@@ -330,10 +330,11 @@ function ConversationListItem({
     <button
       type="button"
       onClick={onSelect}
-      className={`flex w-full items-center gap-3 border-b border-border/60 p-3 text-left transition-colors last:border-b-0 hover:bg-accent ${
+      className={`relative flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-accent/60 ${
         active ? "bg-accent" : ""
       }`}
     >
+      {active && <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-primary" />}
       <Avatar>
         <AvatarFallback>{initial(conversation.participantUsername)}</AvatarFallback>
       </Avatar>
@@ -499,8 +500,14 @@ function InstagramMessagesTab({
   if (items.length === 0) {
     return (
       <Card>
-        <CardContent className="py-10 text-center text-sm text-muted-foreground">
-          No conversations yet. Messages sent to your Instagram account will show up here.
+        <CardContent className="flex flex-col items-center gap-3 py-14 text-center">
+          <div className="flex size-12 items-center justify-center rounded-xl bg-muted">
+            <MessageCircle className="size-5 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="font-heading text-sm font-bold">No conversations yet</p>
+            <p className="mt-1 text-sm text-muted-foreground">Messages sent to your Instagram account will show up here.</p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -514,7 +521,13 @@ function InstagramMessagesTab({
             selected ? "hidden sm:flex" : "flex"
           }`}
         >
-          <div className="flex-1 overflow-y-auto">
+          <div className="shrink-0 border-b border-border px-4 py-3">
+            <p className="font-heading text-sm font-bold">Messages</p>
+            <p className="text-xs text-muted-foreground">
+              {items.length} conversation{items.length === 1 ? "" : "s"}
+            </p>
+          </div>
+          <div className="flex-1 divide-y divide-border/60 overflow-y-auto">
             {items.map((conversation) => (
               <ConversationListItem
                 key={conversation.id}
@@ -525,7 +538,7 @@ function InstagramMessagesTab({
             ))}
           </div>
           {cursor && (
-            <div className="border-t border-border p-2">
+            <div className="shrink-0 border-t border-border p-2">
               <Button
                 type="button"
                 variant="outline"
@@ -550,8 +563,14 @@ function InstagramMessagesTab({
               onBack={() => setSelectedId(null)}
             />
           ) : (
-            <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-              Select a conversation to start chatting
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+              <div className="flex size-12 items-center justify-center rounded-xl bg-muted">
+                <MessageCircle className="size-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-heading text-sm font-bold">Select a conversation</p>
+                <p className="mt-1 text-sm text-muted-foreground">Choose from the list to start chatting.</p>
+              </div>
             </div>
           )}
         </div>

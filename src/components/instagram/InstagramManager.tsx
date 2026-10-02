@@ -17,6 +17,12 @@ import {
   Plus,
   Trash2,
   Zap,
+  Eye,
+  Users,
+  TrendingUp,
+  UserPlus,
+  MousePointerClick,
+  Images,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import {
@@ -39,7 +45,13 @@ import {
   switchInstagramAccount,
 } from "@/lib/instagram/actions";
 import type { InstagramConnectionSummary, InstagramDashboardData, InstagramAccountOption } from "@/lib/instagram/dal";
-import type { InstagramMedia, InstagramInsightValue, InstagramConversation, InstagramMessage } from "@/lib/instagram/client";
+import type {
+  InstagramMedia,
+  InstagramInsightValue,
+  InstagramDailyInsight,
+  InstagramConversation,
+  InstagramMessage,
+} from "@/lib/instagram/client";
 import type { InstagramCommentAutomation } from "@/types/database";
 import { HUMAN_AGENT_WINDOW_MS, STANDARD_WINDOW_MS } from "@/lib/instagram/constants";
 import { Button } from "@/components/ui/button";
@@ -685,12 +697,253 @@ function InstagramPostsTab({
 // Insights
 // ---------------------------------------------------------------------------
 
+const STAT_ICONS: Record<string, typeof Eye> = {
+  followers: Users,
+  media_count: Images,
+  reach: Eye,
+  profile_views: MousePointerClick,
+  accounts_engaged: UserPlus,
+  total_interactions: Heart,
+};
+
+function StatCard({ name, label, value }: { name: string; label: string; value: number }) {
+  const Icon = STAT_ICONS[name] ?? TrendingUp;
+  return (
+    <Card>
+      <CardContent className="flex items-start justify-between gap-3 py-4">
+        <div>
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="mt-1 text-2xl font-bold">{value.toLocaleString()}</p>
+        </div>
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+          <Icon className="size-4 text-primary" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function formatChartDate(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+// A thin-lined area chart with a gradient fill and a hover crosshair +
+// tooltip — single series, so per the usual chart convention a legend box
+// would be redundant; the title above it already names it. Colors come
+// from the app's own --primary token rather than an invented palette,
+// since a single-series chart has no categorical-hue assignment to make.
+function TrendAreaChart({ data, valueLabel }: { data: { label: string; value: number }[]; valueLabel: string }) {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const width = 600;
+  const height = 180;
+  const padding = { top: 12, right: 12, bottom: 24, left: 12 };
+
+  if (data.length === 0) {
+    return <p className="py-10 text-center text-sm text-muted-foreground">No data for this period yet.</p>;
+  }
+
+  const values = data.map((d) => d.value);
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = max - min || 1;
+  const innerWidth = width - padding.left - padding.right;
+  const innerHeight = height - padding.top - padding.bottom;
+
+  function xFor(i: number): number {
+    return padding.left + (data.length === 1 ? innerWidth / 2 : (i / (data.length - 1)) * innerWidth);
+  }
+  function yFor(value: number): number {
+    return padding.top + innerHeight - ((value - min) / range) * innerHeight;
+  }
+
+  const linePoints = data.map((d, i) => `${xFor(i)},${yFor(d.value)}`).join(" ");
+  const areaPoints = `${xFor(0)},${yFor(min)} ${linePoints} ${xFor(data.length - 1)},${yFor(min)}`;
+  const hovered = hoverIndex !== null ? data[hoverIndex] : null;
+
+  function handleMove(e: React.MouseEvent<SVGRectElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / rect.width;
+    const index = Math.round(ratio * (data.length - 1));
+    setHoverIndex(Math.max(0, Math.min(data.length - 1, index)));
+  }
+
+  return (
+    <div className="relative">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full overflow-visible" preserveAspectRatio="none" height={height}>
+        <defs>
+          <linearGradient id="reach-area-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <line x1={padding.left} y1={yFor(min)} x2={width - padding.right} y2={yFor(min)} stroke="var(--border)" strokeWidth="1" />
+        <polygon points={areaPoints} fill="url(#reach-area-fill)" />
+        <polyline points={linePoints} fill="none" stroke="var(--primary)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        {hoverIndex !== null && (
+          <line
+            x1={xFor(hoverIndex)}
+            y1={padding.top}
+            x2={xFor(hoverIndex)}
+            y2={yFor(min)}
+            stroke="var(--border)"
+            strokeWidth="1"
+            strokeDasharray="3,3"
+          />
+        )}
+        {data.map((d, i) => (
+          <circle
+            key={d.label}
+            cx={xFor(i)}
+            cy={yFor(d.value)}
+            r={i === hoverIndex ? 4 : 0}
+            fill="var(--primary)"
+            className="transition-all"
+          />
+        ))}
+        {/* Only first/last/hover labels, to avoid crowding a 14-point axis. */}
+        <text x={xFor(0)} y={height - 6} fontSize="10" fill="var(--muted-foreground)">
+          {data[0].label}
+        </text>
+        <text x={xFor(data.length - 1)} y={height - 6} textAnchor="end" fontSize="10" fill="var(--muted-foreground)">
+          {data[data.length - 1].label}
+        </text>
+        <rect
+          x={padding.left}
+          y={0}
+          width={innerWidth}
+          height={height}
+          fill="transparent"
+          onMouseMove={handleMove}
+          onMouseLeave={() => setHoverIndex(null)}
+        />
+      </svg>
+      {hovered && (
+        <div
+          className="pointer-events-none absolute top-0 -translate-x-1/2 rounded-md border border-border bg-popover px-2 py-1 text-xs shadow-sm"
+          style={{ left: `${(xFor(hoverIndex as number) / width) * 100}%` }}
+        >
+          <p className="font-medium text-popover-foreground">
+            {hovered.value.toLocaleString()} {valueLabel}
+          </p>
+          <p className="text-muted-foreground">{hovered.label}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Bars anchored to a zero baseline so a negative value (net unfollows that
+// day) reads correctly below the line, not just as a short bar.
+function DailyBarChart({ data, valueLabel }: { data: { label: string; value: number }[]; valueLabel: string }) {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+
+  if (data.length === 0) {
+    return <p className="py-10 text-center text-sm text-muted-foreground">No data for this period yet.</p>;
+  }
+
+  const maxAbs = Math.max(...data.map((d) => Math.abs(d.value)), 1);
+  const hovered = hoverIndex !== null ? data[hoverIndex] : null;
+
+  return (
+    <div className="relative">
+      <div className="flex h-36 items-center gap-1">
+        {data.map((d, i) => {
+          const heightPercent = (Math.abs(d.value) / maxAbs) * 100;
+          return (
+            <button
+              key={d.label}
+              type="button"
+              className="group flex h-full flex-1 flex-col items-center justify-center"
+              onMouseEnter={() => setHoverIndex(i)}
+              onMouseLeave={() => setHoverIndex(null)}
+              onFocus={() => setHoverIndex(i)}
+              onBlur={() => setHoverIndex(null)}
+            >
+              <div className="flex h-full w-full flex-col justify-end">
+                <div
+                  className={`w-full rounded-t-sm transition-colors ${
+                    i === hoverIndex ? "bg-primary" : "bg-primary/60 group-hover:bg-primary"
+                  }`}
+                  style={{ height: `${Math.max(heightPercent, 3)}%` }}
+                />
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+        <span>{data[0].label}</span>
+        <span>{data[data.length - 1].label}</span>
+      </div>
+      {hovered && (
+        <div className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 rounded-md border border-border bg-popover px-2 py-1 text-xs shadow-sm">
+          <p className="font-medium text-popover-foreground">
+            {hovered.value > 0 ? "+" : ""}
+            {hovered.value.toLocaleString()} {valueLabel}
+          </p>
+          <p className="text-muted-foreground">{hovered.label}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Horizontal bars, longest first — built entirely from data the Posts tab
+// already fetched (no extra API calls), so this works even on plans/accounts
+// where per-post insights calls are otherwise rate-limited.
+function TopPostsChart({ media }: { media: InstagramMedia[] }) {
+  const top = [...media]
+    .map((m) => ({ ...m, engagement: m.likeCount + m.commentsCount }))
+    .sort((a, b) => b.engagement - a.engagement)
+    .slice(0, 5);
+
+  if (top.length === 0) {
+    return <p className="py-10 text-center text-sm text-muted-foreground">No posts yet.</p>;
+  }
+
+  const max = Math.max(...top.map((m) => m.engagement), 1);
+
+  return (
+    <div className="space-y-3">
+      {top.map((m) => (
+        <a
+          key={m.id}
+          href={m.permalink}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-3 rounded-lg p-1.5 hover:bg-accent"
+        >
+          {(m.thumbnailUrl ?? m.mediaUrl) && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={m.thumbnailUrl ?? m.mediaUrl ?? undefined}
+              alt={m.caption ?? "Instagram post"}
+              className="size-10 shrink-0 rounded-md object-cover"
+            />
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs text-muted-foreground">{m.caption ?? "Untitled post"}</p>
+            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-primary" style={{ width: `${(m.engagement / max) * 100}%` }} />
+            </div>
+          </div>
+          <span className="shrink-0 text-sm font-medium tabular-nums">{m.engagement.toLocaleString()}</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
 function InstagramInsightsTab({
   profile,
   insights,
+  dailyInsights,
+  media,
 }: {
   profile: InstagramConnectionSummary;
   insights: InstagramInsightValue[];
+  dailyInsights: InstagramDailyInsight[];
+  media: InstagramMedia[];
 }) {
   const stats = [
     { name: "followers", value: profile.followersCount ?? 0 },
@@ -699,16 +952,44 @@ function InstagramInsightsTab({
   ];
   const statLabels: Record<string, string> = { followers: "Followers", media_count: "Total posts" };
 
+  const reachSeries = dailyInsights.map((d) => ({ label: formatChartDate(d.date), value: d.reach }));
+  const followerSeries = dailyInsights.map((d) => ({ label: formatChartDate(d.date), value: d.followerChange }));
+
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-      {stats.map((stat) => (
-        <Card key={stat.name}>
-          <CardContent className="py-4">
-            <p className="text-xs text-muted-foreground">{statLabels[stat.name] ?? insightLabel(stat.name)}</p>
-            <p className="mt-1 text-2xl font-bold">{stat.value.toLocaleString()}</p>
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        {stats.map((stat) => (
+          <StatCard key={stat.name} name={stat.name} label={statLabels[stat.name] ?? insightLabel(stat.name)} value={stat.value} />
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Reach — last 14 days</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <TrendAreaChart data={reachSeries} valueLabel="accounts reached" />
           </CardContent>
         </Card>
-      ))}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Follower growth — last 14 days</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DailyBarChart data={followerSeries} valueLabel="followers" />
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Top posts by engagement</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <TopPostsChart media={media} />
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -1522,7 +1803,12 @@ export function InstagramManager({
           />
         </TabsPanel>
         <TabsPanel value="insights">
-          <InstagramInsightsTab profile={data.profile} insights={data.insights} />
+          <InstagramInsightsTab
+            profile={data.profile}
+            insights={data.insights}
+            dailyInsights={data.dailyInsights}
+            media={data.media.items}
+          />
         </TabsPanel>
         <TabsPanel value="messages">
           <InstagramMessagesTab

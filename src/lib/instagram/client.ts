@@ -271,6 +271,55 @@ export async function fetchAccountInsights(accessToken: string): Promise<Instagr
   }));
 }
 
+export interface InstagramDailyInsight {
+  date: string; // "YYYY-MM-DD"
+  reach: number;
+  // Net change that day (follows minus unfollows), not a running total —
+  // Instagram's own total follower count comes from the profile endpoint
+  // (InstagramConnectionSummary.followersCount), not this metric.
+  followerChange: number;
+}
+
+const TIME_SERIES_LOOKBACK_DAYS = 14;
+
+// Of everything in Meta's full metrics list, only reach and follower_count
+// actually return day-by-day values for metric_type=time_series on this
+// product — confirmed by testing every other documented metric
+// (profile_views, accounts_engaged, likes, comments, saves, etc.) live
+// against a real connected account: all come back as an empty data array.
+// Those others remain available only as a single current-total snapshot
+// (see fetchAccountInsights above), not a trend.
+export async function fetchAccountInsightsTimeSeries(accessToken: string): Promise<InstagramDailyInsight[]> {
+  const since = Math.floor((Date.now() - TIME_SERIES_LOOKBACK_DAYS * 24 * 60 * 60 * 1000) / 1000);
+  const until = Math.floor(Date.now() / 1000);
+
+  const url = new URL(`${GRAPH_BASE}/me/insights`);
+  url.searchParams.set("metric", "reach,follower_count");
+  url.searchParams.set("period", "day");
+  url.searchParams.set("metric_type", "time_series");
+  url.searchParams.set("since", String(since));
+  url.searchParams.set("until", String(until));
+  url.searchParams.set("access_token", accessToken);
+
+  const res = await fetch(url.toString(), { cache: "no-store" });
+  if (!res.ok) return [];
+
+  const data = (await res.json()) as RawPage<{ name: string; values?: { value: number; end_time: string }[] }>;
+  const byDate = new Map<string, InstagramDailyInsight>();
+
+  for (const metric of data.data) {
+    for (const point of metric.values ?? []) {
+      const date = point.end_time.slice(0, 10);
+      const entry = byDate.get(date) ?? { date, reach: 0, followerChange: 0 };
+      if (metric.name === "reach") entry.reach = point.value;
+      if (metric.name === "follower_count") entry.followerChange = point.value;
+      byDate.set(date, entry);
+    }
+  }
+
+  return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export interface InstagramConversation {
   id: string;
   participantId: string | null;

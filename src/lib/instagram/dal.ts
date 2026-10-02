@@ -6,9 +6,11 @@ import { getValidAccessToken } from "@/lib/instagram/token";
 import {
   fetchMedia,
   fetchAccountInsights,
+  fetchAccountInsightsTimeSeries,
   fetchConversations,
   type InstagramMediaPage,
   type InstagramInsightValue,
+  type InstagramDailyInsight,
   type InstagramConversation,
 } from "@/lib/instagram/client";
 import { getCommentAutomations } from "@/lib/instagram/automation";
@@ -144,6 +146,7 @@ export type InstagramDashboardData =
       profile: InstagramConnectionSummary;
       media: InstagramMediaPage;
       insights: InstagramInsightValue[];
+      dailyInsights: InstagramDailyInsight[];
       conversations: { items: InstagramConversation[]; nextCursor: string | null };
       automations: InstagramCommentAutomation[];
       // True when the stored connection exists but the live Graph API calls
@@ -175,21 +178,23 @@ export async function getInstagramDashboardData(organizationId: string): Promise
 
   try {
     const accessToken = await getValidAccessToken(connection);
-    const [media, insights, conversationsPage] = await Promise.all([
+    const [media, insights, dailyInsights, conversationsPage] = await Promise.all([
       fetchMedia(accessToken),
       fetchAccountInsights(accessToken),
+      fetchAccountInsightsTimeSeries(accessToken),
       fetchConversations(accessToken, connection.username),
     ]);
     const items = await attachReadState(organizationId, conversationsPage.items);
     await ensureMessagingUserId(connection, conversationsPage.ownerMessagingId);
     const conversations = { items, nextCursor: conversationsPage.nextCursor };
-    return { connected: true, profile, media, insights, conversations, automations, syncError: false };
+    return { connected: true, profile, media, insights, dailyInsights, conversations, automations, syncError: false };
   } catch {
     return {
       connected: true,
       profile,
       media: { items: [], nextCursor: null },
       insights: [],
+      dailyInsights: [],
       conversations: { items: [], nextCursor: null },
       automations,
       syncError: true,

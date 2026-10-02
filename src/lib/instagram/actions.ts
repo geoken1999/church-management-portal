@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/dal";
-import { getInstagramConnection, attachReadState } from "@/lib/instagram/dal";
+import { getInstagramConnection, attachReadState, ensureMessagingUserId } from "@/lib/instagram/dal";
 import { getValidAccessToken } from "@/lib/instagram/token";
 import {
   fetchMedia,
@@ -14,6 +14,15 @@ import {
   type InstagramConversation,
   type InstagramMessage,
 } from "@/lib/instagram/client";
+import {
+  getAiMode,
+  setAiMode,
+  getCommentAutomations,
+  createCommentAutomation,
+  setCommentAutomationEnabled,
+  deleteCommentAutomation,
+} from "@/lib/instagram/automation";
+import type { InstagramCommentAutomation } from "@/types/database";
 
 const INSTAGRAM_PATH = "/dashboard/instagram";
 
@@ -48,8 +57,9 @@ export async function loadMoreInstagramConversations(
 
   const accessToken = await getValidAccessToken(connection);
   const page = await fetchConversations(accessToken, connection.username, after);
-  page.items = await attachReadState(organizationId, page.items);
-  return page;
+  const items = await attachReadState(organizationId, page.items);
+  await ensureMessagingUserId(connection, page.ownerMessagingId);
+  return { items, nextCursor: page.nextCursor };
 }
 
 // Polled by the Messages tab every so often to approximate real-time
@@ -65,8 +75,9 @@ export async function refreshInstagramConversations(
 
   const accessToken = await getValidAccessToken(connection);
   const page = await fetchConversations(accessToken, connection.username);
-  page.items = await attachReadState(organizationId, page.items);
-  return page;
+  const items = await attachReadState(organizationId, page.items);
+  await ensureMessagingUserId(connection, page.ownerMessagingId);
+  return { items, nextCursor: page.nextCursor };
 }
 
 export async function getInstagramConversationMessages(
@@ -129,4 +140,51 @@ export async function markInstagramConversationRead(organizationId: string, conv
       { organization_id: organizationId, conversation_id: conversationId, last_read_at: new Date().toISOString() },
       { onConflict: "organization_id,conversation_id" },
     );
+}
+
+export async function getInstagramAiMode(organizationId: string, participantId: string): Promise<boolean> {
+  await requireUser();
+  return getAiMode(organizationId, participantId);
+}
+
+// Turning this on hands the conversation to the webhook handler entirely
+// (see /api/instagram/webhook's POST) — every inbound message from this
+// participant gets an AI-generated reply sent automatically, with no human
+// review, for as long as it stays enabled.
+export async function setInstagramAiMode(organizationId: string, participantId: string, enabled: boolean): Promise<void> {
+  await requireUser();
+  await setAiMode(organizationId, participantId, enabled);
+}
+
+export async function listCommentAutomations(organizationId: string): Promise<InstagramCommentAutomation[]> {
+  await requireUser();
+  return getCommentAutomations(organizationId);
+}
+
+export interface CommentAutomationFormState {
+  error?: string;
+  success?: boolean;
+}
+
+export async function addCommentAutomation(
+  organizationId: string,
+  input: { mediaId: string | null; keyword: string | null; replyTemplate: string },
+): Promise<CommentAutomationFormState> {
+  const user = await requireUser();
+  const result = await createCommentAutomation(organizationId, user.id, input);
+  if (result.error) return { error: result.error };
+  revalidatePath(INSTAGRAM_PATH);
+  return { success: true };
+}
+
+export async function toggleCommentAutomation(organizationId: string, automationId: string, enabled: boolean): Promise<void> {
+  await requireUser();
+  await setCommentAutomationEnabled(organizationId, automationId, enabled);
+  revalidatePath(INSTAGRAM_PATH);
+}
+
+export async function removeCommentAutomation(organizationId: string, automationId: string): Promise<void> {
+  await requireUser();
+  await deleteCommentAutomation(organizationId, automationId);
+  revalidatePath(INSTAGRAM_PATH);
 }

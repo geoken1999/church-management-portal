@@ -15,7 +15,8 @@ export type PlatformEventSource =
   | "quota"
   | "addon_purchase"
   | "fundraiser_giving"
-  | "platform_admin";
+  | "platform_admin"
+  | "instagram_webhook";
 
 // Fire-and-forget: a logging failure must never break the real
 // request/action it's describing, so every call site awaits this but

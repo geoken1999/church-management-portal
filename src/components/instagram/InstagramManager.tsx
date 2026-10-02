@@ -9,6 +9,13 @@ import {
   Send,
   ChevronLeft,
   AlertTriangle,
+  Sparkles,
+  PictureInPicture2,
+  X,
+  Minus,
+  Plus,
+  Trash2,
+  Zap,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import {
@@ -19,17 +26,27 @@ import {
   getInstagramConversationMessages,
   sendInstagramReply,
   markInstagramConversationRead,
+  getInstagramAiMode,
+  setInstagramAiMode,
+  listCommentAutomations,
+  addCommentAutomation,
+  toggleCommentAutomation,
+  removeCommentAutomation,
 } from "@/lib/instagram/actions";
 import type { InstagramConnectionSummary, InstagramDashboardData } from "@/lib/instagram/dal";
 import type { InstagramMedia, InstagramInsightValue, InstagramConversation, InstagramMessage } from "@/lib/instagram/client";
+import type { InstagramCommentAutomation } from "@/types/database";
 import { HUMAN_AGENT_WINDOW_MS, STANDARD_WINDOW_MS } from "@/lib/instagram/constants";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTab, TabsIndicator, TabsPanel } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
   DialogTrigger,
@@ -413,11 +430,20 @@ function ConversationThread({
   conversation,
   profileUsername,
   onBack,
+  onPopOut,
+  onMinimize,
+  onClose,
 }: {
   organizationId: string;
   conversation: InstagramConversation;
   profileUsername: string;
   onBack: () => void;
+  // Only ever passed by one caller each: the main panel offers "pop out"
+  // (into the floating window); the floating window offers "minimize" and
+  // "close" instead.
+  onPopOut?: () => void;
+  onMinimize?: () => void;
+  onClose?: () => void;
 }) {
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState<InstagramMessage[]>([]);
@@ -425,6 +451,8 @@ function ConversationThread({
   const [reply, setReply] = useState("");
   const [error, setError] = useState<string | undefined>();
   const [sending, startSending] = useTransition();
+  const [aiMode, setAiMode] = useState(false);
+  const [aiModePending, startAiModeTransition] = useTransition();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -454,6 +482,19 @@ function ConversationThread({
     // Only needs to fire once when the thread is opened.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!conversation.participantId) return;
+    getInstagramAiMode(organizationId, conversation.participantId).then(setAiMode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handleToggleAiMode() {
+    if (!conversation.participantId) return;
+    const next = !aiMode;
+    setAiMode(next);
+    startAiModeTransition(() => setInstagramAiMode(organizationId, conversation.participantId as string, next));
+  }
 
   const windowState = getWindowState(lastInboundAt);
 
@@ -496,8 +537,45 @@ function ConversationThread({
         <Avatar size="sm">
           <AvatarFallback>{initial(conversation.participantUsername)}</AvatarFallback>
         </Avatar>
-        <p className="font-medium">{conversation.participantUsername ?? "Unknown"}</p>
+        <p className="min-w-0 flex-1 truncate font-medium">{conversation.participantUsername ?? "Unknown"}</p>
+        {conversation.participantId && (
+          <Button
+            type="button"
+            variant={aiMode ? "default" : "outline"}
+            size="sm"
+            onClick={handleToggleAiMode}
+            disabled={aiModePending}
+            title="When on, AI replies to this person automatically with no review"
+          >
+            <Sparkles className="size-3.5" />
+            AI mode {aiMode ? "on" : "off"}
+          </Button>
+        )}
+        {onPopOut && (
+          <Button type="button" variant="ghost" size="icon" onClick={onPopOut} title="Pop out into a floating window">
+            <PictureInPicture2 className="size-4" />
+          </Button>
+        )}
+        {onMinimize && (
+          <Button type="button" variant="ghost" size="icon" onClick={onMinimize} title="Minimize">
+            <Minus className="size-4" />
+          </Button>
+        )}
+        {onClose && (
+          <Button type="button" variant="ghost" size="icon" onClick={onClose} title="Close">
+            <X className="size-4" />
+          </Button>
+        )}
       </div>
+
+      {aiMode && (
+        <div className="border-b border-border bg-primary/5 px-4 py-2">
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Sparkles className="size-3.5 shrink-0 text-primary" />
+            AI is replying to this conversation automatically. Turn it off to take over.
+          </p>
+        </div>
+      )}
 
       <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto p-4">
         {loading && <p className="text-sm text-muted-foreground">Loading messages...</p>}
@@ -572,10 +650,12 @@ function InstagramMessagesTab({
   organizationId,
   profileUsername,
   initialConversations,
+  onPopOut,
 }: {
   organizationId: string;
   profileUsername: string;
   initialConversations: { items: InstagramConversation[]; nextCursor: string | null };
+  onPopOut: (conversation: InstagramConversation) => void;
 }) {
   const [items, setItems] = useState(initialConversations.items);
   const [cursor, setCursor] = useState(initialConversations.nextCursor);
@@ -673,6 +753,10 @@ function InstagramMessagesTab({
               conversation={selected}
               profileUsername={profileUsername}
               onBack={() => setSelectedId(null)}
+              onPopOut={() => {
+                onPopOut(selected);
+                setSelectedId(null);
+              }}
             />
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
@@ -691,6 +775,238 @@ function InstagramMessagesTab({
   );
 }
 
+// A conversation popped out of the Messages tab — rendered as a sibling of
+// <Tabs> at the root, not inside any TabsPanel, so it stays visible and
+// polling even while browsing Posts/Insights on the same Instagram page
+// (base-ui's Tabs unmounts inactive panels, which would otherwise kill it
+// the moment the tab changed).
+function FloatingChatWindow({
+  organizationId,
+  conversation,
+  profileUsername,
+  onClose,
+}: {
+  organizationId: string;
+  conversation: InstagramConversation;
+  profileUsername: string;
+  onClose: () => void;
+}) {
+  const [minimized, setMinimized] = useState(false);
+
+  return (
+    <div className="fixed bottom-4 right-4 z-50 flex w-[22rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+      {minimized ? (
+        <button
+          type="button"
+          onClick={() => setMinimized(false)}
+          className="flex items-center gap-2 p-3 text-left hover:bg-accent"
+        >
+          <Avatar size="sm">
+            <AvatarFallback>{initial(conversation.participantUsername)}</AvatarFallback>
+          </Avatar>
+          <p className="min-w-0 flex-1 truncate text-sm font-medium">{conversation.participantUsername ?? "Unknown"}</p>
+          <Plus className="size-4 shrink-0 text-muted-foreground" />
+        </button>
+      ) : (
+        <div className="flex h-[28rem] flex-col">
+          <ConversationThread
+            key={conversation.id}
+            organizationId={organizationId}
+            conversation={conversation}
+            profileUsername={profileUsername}
+            onBack={onClose}
+            onMinimize={() => setMinimized(true)}
+            onClose={onClose}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Comment automation
+// ---------------------------------------------------------------------------
+
+function CommentAutomationRow({
+  automation,
+  mediaCaption,
+  onToggle,
+  onDelete,
+}: {
+  automation: InstagramCommentAutomation;
+  mediaCaption: string | null;
+  onToggle: (enabled: boolean) => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 border-b border-border p-4 last:border-b-0">
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge variant="outline" className="text-[10px]">
+            {automation.media_id ? `Post: ${mediaCaption ?? "Untitled post"}` : "Any post"}
+          </Badge>
+          <Badge variant="outline" className="text-[10px]">
+            {automation.keyword ? `Keyword: "${automation.keyword}"` : "Any comment"}
+          </Badge>
+        </div>
+        <p className="text-sm text-muted-foreground">{automation.reply_template}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <Button type="button" variant={automation.enabled ? "default" : "outline"} size="sm" onClick={() => onToggle(!automation.enabled)}>
+          {automation.enabled ? "On" : "Off"}
+        </Button>
+        <Button type="button" variant="ghost" size="icon" onClick={onDelete}>
+          <Trash2 className="size-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function InstagramAutomationTab({
+  organizationId,
+  canManage,
+  media,
+  initialAutomations,
+}: {
+  organizationId: string;
+  canManage: boolean;
+  media: InstagramMedia[];
+  initialAutomations: InstagramCommentAutomation[];
+}) {
+  const [automations, setAutomations] = useState(initialAutomations);
+  const [mediaId, setMediaId] = useState<string>("any");
+  const [keyword, setKeyword] = useState("");
+  const [replyTemplate, setReplyTemplate] = useState("");
+  const [error, setError] = useState<string | undefined>();
+  const [saving, startSaving] = useTransition();
+
+  const captionByMediaId = new Map(media.map((m) => [m.id, m.caption]));
+
+  function handleCreate() {
+    if (!replyTemplate.trim()) {
+      setError("Reply message can't be empty.");
+      return;
+    }
+    startSaving(async () => {
+      const result = await addCommentAutomation(organizationId, {
+        mediaId: mediaId === "any" ? null : mediaId,
+        keyword: keyword.trim() || null,
+        replyTemplate: replyTemplate.trim(),
+      });
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setError(undefined);
+      const refreshed = await listCommentAutomations(organizationId);
+      setAutomations(refreshed);
+      setMediaId("any");
+      setKeyword("");
+      setReplyTemplate("");
+    });
+  }
+
+  function handleToggle(automationId: string, enabled: boolean) {
+    setAutomations((prev) => prev.map((a) => (a.id === automationId ? { ...a, enabled } : a)));
+    toggleCommentAutomation(organizationId, automationId, enabled);
+  }
+
+  function handleDelete(automationId: string) {
+    setAutomations((prev) => prev.filter((a) => a.id !== automationId));
+    removeCommentAutomation(organizationId, automationId);
+  }
+
+  return (
+    <div className="space-y-4">
+      {canManage && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="size-4" />
+              New automation rule
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              When a comment matches, the commenter gets an automatic DM — using Instagram&apos;s private-reply
+              mechanism, so it works even if they&apos;ve never messaged the account before.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Applies to</Label>
+                <Select value={mediaId} onValueChange={(v) => setMediaId(v ?? "any")}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue>
+                      {() => (mediaId === "any" ? "Any post" : (captionByMediaId.get(mediaId) ?? "Untitled post"))}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">Any post</SelectItem>
+                    {media.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.caption ? m.caption.slice(0, 60) : "Untitled post"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="automation-keyword">Keyword (optional)</Label>
+                <Input
+                  id="automation-keyword"
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  placeholder="e.g. LINK — leave blank to match any comment"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="automation-reply">DM to send</Label>
+              <Textarea
+                id="automation-reply"
+                value={replyTemplate}
+                onChange={(e) => setReplyTemplate(e.target.value)}
+                placeholder="Thanks for your comment! Here's the link..."
+                rows={3}
+              />
+            </div>
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <Button type="button" onClick={handleCreate} disabled={saving}>
+              {saving ? "Saving..." : "Add rule"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {automations.length === 0 ? (
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+            No automation rules yet. {canManage ? "Add one above." : "Ask an admin to set one up."}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="overflow-hidden py-0">
+          {automations.map((automation) => (
+            <CommentAutomationRow
+              key={automation.id}
+              automation={automation}
+              mediaCaption={automation.media_id ? (captionByMediaId.get(automation.media_id) ?? null) : null}
+              onToggle={(enabled) => handleToggle(automation.id, enabled)}
+              onDelete={() => handleDelete(automation.id)}
+            />
+          ))}
+        </Card>
+      )}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Root
 // ---------------------------------------------------------------------------
@@ -704,6 +1020,8 @@ export function InstagramManager({
   canManage: boolean;
   data: InstagramDashboardData;
 }) {
+  const [poppedOut, setPoppedOut] = useState<InstagramConversation | null>(null);
+
   if (!data.connected) {
     return <ConnectInstagramCard canManage={canManage} />;
   }
@@ -723,6 +1041,7 @@ export function InstagramManager({
           <TabsTab value="posts">Posts</TabsTab>
           <TabsTab value="insights">Insights</TabsTab>
           <TabsTab value="messages">Messages</TabsTab>
+          <TabsTab value="automation">Automation</TabsTab>
         </TabsList>
         <TabsPanel value="posts">
           <InstagramPostsTab organizationId={organizationId} initialMedia={data.media} />
@@ -735,9 +1054,27 @@ export function InstagramManager({
             organizationId={organizationId}
             profileUsername={data.profile.username}
             initialConversations={data.conversations}
+            onPopOut={setPoppedOut}
+          />
+        </TabsPanel>
+        <TabsPanel value="automation">
+          <InstagramAutomationTab
+            organizationId={organizationId}
+            canManage={canManage}
+            media={data.media.items}
+            initialAutomations={data.automations}
           />
         </TabsPanel>
       </Tabs>
+
+      {poppedOut && (
+        <FloatingChatWindow
+          organizationId={organizationId}
+          conversation={poppedOut}
+          profileUsername={data.profile.username}
+          onClose={() => setPoppedOut(null)}
+        />
+      )}
     </div>
   );
 }

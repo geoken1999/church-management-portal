@@ -306,11 +306,23 @@ interface RawConversation {
   messages?: { data: RawConversationMessage[] };
 }
 
+export interface ConversationsPage {
+  items: InstagramConversation[];
+  nextCursor: string | null;
+  // The connected account's own id in this product's messaging-scoped id
+  // namespace (see the comment below) — found as a byproduct of resolving
+  // "other" on each conversation. Null only when the page has zero
+  // conversations to find it from. Persisted by the dal layer so inbound
+  // webhook events (which arrive carrying only this same namespace) can be
+  // matched back to an organization.
+  ownerMessagingId: string | null;
+}
+
 export async function fetchConversations(
   accessToken: string,
   ownerUsername: string,
   after?: string | null,
-): Promise<{ items: InstagramConversation[]; nextCursor: string | null }> {
+): Promise<ConversationsPage> {
   const url = new URL(`${GRAPH_BASE}/me/conversations`);
   url.searchParams.set("platform", "instagram");
   // limit(5) rather than limit(1): the single most recent message might be
@@ -326,6 +338,7 @@ export async function fetchConversations(
   }
 
   const data = (await res.json()) as RawPage<RawConversation>;
+  let ownerMessagingId: string | null = null;
   const items: InstagramConversation[] = data.data.map((c) => {
     const participants = c.participants?.data ?? [];
     // The API lists both sides of the DM, each with a username — this
@@ -334,7 +347,9 @@ export async function fetchConversations(
     // account (a messaging-scoped id) doesn't match instagram_user_id (the
     // id from the profile endpoint) — same account, two different id
     // namespaces. Username is the one field that's consistent across both.
+    const mine = participants.find((p) => p.username === ownerUsername);
     const other = participants.find((p) => p.username !== ownerUsername) ?? participants[0];
+    if (mine?.id) ownerMessagingId = mine.id;
 
     const recentMessages = c.messages?.data ?? [];
     const lastInbound = recentMessages.find((m) => m.from?.username !== ownerUsername);
@@ -351,7 +366,59 @@ export async function fetchConversations(
     };
   });
 
-  return { items, nextCursor: data.paging?.cursors?.after ?? null };
+  return { items, nextCursor: data.paging?.cursors?.after ?? null, ownerMessagingId };
+}
+
+// Used by the webhook handler: an inbound message event carries only the
+// sender's id, not Instagram's opaque conversation id, so this looks the
+// conversation up by participant instead of paging through the full list.
+export async function fetchConversationMessagesByParticipant(
+  accessToken: string,
+  participantId: string,
+  limit = 10,
+): Promise<InstagramMessage[]> {
+  const url = new URL(`${GRAPH_BASE}/me/conversations`);
+  url.searchParams.set("platform", "instagram");
+  url.searchParams.set("user_id", participantId);
+  url.searchParams.set("fields", `messages.limit(${limit}){message,from,created_time}`);
+  url.searchParams.set("access_token", accessToken);
+
+  const res = await fetch(url.toString(), { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`Couldn't fetch Instagram conversation: ${await readGraphError(res)}`);
+  }
+
+  const data = (await res.json()) as RawPage<{ messages?: { data: RawMessage[] } }>;
+  const messages = data.data[0]?.messages?.data ?? [];
+  return messages
+    .map((m) => ({
+      id: m.id,
+      fromUsername: m.from?.username ?? m.from?.id ?? null,
+      text: m.message ?? null,
+      createdTime: m.created_time,
+    }))
+    .reverse();
+}
+
+// The policy-compliant way to DM someone in response to their public
+// comment — a regular /me/messages send to their id is still subject to
+// the normal 24-hour conversation window (and most commenters have never
+// messaged the account at all, so there'd be no window open regardless).
+// Addressing the comment itself bypasses that: Meta allows exactly one
+// private reply per comment, usable up to 7 days after it was posted.
+export async function sendPrivateReply(accessToken: string, commentId: string, text: string): Promise<void> {
+  const url = new URL(`${GRAPH_BASE}/me/messages`);
+  url.searchParams.set("access_token", accessToken);
+
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ recipient: { comment_id: commentId }, message: { text } }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Couldn't send private reply: ${await readGraphError(res)}`);
+  }
 }
 
 export interface InstagramMessage {

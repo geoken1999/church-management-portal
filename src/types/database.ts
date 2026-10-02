@@ -374,6 +374,11 @@ export type InstagramConnection = {
   access_token: string;
   token_expires_at: string;
   connected_by: string | null;
+  // The messaging-scoped id Instagram's webhook events carry for this
+  // account — a different id namespace than instagram_user_id above.
+  // Populated lazily (see ensureMessagingUserId in dal.ts), so null until
+  // the dashboard has been loaded at least once after migration 0089.
+  messaging_user_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -383,6 +388,35 @@ export type InstagramConversationRead = {
   organization_id: string;
   conversation_id: string;
   last_read_at: string;
+};
+
+export type InstagramAiMode = {
+  id: string;
+  organization_id: string;
+  participant_id: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type InstagramCommentAutomation = {
+  id: string;
+  organization_id: string;
+  media_id: string | null;
+  keyword: string | null;
+  reply_template: string;
+  enabled: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type InstagramCommentReply = {
+  id: string;
+  organization_id: string;
+  comment_id: string;
+  automation_id: string | null;
+  created_at: string;
 };
 
 export type YouTubeConnection = {
@@ -2003,6 +2037,62 @@ export type Database = {
             columns: ["organization_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      instagram_ai_mode: {
+        Row: InstagramAiMode;
+        Insert: Partial<InstagramAiMode> & Pick<InstagramAiMode, "organization_id" | "participant_id">;
+        Update: Partial<InstagramAiMode>;
+        Relationships: [
+          {
+            foreignKeyName: "instagram_ai_mode_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      instagram_comment_automations: {
+        Row: InstagramCommentAutomation;
+        Insert: Partial<InstagramCommentAutomation> & Pick<InstagramCommentAutomation, "organization_id" | "reply_template">;
+        Update: Partial<InstagramCommentAutomation>;
+        Relationships: [
+          {
+            foreignKeyName: "instagram_comment_automations_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instagram_comment_automations_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["auth_user_id"];
+          },
+        ];
+      };
+      instagram_comment_replies: {
+        Row: InstagramCommentReply;
+        Insert: Partial<InstagramCommentReply> & Pick<InstagramCommentReply, "organization_id" | "comment_id">;
+        Update: Partial<InstagramCommentReply>;
+        Relationships: [
+          {
+            foreignKeyName: "instagram_comment_replies_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instagram_comment_replies_automation_id_fkey";
+            columns: ["automation_id"];
+            isOneToOne: false;
+            referencedRelation: "instagram_comment_automations";
             referencedColumns: ["id"];
           },
         ];

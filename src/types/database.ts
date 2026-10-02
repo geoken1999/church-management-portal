@@ -1005,6 +1005,15 @@ export type PlatformEvent = {
   created_at: string;
 };
 
+// A tab/feature with no row here is enabled by default — see
+// getDisabledFeatures in src/lib/platform-admin/feature-flags.ts.
+export type PlatformFeatureFlag = {
+  tab_key: string;
+  enabled: boolean;
+  updated_by: string | null;
+  updated_at: string;
+};
+
 export type MessageDeliveryChannel = "sms" | "whatsapp" | "email";
 
 export type MessageDeliveryEvent = {
@@ -1572,6 +1581,20 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "organizations";
             referencedColumns: ["id"];
+          },
+        ];
+      };
+      platform_feature_flags: {
+        Row: PlatformFeatureFlag;
+        Insert: Partial<PlatformFeatureFlag> & Pick<PlatformFeatureFlag, "tab_key">;
+        Update: Partial<PlatformFeatureFlag>;
+        Relationships: [
+          {
+            foreignKeyName: "platform_feature_flags_updated_by_fkey";
+            columns: ["updated_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["auth_user_id"];
           },
         ];
       };

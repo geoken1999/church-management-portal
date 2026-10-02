@@ -6,12 +6,14 @@ import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
 import { isPlanId } from "@/lib/plans/config";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { notifyOrgOfSupportReply } from "@/lib/support/notify-org";
+import { TAB_LABELS, type TabKey } from "@/lib/permissions/tabs";
 import type { SupportTicketStatus } from "@/types/database";
 
 const PAYOUTS_PATH = "/platform-admin/payouts";
 const TENANTS_PATH = "/platform-admin/tenants";
 const SUPPORT_PATH = "/platform-admin/support";
 const SESSIONS_PATH = "/platform-admin/sessions";
+const FEATURE_FLAGS_PATH = "/platform-admin/feature-flags";
 
 const SUPPORT_TICKET_STATUSES: SupportTicketStatus[] = ["open", "in_progress", "resolved", "closed"];
 
@@ -254,4 +256,28 @@ export async function revokeSession(formData: FormData) {
   });
 
   revalidatePath(SESSIONS_PATH);
+}
+
+// Turns a tab off (or back on) for every tenant at once — see
+// getDisabledFeatures/getUserOrganizations/checkTabAccess for the two
+// places this is actually enforced. revalidatePath("/dashboard", "layout")
+// busts every dashboard page's cache in one call so the change is visible
+// immediately, not just after this admin page's own next load.
+export async function setFeatureFlag(tabKey: TabKey, enabled: boolean): Promise<void> {
+  const platformAdmin = await requirePlatformAdmin();
+
+  const admin = createAdminClient();
+  await admin
+    .from("platform_feature_flags")
+    .upsert({ tab_key: tabKey, enabled, updated_by: platformAdmin.id, updated_at: new Date().toISOString() }, { onConflict: "tab_key" });
+
+  await logPlatformEvent({
+    level: "warning",
+    source: "platform_admin",
+    message: `Platform admin (${platformAdmin.email ?? "unknown"}) ${enabled ? "re-enabled" : "disabled"} "${TAB_LABELS[tabKey]}" platform-wide`,
+    metadata: { tabKey, enabled },
+  });
+
+  revalidatePath(FEATURE_FLAGS_PATH);
+  revalidatePath("/dashboard", "layout");
 }

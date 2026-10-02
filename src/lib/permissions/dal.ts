@@ -3,6 +3,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/dal";
 import { normalizeTabPermissions, fullTabAccess, type TabKey } from "@/lib/permissions/tabs";
+import { getDisabledFeatures } from "@/lib/platform-admin/feature-flags";
 import type { TabAccess } from "@/types/database";
 
 export type TabAccessLevel = keyof TabAccess;
@@ -24,6 +25,14 @@ export async function checkTabAccess(
   tab: TabKey,
   level: TabAccessLevel,
 ): Promise<TabAccessResult> {
+  // Checked before anything org/role-specific — a platform admin turning a
+  // feature off applies to every tenant, including owners, who otherwise
+  // bypass the tab_permissions matrix entirely below.
+  const disabledFeatures = await getDisabledFeatures();
+  if (disabledFeatures.has(tab)) {
+    return { ok: false, message: "This feature has been turned off platform-wide." };
+  }
+
   const user = await requireUser();
   const supabase = await createClient();
 

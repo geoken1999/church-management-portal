@@ -4,7 +4,8 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthUser, getProfile } from "@/lib/auth/dal";
-import { normalizeTabPermissions, allFullTabAccess, type TabKey } from "@/lib/permissions/tabs";
+import { normalizeTabPermissions, allFullTabAccess, noTabAccess, type TabKey } from "@/lib/permissions/tabs";
+import { getDisabledFeatures } from "@/lib/platform-admin/feature-flags";
 import type { Organization, OrganizationRole, TabAccess } from "@/types/database";
 
 export interface OrganizationMembership {
@@ -22,22 +23,33 @@ export const getUserOrganizations = cache(async (): Promise<OrganizationMembersh
   if (!user) return [];
 
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("organization_members")
-    .select("role, tab_permissions, organizations(*)")
-    .eq("auth_user_id", user.id);
+  const [{ data }, disabledFeatures] = await Promise.all([
+    supabase.from("organization_members").select("role, tab_permissions, organizations(*)").eq("auth_user_id", user.id),
+    getDisabledFeatures(),
+  ]);
 
   if (!data) return [];
+
+  // A platform admin's kill switch overrides every org's own tab_permissions
+  // and even the owner/admin "always full access" rule below — it's a layer
+  // above both, not a third option alongside them.
+  function withGlobalFlags(access: Record<TabKey, TabAccess>): Record<TabKey, TabAccess> {
+    if (disabledFeatures.size === 0) return access;
+    const result = { ...access };
+    for (const tab of disabledFeatures) {
+      result[tab] = noTabAccess();
+    }
+    return result;
+  }
 
   return data
     .filter((row): row is typeof row & { organizations: Organization } => Boolean(row.organizations))
     .map((row) => ({
       organization: row.organizations,
       role: row.role,
-      tabAccess:
-        row.role === "owner" || row.role === "admin"
-          ? allFullTabAccess()
-          : normalizeTabPermissions(row.tab_permissions),
+      tabAccess: withGlobalFlags(
+        row.role === "owner" || row.role === "admin" ? allFullTabAccess() : normalizeTabPermissions(row.tab_permissions),
+      ),
     }));
 });
 

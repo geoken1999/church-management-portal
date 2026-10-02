@@ -3,6 +3,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOccurrencesInRange } from "@/lib/events/recurrence";
+import { getSiteUrl } from "@/lib/site-url";
 import type { InstagramCommentAutomation, InstagramConnection } from "@/types/database";
 
 export async function getAiMode(organizationId: string, participantId: string): Promise<boolean> {
@@ -192,19 +193,44 @@ const MAX_EVENTS_IN_CONTEXT = 8;
 // expands them the same way the dashboard's own calendar/list views do
 // (events aren't stored per-occurrence) rather than returning the raw
 // recurrence pattern for the model to misinterpret.
+// Every query below selects only organization-level descriptive columns —
+// never a column that names, contact-details, or otherwise identifies an
+// individual person (a leader's name/phone, who manages something, a
+// donor's name, a form response). Each table's full schema has columns
+// that DO carry that kind of data (ministries.managed_by,
+// branches.leader_name/leader_phone/managed_by, fundraisers.managed_by,
+// donations entirely); none of them are selected here, on purpose, per
+// "restrict for personal details."
 export async function getOrganizationContextForAi(organizationId: string): Promise<string> {
   const supabase = createAdminClient();
+  const siteUrl = getSiteUrl();
 
-  const [{ data: org }, { data: events }] = await Promise.all([
-    supabase.from("organizations").select("name").eq("id", organizationId).maybeSingle(),
-    supabase
-      .from("events")
-      .select(
-        "title, description, start_at, end_at, is_recurring, recurrence_frequency, recurrence_end_date, venue, meeting_mode",
-      )
-      .eq("organization_id", organizationId)
-      .neq("status", "cancelled"),
-  ]);
+  const [{ data: org }, { data: events }, { data: ministries }, { data: branches }, { data: fundraisers }, { data: forms }] =
+    await Promise.all([
+      supabase.from("organizations").select("name").eq("id", organizationId).maybeSingle(),
+      supabase
+        .from("events")
+        .select(
+          "title, description, start_at, end_at, is_recurring, recurrence_frequency, recurrence_end_date, venue, meeting_mode",
+        )
+        .eq("organization_id", organizationId)
+        .neq("status", "cancelled"),
+      supabase
+        .from("ministries")
+        .select("title, type, vision, mission, started_on, future_plans")
+        .eq("organization_id", organizationId),
+      supabase.from("branches").select("name, location, member_count, country").eq("organization_id", organizationId),
+      supabase
+        .from("fundraisers")
+        .select("id, title, description, goal_amount, start_date, end_date, share_token, payment_link_enabled, payment_mode")
+        .eq("organization_id", organizationId)
+        .eq("status", "active"),
+      supabase
+        .from("forms")
+        .select("title, description, slug, fields")
+        .eq("organization_id", organizationId)
+        .eq("status", "published"),
+    ]);
 
   const now = new Date();
   const horizon = new Date(now.getTime() + EVENTS_LOOKAHEAD_DAYS * 24 * 60 * 60 * 1000);
@@ -222,8 +248,54 @@ export async function getOrganizationContextForAi(organizationId: string): Promi
     const line = where ? `${event.title} — ${when}, at ${where}` : `${event.title} — ${when}`;
     return event.description ? `- ${line}: ${event.description.slice(0, 140)}` : `- ${line}`;
   });
-
   const eventsBlock = eventLines.length > 0 ? eventLines.join("\n") : "No upcoming events are currently listed.";
 
-  return [`Organization name: ${org?.name ?? "this organization"}`, "", "Upcoming events:", eventsBlock].join("\n");
+  const ministryLines = (ministries ?? []).map((m) => {
+    const label = m.type ? `${m.title} (${m.type})` : m.title;
+    const detail = [m.vision, m.mission].filter(Boolean).join(" ").slice(0, 160);
+    return detail ? `- ${label}: ${detail}` : `- ${label}`;
+  });
+  const ministriesBlock = ministryLines.length > 0 ? ministryLines.join("\n") : null;
+
+  const branchLines = (branches ?? []).map((b) => (b.location ? `- ${b.name} — ${b.location}` : `- ${b.name}`));
+  const branchesBlock = branchLines.length > 0 ? branchLines.join("\n") : null;
+
+  // goal_amount is a stored column, but how much has actually been raised
+  // is computed on the fly everywhere else in this app too (there's no
+  // raised_amount column) — same sum-of-donations approach used by the
+  // public give page's own get_shared_fundraiser RPC.
+  const activeFundraisers = (fundraisers ?? []).filter((f) => f.payment_link_enabled && f.payment_mode);
+  const fundraiserLines = await Promise.all(
+    activeFundraisers.map(async (f) => {
+      const { data: donations } = await supabase.from("donations").select("amount").eq("fundraiser_id", f.id);
+      const raised = (donations ?? []).reduce((sum, d) => sum + d.amount, 0);
+      const link = `${siteUrl}/give/${f.share_token}`;
+      const base = `${f.title} — ₹${raised.toLocaleString("en-IN")} raised of a ₹${f.goal_amount.toLocaleString("en-IN")} goal. Give here: ${link}`;
+      return f.description ? `- ${base}\n  ${f.description.slice(0, 160)}` : `- ${base}`;
+    }),
+  );
+  const fundraisersBlock = fundraiserLines.length > 0 ? fundraiserLines.join("\n") : null;
+
+  const formLines = (forms ?? []).map((f) => {
+    const fieldLabels = (f.fields ?? []).map((field) => field.label).join(", ");
+    const link = `${siteUrl}/forms/${f.slug}`;
+    const parts = [`${f.title} — ${link}`];
+    if (f.description) parts.push(f.description.slice(0, 120));
+    if (fieldLabels) parts.push(`Asks for: ${fieldLabels}`);
+    return `- ${parts.join(". ")}`;
+  });
+  const formsBlock = formLines.length > 0 ? formLines.join("\n") : null;
+
+  const sections = [
+    `Organization name: ${org?.name ?? "this organization"}`,
+    "",
+    "Upcoming events:",
+    eventsBlock,
+  ];
+  if (ministriesBlock) sections.push("", "Ministries:", ministriesBlock);
+  if (branchesBlock) sections.push("", "Locations/branches:", branchesBlock);
+  if (fundraisersBlock) sections.push("", "Active fundraisers (share the link when relevant):", fundraisersBlock);
+  if (formsBlock) sections.push("", "Public forms (share the link when relevant):", formsBlock);
+
+  return sections.join("\n");
 }

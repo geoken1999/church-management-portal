@@ -55,6 +55,7 @@ import { SpotlightTour, type SpotlightStep } from "@/components/dashboard/Spotli
 import { completeTour } from "@/lib/organizations/actions";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { CreditBalances } from "@/components/dashboard/CreditBalances";
 import { DashboardLocaleProvider } from "@/lib/i18n/DashboardLocaleProvider";
 import { useLocale } from "@/lib/i18n/LocaleContext";
 import type { AppLocale } from "@/lib/i18n/config";
@@ -180,6 +181,7 @@ export function DashboardShell(
     notifications: Notification[];
     tabAccess: Record<TabKey, TabAccess>;
     planFeatures: { finance: boolean; socialMedia: boolean };
+    creditBalances: { sms: number; ai: number; email: number };
     trialDaysRemaining: number | null;
     initialLocale: AppLocale;
     children: ReactNode;
@@ -200,6 +202,7 @@ function DashboardShellInner({
   notifications,
   tabAccess,
   planFeatures,
+  creditBalances,
   trialDaysRemaining,
   children,
 }: {
@@ -209,6 +212,7 @@ function DashboardShellInner({
   notifications: Notification[];
   tabAccess: Record<TabKey, TabAccess>;
   planFeatures: { finance: boolean; socialMedia: boolean };
+  creditBalances: { sms: number; ai: number; email: number };
   trialDaysRemaining: number | null;
   children: ReactNode;
 }) {
@@ -376,6 +380,7 @@ function DashboardShellInner({
               <Menu className="size-5" />
             </Button>
             <div className="ml-auto flex items-center gap-2">
+              <CreditBalances sms={creditBalances.sms} ai={creditBalances.ai} email={creditBalances.email} />
               <LanguageSwitcher />
               <NotificationBell organizationId={organization.id} initialNotifications={notifications} />
               <LogoutButton />

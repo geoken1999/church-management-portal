@@ -13,6 +13,7 @@ import {
   hasAlreadyRepliedToComment,
   recordCommentReply,
 } from "@/lib/instagram/automation";
+import { hasAiCreditAvailableForWebhook, recordAiReplyUsageForWebhook } from "@/lib/plans/dal";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 
 // Meta's webhook verification handshake, run once when the Callback URL is
@@ -128,6 +129,13 @@ async function handleMessagingEvent(businessMessagingId: string, event: Messagin
     return;
   }
 
+  // Checked before generating anything, not just before sending — no point
+  // spending an OpenAI call on a reply the org's plan has no credit left to
+  // send. hasAiCreditAvailableForWebhook logs its own "quota exceeded"
+  // event (source: "quota"), matching how every other quota check in this
+  // app logs, so this just needs to bail out quietly.
+  if (!(await hasAiCreditAvailableForWebhook(connection.organization_id))) return;
+
   // Signals the dashboard's open conversation view to show a typing
   // indicator and disable the reply box — cleared in `finally` below no
   // matter how this turns out, so a failure never leaves it stuck.
@@ -170,6 +178,9 @@ async function handleMessagingEvent(businessMessagingId: string, event: Messagin
     // messages — and unnecessary anyway, since this fires immediately off
     // an inbound message, well inside the normal 24-hour window.
     await sendMessage(accessToken, senderId, reply);
+    // Only charged on a confirmed send — a failed generation or Graph API
+    // call shouldn't cost the org a credit.
+    await recordAiReplyUsageForWebhook(connection.organization_id, senderId);
     await logPlatformEvent({
       level: "info",
       source: "instagram_webhook",

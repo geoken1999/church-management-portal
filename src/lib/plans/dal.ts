@@ -24,6 +24,10 @@ export interface PlanAccess {
   addonEmailCredits: number;
   addonWhatsappCredits: number;
   addonStorageBytes: number;
+  // Not sold as an ADDON_PACKS pack (no purchase flow yet) — same shape as
+  // the others regardless, so it composes into *Remaining the same way and
+  // a platform admin can manually top it up later without a schema change.
+  addonAiCredits: number;
 }
 
 // organizations.plan is the source of truth for which tier a *subscribed*
@@ -43,7 +47,9 @@ export const getPlanAccess = cache(async (organizationId: string): Promise<PlanA
   const [{ data: org }, { data: subscription }] = await Promise.all([
     supabase
       .from("organizations")
-      .select("plan, trial_ends_at, addon_sms_credits, addon_email_credits, addon_whatsapp_credits, addon_storage_bytes")
+      .select(
+        "plan, trial_ends_at, addon_sms_credits, addon_email_credits, addon_whatsapp_credits, addon_storage_bytes, addon_ai_credits",
+      )
       .eq("id", organizationId)
       .maybeSingle(),
     admin.from("organization_subscriptions").select("status").eq("organization_id", organizationId).maybeSingle(),
@@ -54,6 +60,7 @@ export const getPlanAccess = cache(async (organizationId: string): Promise<PlanA
     addonEmailCredits: org?.addon_email_credits ?? 0,
     addonWhatsappCredits: org?.addon_whatsapp_credits ?? 0,
     addonStorageBytes: org?.addon_storage_bytes ?? 0,
+    addonAiCredits: org?.addon_ai_credits ?? 0,
   };
 
   if (subscription?.status === "active") {
@@ -98,6 +105,8 @@ export interface PlanUsage {
   smsRemaining: number;
   whatsappSentThisMonth: number;
   whatsappRemaining: number;
+  aiRepliesSentThisMonth: number;
+  aiRepliesRemaining: number;
   storageBytesUsed: number;
   storageBytesRemaining: number;
   additionalTeamMembers: number;
@@ -108,57 +117,81 @@ export interface PlanUsage {
   addonEmailCredits: number;
   addonWhatsappCredits: number;
   addonStorageBytes: number;
+  addonAiCredits: number;
 }
 
 // cache()-wrapped so the several call sites in one request (dashboard
 // usage card, email/sms availability checks, quota checks before
 // send/upload) share one set of queries instead of re-fetching per call.
 export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUsage> => {
-  const { plan, accessStatus, trialEndsAt, addonSmsCredits, addonEmailCredits, addonWhatsappCredits, addonStorageBytes } =
-    await getPlanAccess(organizationId);
+  const {
+    plan,
+    accessStatus,
+    trialEndsAt,
+    addonSmsCredits,
+    addonEmailCredits,
+    addonWhatsappCredits,
+    addonStorageBytes,
+    addonAiCredits,
+  } = await getPlanAccess(organizationId);
   const supabase = await createClient();
 
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  const [{ data: emailCampaigns }, { data: smsCampaigns }, { data: whatsappCampaigns }, { data: storageBytes }, { count: teamMemberCount }] =
-    await Promise.all([
-      // Only 'shared' sends count against the quota — an org's own SMTP
-      // (provider: 'smtp') doesn't touch our Resend account at all.
-      supabase
-        .from("email_campaigns")
-        .select("sent_count")
-        .eq("organization_id", organizationId)
-        .eq("provider", "shared")
-        .gte("created_at", startOfMonth.toISOString()),
-      // SMS has no per-org "bring your own Twilio" option, so every
-      // campaign counts against the quota.
-      supabase
-        .from("sms_campaigns")
-        .select("sent_count")
-        .eq("organization_id", organizationId)
-        .gte("created_at", startOfMonth.toISOString()),
-      // Same shared-vs-own split as email: only 'shared'-mode WhatsApp
-      // sends touch our Twilio account; 'own' mode is the org's own bill.
-      supabase
-        .from("whatsapp_campaigns")
-        .select("sent_count")
-        .eq("organization_id", organizationId)
-        .eq("mode", "shared")
-        .gte("created_at", startOfMonth.toISOString()),
-      supabase.rpc("get_organization_storage_bytes", { target_org_id: organizationId }),
-      // The owner's own seat doesn't count against the added-members limit.
-      supabase
-        .from("organization_members")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", organizationId)
-        .neq("role", "owner"),
-    ]);
+  const [
+    { data: emailCampaigns },
+    { data: smsCampaigns },
+    { data: whatsappCampaigns },
+    { count: aiRepliesCount },
+    { data: storageBytes },
+    { count: teamMemberCount },
+  ] = await Promise.all([
+    // Only 'shared' sends count against the quota — an org's own SMTP
+    // (provider: 'smtp') doesn't touch our Resend account at all.
+    supabase
+      .from("email_campaigns")
+      .select("sent_count")
+      .eq("organization_id", organizationId)
+      .eq("provider", "shared")
+      .gte("created_at", startOfMonth.toISOString()),
+    // SMS has no per-org "bring your own Twilio" option, so every
+    // campaign counts against the quota.
+    supabase
+      .from("sms_campaigns")
+      .select("sent_count")
+      .eq("organization_id", organizationId)
+      .gte("created_at", startOfMonth.toISOString()),
+    // Same shared-vs-own split as email: only 'shared'-mode WhatsApp
+    // sends touch our Twilio account; 'own' mode is the org's own bill.
+    supabase
+      .from("whatsapp_campaigns")
+      .select("sent_count")
+      .eq("organization_id", organizationId)
+      .eq("mode", "shared")
+      .gte("created_at", startOfMonth.toISOString()),
+    // One row per AI reply actually sent (see ai_reply_usage) — a straight
+    // count, unlike the sent_count sums above, since there's no campaign
+    // batching concept for individual DM replies.
+    supabase
+      .from("ai_reply_usage")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .gte("created_at", startOfMonth.toISOString()),
+    supabase.rpc("get_organization_storage_bytes", { target_org_id: organizationId }),
+    // The owner's own seat doesn't count against the added-members limit.
+    supabase
+      .from("organization_members")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .neq("role", "owner"),
+  ]);
 
   const emailsSentThisMonth = (emailCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0);
   const smsSentThisMonth = (smsCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0);
   const whatsappSentThisMonth = (whatsappCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0);
+  const aiRepliesSentThisMonth = aiRepliesCount ?? 0;
   const storageBytesUsed = storageBytes ?? 0;
   const additionalTeamMembers = teamMemberCount ?? 0;
 
@@ -178,6 +211,8 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
     smsRemaining: Math.max(0, plan.smsPerMonth - smsSentThisMonth) + addonSmsCredits,
     whatsappSentThisMonth,
     whatsappRemaining: Math.max(0, plan.whatsappPerMonth - whatsappSentThisMonth) + addonWhatsappCredits,
+    aiRepliesSentThisMonth,
+    aiRepliesRemaining: Math.max(0, plan.aiRepliesPerMonth - aiRepliesSentThisMonth) + addonAiCredits,
     storageBytesUsed,
     storageBytesRemaining: Math.max(0, plan.storageBytes + addonStorageBytes - storageBytesUsed),
     additionalTeamMembers,
@@ -185,6 +220,7 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
     addonSmsCredits,
     addonEmailCredits,
     addonWhatsappCredits,
+    addonAiCredits,
     addonStorageBytes,
   };
 });
@@ -300,4 +336,86 @@ export async function checkStorageQuota(organizationId: string, additionalBytes:
     return `This would exceed your ${usage.plan.name} plan's ${limitLabel} storage limit (${formatBytes(usage.storageBytesRemaining)} remaining). Buy a storage add-on pack, upgrade your plan, or free up space.`;
   }
   return null;
+}
+
+// --- Webhook-side AI credit check below: the Instagram webhook that
+// generates and sends AI replies carries no user session, so it can't use
+// getPlanUsage/getPlanAccess above (both go through the request-scoped,
+// RLS-governed client) — this re-reads the same organizations/
+// organization_subscriptions/ai_reply_usage data directly via the admin
+// client instead, mirroring getPlanAccess's own active-subscription logic
+// rather than composing it. ---
+
+async function resolveEffectivePlanForWebhook(organizationId: string): Promise<PlanLimits> {
+  const admin = createAdminClient();
+  const [{ data: org }, { data: subscription }] = await Promise.all([
+    admin.from("organizations").select("plan").eq("id", organizationId).maybeSingle(),
+    admin.from("organization_subscriptions").select("status").eq("organization_id", organizationId).maybeSingle(),
+  ]);
+  if (subscription?.status !== "active") return PLANS.basic;
+  return PLANS[org?.plan && isPlanId(org.plan) ? org.plan : "basic"];
+}
+
+function startOfCurrentMonthIso(): string {
+  const start = new Date();
+  start.setDate(1);
+  start.setHours(0, 0, 0, 0);
+  return start.toISOString();
+}
+
+// Read-only — call before generating a reply, to avoid spending an OpenAI
+// call on a reply that can't be sent anyway once credits are exhausted.
+export async function hasAiCreditAvailableForWebhook(organizationId: string): Promise<boolean> {
+  const admin = createAdminClient();
+  const [plan, { data: org }, { count: usedThisMonth }] = await Promise.all([
+    resolveEffectivePlanForWebhook(organizationId),
+    admin.from("organizations").select("addon_ai_credits").eq("id", organizationId).maybeSingle(),
+    admin
+      .from("ai_reply_usage")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .gte("created_at", startOfCurrentMonthIso()),
+  ]);
+
+  const remaining = Math.max(0, plan.aiRepliesPerMonth - (usedThisMonth ?? 0)) + (org?.addon_ai_credits ?? 0);
+  if (remaining <= 0) {
+    await logPlatformEvent({
+      level: "info",
+      source: "quota",
+      message: `AI credit quota exceeded on ${plan.name} plan`,
+      organizationId,
+      metadata: { planLimit: plan.aiRepliesPerMonth, addonAiCredits: org?.addon_ai_credits ?? 0 },
+    });
+  }
+  return remaining > 0;
+}
+
+// Call only after the reply has actually been sent successfully — a failed
+// generation or send shouldn't cost a credit. Re-reads current state
+// rather than reusing hasAiCreditAvailableForWebhook's numbers (same soft
+// read-then-write tradeoff as consumeAddonOverage above); the two calls are
+// seconds apart around one OpenAI + one Graph API call, not a hot loop, so
+// the tiny race window this leaves is the same kind already accepted
+// throughout this file.
+export async function recordAiReplyUsageForWebhook(organizationId: string, participantId: string): Promise<void> {
+  const admin = createAdminClient();
+  const [plan, { data: org }, { count: usedThisMonth }] = await Promise.all([
+    resolveEffectivePlanForWebhook(organizationId),
+    admin.from("organizations").select("addon_ai_credits").eq("id", organizationId).maybeSingle(),
+    admin
+      .from("ai_reply_usage")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .gte("created_at", startOfCurrentMonthIso()),
+  ]);
+
+  const planOnlyRemaining = Math.max(0, plan.aiRepliesPerMonth - (usedThisMonth ?? 0));
+  if (planOnlyRemaining <= 0 && (org?.addon_ai_credits ?? 0) > 0) {
+    await admin
+      .from("organizations")
+      .update({ addon_ai_credits: Math.max(0, (org?.addon_ai_credits ?? 0) - 1) })
+      .eq("id", organizationId);
+  }
+
+  await admin.from("ai_reply_usage").insert({ organization_id: organizationId, participant_id: participantId });
 }

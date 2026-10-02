@@ -45,6 +45,7 @@ export type Organization = {
   addon_email_credits: number;
   addon_whatsapp_credits: number;
   addon_storage_bytes: number;
+  addon_ai_credits: number;
   // null until the welcome tour (src/components/dashboard/WelcomeTour.tsx)
   // is completed or skipped — that's also what triggers it to auto-show.
   tour_completed_at: string | null;
@@ -421,6 +422,17 @@ export type InstagramCommentReply = {
   organization_id: string;
   comment_id: string;
   automation_id: string | null;
+  created_at: string;
+};
+
+// One row per AI-generated Instagram DM reply actually sent — usage for
+// the plan's monthly AI credit quota is counted by querying this table for
+// the current month, the same approach as sms_campaigns/email_campaigns,
+// rather than a decrementing counter.
+export type AiReplyUsage = {
+  id: string;
+  organization_id: string;
+  participant_id: string | null;
   created_at: string;
 };
 
@@ -2098,6 +2110,20 @@ export type Database = {
             columns: ["automation_id"];
             isOneToOne: false;
             referencedRelation: "instagram_comment_automations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_reply_usage: {
+        Row: AiReplyUsage;
+        Insert: Partial<AiReplyUsage> & Pick<AiReplyUsage, "organization_id">;
+        Update: Partial<AiReplyUsage>;
+        Relationships: [
+          {
+            foreignKeyName: "ai_reply_usage_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
             referencedColumns: ["id"];
           },
         ];

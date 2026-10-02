@@ -41,7 +41,15 @@ export default async function YouTubePage({
   }
 
   const [data, channels] = await Promise.all([getYouTubeDashboardData(organizationId), getYouTubeConnections(organizationId)]);
-  const statusNotice = status ? STATUS_MESSAGES[status] : undefined;
+  const statusNotice =
+    status === "account_limit_reached"
+      ? {
+          message: `Your ${plan.name} plan allows up to ${plan.youtubeAccountLimit} connected YouTube ${plan.youtubeAccountLimit === 1 ? "channel" : "channels"}. Disconnect one or upgrade your plan to add another.`,
+          destructive: true,
+        }
+      : status
+        ? STATUS_MESSAGES[status]
+        : undefined;
 
   return (
     <div className="space-y-8">

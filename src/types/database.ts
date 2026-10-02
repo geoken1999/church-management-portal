@@ -380,6 +380,14 @@ export type InstagramConnection = {
   // Populated lazily (see ensureMessagingUserId in dal.ts), so null until
   // the dashboard has been loaded at least once after migration 0089.
   messaging_user_id: string | null;
+  // An org can have several connected Instagram accounts at once (see
+  // migration 0093, mirroring youtube_connections' own multi-channel
+  // support) — the dashboard shows whichever one has is_active = true,
+  // switchable without disconnecting/reconnecting. Automated behavior
+  // (AI replies, comment automations) runs for every connected account
+  // regardless of which is active; this only controls what the dashboard
+  // displays by default.
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 };

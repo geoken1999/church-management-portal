@@ -6,6 +6,7 @@ import { buildAuthorizeUrl } from "@/lib/instagram/client";
 import { getInstagramEnv } from "@/lib/instagram/env";
 import { getSiteUrl } from "@/lib/site-url";
 import { getPlanUsage } from "@/lib/plans/dal";
+import { createClient } from "@/lib/supabase/server";
 
 const STATE_COOKIE = "ig_oauth_state";
 
@@ -24,6 +25,18 @@ export async function GET() {
   const { plan } = await getPlanUsage(membership.organization.id);
   if (!plan.socialMediaEnabled) {
     return NextResponse.redirect(`${getSiteUrl()}/dashboard/instagram`);
+  }
+
+  // Each connected account counts, regardless of which one is active — the
+  // limit caps how many an org can have at once, not just how many show up
+  // in the switcher at a time.
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("instagram_connections")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", membership.organization.id);
+  if ((count ?? 0) >= plan.instagramAccountLimit) {
+    return NextResponse.redirect(`${getSiteUrl()}/dashboard/instagram?status=account_limit_reached`);
   }
 
   try {

@@ -6,6 +6,7 @@ import { buildAuthorizeUrl } from "@/lib/youtube/client";
 import { getYouTubeEnv } from "@/lib/youtube/env";
 import { getSiteUrl } from "@/lib/site-url";
 import { getPlanUsage } from "@/lib/plans/dal";
+import { createClient } from "@/lib/supabase/server";
 
 const STATE_COOKIE = "yt_oauth_state";
 
@@ -23,6 +24,18 @@ export async function GET() {
   const { plan } = await getPlanUsage(membership.organization.id);
   if (!plan.socialMediaEnabled) {
     return NextResponse.redirect(`${getSiteUrl()}/dashboard/youtube`);
+  }
+
+  // Each connected channel counts, regardless of which one is active —
+  // the limit caps how many an org can have at once, not just how many
+  // show up in the switcher at a time.
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("youtube_connections")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", membership.organization.id);
+  if ((count ?? 0) >= plan.youtubeAccountLimit) {
+    return NextResponse.redirect(`${getSiteUrl()}/dashboard/youtube?status=account_limit_reached`);
   }
 
   try {

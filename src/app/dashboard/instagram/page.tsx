@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
-import { getInstagramDashboardData } from "@/lib/instagram/dal";
+import { getInstagramDashboardData, getInstagramConnections } from "@/lib/instagram/dal";
 import { InstagramManagerClient } from "@/components/instagram/InstagramManagerClient";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
@@ -40,8 +40,19 @@ export default async function InstagramPage({
     return <AccessRestricted label="Instagram" />;
   }
 
-  const data = await getInstagramDashboardData(organizationId);
-  const statusNotice = status ? STATUS_MESSAGES[status] : undefined;
+  const [data, accounts] = await Promise.all([
+    getInstagramDashboardData(organizationId),
+    getInstagramConnections(organizationId),
+  ]);
+  const statusNotice =
+    status === "account_limit_reached"
+      ? {
+          message: `Your ${plan.name} plan allows up to ${plan.instagramAccountLimit} connected Instagram ${plan.instagramAccountLimit === 1 ? "account" : "accounts"}. Disconnect one or upgrade your plan to add another.`,
+          destructive: true,
+        }
+      : status
+        ? STATUS_MESSAGES[status]
+        : undefined;
 
   return (
     <div className="space-y-8">
@@ -58,7 +69,7 @@ export default async function InstagramPage({
         </Alert>
       )}
 
-      <InstagramManagerClient organizationId={organizationId} canManage={canManage} data={data} />
+      <InstagramManagerClient organizationId={organizationId} canManage={canManage} data={data} accounts={accounts} />
     </div>
   );
 }

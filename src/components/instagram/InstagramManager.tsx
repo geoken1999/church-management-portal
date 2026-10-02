@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   Heart,
   MessageCircle,
@@ -35,8 +36,9 @@ import {
   removeCommentAutomation,
   uploadInstagramPost,
   type UploadPostState,
+  switchInstagramAccount,
 } from "@/lib/instagram/actions";
-import type { InstagramConnectionSummary, InstagramDashboardData } from "@/lib/instagram/dal";
+import type { InstagramConnectionSummary, InstagramDashboardData, InstagramAccountOption } from "@/lib/instagram/dal";
 import type { InstagramMedia, InstagramInsightValue, InstagramConversation, InstagramMessage } from "@/lib/instagram/client";
 import type { InstagramCommentAutomation } from "@/types/database";
 import { HUMAN_AGENT_WINDOW_MS, STANDARD_WINDOW_MS } from "@/lib/instagram/constants";
@@ -131,6 +133,87 @@ function ConnectInstagramCard({ canManage }: { canManage: boolean }) {
 }
 
 // ---------------------------------------------------------------------------
+// Account switcher
+// ---------------------------------------------------------------------------
+
+// Same pattern as YouTube's own ChannelSwitcher — an org can have several
+// connected Instagram accounts at once (plan-gated), one of which is
+// active at a time. Automated behavior (AI replies, comment automations)
+// runs for every connected account regardless of which is active; this
+// only controls which one the dashboard displays.
+function AccountSwitcher({
+  organizationId,
+  accounts,
+  canManage,
+}: {
+  organizationId: string;
+  accounts: InstagramAccountOption[];
+  canManage: boolean;
+}) {
+  const router = useRouter();
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+
+  if (accounts.length <= 1 && !canManage) return null;
+
+  function handleSwitch(account: InstagramAccountOption) {
+    if (account.isActive || switchingId) return;
+    setError(null);
+    setSwitchingId(account.id);
+    startTransition(async () => {
+      const result = await switchInstagramAccount(organizationId, account.id);
+      setSwitchingId(null);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {accounts.map((account) => (
+          <button
+            key={account.id}
+            type="button"
+            onClick={() => handleSwitch(account)}
+            disabled={switchingId !== null}
+            className={`flex items-center gap-2 rounded-full border px-2.5 py-1 text-sm transition-colors disabled:opacity-60 ${
+              account.isActive
+                ? "border-primary bg-primary/5 font-medium text-foreground"
+                : "border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            }`}
+          >
+            {account.profilePictureUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={account.profilePictureUrl} alt={account.username} className="size-5 shrink-0 rounded-full object-cover" />
+            ) : (
+              <InstagramIcon className="size-4 shrink-0" />
+            )}
+            <span className="max-w-40 truncate">@{account.username}</span>
+            {switchingId === account.id && <span className="text-xs text-muted-foreground">Switching...</span>}
+          </button>
+        ))}
+        {canManage && (
+          <Button type="button" variant="outline" size="sm" nativeButton={false} render={<a href="/api/instagram/connect" />}>
+            <Plus className="size-3.5" />
+            Add account
+          </Button>
+        )}
+      </div>
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Header (profile summary + disconnect)
 // ---------------------------------------------------------------------------
 
@@ -177,6 +260,7 @@ function InstagramHeader({
             </Button>
             <form action={disconnectInstagram}>
               <input type="hidden" name="organizationId" value={organizationId} />
+              <input type="hidden" name="connectionId" value={profile.id} />
               <Button type="submit" variant="ghost" size="sm">
                 Disconnect
               </Button>
@@ -1394,10 +1478,12 @@ export function InstagramManager({
   organizationId,
   canManage,
   data,
+  accounts,
 }: {
   organizationId: string;
   canManage: boolean;
   data: InstagramDashboardData;
+  accounts: InstagramAccountOption[];
 }) {
   const [poppedOut, setPoppedOut] = useState<InstagramConversation | null>(null);
   const [automations, setAutomations] = useState<InstagramCommentAutomation[]>(
@@ -1410,6 +1496,7 @@ export function InstagramManager({
 
   return (
     <div className="space-y-4">
+      <AccountSwitcher organizationId={organizationId} accounts={accounts} canManage={canManage} />
       <InstagramHeader
         organizationId={organizationId}
         profile={data.profile}

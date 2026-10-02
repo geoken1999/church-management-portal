@@ -26,6 +26,13 @@ export interface PlanLimits {
   whatsappPerMonth: number;
   // Each automatic AI-generated Instagram DM reply costs 1 credit.
   aiRepliesPerMonth: number;
+  // How many separate Instagram/YouTube accounts an org can have connected
+  // at once (each counted independently — an org on Pro can have 2
+  // Instagram accounts AND 2 YouTube channels, not 2 total). Deliberately
+  // not ascending with price: Premium (cheaper than Pro) gets more
+  // accounts than Pro, per explicit product decision.
+  instagramAccountLimit: number;
+  youtubeAccountLimit: number;
   storageBytes: number;
   // How many logins an owner/admin can add beyond themselves (invited
   // members, and now manually-issued logins) — the org creator's own seat
@@ -71,6 +78,8 @@ export const PLANS: Record<PlanId, PlanLimits> = {
     // WhatsApp sends; an org's own connected number is unmetered.
     whatsappPerMonth: 50,
     aiRepliesPerMonth: 100,
+    instagramAccountLimit: 1,
+    youtubeAccountLimit: 1,
     storageBytes: 1 * 1024 * 1024 * 1024, // 1GB
     maxAdditionalTeamMembers: 3,
     financeEnabled: false,
@@ -82,6 +91,8 @@ export const PLANS: Record<PlanId, PlanLimits> = {
     smsPerMonth: 300,
     whatsappPerMonth: 300,
     aiRepliesPerMonth: 500,
+    instagramAccountLimit: 3,
+    youtubeAccountLimit: 3,
     storageBytes: 10 * 1024 * 1024 * 1024, // 10GB
     maxAdditionalTeamMembers: 10,
     financeEnabled: true,
@@ -93,6 +104,8 @@ export const PLANS: Record<PlanId, PlanLimits> = {
     smsPerMonth: 1000,
     whatsappPerMonth: 1000,
     aiRepliesPerMonth: 1000,
+    instagramAccountLimit: 2,
+    youtubeAccountLimit: 2,
     storageBytes: 50 * 1024 * 1024 * 1024, // 50GB
     maxAdditionalTeamMembers: 50,
     financeEnabled: true,

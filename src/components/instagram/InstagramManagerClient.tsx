@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { InstagramDashboardData } from "@/lib/instagram/dal";
+import type { InstagramDashboardData, InstagramAccountOption } from "@/lib/instagram/dal";
 
 // Same reasoning as YouTubeManagerClient — InstagramManager formats dates
 // with the runtime's default locale and computes "time ago" text from
@@ -17,6 +17,7 @@ export function InstagramManagerClient(props: {
   organizationId: string;
   canManage: boolean;
   data: InstagramDashboardData;
+  accounts: InstagramAccountOption[];
 }) {
   return <InstagramManager {...props} />;
 }

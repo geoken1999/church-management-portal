@@ -46,6 +46,17 @@ export async function GET(request: Request) {
     const tokenExpiresAt = new Date(Date.now() + longLived.expiresInSeconds * 1000).toISOString();
 
     const supabase = await createClient();
+
+    // Connecting an account — whether it's the first, a reconnect of an
+    // existing one, or an additional account — always makes it the active
+    // one. Deactivate the rest first so the upsert below can't collide
+    // with the "one active account per org" constraint.
+    await supabase
+      .from("instagram_connections")
+      .update({ is_active: false })
+      .eq("organization_id", membership.organization.id)
+      .eq("is_active", true);
+
     const { error } = await supabase.from("instagram_connections").upsert(
       {
         organization_id: membership.organization.id,
@@ -57,9 +68,10 @@ export async function GET(request: Request) {
         followers_count: profile.followersCount,
         access_token: longLived.accessToken,
         token_expires_at: tokenExpiresAt,
+        is_active: true,
         connected_by: user.id,
       },
-      { onConflict: "organization_id" },
+      { onConflict: "organization_id,instagram_user_id" },
     );
 
     if (error) {

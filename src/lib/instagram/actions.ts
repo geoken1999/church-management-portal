@@ -35,13 +35,69 @@ const INSTAGRAM_PATH = "/dashboard/instagram";
 export async function disconnectInstagram(formData: FormData) {
   await requireUser();
   const organizationId = String(formData.get("organizationId") ?? "");
+  const connectionId = String(formData.get("connectionId") ?? "");
 
   const supabase = await createClient();
   // RLS restricts this to admins; a non-admin's request simply deletes
   // nothing rather than erroring.
-  await supabase.from("instagram_connections").delete().eq("organization_id", organizationId);
+  const { data: deleted } = await supabase
+    .from("instagram_connections")
+    .delete()
+    .eq("id", connectionId)
+    .eq("organization_id", organizationId)
+    .select("is_active")
+    .maybeSingle();
+
+  // Disconnecting the active account leaves the org with zero active
+  // accounts even if others are still connected — promote the
+  // longest-connected remaining one so the dashboard doesn't go blank
+  // until someone thinks to switch manually.
+  if (deleted?.is_active) {
+    const { data: nextAccount } = await supabase
+      .from("instagram_connections")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (nextAccount) {
+      await supabase.from("instagram_connections").update({ is_active: true }).eq("id", nextAccount.id);
+    }
+  }
 
   revalidatePath(INSTAGRAM_PATH);
+}
+
+export interface SwitchAccountState {
+  error?: string;
+}
+
+export async function switchInstagramAccount(organizationId: string, connectionId: string): Promise<SwitchAccountState> {
+  await requireUser();
+
+  const supabase = await createClient();
+  const { data: target } = await supabase
+    .from("instagram_connections")
+    .select("id")
+    .eq("id", connectionId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (!target) {
+    return { error: "That account could not be found." };
+  }
+
+  // RLS scopes both writes to this org's admins already; sequential rather
+  // than a single statement since supabase-js has no multi-table
+  // transaction helper here — acceptable for an admin-driven, low-
+  // concurrency toggle like this one.
+  await supabase.from("instagram_connections").update({ is_active: false }).eq("organization_id", organizationId).eq("is_active", true);
+  const { error } = await supabase.from("instagram_connections").update({ is_active: true }).eq("id", connectionId);
+  if (error) {
+    return { error: "Couldn't switch accounts. Please try again." };
+  }
+
+  revalidatePath(INSTAGRAM_PATH);
+  return {};
 }
 
 export async function loadMoreInstagramMedia(organizationId: string, after: string): Promise<InstagramMediaPage> {

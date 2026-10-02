@@ -14,19 +14,78 @@ import {
 import { getCommentAutomations } from "@/lib/instagram/automation";
 import type { InstagramCommentAutomation } from "@/types/database";
 
-// Returns the full row, including access_token — this file is server-only
-// and every caller must be careful never to forward that field into a
-// Client Component prop. Pages should destructure a safe subset before
-// passing data down (see getInstagramDashboardData below).
+// Returns the full row for the ACTIVE account, including access_token —
+// this file is server-only and every caller must be careful never to
+// forward that field into a Client Component prop. An org can have
+// several connected accounts (see getInstagramConnections); the dashboard
+// operates on whichever one is active.
 export const getInstagramConnection = cache(async (organizationId: string) => {
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("instagram_connections")
     .select("*")
     .eq("organization_id", organizationId)
+    .eq("is_active", true)
     .maybeSingle();
 
+  // Falls back to the pre-multi-account query (no is_active column) if
+  // migration 0093 hasn't been applied to this environment yet — without
+  // this, every org's existing, already-working connection would appear
+  // disconnected the moment this code deploys, ahead of a migration that
+  // (per this app's own deploy process) can lag behind by a while.
+  if (error) {
+    const { data: fallback } = await supabase
+      .from("instagram_connections")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    return fallback;
+  }
+
   return data;
+});
+
+export interface InstagramAccountOption {
+  id: string;
+  username: string;
+  profilePictureUrl: string | null;
+  isActive: boolean;
+}
+
+// Public-safe summary of every account connected to this org, for the
+// account switcher — deliberately excludes access_token, unlike
+// getInstagramConnection, since this shape is passed down into a Client
+// Component.
+export const getInstagramConnections = cache(async (organizationId: string): Promise<InstagramAccountOption[]> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("instagram_connections")
+    .select("id, username, profile_picture_url, is_active")
+    .eq("organization_id", organizationId)
+    .order("created_at", { ascending: true });
+
+  // Same pre-migration fallback as getInstagramConnection above — treats
+  // the one pre-multi-account row (if any) as the active one, matching
+  // reality before is_active existed at all.
+  if (error) {
+    const { data: fallback } = await supabase
+      .from("instagram_connections")
+      .select("id, username, profile_picture_url")
+      .eq("organization_id", organizationId);
+    return (fallback ?? []).map((row) => ({
+      id: row.id,
+      username: row.username,
+      profilePictureUrl: row.profile_picture_url,
+      isActive: true,
+    }));
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    username: row.username,
+    profilePictureUrl: row.profile_picture_url,
+    isActive: row.is_active,
+  }));
 });
 
 // Inbound webhook events (messages, comments) carry the business account's
@@ -70,6 +129,7 @@ export async function attachReadState(
 }
 
 export interface InstagramConnectionSummary {
+  id: string;
   username: string;
   accountType: string | null;
   profilePictureUrl: string | null;
@@ -100,6 +160,7 @@ export async function getInstagramDashboardData(organizationId: string): Promise
   if (!connection) return { connected: false };
 
   const profile: InstagramConnectionSummary = {
+    id: connection.id,
     username: connection.username,
     accountType: connection.account_type,
     profilePictureUrl: connection.profile_picture_url,

@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/dal";
+import { requireOrganization } from "@/lib/organizations/dal";
+import { checkStorageQuota } from "@/lib/plans/dal";
 import { getInstagramConnection, attachReadState, ensureMessagingUserId } from "@/lib/instagram/dal";
 import { getValidAccessToken } from "@/lib/instagram/token";
 import {
@@ -10,6 +12,9 @@ import {
   fetchConversations,
   fetchConversationMessages,
   sendMessage,
+  createMediaContainer,
+  waitForContainerReady,
+  publishMediaContainer,
   type InstagramMediaPage,
   type InstagramConversation,
   type InstagramMessage,
@@ -193,4 +198,78 @@ export async function removeCommentAutomation(organizationId: string, automation
   await requireUser();
   await deleteCommentAutomation(organizationId, automationId);
   revalidatePath(INSTAGRAM_PATH);
+}
+
+const ALLOWED_POST_IMAGE_TYPES = ["image/jpeg", "image/png"];
+const MAX_POST_IMAGE_BYTES = 25 * 1024 * 1024;
+
+export interface UploadPostState {
+  error?: string;
+  success?: boolean;
+}
+
+// Publishing is the one capability this product's API actually supports
+// (see the doc comment on createMediaContainer in client.ts) — there's no
+// edit or delete to pair with it.
+export async function uploadInstagramPost(
+  _prevState: UploadPostState,
+  formData: FormData,
+): Promise<UploadPostState> {
+  await requireUser();
+
+  const organizationId = String(formData.get("organizationId") ?? "");
+  const membership = await requireOrganization();
+  if (membership.role !== "owner" && membership.role !== "admin") {
+    return { error: "Only owners and admins can publish to Instagram." };
+  }
+
+  const file = formData.get("image");
+  const caption = String(formData.get("caption") ?? "").trim();
+
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "Choose an image to upload." };
+  }
+  if (!ALLOWED_POST_IMAGE_TYPES.includes(file.type)) {
+    return { error: "Image must be a JPEG or PNG." };
+  }
+  if (file.size > MAX_POST_IMAGE_BYTES) {
+    return { error: "Image must be smaller than 25MB." };
+  }
+
+  const connection = await getInstagramConnection(organizationId);
+  if (!connection) {
+    return { error: "Instagram isn't connected." };
+  }
+
+  const quotaError = await checkStorageQuota(organizationId, file.size);
+  if (quotaError) {
+    return { error: quotaError };
+  }
+
+  const supabase = await createClient();
+  const extension = file.type === "image/png" ? "png" : "jpg";
+  const path = `${organizationId}/${crypto.randomUUID()}.${extension}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("instagram-post-uploads")
+    .upload(path, file, { contentType: file.type });
+  if (uploadError) {
+    return { error: "Couldn't upload that image. You may not have permission to post." };
+  }
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from("instagram-post-uploads").getPublicUrl(path);
+
+  try {
+    const accessToken = await getValidAccessToken(connection);
+    const containerId = await createMediaContainer(accessToken, publicUrl, caption);
+    await waitForContainerReady(accessToken, containerId);
+    await publishMediaContainer(accessToken, containerId);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Couldn't publish that post." };
+  }
+
+  revalidatePath(INSTAGRAM_PATH);
+  return { success: true };
 }

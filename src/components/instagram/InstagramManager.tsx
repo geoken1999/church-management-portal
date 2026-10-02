@@ -33,6 +33,8 @@ import {
   addCommentAutomation,
   toggleCommentAutomation,
   removeCommentAutomation,
+  uploadInstagramPost,
+  type UploadPostState,
 } from "@/lib/instagram/actions";
 import type { InstagramConnectionSummary, InstagramDashboardData } from "@/lib/instagram/dal";
 import type { InstagramMedia, InstagramInsightValue, InstagramConversation, InstagramMessage } from "@/lib/instagram/client";
@@ -55,6 +57,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 
 const INSIGHT_LABELS: Record<string, string> = {
@@ -421,6 +424,108 @@ function PostCard({
   );
 }
 
+const UPLOAD_POST_INITIAL_STATE: UploadPostState = {};
+
+// Publishing is the one capability Instagram's API actually supports for
+// this app's product — no edit or delete to pair with it (see the doc
+// comment on createMediaContainer in client.ts), so this is just an upload
+// form, not a fuller "manage this post" dialog.
+function UploadPostDialog({ organizationId }: { organizationId: string }) {
+  const [state, setState] = useState<UploadPostState>(UPLOAD_POST_INITIAL_STATE);
+  const [pending, startTransition] = useTransition();
+  const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [clientError, setClientError] = useState<string | undefined>();
+  const formRef = useRef<HTMLFormElement>(null);
+
+  function handleSubmit(formData: FormData) {
+    startTransition(async () => {
+      const result = await uploadInstagramPost(state, formData);
+      setState(result);
+      if (result.success) {
+        setOpen(false);
+        setPreview(null);
+        formRef.current?.reset();
+      }
+    });
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    setClientError(undefined);
+    if (!file) {
+      setPreview(null);
+      return;
+    }
+    if (!["image/jpeg", "image/png"].includes(file.type)) {
+      setClientError("Image must be a JPEG or PNG.");
+      e.target.value = "";
+      setPreview(null);
+      return;
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      setClientError("Image must be smaller than 25MB.");
+      e.target.value = "";
+      setPreview(null);
+      return;
+    }
+    setPreview(URL.createObjectURL(file));
+  }
+
+  const error = clientError ?? state.error;
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) {
+          setState(UPLOAD_POST_INITIAL_STATE);
+          setClientError(undefined);
+        } else {
+          setPreview(null);
+        }
+      }}
+    >
+      <DialogTrigger render={<Button type="button"><Plus className="size-4" />Upload post</Button>} />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Upload a new post</DialogTitle>
+          <DialogDescription>
+            Publishes directly to your connected Instagram account. There&apos;s no undo via this app — to remove
+            or change it afterward, use the Instagram app directly.
+          </DialogDescription>
+        </DialogHeader>
+        <form ref={formRef} action={handleSubmit} className="space-y-4">
+          <input type="hidden" name="organizationId" value={organizationId} />
+          <div className="space-y-1.5">
+            <Label htmlFor="post-image">Image (JPEG or PNG)</Label>
+            <Input id="post-image" name="image" type="file" accept="image/jpeg,image/png" onChange={handleFileChange} required />
+          </div>
+          {preview && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={preview} alt="Preview" className="aspect-square w-full rounded-lg object-cover" />
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="post-caption">Caption (optional)</Label>
+            <Textarea id="post-caption" name="caption" rows={3} placeholder="Write a caption..." />
+          </div>
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <DialogFooter>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Publishing..." : "Publish"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function InstagramPostsTab({
   organizationId,
   canManage,
@@ -449,14 +554,26 @@ function InstagramPostsTab({
 
   if (items.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-10 text-center text-sm text-muted-foreground">No posts yet.</CardContent>
-      </Card>
+      <div className="space-y-4">
+        {canManage && (
+          <div className="flex justify-end">
+            <UploadPostDialog organizationId={organizationId} />
+          </div>
+        )}
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">No posts yet.</CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
     <div className="space-y-4">
+      {canManage && (
+        <div className="flex justify-end">
+          <UploadPostDialog organizationId={organizationId} />
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((media) => (
           <PostCard

@@ -491,3 +491,66 @@ export async function sendMessage(
     throw new Error(`Couldn't send that message: ${await readGraphError(res)}`);
   }
 }
+
+// Publishing a new post is a two-step Graph API call: create a container
+// referencing a publicly-fetchable image URL, then publish that container.
+// Editing a caption or deleting a published post afterward is NOT possible
+// through this API at all (confirmed against Meta's own IG Media reference
+// for this specific product — POST on a media object only supports
+// toggling comments, and DELETE is explicitly documented as
+// Facebook-Login-product-only) — once published, removing a post means
+// going into the Instagram app directly, same as today.
+export async function createMediaContainer(accessToken: string, imageUrl: string, caption: string): Promise<string> {
+  const url = new URL(`${GRAPH_BASE}/me/media`);
+  url.searchParams.set("image_url", imageUrl);
+  if (caption) url.searchParams.set("caption", caption);
+  url.searchParams.set("access_token", accessToken);
+
+  const res = await fetch(url.toString(), { method: "POST" });
+  if (!res.ok) {
+    throw new Error(`Couldn't prepare that post: ${await readGraphError(res)}`);
+  }
+  const data = (await res.json()) as { id: string };
+  return data.id;
+}
+
+interface ContainerStatus {
+  status_code?: "EXPIRED" | "ERROR" | "FINISHED" | "IN_PROGRESS" | "PUBLISHED";
+}
+
+// Images are usually ready immediately, but polling instead of publishing
+// right away guards against the rarer case where Instagram's fetch of the
+// image URL hasn't finished yet — publishing an IN_PROGRESS container
+// fails outright rather than queueing.
+export async function waitForContainerReady(accessToken: string, containerId: string): Promise<void> {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const url = new URL(`${GRAPH_BASE}/${containerId}`);
+    url.searchParams.set("fields", "status_code");
+    url.searchParams.set("access_token", accessToken);
+
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) {
+      throw new Error(`Couldn't check post status: ${await readGraphError(res)}`);
+    }
+    const data = (await res.json()) as ContainerStatus;
+    if (data.status_code === "FINISHED") return;
+    if (data.status_code === "ERROR" || data.status_code === "EXPIRED") {
+      throw new Error("Instagram couldn't process that image.");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+  throw new Error("Instagram is still processing that image — try publishing again in a moment.");
+}
+
+export async function publishMediaContainer(accessToken: string, containerId: string): Promise<string> {
+  const url = new URL(`${GRAPH_BASE}/me/media_publish`);
+  url.searchParams.set("creation_id", containerId);
+  url.searchParams.set("access_token", accessToken);
+
+  const res = await fetch(url.toString(), { method: "POST" });
+  if (!res.ok) {
+    throw new Error(`Couldn't publish that post: ${await readGraphError(res)}`);
+  }
+  const data = (await res.json()) as { id: string };
+  return data.id;
+}

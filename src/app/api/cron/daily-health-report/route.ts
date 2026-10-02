@@ -8,7 +8,8 @@ import { logPlatformEvent } from "@/lib/platform-events/log";
 // vercel.json) — no user session exists on a cron-triggered request, so
 // this checks CRON_SECRET (the same pattern as
 // src/app/api/instagram/cron/refresh-tokens) rather than
-// requirePlatformAdmin(), which needs a signed-in user.
+// requirePlatformAdmin(), which needs a signed-in user. Sends to
+// HEALTH_REPORT_EMAIL from EMAIL_FROM_ADDRESS — both @kingdomflow.in.
 export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {

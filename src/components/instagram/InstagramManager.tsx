@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   Heart,
   MessageCircle,
   ExternalLink,
   RefreshCw,
   Send,
-  ChevronRight,
+  ChevronLeft,
   AlertTriangle,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
@@ -25,6 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTab, TabsIndicator, TabsPanel } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -59,6 +60,14 @@ function timeAgo(iso: string | null): string {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
+}
+
+function formatMessageTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function initial(name: string | null): string {
+  return (name ?? "?").charAt(0).toUpperCase();
 }
 
 // ---------------------------------------------------------------------------
@@ -308,33 +317,68 @@ function InstagramInsightsTab({
 // Messages
 // ---------------------------------------------------------------------------
 
-function ConversationThreadDialog({
+function ConversationListItem({
+  conversation,
+  active,
+  onSelect,
+}: {
+  conversation: InstagramConversation;
+  active: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`flex w-full items-center gap-3 border-b border-border/60 p-3 text-left transition-colors last:border-b-0 hover:bg-accent ${
+        active ? "bg-accent" : ""
+      }`}
+    >
+      <Avatar>
+        <AvatarFallback>{initial(conversation.participantUsername)}</AvatarFallback>
+      </Avatar>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="truncate text-sm font-medium">{conversation.participantUsername ?? "Unknown"}</p>
+          <span className="shrink-0 text-xs text-muted-foreground">{timeAgo(conversation.updatedTime)}</span>
+        </div>
+        {conversation.snippet && <p className="truncate text-xs text-muted-foreground">{conversation.snippet}</p>}
+      </div>
+    </button>
+  );
+}
+
+function ConversationThread({
   organizationId,
   conversation,
   profileUsername,
+  onBack,
 }: {
   organizationId: string;
   conversation: InstagramConversation;
   profileUsername: string;
+  onBack: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState<InstagramMessage[]>([]);
   const [reply, setReply] = useState("");
   const [error, setError] = useState<string | undefined>();
   const [sending, startSending] = useTransition();
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  function handleOpenChange(next: boolean) {
-    setOpen(next);
-    if (next) {
-      setError(undefined);
-      setReply("");
-      setLoading(true);
-      getInstagramConversationMessages(organizationId, conversation.id)
-        .then(setMessages)
-        .finally(() => setLoading(false));
-    }
-  }
+  useEffect(() => {
+    getInstagramConversationMessages(organizationId, conversation.id)
+      .then(setMessages)
+      .finally(() => setLoading(false));
+    // ConversationThread is remounted (via `key`) whenever the selected
+    // conversation changes, so initial state already covers loading/reply —
+    // this effect only needs to run the fetch once per mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [messages, loading]);
 
   function handleSend() {
     if (!conversation.participantId || !reply.trim()) return;
@@ -353,80 +397,77 @@ function ConversationThreadDialog({
     });
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger
-        render={
-          <button
-            type="button"
-            className="flex w-full items-center justify-between gap-3 rounded-lg p-2.5 text-left transition-colors hover:bg-accent"
-          >
-            <div className="min-w-0">
-              <p className="font-medium">{conversation.participantUsername ?? "Unknown"}</p>
-              {conversation.snippet && (
-                <p className="truncate text-sm text-muted-foreground">{conversation.snippet}</p>
-              )}
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <span className="text-xs text-muted-foreground">{timeAgo(conversation.updatedTime)}</span>
-              <ChevronRight className="size-4 text-muted-foreground" />
-            </div>
-          </button>
-        }
-      />
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{conversation.participantUsername ?? "Conversation"}</DialogTitle>
-          <DialogDescription>Messages sync live from Instagram.</DialogDescription>
-        </DialogHeader>
+    <div className="flex h-full flex-1 flex-col">
+      <div className="flex items-center gap-2 border-b border-border p-3">
+        <Button type="button" variant="ghost" size="icon" className="sm:hidden" onClick={onBack}>
+          <ChevronLeft className="size-4" />
+        </Button>
+        <Avatar size="sm">
+          <AvatarFallback>{initial(conversation.participantUsername)}</AvatarFallback>
+        </Avatar>
+        <p className="font-medium">{conversation.participantUsername ?? "Unknown"}</p>
+      </div>
 
-        <div className="flex max-h-80 flex-col gap-2 overflow-y-auto">
-          {loading && <p className="text-sm text-muted-foreground">Loading messages...</p>}
-          {!loading && messages.length === 0 && (
-            <p className="text-sm text-muted-foreground">No messages in this conversation.</p>
-          )}
-          {messages.map((message) => {
-            const isOwn = message.fromUsername === profileUsername;
-            return (
-              <div key={message.id} className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[80%] rounded-lg px-3 py-1.5 text-sm ${
-                    isOwn ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
-                  }`}
-                >
-                  {message.text}
-                </div>
+      <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto p-4">
+        {loading && <p className="text-sm text-muted-foreground">Loading messages...</p>}
+        {!loading && messages.length === 0 && (
+          <p className="text-sm text-muted-foreground">No messages in this conversation.</p>
+        )}
+        {messages.map((message) => {
+          const isOwn = message.fromUsername === profileUsername;
+          return (
+            <div key={message.id} className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
+              <div
+                className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
+                  isOwn ? "rounded-br-sm bg-primary text-primary-foreground" : "rounded-bl-sm bg-muted text-foreground"
+                }`}
+              >
+                <p>{message.text}</p>
+                <p className={`mt-0.5 text-[10px] ${isOwn ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                  {formatMessageTime(message.createdTime)}
+                </p>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
+      </div>
 
-        {error && (
+      {error && (
+        <div className="px-4 pb-2">
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
-        )}
+        </div>
+      )}
 
-        {conversation.participantId ? (
-          <div className="flex items-end gap-2">
-            <Textarea
-              value={reply}
-              onChange={(e) => setReply(e.target.value)}
-              placeholder="Type a reply..."
-              rows={2}
-              className="flex-1"
-            />
-            <Button type="button" size="icon" onClick={handleSend} disabled={sending || !reply.trim()}>
-              <Send className="size-4" />
-            </Button>
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            Can&apos;t identify the recipient for this conversation — replying isn&apos;t available.
-          </p>
-        )}
-      </DialogContent>
-    </Dialog>
+      {conversation.participantId ? (
+        <div className="flex items-end gap-2 border-t border-border p-3">
+          <Textarea
+            value={reply}
+            onChange={(e) => setReply(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Type a reply..."
+            rows={1}
+            className="max-h-32 flex-1 resize-none"
+          />
+          <Button type="button" size="icon" onClick={handleSend} disabled={sending || !reply.trim()}>
+            <Send className="size-4" />
+          </Button>
+        </div>
+      ) : (
+        <p className="border-t border-border p-3 text-xs text-muted-foreground">
+          Can&apos;t identify the recipient for this conversation — replying isn&apos;t available.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -442,6 +483,9 @@ function InstagramMessagesTab({
   const [items, setItems] = useState(initialConversations.items);
   const [cursor, setCursor] = useState(initialConversations.nextCursor);
   const [pending, startTransition] = useTransition();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const selected = items.find((c) => c.id === selectedId) ?? null;
 
   function loadMore() {
     if (!cursor) return;
@@ -463,27 +507,56 @@ function InstagramMessagesTab({
   }
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardContent className="flex flex-col gap-1">
-          {items.map((conversation) => (
-            <ConversationThreadDialog
-              key={conversation.id}
-              organizationId={organizationId}
-              conversation={conversation}
-              profileUsername={profileUsername}
-            />
-          ))}
-        </CardContent>
-      </Card>
-      {cursor && (
-        <div className="flex justify-center">
-          <Button type="button" variant="outline" onClick={loadMore} disabled={pending}>
-            {pending ? "Loading..." : "Load more"}
-          </Button>
+    <Card className="overflow-hidden py-0">
+      <div className="flex h-[34rem]">
+        <div
+          className={`w-full flex-col border-border sm:w-80 sm:flex-none sm:border-r ${
+            selected ? "hidden sm:flex" : "flex"
+          }`}
+        >
+          <div className="flex-1 overflow-y-auto">
+            {items.map((conversation) => (
+              <ConversationListItem
+                key={conversation.id}
+                conversation={conversation}
+                active={conversation.id === selectedId}
+                onSelect={() => setSelectedId(conversation.id)}
+              />
+            ))}
+          </div>
+          {cursor && (
+            <div className="border-t border-border p-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={loadMore}
+                disabled={pending}
+              >
+                {pending ? "Loading..." : "Load more"}
+              </Button>
+            </div>
+          )}
         </div>
-      )}
-    </div>
+
+        <div className={`flex-1 flex-col ${selected ? "flex" : "hidden sm:flex"}`}>
+          {selected ? (
+            <ConversationThread
+              key={selected.id}
+              organizationId={organizationId}
+              conversation={selected}
+              profileUsername={profileUsername}
+              onBack={() => setSelectedId(null)}
+            />
+          ) : (
+            <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+              Select a conversation to start chatting
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
   );
 }
 

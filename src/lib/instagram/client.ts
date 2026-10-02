@@ -293,6 +293,7 @@ interface RawConversation {
 
 export async function fetchConversations(
   accessToken: string,
+  ownerId: string,
   after?: string | null,
 ): Promise<{ items: InstagramConversation[]; nextCursor: string | null }> {
   const url = new URL(`${GRAPH_BASE}/me/conversations`);
@@ -309,10 +310,10 @@ export async function fetchConversations(
   const data = (await res.json()) as RawPage<RawConversation>;
   const items: InstagramConversation[] = data.data.map((c) => {
     const participants = c.participants?.data ?? [];
-    // The API lists both sides of the DM — the "other" participant is
-    // whichever one isn't this connected account itself. Falls back to the
-    // first entry if that can't be determined.
-    const other = participants.find((p) => p.username) ?? participants[0];
+    // The API lists both sides of the DM, each with a username — this
+    // account's own profile is always included, so the "other" participant
+    // has to be picked out by id, not by "has a username" (both do).
+    const other = participants.find((p) => p.id !== ownerId) ?? participants[0];
     return {
       id: c.id,
       participantId: other?.id ?? null,

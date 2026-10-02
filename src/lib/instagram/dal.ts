@@ -69,7 +69,7 @@ export async function getInstagramDashboardData(organizationId: string): Promise
     const [media, insights, conversations] = await Promise.all([
       fetchMedia(accessToken),
       fetchAccountInsights(accessToken),
-      fetchConversations(accessToken),
+      fetchConversations(accessToken, connection.instagram_user_id),
     ]);
     return { connected: true, profile, media, insights, conversations, syncError: false };
   } catch {

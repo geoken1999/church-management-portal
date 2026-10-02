@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getOccurrencesInRange } from "@/lib/events/recurrence";
 import type { InstagramCommentAutomation, InstagramConnection } from "@/types/database";
 
 export async function getAiMode(organizationId: string, participantId: string): Promise<boolean> {
@@ -178,4 +179,51 @@ export async function recordCommentReply(
   await supabase
     .from("instagram_comment_replies")
     .insert({ organization_id: organizationId, comment_id: commentId, automation_id: automationId });
+}
+
+const EVENTS_LOOKAHEAD_DAYS = 60;
+const MAX_EVENTS_IN_CONTEXT = 8;
+
+// Gives the AI auto-reply real organization data to answer from instead of
+// generic chit-chat — the actual ask that prompted this. There's no
+// dedicated "service times" or "about us" field anywhere in this schema
+// (confirmed by exploring it): recurring events rows are the only real
+// source for "what time is the Sunday service"-type questions, so this
+// expands them the same way the dashboard's own calendar/list views do
+// (events aren't stored per-occurrence) rather than returning the raw
+// recurrence pattern for the model to misinterpret.
+export async function getOrganizationContextForAi(organizationId: string): Promise<string> {
+  const supabase = createAdminClient();
+
+  const [{ data: org }, { data: events }] = await Promise.all([
+    supabase.from("organizations").select("name").eq("id", organizationId).maybeSingle(),
+    supabase
+      .from("events")
+      .select(
+        "title, description, start_at, end_at, is_recurring, recurrence_frequency, recurrence_end_date, venue, meeting_mode",
+      )
+      .eq("organization_id", organizationId)
+      .neq("status", "cancelled"),
+  ]);
+
+  const now = new Date();
+  const horizon = new Date(now.getTime() + EVENTS_LOOKAHEAD_DAYS * 24 * 60 * 60 * 1000);
+  const occurrences = getOccurrencesInRange(events ?? [], now, horizon).slice(0, MAX_EVENTS_IN_CONTEXT);
+
+  const eventLines = occurrences.map(({ event, date }) => {
+    const when = date.toLocaleString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    const where = event.meeting_mode === "online" ? "online" : event.venue;
+    const line = where ? `${event.title} — ${when}, at ${where}` : `${event.title} — ${when}`;
+    return event.description ? `- ${line}: ${event.description.slice(0, 140)}` : `- ${line}`;
+  });
+
+  const eventsBlock = eventLines.length > 0 ? eventLines.join("\n") : "No upcoming events are currently listed.";
+
+  return [`Organization name: ${org?.name ?? "this organization"}`, "", "Upcoming events:", eventsBlock].join("\n");
 }

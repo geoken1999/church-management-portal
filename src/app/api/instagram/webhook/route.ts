@@ -8,6 +8,7 @@ import {
   findConnectionByMessagingId,
   getAiModeForWebhook,
   setAiTypingForWebhook,
+  getOrganizationContextForAi,
   findMatchingCommentAutomation,
   hasAlreadyRepliedToComment,
   recordCommentReply,
@@ -56,9 +57,19 @@ interface WebhookPayload {
   entry?: WebhookEntry[];
 }
 
-const AI_SYSTEM_PROMPT =
-  "You are replying to Instagram direct messages on behalf of a church's Instagram account. " +
-  "Keep replies short, warm, and natural, like a real person texting back. Never mention that you are an AI.";
+function buildAiSystemPrompt(organizationContext: string): string {
+  return [
+    "You are replying to Instagram direct messages on behalf of a church's Instagram account.",
+    "Keep replies short, warm, and natural, like a real person texting back. Never mention that you are an AI.",
+    "",
+    "Use the organization data below to answer questions about events, schedule, or timing accurately.",
+    "Only state event details (names, dates, times, locations) that appear below — never invent or guess ones",
+    "that aren't listed. If someone asks about something not covered here, say you're not sure and suggest",
+    "they check back or ask a staff member, rather than making something up.",
+    "",
+    organizationContext,
+  ].join("\n");
+}
 
 // Temporary verbose logging while tracking down why AI mode sometimes
 // doesn't reply at all (no error logged, just silence) — every exit point
@@ -117,7 +128,10 @@ async function handleMessagingEvent(businessMessagingId: string, event: Messagin
   // matter how this turns out, so a failure never leaves it stuck.
   await setAiTypingForWebhook(connection.organization_id, senderId, true);
   try {
-    const accessToken = await getValidAccessToken(connection);
+    const [accessToken, organizationContext] = await Promise.all([
+      getValidAccessToken(connection),
+      getOrganizationContextForAi(connection.organization_id),
+    ]);
     const recent = await fetchConversationMessagesByParticipant(accessToken, senderId, 10);
     const history: ChatTurn[] = recent
       .filter((m) => m.text)
@@ -134,7 +148,7 @@ async function handleMessagingEvent(businessMessagingId: string, event: Messagin
       metadata: { senderId, historyLength: history.length },
     });
 
-    const reply = await generateReply(AI_SYSTEM_PROMPT, history);
+    const reply = await generateReply(buildAiSystemPrompt(organizationContext), history);
     if (!reply) {
       await logPlatformEvent({
         level: "warning",

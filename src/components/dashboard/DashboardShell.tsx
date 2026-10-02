@@ -334,7 +334,7 @@ function DashboardShellInner({
 
   return (
     <div className="min-h-screen bg-background lg:flex lg:h-screen lg:overflow-hidden">
-      <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:overflow-y-auto lg:border-r lg:border-border lg:bg-card print:hidden">
+      <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:overflow-y-auto lg:border-r lg:border-border lg:bg-card scrollbar-hide print:hidden">
         {orgHeader}
         <Separator />
         {nav}
@@ -401,7 +401,7 @@ function DashboardShellInner({
             )}
           </div>
         )}
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6 lg:overflow-y-auto print:max-w-none print:p-0">
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6 lg:overflow-y-auto scrollbar-hide print:max-w-none print:p-0">
           {children}
         </main>
       </div>

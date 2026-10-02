@@ -12,8 +12,10 @@ export async function PlanUsageCard({ organizationId }: { organizationId: string
   const smsPercent = Math.min(100, Math.round((usage.smsSentThisMonth / usage.plan.smsPerMonth) * 100));
   const storageCeiling = usage.plan.storageBytes + usage.addonStorageBytes;
   const storagePercent = Math.min(100, Math.round((usage.storageBytesUsed / storageCeiling) * 100));
+  const aiPercent = Math.min(100, Math.round((usage.aiRepliesSentThisMonth / usage.plan.aiRepliesPerMonth) * 100));
   const emailExhausted = usage.emailsRemaining <= 0;
   const smsExhausted = usage.smsRemaining <= 0;
+  const aiExhausted = usage.aiRepliesRemaining <= 0;
   const storageExhausted = usage.storageBytesRemaining <= 0;
   // A send can legitimately push emailsSentThisMonth/smsSentThisMonth past
   // the plan's own monthly figure once add-on credits are covering the
@@ -22,6 +24,7 @@ export async function PlanUsageCard({ organizationId }: { organizationId: string
   // still show in the text next to it.
   const emailBarValue = Math.min(usage.emailsSentThisMonth, usage.plan.emailsPerMonth);
   const smsBarValue = Math.min(usage.smsSentThisMonth, usage.plan.smsPerMonth);
+  const aiBarValue = Math.min(usage.aiRepliesSentThisMonth, usage.plan.aiRepliesPerMonth);
 
   return (
     <Card className="max-w-lg">
@@ -33,7 +36,7 @@ export async function PlanUsageCard({ organizationId }: { organizationId: string
             {usage.plan.name}
           </Badge>
         </CardTitle>
-        <CardDescription>Shared email/SMS services and file storage, reset with your plan.</CardDescription>
+        <CardDescription>Shared email/SMS/AI reply services and file storage, reset with your plan.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-1.5">
@@ -83,6 +86,29 @@ export async function PlanUsageCard({ organizationId }: { organizationId: string
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">AI replies this month</span>
+            <span className={aiExhausted ? "font-medium text-destructive" : "font-medium"}>
+              {usage.aiRepliesSentThisMonth.toLocaleString()} / {usage.plan.aiRepliesPerMonth.toLocaleString()}
+            </span>
+          </div>
+          <Progress value={aiBarValue} max={usage.plan.aiRepliesPerMonth}>
+            <ProgressTrack>
+              <ProgressIndicator />
+            </ProgressTrack>
+          </Progress>
+          {usage.addonAiCredits > 0 && (
+            <p className="text-xs text-muted-foreground">+ {usage.addonAiCredits.toLocaleString()} add-on credits available</p>
+          )}
+          {aiExhausted && (
+            <p className="text-xs text-destructive">
+              You&apos;ve used this month&apos;s AI reply limit — Instagram AI mode will stop auto-replying until
+              next month, or upgrade your plan for more.
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Storage used</span>
             <span className={storageExhausted ? "font-medium text-destructive" : "font-medium"}>
               {formatBytes(usage.storageBytesUsed)} / {formatBytes(storageCeiling)}
@@ -104,7 +130,7 @@ export async function PlanUsageCard({ organizationId }: { organizationId: string
           )}
         </div>
 
-        {(emailPercent >= 90 || smsPercent >= 90 || storagePercent >= 90) && (
+        {(emailPercent >= 90 || smsPercent >= 90 || aiPercent >= 90 || storagePercent >= 90) && (
           <p className="text-xs text-muted-foreground">
             Need more room? Visit the Email page to raise a ticket, or contact us to upgrade your plan.
           </p>

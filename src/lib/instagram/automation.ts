@@ -194,14 +194,17 @@ const MAX_EVENTS_IN_CONTEXT = 8;
 // (events aren't stored per-occurrence) rather than returning the raw
 // recurrence pattern for the model to misinterpret.
 // Every query below selects only organization-level descriptive columns,
-// with one deliberate exception: a branch's designated leader name/phone
+// with one deliberate exception: a branch's manager (branches.managed_by,
+// resolved to that member's name/phone the same way BranchesManager.tsx's
+// own card display does — leader_name/leader_phone are dead legacy columns
+// with no UI to ever set them, confirmed empty on every branch tested)
 // IS included, on request, specifically so someone can be told how to
 // reach that location — that's public-facing contact info a church
 // chooses to publish, not private data about a congregant. Everything else
 // that identifies an individual stays excluded: who manages a ministry or
-// fundraiser (ministries.managed_by, branches.managed_by,
-// fundraisers.managed_by), and anything about a donor or form respondent
-// (donations, form_responses) — none of those are selected here.
+// fundraiser (ministries.managed_by, fundraisers.managed_by), and anything
+// about a donor or form respondent (donations, form_responses) — none of
+// those are selected here.
 export async function getOrganizationContextForAi(organizationId: string): Promise<string> {
   const supabase = createAdminClient();
   const siteUrl = getSiteUrl();
@@ -222,7 +225,7 @@ export async function getOrganizationContextForAi(organizationId: string): Promi
         .eq("organization_id", organizationId),
       supabase
         .from("branches")
-        .select("name, location, member_count, country, leader_name, leader_phone")
+        .select("name, location, member_count, country, members!branches_managed_by_fkey(first_name, last_name, phone)")
         .eq("organization_id", organizationId),
       supabase
         .from("fundraisers")
@@ -264,7 +267,9 @@ export async function getOrganizationContextForAi(organizationId: string): Promi
   const branchLines = (branches ?? []).map((b) => {
     const parts = [b.name];
     if (b.location) parts.push(b.location);
-    const contact = [b.leader_name, b.leader_phone].filter(Boolean).join(", ");
+    const manager = b.members;
+    const managerName = manager ? `${manager.first_name} ${manager.last_name}`.trim() : null;
+    const contact = [managerName, manager?.phone].filter(Boolean).join(", ");
     const line = parts.join(" — ");
     return contact ? `- ${line} (Contact: ${contact})` : `- ${line}`;
   });

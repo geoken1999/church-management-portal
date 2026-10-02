@@ -185,7 +185,19 @@ async function handleCommentChange(businessMessagingId: string, change: CommentC
 
   try {
     const accessToken = await getValidAccessToken(connection);
-    await sendPrivateReply(accessToken, commentId, automation.reply_template);
+    // A comment delivered via webhook can momentarily precede Instagram's
+    // own backend having it fully indexed — observed directly as a private
+    // reply failing once with Meta's generic "An unknown error has
+    // occurred" and then succeeding seconds later on an identical retry.
+    // One retry after a short pause covers that without risking a double
+    // send (hasAlreadyRepliedToComment above already guards redeliveries;
+    // this is the same request, not a new delivery).
+    try {
+      await sendPrivateReply(accessToken, commentId, automation.reply_template);
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await sendPrivateReply(accessToken, commentId, automation.reply_template);
+    }
     await recordCommentReply(connection.organization_id, commentId, automation.id);
   } catch (err) {
     await logPlatformEvent({

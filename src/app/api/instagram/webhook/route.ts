@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getInstagramEnv } from "@/lib/instagram/env";
 import { getValidAccessToken } from "@/lib/instagram/token";
 import { fetchConversationMessagesByParticipant, sendMessage, sendPrivateReply } from "@/lib/instagram/client";
-import { generateReply, type ChatTurn } from "@/lib/ai/openrouter";
+import { generateReply, type ChatTurn } from "@/lib/ai/openai";
 import {
   findConnectionByMessagingId,
   getAiModeForWebhook,
@@ -59,19 +59,57 @@ const AI_SYSTEM_PROMPT =
   "You are replying to Instagram direct messages on behalf of a church's Instagram account. " +
   "Keep replies short, warm, and natural, like a real person texting back. Never mention that you are an AI.";
 
+// Temporary verbose logging while tracking down why AI mode sometimes
+// doesn't reply at all (no error logged, just silence) — every exit point
+// logs which one it took, so the next real test pinpoints the exact
+// checkpoint instead of guessing. Remove once AI mode is confirmed stable.
 async function handleMessagingEvent(businessMessagingId: string, event: MessagingEvent): Promise<void> {
   const senderId = event.sender?.id;
   const text = event.message?.text;
+  const isEcho = event.message?.is_echo;
+
+  await logPlatformEvent({
+    level: "info",
+    source: "instagram_webhook",
+    message: "messaging event received",
+    metadata: { businessMessagingId, senderId, hasText: !!text, isEcho },
+  });
+
   // is_echo is Meta's own copy of a message *we* sent, delivered back
   // through the same webhook — without this check, every AI (or human)
   // reply would immediately re-trigger this handler on itself.
-  if (!senderId || !text || event.message?.is_echo || senderId === businessMessagingId) return;
+  if (!senderId || !text || isEcho || senderId === businessMessagingId) {
+    await logPlatformEvent({
+      level: "info",
+      source: "instagram_webhook",
+      message: "messaging event skipped: missing sender/text, echo, or self",
+      metadata: { businessMessagingId, senderId, isEcho },
+    });
+    return;
+  }
 
   const connection = await findConnectionByMessagingId(businessMessagingId);
-  if (!connection) return;
+  if (!connection) {
+    await logPlatformEvent({
+      level: "warning",
+      source: "instagram_webhook",
+      message: "messaging event skipped: no connection found for messaging id",
+      metadata: { businessMessagingId },
+    });
+    return;
+  }
 
   const aiEnabled = await getAiModeForWebhook(connection.organization_id, senderId);
-  if (!aiEnabled) return;
+  if (!aiEnabled) {
+    await logPlatformEvent({
+      level: "info",
+      source: "instagram_webhook",
+      message: "messaging event skipped: AI mode is off for this participant",
+      organizationId: connection.organization_id,
+      metadata: { senderId },
+    });
+    return;
+  }
 
   try {
     const accessToken = await getValidAccessToken(connection);
@@ -83,14 +121,38 @@ async function handleMessagingEvent(businessMessagingId: string, event: Messagin
         content: m.text as string,
       }));
 
+    await logPlatformEvent({
+      level: "info",
+      source: "instagram_webhook",
+      message: "generating AI reply",
+      organizationId: connection.organization_id,
+      metadata: { senderId, historyLength: history.length },
+    });
+
     const reply = await generateReply(AI_SYSTEM_PROMPT, history);
-    if (!reply) return;
+    if (!reply) {
+      await logPlatformEvent({
+        level: "warning",
+        source: "instagram_webhook",
+        message: "AI reply generation returned empty content",
+        organizationId: connection.organization_id,
+        metadata: { senderId },
+      });
+      return;
+    }
 
     // No tag here, ever: HUMAN_AGENT is reserved by Meta's policy for a
     // genuine human responding, explicitly prohibited for automated
     // messages — and unnecessary anyway, since this fires immediately off
     // an inbound message, well inside the normal 24-hour window.
     await sendMessage(accessToken, senderId, reply);
+    await logPlatformEvent({
+      level: "info",
+      source: "instagram_webhook",
+      message: "AI reply sent",
+      organizationId: connection.organization_id,
+      metadata: { senderId },
+    });
   } catch (err) {
     await logPlatformEvent({
       level: "warning",

@@ -93,8 +93,8 @@ function initial(name: string | null): string {
 // This app has no push channel for Instagram messages (no stored data to
 // subscribe to — everything is fetched live from the Graph API on demand),
 // so "real-time" here means polling on a short interval instead.
-const CONVERSATION_LIST_POLL_MS = 20_000;
-const MESSAGE_THREAD_POLL_MS = 8_000;
+const CONVERSATION_LIST_POLL_MS = 15_000;
+const MESSAGE_THREAD_POLL_MS = 4_000;
 
 // ---------------------------------------------------------------------------
 // Not connected
@@ -1013,6 +1013,45 @@ function FloatingChatWindow({
             onClose={onClose}
           />
         </div>
+      )}
+    </div>
+  );
+}
+
+// The full Messages experience as its own standalone unit (list + thread +
+// floating pop-out), used by the /instagram-messages popup window. Not just
+// InstagramMessagesTab alone — that tab's own "pop out" button needs
+// somewhere to render its floating window, which the embedded version gets
+// from the root InstagramManager; this is that same wiring, self-contained,
+// so pop-out still works inside the popup window instead of silently doing
+// nothing (there's no outer InstagramManager root there to host it).
+export function InstagramMessagesStandalone({
+  organizationId,
+  profileUsername,
+  initialConversations,
+}: {
+  organizationId: string;
+  profileUsername: string;
+  initialConversations: { items: InstagramConversation[]; nextCursor: string | null };
+}) {
+  const [poppedOut, setPoppedOut] = useState<InstagramConversation | null>(null);
+
+  return (
+    <div className="relative h-dvh">
+      <InstagramMessagesTab
+        organizationId={organizationId}
+        profileUsername={profileUsername}
+        initialConversations={initialConversations}
+        onPopOut={setPoppedOut}
+        fullHeight
+      />
+      {poppedOut && (
+        <FloatingChatWindow
+          organizationId={organizationId}
+          conversation={poppedOut}
+          profileUsername={profileUsername}
+          onClose={() => setPoppedOut(null)}
+        />
       )}
     </div>
   );

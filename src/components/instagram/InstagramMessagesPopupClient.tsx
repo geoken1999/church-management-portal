@@ -5,9 +5,10 @@ import type { InstagramDashboardData } from "@/lib/instagram/dal";
 
 // Same reasoning as InstagramManagerClient — avoids a server/client
 // hydration mismatch from locale- and Date.now()-dependent formatting.
-const InstagramMessagesTab = dynamic(() => import("./InstagramManager").then((mod) => mod.InstagramMessagesTab), {
-  ssr: false,
-});
+const InstagramMessagesStandalone = dynamic(
+  () => import("./InstagramManager").then((mod) => mod.InstagramMessagesStandalone),
+  { ssr: false },
+);
 
 export function InstagramMessagesPopupClient({
   organizationId,
@@ -25,11 +26,10 @@ export function InstagramMessagesPopupClient({
   }
 
   return (
-    <InstagramMessagesTab
+    <InstagramMessagesStandalone
       organizationId={organizationId}
       profileUsername={data.profile.username}
       initialConversations={data.conversations}
-      fullHeight
     />
   );
 }

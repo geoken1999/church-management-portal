@@ -193,14 +193,15 @@ const MAX_EVENTS_IN_CONTEXT = 8;
 // expands them the same way the dashboard's own calendar/list views do
 // (events aren't stored per-occurrence) rather than returning the raw
 // recurrence pattern for the model to misinterpret.
-// Every query below selects only organization-level descriptive columns —
-// never a column that names, contact-details, or otherwise identifies an
-// individual person (a leader's name/phone, who manages something, a
-// donor's name, a form response). Each table's full schema has columns
-// that DO carry that kind of data (ministries.managed_by,
-// branches.leader_name/leader_phone/managed_by, fundraisers.managed_by,
-// donations entirely); none of them are selected here, on purpose, per
-// "restrict for personal details."
+// Every query below selects only organization-level descriptive columns,
+// with one deliberate exception: a branch's designated leader name/phone
+// IS included, on request, specifically so someone can be told how to
+// reach that location — that's public-facing contact info a church
+// chooses to publish, not private data about a congregant. Everything else
+// that identifies an individual stays excluded: who manages a ministry or
+// fundraiser (ministries.managed_by, branches.managed_by,
+// fundraisers.managed_by), and anything about a donor or form respondent
+// (donations, form_responses) — none of those are selected here.
 export async function getOrganizationContextForAi(organizationId: string): Promise<string> {
   const supabase = createAdminClient();
   const siteUrl = getSiteUrl();
@@ -219,7 +220,10 @@ export async function getOrganizationContextForAi(organizationId: string): Promi
         .from("ministries")
         .select("title, type, vision, mission, started_on, future_plans")
         .eq("organization_id", organizationId),
-      supabase.from("branches").select("name, location, member_count, country").eq("organization_id", organizationId),
+      supabase
+        .from("branches")
+        .select("name, location, member_count, country, leader_name, leader_phone")
+        .eq("organization_id", organizationId),
       supabase
         .from("fundraisers")
         .select("id, title, description, goal_amount, start_date, end_date, share_token, payment_link_enabled, payment_mode")
@@ -257,7 +261,13 @@ export async function getOrganizationContextForAi(organizationId: string): Promi
   });
   const ministriesBlock = ministryLines.length > 0 ? ministryLines.join("\n") : null;
 
-  const branchLines = (branches ?? []).map((b) => (b.location ? `- ${b.name} — ${b.location}` : `- ${b.name}`));
+  const branchLines = (branches ?? []).map((b) => {
+    const parts = [b.name];
+    if (b.location) parts.push(b.location);
+    const contact = [b.leader_name, b.leader_phone].filter(Boolean).join(", ");
+    const line = parts.join(" — ");
+    return contact ? `- ${line} (Contact: ${contact})` : `- ${line}`;
+  });
   const branchesBlock = branchLines.length > 0 ? branchLines.join("\n") : null;
 
   // goal_amount is a stored column, but how much has actually been raised

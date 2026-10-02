@@ -1019,7 +1019,8 @@ export type NotificationType =
   | "youtube_live_started"
   | "facebook_post_created"
   | "facebook_post_updated"
-  | "support_ticket_reply";
+  | "support_ticket_reply"
+  | "instagram_ai_followup";
 
 export type Notification = {
   id: string;

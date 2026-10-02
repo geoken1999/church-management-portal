@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { NotificationType } from "@/types/database";
 
 // Not itself a Server Action — a plain server-only helper other Server
@@ -16,6 +17,27 @@ export async function createNotification(input: {
 }): Promise<void> {
   const supabase = await createClient();
   await supabase.from("notifications").insert({
+    organization_id: input.organizationId,
+    type: input.type,
+    title: input.title,
+    body: input.body ?? null,
+    link: input.link ?? null,
+  });
+}
+
+// Same insert, but via the admin client — for callers with no user session
+// to satisfy the "Admins can create notifications" RLS policy with (e.g.
+// the Instagram webhook, which runs on Meta's server-to-server calls, not
+// an authenticated request).
+export async function createNotificationForWebhook(input: {
+  organizationId: string;
+  type: NotificationType;
+  title: string;
+  body?: string | null;
+  link?: string | null;
+}): Promise<void> {
+  const admin = createAdminClient();
+  await admin.from("notifications").insert({
     organization_id: input.organizationId,
     type: input.type,
     title: input.title,

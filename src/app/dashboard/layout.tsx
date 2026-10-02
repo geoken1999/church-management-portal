@@ -48,7 +48,23 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       notifications={notifications}
       tabAccess={membership.tabAccess}
       planFeatures={{ finance: planUsage.plan.financeEnabled, socialMedia: planUsage.plan.socialMediaEnabled }}
-      creditBalances={{ sms: planUsage.smsRemaining, ai: planUsage.aiRepliesRemaining, email: planUsage.emailsRemaining }}
+      creditBalances={{
+        sms: {
+          planRemaining: Math.max(0, planUsage.plan.smsPerMonth - planUsage.smsSentThisMonth),
+          planLimit: planUsage.plan.smsPerMonth,
+          addon: planUsage.addonSmsCredits,
+        },
+        ai: {
+          planRemaining: Math.max(0, planUsage.plan.aiRepliesPerMonth - planUsage.aiRepliesSentThisMonth),
+          planLimit: planUsage.plan.aiRepliesPerMonth,
+          addon: planUsage.addonAiCredits,
+        },
+        email: {
+          planRemaining: Math.max(0, planUsage.plan.emailsPerMonth - planUsage.emailsSentThisMonth),
+          planLimit: planUsage.plan.emailsPerMonth,
+          addon: planUsage.addonEmailCredits,
+        },
+      }}
       trialDaysRemaining={planUsage.trialDaysRemaining}
       initialLocale={toAppLocale(profile?.locale)}
     >

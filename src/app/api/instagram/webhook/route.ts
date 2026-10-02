@@ -14,6 +14,7 @@ import {
   recordCommentReply,
 } from "@/lib/instagram/automation";
 import { hasAiCreditAvailableForWebhook, recordAiReplyUsageForWebhook } from "@/lib/plans/dal";
+import { createNotificationForWebhook } from "@/lib/notifications/create";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 
 // Meta's webhook verification handshake, run once when the Callback URL is
@@ -58,6 +59,14 @@ interface WebhookPayload {
   entry?: WebhookEntry[];
 }
 
+// Appended by the model to the very end of its reply, on its own line,
+// whenever it couldn't actually answer from the data it was given — parsed
+// back out below, stripped before the message is sent (the person reading
+// it on Instagram never sees this), and used purely as the signal to
+// notify staff. A sentinel string rather than a second "can you answer
+// this?" API call: cheaper, and avoids the two calls disagreeing.
+const STAFF_FOLLOWUP_MARKER = "[[NEEDS_STAFF_FOLLOWUP]]";
+
 function buildAiSystemPrompt(organizationContext: string): string {
   return [
     "You are replying to Instagram direct messages on behalf of a church's Instagram account.",
@@ -65,13 +74,18 @@ function buildAiSystemPrompt(organizationContext: string): string {
     "",
     "Use the organization data below to answer questions about events, ministries, locations, fundraisers, or",
     "forms accurately. Only state details (names, dates, times, amounts, links) that appear below — never invent",
-    "or guess ones that aren't listed. If someone asks about something not covered here, say you're not sure and",
-    "suggest they check back or ask a staff member, rather than making something up.",
+    "or guess ones that aren't listed.",
     "",
-    "Never share or guess any individual person's personal details — names, phone numbers, emails, addresses,",
-    "donation history, attendance, or any other private information about a specific staff member, leader,",
-    "volunteer, or congregant. The data below deliberately contains none of that; if asked for it, say that's",
-    "not something you can share and suggest contacting the church directly.",
+    "If someone asks something you can't answer from the data below, don't guess or make something up. Instead,",
+    "tell them warmly that it's outside what you can help with right now and that you've let the team know to",
+    "follow up with them directly — then, on its own new line at the very end of your reply, add exactly:",
+    STAFF_FOLLOWUP_MARKER,
+    "",
+    "Branch/location contact names and phone numbers below ARE meant to be shared — that's how someone reaches a",
+    "specific location, and the church has chosen to publish it. That's different from anything else about a",
+    "specific individual: never share or guess a staff member's, leader's, volunteer's, or congregant's personal",
+    "details beyond that — no donation history, attendance, or other private information. The data below",
+    "deliberately contains none of that; if asked for it, say that's not something you can share.",
     "",
     organizationContext,
   ].join("\n");
@@ -152,6 +166,7 @@ async function handleMessagingEvent(businessMessagingId: string, event: Messagin
         role: m.fromUsername === connection.username ? "assistant" : "user",
         content: m.text as string,
       }));
+    const senderUsername = recent.find((m) => m.fromUsername && m.fromUsername !== connection.username)?.fromUsername;
 
     await logPlatformEvent({
       level: "info",
@@ -173,20 +188,33 @@ async function handleMessagingEvent(businessMessagingId: string, event: Messagin
       return;
     }
 
+    const needsStaffFollowUp = reply.includes(STAFF_FOLLOWUP_MARKER);
+    const outgoingReply = reply.replace(STAFF_FOLLOWUP_MARKER, "").trim();
+
     // No tag here, ever: HUMAN_AGENT is reserved by Meta's policy for a
     // genuine human responding, explicitly prohibited for automated
     // messages — and unnecessary anyway, since this fires immediately off
     // an inbound message, well inside the normal 24-hour window.
-    await sendMessage(accessToken, senderId, reply);
+    await sendMessage(accessToken, senderId, outgoingReply);
     // Only charged on a confirmed send — a failed generation or Graph API
     // call shouldn't cost the org a credit.
     await recordAiReplyUsageForWebhook(connection.organization_id, senderId);
+
+    if (needsStaffFollowUp) {
+      await createNotificationForWebhook({
+        organizationId: connection.organization_id,
+        type: "instagram_ai_followup",
+        title: "Instagram DM needs a staff reply",
+        body: `@${senderUsername ?? "Someone"} asked something the AI couldn't answer from your organization's data. Open the conversation to follow up directly.`,
+        link: "/dashboard/instagram",
+      });
+    }
     await logPlatformEvent({
       level: "info",
       source: "instagram_webhook",
       message: "AI reply sent",
       organizationId: connection.organization_id,
-      metadata: { senderId },
+      metadata: { senderId, needsStaffFollowUp },
     });
   } catch (err) {
     await logPlatformEvent({

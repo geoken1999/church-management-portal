@@ -55,7 +55,7 @@ import { SpotlightTour, type SpotlightStep } from "@/components/dashboard/Spotli
 import { completeTour } from "@/lib/organizations/actions";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { CreditBalances } from "@/components/dashboard/CreditBalances";
+import { CreditBalances, type CreditWallet } from "@/components/dashboard/CreditBalances";
 import { DashboardLocaleProvider } from "@/lib/i18n/DashboardLocaleProvider";
 import { useLocale } from "@/lib/i18n/LocaleContext";
 import type { AppLocale } from "@/lib/i18n/config";
@@ -181,7 +181,7 @@ export function DashboardShell(
     notifications: Notification[];
     tabAccess: Record<TabKey, TabAccess>;
     planFeatures: { finance: boolean; socialMedia: boolean };
-    creditBalances: { sms: number; ai: number; email: number };
+    creditBalances: { sms: CreditWallet; ai: CreditWallet; email: CreditWallet };
     trialDaysRemaining: number | null;
     initialLocale: AppLocale;
     children: ReactNode;
@@ -212,7 +212,7 @@ function DashboardShellInner({
   notifications: Notification[];
   tabAccess: Record<TabKey, TabAccess>;
   planFeatures: { finance: boolean; socialMedia: boolean };
-  creditBalances: { sms: number; ai: number; email: number };
+  creditBalances: { sms: CreditWallet; ai: CreditWallet; email: CreditWallet };
   trialDaysRemaining: number | null;
   children: ReactNode;
 }) {
@@ -333,8 +333,8 @@ function DashboardShellInner({
   );
 
   return (
-    <div className="min-h-screen bg-background lg:flex">
-      <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:border-r lg:border-border lg:bg-card print:hidden">
+    <div className="min-h-screen bg-background lg:flex lg:h-screen lg:overflow-hidden">
+      <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:overflow-y-auto lg:border-r lg:border-border lg:bg-card print:hidden">
         {orgHeader}
         <Separator />
         {nav}
@@ -366,7 +366,7 @@ function DashboardShellInner({
         </div>
       )}
 
-      <div className="flex min-h-screen flex-1 flex-col">
+      <div className="flex min-h-screen flex-1 flex-col lg:h-screen lg:min-h-0 lg:overflow-hidden">
         <header className="border-b border-border bg-card print:hidden">
           <div className="flex items-center justify-between px-4 py-4 sm:px-6">
             <Button
@@ -401,7 +401,9 @@ function DashboardShellInner({
             )}
           </div>
         )}
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6 print:max-w-none print:p-0">{children}</main>
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6 lg:overflow-y-auto print:max-w-none print:p-0">
+          {children}
+        </main>
       </div>
 
       <WelcomeTour open={tourOpen} onOpenChange={setTourOpen} onSkip={handleTourSkip} onFinish={handleTourFinish} />

@@ -1,13 +1,16 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { MessageCircle, Search, Send, TriangleAlert, Landmark, User } from "lucide-react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { MessageCircle, Search, Send, Sparkles, TriangleAlert, Landmark, User } from "lucide-react";
 import {
   saveOwnWhatsAppAccount,
   removeOwnWhatsAppAccount,
   sendBulkWhatsAppAction,
   sendWhatsAppReplyAction,
   markWhatsAppConversationRead,
+  getWhatsAppAiMode,
+  setWhatsAppAiMode,
+  getWhatsAppAiTypingState,
   type WhatsAppAccountState,
   type SendWhatsAppState,
 } from "@/lib/whatsapp/actions";
@@ -505,10 +508,48 @@ function WhatsAppHistory({ campaigns }: { campaigns: WhatsAppCampaignRow[] }) {
 // Chat — 'own' mode only
 // ---------------------------------------------------------------------------
 
-function ChatThread({ conversationId, messages }: { conversationId: string; messages: WhatsAppMessageRow[] }) {
+const AI_TYPING_POLL_MS = 2000;
+
+function ChatThread({
+  organizationId,
+  conversationId,
+  phoneNumber,
+  messages,
+}: {
+  organizationId: string;
+  conversationId: string;
+  phoneNumber: string;
+  messages: WhatsAppMessageRow[];
+}) {
   const [body, setBody] = useState("");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [aiMode, setAiModeState] = useState(false);
+  const [aiTyping, setAiTyping] = useState(false);
+  const [aiModePending, startAiModeTransition] = useTransition();
+
+  useEffect(() => {
+    getWhatsAppAiMode(organizationId, phoneNumber).then(setAiModeState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Only polled while AI mode is actually on — same reasoning as the
+  // Instagram conversation view's identical effect.
+  useEffect(() => {
+    if (!aiMode) return;
+    function poll() {
+      getWhatsAppAiTypingState(organizationId, phoneNumber).then(setAiTyping);
+    }
+    poll();
+    const interval = setInterval(poll, AI_TYPING_POLL_MS);
+    return () => clearInterval(interval);
+  }, [aiMode, organizationId, phoneNumber]);
+
+  function handleToggleAiMode() {
+    const next = !aiMode;
+    setAiModeState(next);
+    startAiModeTransition(() => setWhatsAppAiMode(organizationId, phoneNumber, next));
+  }
 
   function handleSend() {
     if (!body.trim()) return;
@@ -523,8 +564,23 @@ function ChatThread({ conversationId, messages }: { conversationId: string; mess
     });
   }
 
+  const replyDisabled = pending || (aiMode && aiTyping);
+
   return (
     <div className="flex h-[28rem] flex-col">
+      <div className="flex items-center justify-end gap-2 border-b border-border px-3 py-2">
+        <Button
+          type="button"
+          variant={aiMode ? "default" : "outline"}
+          size="sm"
+          onClick={handleToggleAiMode}
+          disabled={aiModePending}
+          title="When on, AI replies to this person automatically with no review"
+        >
+          <Sparkles className="size-3.5" />
+          AI mode {aiMode ? "on" : "off"}
+        </Button>
+      </div>
       <div className="flex-1 space-y-2 overflow-y-auto p-3">
         {messages.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">No messages yet.</p>
@@ -540,6 +596,14 @@ function ChatThread({ conversationId, messages }: { conversationId: string; mess
             </div>
           ))
         )}
+        {aiMode && aiTyping && (
+          <div className="flex justify-start">
+            <div className="flex items-center gap-1 rounded-lg bg-muted px-3 py-2">
+              <Sparkles className="size-3.5 shrink-0 text-primary" />
+              <span className="text-xs text-muted-foreground">AI is typing...</span>
+            </div>
+          </div>
+        )}
       </div>
       <div className="border-t border-border p-3">
         {error && (
@@ -551,9 +615,10 @@ function ChatThread({ conversationId, messages }: { conversationId: string; mess
           <Textarea
             value={body}
             onChange={(event) => setBody(event.target.value)}
-            placeholder="Type a reply..."
+            placeholder={aiMode && aiTyping ? "AI is replying..." : "Type a reply..."}
             rows={2}
             className="flex-1"
+            disabled={replyDisabled}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
@@ -561,7 +626,7 @@ function ChatThread({ conversationId, messages }: { conversationId: string; mess
               }
             }}
           />
-          <Button type="button" size="icon" onClick={handleSend} disabled={pending || !body.trim()}>
+          <Button type="button" size="icon" onClick={handleSend} disabled={replyDisabled || !body.trim()}>
             <Send className="size-4" />
           </Button>
         </div>
@@ -571,7 +636,7 @@ function ChatThread({ conversationId, messages }: { conversationId: string; mess
   );
 }
 
-function ChatInbox({ conversations }: { conversations: WhatsAppConversationRow[] }) {
+function ChatInbox({ organizationId, conversations }: { organizationId: string; conversations: WhatsAppConversationRow[] }) {
   const [activeId, setActiveId] = useState<string | null>(conversations[0]?.id ?? null);
   const [, startTransition] = useTransition();
 
@@ -630,7 +695,17 @@ function ChatInbox({ conversations }: { conversations: WhatsAppConversationRow[]
             );
           })}
         </div>
-        <div>{active && <ChatThread key={active.id} conversationId={active.id} messages={active.messages} />}</div>
+        <div>
+          {active && (
+            <ChatThread
+              key={active.id}
+              organizationId={organizationId}
+              conversationId={active.id}
+              phoneNumber={active.phone_number}
+              messages={active.messages}
+            />
+          )}
+        </div>
       </div>
     </Card>
   );
@@ -705,7 +780,7 @@ export function WhatsAppManager({
         </TabsPanel>
         <TabsPanel value="chat">
           {hasOwnAccount ? (
-            <ChatInbox conversations={conversations} />
+            <ChatInbox organizationId={organizationId} conversations={conversations} />
           ) : (
             <Card>
               <CardContent className="py-10 text-center text-sm text-muted-foreground">

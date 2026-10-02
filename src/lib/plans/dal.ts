@@ -443,7 +443,11 @@ export async function hasAiCreditAvailableForWebhook(organizationId: string): Pr
 // seconds apart around one OpenAI + one Graph API call, not a hot loop, so
 // the tiny race window this leaves is the same kind already accepted
 // throughout this file.
-export async function recordAiReplyUsageForWebhook(organizationId: string, participantId: string): Promise<void> {
+export async function recordAiReplyUsageForWebhook(
+  organizationId: string,
+  participantId: string,
+  source: "instagram" | "whatsapp" = "instagram",
+): Promise<void> {
   const admin = createAdminClient();
   const [plan, { data: org }, { count: usedThisMonth }] = await Promise.all([
     resolveEffectivePlanForWebhook(organizationId),
@@ -463,5 +467,5 @@ export async function recordAiReplyUsageForWebhook(organizationId: string, parti
       .eq("id", organizationId);
   }
 
-  await admin.from("ai_reply_usage").insert({ organization_id: organizationId, participant_id: participantId });
+  await admin.from("ai_reply_usage").insert({ organization_id: organizationId, participant_id: participantId, source });
 }

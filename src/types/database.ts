@@ -413,6 +413,20 @@ export type InstagramAiMode = {
   updated_at: string;
 };
 
+// Mirrors InstagramAiMode exactly, keyed by phone_number instead of
+// participant_id (WhatsApp conversations are already keyed by phone number
+// everywhere else in this schema).
+export type WhatsAppAiMode = {
+  id: string;
+  organization_id: string;
+  phone_number: string;
+  enabled: boolean;
+  is_typing: boolean;
+  typing_started_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type InstagramCommentAutomation = {
   id: string;
   organization_id: string;
@@ -441,10 +455,10 @@ export type AiReplyUsage = {
   id: string;
   organization_id: string;
   participant_id: string | null;
-  // 'instagram' (DM auto-replies) or 'ask_aura' (internal chat tool) — both
-  // draw from the same shared monthly quota/addon pool, tagged here purely
-  // for observability.
-  source: "instagram" | "ask_aura";
+  // 'instagram'/'whatsapp' (DM auto-replies) or 'ask_aura' (internal chat
+  // tool) — all three draw from the same shared monthly quota/addon pool,
+  // tagged here purely for observability.
+  source: "instagram" | "ask_aura" | "whatsapp";
   created_at: string;
 };
 
@@ -1053,7 +1067,8 @@ export type NotificationType =
   | "facebook_post_created"
   | "facebook_post_updated"
   | "support_ticket_reply"
-  | "instagram_ai_followup";
+  | "instagram_ai_followup"
+  | "whatsapp_ai_followup";
 
 export type Notification = {
   id: string;
@@ -2113,6 +2128,20 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "instagram_ai_mode_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      whatsapp_ai_mode: {
+        Row: WhatsAppAiMode;
+        Insert: Partial<WhatsAppAiMode> & Pick<WhatsAppAiMode, "organization_id" | "phone_number">;
+        Update: Partial<WhatsAppAiMode>;
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_ai_mode_organization_id_fkey";
             columns: ["organization_id"];
             isOneToOne: false;
             referencedRelation: "organizations";

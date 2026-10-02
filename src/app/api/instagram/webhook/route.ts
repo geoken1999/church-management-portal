@@ -8,11 +8,11 @@ import {
   findConnectionByMessagingId,
   getAiModeForWebhook,
   setAiTypingForWebhook,
-  getOrganizationContextForAi,
   findMatchingCommentAutomation,
   hasAlreadyRepliedToComment,
   recordCommentReply,
 } from "@/lib/instagram/automation";
+import { getOrganizationContextForAi } from "@/lib/ai/organization-context";
 import { hasAiCreditAvailableForWebhook, recordAiReplyUsageForWebhook } from "@/lib/plans/dal";
 import { createNotificationForWebhook } from "@/lib/notifications/create";
 import { logPlatformEvent } from "@/lib/platform-events/log";

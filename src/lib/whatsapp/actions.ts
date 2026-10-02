@@ -9,6 +9,7 @@ import { checkWhatsAppQuota } from "@/lib/plans/dal";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { sendBulkWhatsApp, sendWhatsAppMessage } from "@/lib/whatsapp/client";
 import { resolveWhatsAppCredentials } from "@/lib/whatsapp/credentials";
+import { getAiMode, setAiMode, getAiTypingState } from "@/lib/whatsapp/automation";
 import {
   normalizePhoneNumber,
   validateWhatsAppBody,
@@ -281,4 +282,23 @@ export async function markWhatsAppConversationRead(conversationId: string) {
 
   await admin.from("whatsapp_conversations").update({ unread_count: 0 }).eq("id", conversationId);
   revalidatePath(WHATSAPP_PATH);
+}
+
+export async function getWhatsAppAiMode(organizationId: string, phoneNumber: string): Promise<boolean> {
+  await requireUser();
+  return getAiMode(organizationId, phoneNumber);
+}
+
+// Turning this on hands the conversation to the webhook handler entirely
+// (see /api/whatsapp/webhook/[organizationId]'s POST) — every inbound
+// message from this number gets an AI-generated reply sent automatically,
+// with no human review, for as long as it stays enabled.
+export async function setWhatsAppAiMode(organizationId: string, phoneNumber: string, enabled: boolean): Promise<void> {
+  await requireUser();
+  await setAiMode(organizationId, phoneNumber, enabled);
+}
+
+export async function getWhatsAppAiTypingState(organizationId: string, phoneNumber: string): Promise<boolean> {
+  await requireUser();
+  return getAiTypingState(organizationId, phoneNumber);
 }

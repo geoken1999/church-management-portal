@@ -15,6 +15,40 @@ export async function getAiMode(organizationId: string, participantId: string): 
   return data?.enabled ?? false;
 }
 
+// A stuck "typing" flag (the webhook invocation crashed or timed out
+// before reaching its finally block) would otherwise permanently disable
+// the reply box — anything older than this is treated as stale and ignored
+// rather than trusted, since a real generation finishes in a few seconds.
+const TYPING_STALE_MS = 25_000;
+
+export async function getAiTypingState(organizationId: string, participantId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("instagram_ai_mode")
+    .select("is_typing, typing_started_at")
+    .eq("organization_id", organizationId)
+    .eq("participant_id", participantId)
+    .maybeSingle();
+
+  if (!data?.is_typing || !data.typing_started_at) return false;
+  return Date.now() - new Date(data.typing_started_at).getTime() < TYPING_STALE_MS;
+}
+
+// Webhook-only (service client — no user session to scope an RLS-governed
+// client to there).
+export async function setAiTypingForWebhook(
+  organizationId: string,
+  participantId: string,
+  typing: boolean,
+): Promise<void> {
+  const supabase = createAdminClient();
+  await supabase
+    .from("instagram_ai_mode")
+    .update({ is_typing: typing, typing_started_at: typing ? new Date().toISOString() : null })
+    .eq("organization_id", organizationId)
+    .eq("participant_id", participantId);
+}
+
 export async function setAiMode(organizationId: string, participantId: string, enabled: boolean): Promise<void> {
   const supabase = await createClient();
   await supabase

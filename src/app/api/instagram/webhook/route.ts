@@ -7,6 +7,7 @@ import { generateReply, type ChatTurn } from "@/lib/ai/openai";
 import {
   findConnectionByMessagingId,
   getAiModeForWebhook,
+  setAiTypingForWebhook,
   findMatchingCommentAutomation,
   hasAlreadyRepliedToComment,
   recordCommentReply,
@@ -111,6 +112,10 @@ async function handleMessagingEvent(businessMessagingId: string, event: Messagin
     return;
   }
 
+  // Signals the dashboard's open conversation view to show a typing
+  // indicator and disable the reply box — cleared in `finally` below no
+  // matter how this turns out, so a failure never leaves it stuck.
+  await setAiTypingForWebhook(connection.organization_id, senderId, true);
   try {
     const accessToken = await getValidAccessToken(connection);
     const recent = await fetchConversationMessagesByParticipant(accessToken, senderId, 10);
@@ -160,6 +165,8 @@ async function handleMessagingEvent(businessMessagingId: string, event: Messagin
       message: `AI auto-reply failed: ${err instanceof Error ? err.message : "unknown error"}`,
       organizationId: connection.organization_id,
     });
+  } finally {
+    await setAiTypingForWebhook(connection.organization_id, senderId, false);
   }
 }
 

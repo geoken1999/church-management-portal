@@ -395,6 +395,11 @@ export type InstagramAiMode = {
   organization_id: string;
   participant_id: string;
   enabled: boolean;
+  // Signals "AI is composing a reply right now" across the webhook
+  // (writer) and the dashboard's open conversation view (reader) — set
+  // true just before generating a reply, cleared once sent or failed.
+  is_typing: boolean;
+  typing_started_at: string | null;
   created_at: string;
   updated_at: string;
 };

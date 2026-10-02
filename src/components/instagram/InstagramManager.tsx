@@ -28,6 +28,7 @@ import {
   markInstagramConversationRead,
   getInstagramAiMode,
   setInstagramAiMode,
+  getInstagramAiTypingState,
   listCommentAutomations,
   addCommentAutomation,
   toggleCommentAutomation,
@@ -95,6 +96,7 @@ function initial(name: string | null): string {
 // so "real-time" here means polling on a short interval instead.
 const CONVERSATION_LIST_POLL_MS = 15_000;
 const MESSAGE_THREAD_POLL_MS = 4_000;
+const AI_TYPING_POLL_MS = 2_000;
 
 // ---------------------------------------------------------------------------
 // Not connected
@@ -624,6 +626,8 @@ function ConversationThread({
   const [sending, startSending] = useTransition();
   const [aiMode, setAiMode] = useState(false);
   const [aiModePending, startAiModeTransition] = useTransition();
+  const [aiTyping, setAiTyping] = useState(false);
+  const showTyping = aiMode && aiTyping;
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -646,7 +650,7 @@ function ConversationThread({
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages, loading]);
+  }, [messages, loading, showTyping]);
 
   useEffect(() => {
     markInstagramConversationRead(organizationId, conversation.id);
@@ -659,6 +663,21 @@ function ConversationThread({
     getInstagramAiMode(organizationId, conversation.participantId).then(setAiMode);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Only polled while AI mode is actually on — there's nothing to show
+  // otherwise, no point spending a request every 2s on it. Render sites
+  // below check `aiMode && aiTyping` rather than resetting this state here
+  // when AI mode turns off, to avoid a synchronous setState-in-effect.
+  useEffect(() => {
+    if (!aiMode || !conversation.participantId) return;
+    const participantId = conversation.participantId;
+    function poll() {
+      getInstagramAiTypingState(organizationId, participantId).then(setAiTyping);
+    }
+    poll();
+    const interval = setInterval(poll, AI_TYPING_POLL_MS);
+    return () => clearInterval(interval);
+  }, [aiMode, organizationId, conversation.participantId]);
 
   function handleToggleAiMode() {
     if (!conversation.participantId) return;
@@ -770,6 +789,15 @@ function ConversationThread({
             </div>
           );
         })}
+        {showTyping && (
+          <div className="flex justify-end">
+            <div className="flex items-center gap-1 rounded-2xl rounded-br-sm bg-muted px-3.5 py-2.5">
+              <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
+              <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
+              <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground" />
+            </div>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -804,11 +832,12 @@ function ConversationThread({
             value={reply}
             onChange={(e) => setReply(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a reply..."
+            placeholder={showTyping ? "AI is replying..." : "Type a reply..."}
             rows={1}
+            disabled={showTyping}
             className="max-h-32 flex-1 resize-none"
           />
-          <Button type="button" size="icon" onClick={handleSend} disabled={sending || !reply.trim()}>
+          <Button type="button" size="icon" onClick={handleSend} disabled={sending || showTyping || !reply.trim()}>
             <Send className="size-4" />
           </Button>
         </div>

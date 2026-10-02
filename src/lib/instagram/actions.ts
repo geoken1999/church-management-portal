@@ -17,6 +17,7 @@ import {
 import {
   getAiMode,
   setAiMode,
+  getAiTypingState,
   getCommentAutomations,
   createCommentAutomation,
   setCommentAutomationEnabled,
@@ -154,6 +155,11 @@ export async function getInstagramAiMode(organizationId: string, participantId: 
 export async function setInstagramAiMode(organizationId: string, participantId: string, enabled: boolean): Promise<void> {
   await requireUser();
   await setAiMode(organizationId, participantId, enabled);
+}
+
+export async function getInstagramAiTypingState(organizationId: string, participantId: string): Promise<boolean> {
+  await requireUser();
+  return getAiTypingState(organizationId, participantId);
 }
 
 export async function listCommentAutomations(organizationId: string): Promise<InstagramCommentAutomation[]> {

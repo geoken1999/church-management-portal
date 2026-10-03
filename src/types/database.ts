@@ -432,14 +432,25 @@ export type WhatsAppAiMode = {
 // are allowed to draw from — see src/lib/ai-rules/dal.ts.
 export type AiDataAccessRules = {
   organization_id: string;
+  // Staff-only — Ask Aura only, no Instagram/WhatsApp equivalent exists.
   allow_attendance: boolean;
   allow_members: boolean;
   allow_finance: boolean;
+  // Ask Aura has tools for these two, so they keep their own flag
+  // independent of whichever public channels are also allowed to use them.
   allow_fundraisers: boolean;
   allow_events: boolean;
-  allow_ministries: boolean;
-  allow_branches: boolean;
-  allow_forms: boolean;
+  allow_fundraisers_instagram: boolean;
+  allow_fundraisers_whatsapp: boolean;
+  allow_events_instagram: boolean;
+  allow_events_whatsapp: boolean;
+  // Ask Aura has no tool for these — Instagram/WhatsApp only.
+  allow_ministries_instagram: boolean;
+  allow_ministries_whatsapp: boolean;
+  allow_branches_instagram: boolean;
+  allow_branches_whatsapp: boolean;
+  allow_forms_instagram: boolean;
+  allow_forms_whatsapp: boolean;
   updated_by: string | null;
   updated_at: string;
 };

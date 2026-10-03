@@ -157,7 +157,7 @@ async function handleMessagingEvent(businessMessagingId: string, event: Messagin
   try {
     const [accessToken, organizationContext] = await Promise.all([
       getValidAccessToken(connection),
-      getOrganizationContextForAi(connection.organization_id),
+      getOrganizationContextForAi(connection.organization_id, "instagram"),
     ]);
     const recent = await fetchConversationMessagesByParticipant(accessToken, senderId, 10);
     const history: ChatTurn[] = recent

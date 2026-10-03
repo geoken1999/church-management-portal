@@ -3,7 +3,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOccurrencesInRange } from "@/lib/events/recurrence";
 import { getSiteUrl } from "@/lib/site-url";
-import { getAiDataAccessRules } from "@/lib/ai-rules/dal";
+import { getAiDataAccessRules, rulesForChannel, type AiReplyChannel } from "@/lib/ai-rules/dal";
 
 // Shared by every channel's AI auto-reply (Instagram DMs, WhatsApp) — gives
 // the model real organization data to answer from instead of generic
@@ -28,10 +28,14 @@ import { getAiDataAccessRules } from "@/lib/ai-rules/dal";
 const EVENTS_LOOKAHEAD_DAYS = 60;
 const MAX_EVENTS_IN_CONTEXT = 8;
 
-export async function getOrganizationContextForAi(organizationId: string): Promise<string> {
+// `channel` picks which side of AI Rules' per-channel toggles applies —
+// Instagram and WhatsApp can be configured independently (e.g. share
+// fundraisers over WhatsApp but not Instagram), so the same org can get a
+// different context block for each bot.
+export async function getOrganizationContextForAi(organizationId: string, channel: AiReplyChannel): Promise<string> {
   const supabase = createAdminClient();
   const siteUrl = getSiteUrl();
-  const rules = await getAiDataAccessRules(organizationId);
+  const rules = rulesForChannel(await getAiDataAccessRules(organizationId), channel);
 
   // Each category this organization has turned off in AI Rules is never
   // even queried, not just hidden from the assembled text below — the

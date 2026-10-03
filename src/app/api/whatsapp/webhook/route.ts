@@ -107,7 +107,7 @@ async function handleWhatsAppAiReply(organizationId: string, phoneNumber: string
   await setAiTypingForWebhook(organizationId, phoneNumber, true);
   try {
     const [organizationContext, { data: recent }] = await Promise.all([
-      getOrganizationContextForAi(organizationId),
+      getOrganizationContextForAi(organizationId, "whatsapp"),
       admin
         .from("whatsapp_messages")
         .select("direction, body")

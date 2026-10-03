@@ -31,14 +31,35 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const REACTIONS = ["👍", "❤️", "😂", "👏", "🎉"];
 
-// A video tile's aspect ratio follows the actual camera stream's own
-// orientation (read off the MediaStreamTrack's settings) rather than the
-// viewer's own window width — a phone's camera is portrait regardless of
-// how wide the person looking at it has their browser, and vice versa.
-function orientationFromTrack(track: MediaStreamTrack | undefined): "portrait" | "landscape" {
-  const settings = track?.getSettings?.();
-  if (settings?.width && settings?.height && settings.height > settings.width) return "portrait";
-  return "landscape";
+// A video tile's aspect ratio follows the camera's actual orientation
+// rather than the viewer's own window width — a phone's camera renders
+// portrait regardless of how wide the person looking at it has their
+// browser, and vice versa. Read from the <video> element's own decoded
+// videoWidth/videoHeight (via the loadedmetadata event) rather than
+// MediaStreamTrack.getSettings(): settings reports the sensor's raw
+// capture resolution, which several mobile browsers (confirmed on real
+// devices, not just this app's own testing) report in landscape terms
+// even when the phone is held upright and the frame is actually rotated
+// before being handed to WebRTC — videoWidth/videoHeight reflects what
+// the browser actually decodes and displays, the only number that
+// matches what a viewer will really see.
+function useVideoOrientation(videoRef: React.RefObject<HTMLVideoElement | null>, deps: readonly unknown[]): "portrait" | "landscape" {
+  const [orientation, setOrientation] = useState<"portrait" | "landscape">("landscape");
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    function handleLoadedMetadata() {
+      if (video && video.videoWidth && video.videoHeight) {
+        setOrientation(video.videoHeight > video.videoWidth ? "portrait" : "landscape");
+      }
+    }
+    video.addEventListener("loadedmetadata", handleLoadedMetadata);
+    return () => video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+
+  return orientation;
 }
 
 // A participant's video and audio are separate concerns in this SDK —
@@ -52,11 +73,7 @@ function ParticipantTile({ participantId, isModerator }: { participantId: string
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const screenRef = useRef<HTMLVideoElement>(null);
-  // Derived straight from the track on every render rather than cached in
-  // state — a plain, pure read of the track's current settings, and some
-  // devices renegotiate resolution mid-call, so re-deriving naturally
-  // stays correct without an effect to keep it in sync.
-  const orientation = webcamOn && webcamStream ? orientationFromTrack(webcamStream.track) : "landscape";
+  const orientation = useVideoOrientation(videoRef, [webcamStream]);
 
   useEffect(() => {
     if (!videoRef.current) return;
@@ -648,7 +665,7 @@ function PreJoinLobby({ title, canJoin, onJoin }: { title: string; canJoin: bool
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
-  const orientation = stream ? orientationFromTrack(stream.getVideoTracks()[0]) : "landscape";
+  const orientation = useVideoOrientation(videoRef, [stream]);
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [mics, setMics] = useState<MediaDeviceInfo[]>([]);
   const [cameraId, setCameraId] = useState("");

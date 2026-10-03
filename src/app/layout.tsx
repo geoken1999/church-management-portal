@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, Geist_Mono } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
+import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
 // DM Sans: matches the KingdomFlow reference design (launchpados.in) — one
@@ -39,6 +40,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${dmSans.variable} ${geistMono.variable} h-full antialiased`}
+      // next-themes sets the `dark`/`light` class on <html> itself via a
+      // blocking inline script before hydration (to avoid a flash of the
+      // wrong theme) — that script's output necessarily differs from what
+      // the server rendered, so this element needs the same suppression
+      // <body> already has below for the same class-of-reason.
+      suppressHydrationWarning
     >
       {/* suppressHydrationWarning: some browser extensions (e.g. ColorZilla)
           inject attributes like cz-shortcut-listen onto <body> before React
@@ -46,12 +53,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           code, not a real server/client mismatch, so it's silenced here
           rather than "fixed" (there's nothing in our render to fix). */}
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
-        {/* Shows a top progress bar on every route transition — App Router
-            gives no built-in "navigation pending" signal, and per-page
-            loading.tsx skeletons would mean writing one per route, so this
-            covers "any page is loading" uniformly from one place. */}
-        <NextTopLoader color="var(--primary)" showSpinner={false} />
-        {children}
+        <ThemeProvider>
+          {/* Shows a top progress bar on every route transition — App Router
+              gives no built-in "navigation pending" signal, and per-page
+              loading.tsx skeletons would mean writing one per route, so this
+              covers "any page is loading" uniformly from one place. */}
+          <NextTopLoader color="var(--primary)" showSpinner={false} />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

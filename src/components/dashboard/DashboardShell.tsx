@@ -57,6 +57,7 @@ import { SpotlightTour, type SpotlightStep } from "@/components/dashboard/Spotli
 import { completeTour } from "@/lib/organizations/actions";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { ThemeToggle } from "@/components/ThemeToggleLoader";
 import { CreditBalances, type CreditWallet } from "@/components/dashboard/CreditBalances";
 import { DashboardLocaleProvider } from "@/lib/i18n/DashboardLocaleProvider";
 import { useLocale } from "@/lib/i18n/LocaleContext";
@@ -390,6 +391,7 @@ function DashboardShellInner({
             </Button>
             <div className="ml-auto flex items-center gap-2">
               <CreditBalances sms={creditBalances.sms} ai={creditBalances.ai} email={creditBalances.email} />
+              <ThemeToggle />
               <LanguageSwitcher />
               <NotificationBell organizationId={organization.id} initialNotifications={notifications} />
               <LogoutButton />

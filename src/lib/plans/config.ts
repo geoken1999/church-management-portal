@@ -123,6 +123,13 @@ export const PLANS: Record<PlanId, PlanLimits> = {
   }),
 };
 
+// K-Audio's limit is always K-meet's limit + 10 minutes (unlimited stays
+// unlimited) — a relative rule, not an independent number, so it can
+// never drift out of sync if K-meet's own limits ever change.
+export function kaudioMaxDurationMinutes(plan: PlanLimits): number | null {
+  return plan.kmeetMaxDurationMinutes === null ? null : plan.kmeetMaxDurationMinutes + 10;
+}
+
 export function isPlanId(value: string): value is PlanId {
   return value === "basic" || value === "premium" || value === "pro";
 }

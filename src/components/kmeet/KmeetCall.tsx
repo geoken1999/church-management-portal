@@ -21,8 +21,10 @@ import {
   ShieldAlert,
   Clock,
   X,
+  Headphones,
 } from "lucide-react";
 import { joinMeetingAction, joinMeetingAsGuestAction, endMeetingAction, toggleAdmissionModeAction } from "@/lib/kmeet/actions";
+import type { KmeetMode } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -352,6 +354,7 @@ interface EntryRequest {
 
 function CallControls({
   meetingId,
+  audioOnly,
   canEnd,
   isModerator,
   requireAdmission,
@@ -361,6 +364,7 @@ function CallControls({
   onLeft,
 }: {
   meetingId: string;
+  audioOnly: boolean;
   canEnd: boolean;
   isModerator: boolean;
   requireAdmission: boolean;
@@ -388,9 +392,11 @@ function CallControls({
       <Button type="button" variant={localMicOn ? "outline" : "destructive"} size="icon" onClick={() => toggleMic()} title={localMicOn ? "Mute" : "Unmute"}>
         {localMicOn ? <Mic className="size-4" /> : <MicOff className="size-4" />}
       </Button>
-      <Button type="button" variant={localWebcamOn ? "outline" : "destructive"} size="icon" onClick={() => toggleWebcam()} title={localWebcamOn ? "Turn off camera" : "Turn on camera"}>
-        {localWebcamOn ? <VideoIcon className="size-4" /> : <VideoOff className="size-4" />}
-      </Button>
+      {!audioOnly && (
+        <Button type="button" variant={localWebcamOn ? "outline" : "destructive"} size="icon" onClick={() => toggleWebcam()} title={localWebcamOn ? "Turn off camera" : "Turn on camera"}>
+          {localWebcamOn ? <VideoIcon className="size-4" /> : <VideoOff className="size-4" />}
+        </Button>
+      )}
       <Button type="button" variant={localScreenShareOn ? "default" : "outline"} size="icon" onClick={() => toggleScreenShare()} title="Share your screen">
         {localScreenShareOn ? <ScreenShareOff className="size-4" /> : <ScreenShare className="size-4" />}
       </Button>
@@ -420,6 +426,7 @@ function CallControls({
 
 function CallView({
   meetingId,
+  audioOnly,
   canEnd,
   isModerator,
   initialRequireAdmission,
@@ -430,6 +437,7 @@ function CallView({
   onLeft,
 }: {
   meetingId: string;
+  audioOnly: boolean;
   canEnd: boolean;
   isModerator: boolean;
   initialRequireAdmission: boolean;
@@ -529,7 +537,7 @@ function CallView({
           <AlertDescription>Couldn&apos;t connect to the call: {connectionError}</AlertDescription>
         </Alert>
         <Button type="button" variant="outline" onClick={onLeft}>
-          Back to K-meet
+          Back to {audioOnly ? "K-Audio" : "K-meet"}
         </Button>
       </div>
     );
@@ -590,6 +598,7 @@ function CallView({
         </div>
         <CallControls
           meetingId={meetingId}
+          audioOnly={audioOnly}
           canEnd={canEnd}
           isModerator={isModerator}
           requireAdmission={requireAdmission}
@@ -665,12 +674,25 @@ export interface LobbyChoice {
 // a track it didn't create itself (ERROR_WEBCAM_PRODUCE_FAILED), so this
 // lets the SDK create its own track as it always has and just points it
 // at the chosen device afterward.
-function PreJoinLobby({ title, canJoin, onJoin }: { title: string; canJoin: boolean; onJoin: (choice: LobbyChoice) => void }) {
+function PreJoinLobby({
+  title,
+  audioOnly,
+  canJoin,
+  onJoin,
+}: {
+  title: string;
+  audioOnly: boolean;
+  canJoin: boolean;
+  onJoin: (choice: LobbyChoice) => void;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [micOn, setMicOn] = useState(true);
-  const [camOn, setCamOn] = useState(true);
+  // Audio-only never turns the camera on — camOn/setCamOn stay fixed so a
+  // K-Audio call never requests camera permission at all, not even a
+  // toggle the person could flip back on.
+  const [camOn, setCamOn] = useState(!audioOnly);
   const orientation = useVideoOrientation(videoRef, [stream]);
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [mics, setMics] = useState<MediaDeviceInfo[]>([]);
@@ -695,7 +717,9 @@ function PreJoinLobby({ title, canJoin, onJoin }: { title: string; canJoin: bool
     async function startPreview() {
       try {
         const newStream = await navigator.mediaDevices.getUserMedia({
-          video: cameraId ? { deviceId: { exact: cameraId } } : true,
+          // Audio-only never asks for the camera at all — no permission
+          // prompt, no camera indicator light, nothing to turn back on.
+          video: audioOnly ? false : cameraId ? { deviceId: { exact: cameraId } } : true,
           audio: micId ? { deviceId: { exact: micId } } : true,
         });
         if (cancelled) {
@@ -710,10 +734,16 @@ function PreJoinLobby({ title, canJoin, onJoin }: { title: string; canJoin: bool
 
         const devices = await navigator.mediaDevices.enumerateDevices();
         if (cancelled) return;
-        setCameras(devices.filter((d) => d.kind === "videoinput"));
+        if (!audioOnly) setCameras(devices.filter((d) => d.kind === "videoinput"));
         setMics(devices.filter((d) => d.kind === "audioinput"));
       } catch {
-        if (!cancelled) setPermissionError("Couldn't access your camera or microphone — check your browser's permission settings for this site.");
+        if (!cancelled) {
+          setPermissionError(
+            audioOnly
+              ? "Couldn't access your microphone — check your browser's permission settings for this site."
+              : "Couldn't access your camera or microphone — check your browser's permission settings for this site.",
+          );
+        }
       }
     }
 
@@ -722,7 +752,7 @@ function PreJoinLobby({ title, canJoin, onJoin }: { title: string; canJoin: bool
       cancelled = true;
       acquiredStream?.getTracks().forEach((t) => t.stop());
     };
-  }, [cameraId, micId]);
+  }, [cameraId, micId, audioOnly]);
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.srcObject = camOn ? stream : null;
@@ -752,7 +782,12 @@ function PreJoinLobby({ title, canJoin, onJoin }: { title: string; canJoin: bool
         </Alert>
       )}
       <div className="relative mx-auto flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg bg-black">
-        {camOn && stream ? (
+        {audioOnly ? (
+          <div className="flex flex-col items-center gap-2 text-white/70">
+            <Headphones className="size-10" />
+            <p className="text-sm">Audio only — no camera</p>
+          </div>
+        ) : camOn && stream ? (
           <video ref={videoRef} autoPlay playsInline muted className={`h-full w-full ${videoFitClass}`} />
         ) : (
           <p className="text-sm text-white/70">{permissionError ? "No camera" : "The camera is off"}</p>
@@ -761,28 +796,32 @@ function PreJoinLobby({ title, canJoin, onJoin }: { title: string; canJoin: bool
           <Button type="button" variant={micOn ? "secondary" : "destructive"} size="icon" onClick={() => setMicOn((v) => !v)} title={micOn ? "Mute" : "Unmute"}>
             {micOn ? <Mic className="size-4" /> : <MicOff className="size-4" />}
           </Button>
-          <Button type="button" variant={camOn ? "secondary" : "destructive"} size="icon" onClick={() => setCamOn((v) => !v)} title={camOn ? "Turn off camera" : "Turn on camera"}>
-            {camOn ? <VideoIcon className="size-4" /> : <VideoOff className="size-4" />}
-          </Button>
+          {!audioOnly && (
+            <Button type="button" variant={camOn ? "secondary" : "destructive"} size="icon" onClick={() => setCamOn((v) => !v)} title={camOn ? "Turn off camera" : "Turn on camera"}>
+              {camOn ? <VideoIcon className="size-4" /> : <VideoOff className="size-4" />}
+            </Button>
+          )}
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label className="text-xs">Camera</Label>
-          <Select value={cameraId || "default"} onValueChange={(v) => setCameraId(v === "default" ? "" : (v ?? ""))}>
-            <SelectTrigger className="w-full">
-              <SelectValue>{() => cameras.find((c) => c.deviceId === cameraId)?.label || "Default camera"}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="default">Default camera</SelectItem>
-              {cameras.map((c) => (
-                <SelectItem key={c.deviceId} value={c.deviceId}>
-                  {c.label || "Camera"}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div className={audioOnly ? "grid grid-cols-1 gap-3" : "grid grid-cols-1 gap-3 sm:grid-cols-2"}>
+        {!audioOnly && (
+          <div className="space-y-1.5">
+            <Label className="text-xs">Camera</Label>
+            <Select value={cameraId || "default"} onValueChange={(v) => setCameraId(v === "default" ? "" : (v ?? ""))}>
+              <SelectTrigger className="w-full">
+                <SelectValue>{() => cameras.find((c) => c.deviceId === cameraId)?.label || "Default camera"}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Default camera</SelectItem>
+                {cameras.map((c) => (
+                  <SelectItem key={c.deviceId} value={c.deviceId}>
+                    {c.label || "Camera"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <div className="space-y-1.5">
           <Label className="text-xs">Microphone</Label>
           <Select value={micId || "default"} onValueChange={(v) => setMicId(v === "default" ? "" : (v ?? ""))}>
@@ -809,6 +848,9 @@ function PreJoinLobby({ title, canJoin, onJoin }: { title: string; canJoin: bool
 
 export interface KmeetCallProps {
   meetingId: string;
+  // Defaults to "video" so the existing K-meet call sites (and any stale
+  // client bundle during a deploy) keep behaving exactly as before.
+  mode?: KmeetMode;
   title: string;
   alreadyEnded: boolean;
   canEnd: boolean;
@@ -830,7 +872,8 @@ interface JoinInfo {
   maxDurationMinutes: number | null;
 }
 
-export function KmeetCall({ meetingId, title, alreadyEnded, canEnd, guestName, backHref }: KmeetCallProps) {
+export function KmeetCall({ meetingId, mode = "video", title, alreadyEnded, canEnd, guestName, backHref }: KmeetCallProps) {
+  const audioOnly = mode === "audio";
   const router = useRouter();
   const [joinInfo, setJoinInfo] = useState<JoinInfo | null>(null);
   const [error, setError] = useState<string | null>(alreadyEnded ? "This meeting has already ended." : null);
@@ -880,7 +923,7 @@ export function KmeetCall({ meetingId, title, alreadyEnded, canEnd, guestName, b
   }
 
   if (!lobbyChoice) {
-    return <PreJoinLobby title={title} canJoin={!!joinInfo} onJoin={setLobbyChoice} />;
+    return <PreJoinLobby title={title} audioOnly={audioOnly} canJoin={!!joinInfo} onJoin={setLobbyChoice} />;
   }
 
   if (!joinInfo) {
@@ -906,6 +949,7 @@ export function KmeetCall({ meetingId, title, alreadyEnded, canEnd, guestName, b
       >
         <CallView
           meetingId={meetingId}
+          audioOnly={audioOnly}
           canEnd={canEnd}
           isModerator={joinInfo.isModerator}
           initialRequireAdmission={joinInfo.requireAdmission}

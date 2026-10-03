@@ -1,5 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { ADDON_PACKS, getAddonPack, addonPacksFor } from "./config";
+import { ADDON_PACKS, getAddonPack, addonPacksFor, kaudioMaxDurationMinutes, PLANS } from "./config";
+
+describe("kaudioMaxDurationMinutes", () => {
+  it("adds 10 minutes to a finite K-meet limit", () => {
+    expect(kaudioMaxDurationMinutes(PLANS.basic)).toBe(30); // basic: 20 -> 30
+    expect(kaudioMaxDurationMinutes(PLANS.premium)).toBe(50); // premium: 40 -> 50
+  });
+
+  it("stays unlimited when K-meet's limit is unlimited", () => {
+    expect(kaudioMaxDurationMinutes(PLANS.pro)).toBeNull(); // pro: null -> null
+  });
+});
 
 describe("getAddonPack", () => {
   it("finds a pack by id", () => {

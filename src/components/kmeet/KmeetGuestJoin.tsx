@@ -1,22 +1,34 @@
 "use client";
 
 import { useState } from "react";
-import { Webcam } from "lucide-react";
+import { Webcam, Headphones } from "lucide-react";
 import { KmeetCall } from "@/components/kmeet/KmeetCallLoader";
+import type { KmeetMode } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-export function KmeetGuestJoin({ meetingId, title, alreadyEnded }: { meetingId: string; title: string; alreadyEnded: boolean }) {
+export function KmeetGuestJoin({
+  mode = "video",
+  meetingId,
+  title,
+  alreadyEnded,
+}: {
+  mode?: KmeetMode;
+  meetingId: string;
+  title: string;
+  alreadyEnded: boolean;
+}) {
   const [name, setName] = useState("");
   const [joining, setJoining] = useState(false);
+  const Icon = mode === "audio" ? Headphones : Webcam;
 
   if (joining) {
     return (
       <div className="min-h-screen bg-background p-4">
-        <KmeetCall meetingId={meetingId} title={title} alreadyEnded={alreadyEnded} canEnd={false} guestName={name.trim()} backHref="/" />
+        <KmeetCall mode={mode} meetingId={meetingId} title={title} alreadyEnded={alreadyEnded} canEnd={false} guestName={name.trim()} backHref="/" />
       </div>
     );
   }
@@ -26,10 +38,12 @@ export function KmeetGuestJoin({ meetingId, title, alreadyEnded }: { meetingId: 
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Webcam className="size-4 text-primary" />
+            <Icon className="size-4 text-primary" />
             {title}
           </CardTitle>
-          <CardDescription>You&apos;ve been invited to a K-meet video call.</CardDescription>
+          <CardDescription>
+            You&apos;ve been invited to a {mode === "audio" ? "K-Audio audio-only" : "K-meet video"} call.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {alreadyEnded ? (

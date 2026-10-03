@@ -56,6 +56,7 @@ export const en = {
       todos: "To Do",
       planner: "Planner",
       kmeet: "K-meet",
+      kaudio: "K-Audio",
       askAura: "Ask Aura",
       aiRules: "AI Rules",
       automations: "Automations",

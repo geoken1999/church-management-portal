@@ -9,10 +9,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createVideoSdkRoom } from "@/lib/kmeet/client";
 import { generateParticipantToken } from "@/lib/kmeet/token";
 import { isVideoSdkConfigured } from "@/lib/kmeet/env";
+import { tabKeyForMode, dashboardBasePathForMode } from "@/lib/kmeet/mode";
 import { getPlanLimits } from "@/lib/plans/dal";
+import { kaudioMaxDurationMinutes, type PlanLimits } from "@/lib/plans/config";
 import { getSiteUrl } from "@/lib/site-url";
+import type { KmeetMode } from "@/types/database";
 
-const KMEET_PATH = "/dashboard/kmeet";
+function maxDurationMinutesForMode(mode: KmeetMode, plan: PlanLimits): number | null {
+  return mode === "audio" ? kaudioMaxDurationMinutes(plan) : plan.kmeetMaxDurationMinutes;
+}
 
 export interface KmeetFormState {
   error?: string;
@@ -33,7 +38,10 @@ export async function scheduleMeetingAction(_prevState: KmeetFormState, formData
   const membership = await requireOrganization();
   const organizationId = membership.organization.id;
 
-  if (!membership.tabAccess.kmeet.write) {
+  const mode: KmeetMode = formData.get("mode") === "audio" ? "audio" : "video";
+  const tabKey = tabKeyForMode(mode);
+
+  if (!membership.tabAccess[tabKey].write) {
     return { error: "You don't have permission to schedule a meeting." };
   }
   if (!isVideoSdkConfigured()) {
@@ -63,6 +71,7 @@ export async function scheduleMeetingAction(_prevState: KmeetFormState, formData
       scheduled_at: scheduledAt.toISOString(),
       status: "scheduled",
       require_admission: requireAdmission,
+      mode,
       created_by: user.id,
     })
     .select("id")
@@ -74,7 +83,7 @@ export async function scheduleMeetingAction(_prevState: KmeetFormState, formData
   // feature set (calendar, reminders, registration, attendance) — either
   // by turning the event the host picked into an online/hybrid one, or,
   // if none was picked, by creating a new event for it.
-  const joinUrl = `${getSiteUrl()}/dashboard/kmeet/${meeting.id}`;
+  const joinUrl = `${getSiteUrl()}${dashboardBasePathForMode(mode)}/${meeting.id}`;
   if (eventId) {
     const { data: existingEvent } = await supabase.from("events").select("venue").eq("id", eventId).maybeSingle();
     await supabase
@@ -101,17 +110,18 @@ export async function scheduleMeetingAction(_prevState: KmeetFormState, formData
     }
   }
 
-  revalidatePath(KMEET_PATH);
+  revalidatePath(dashboardBasePathForMode(mode));
   revalidatePath("/dashboard/events");
   return { meetingId: meeting.id };
 }
 
-export async function startInstantMeetingAction(title: string, requireAdmission: boolean): Promise<KmeetFormState> {
+export async function startInstantMeetingAction(title: string, requireAdmission: boolean, mode: KmeetMode = "video"): Promise<KmeetFormState> {
   const user = await requireUser();
   const membership = await requireOrganization();
   const organizationId = membership.organization.id;
 
-  if (!membership.tabAccess.kmeet.write) {
+  const tabKey = tabKeyForMode(mode);
+  if (!membership.tabAccess[tabKey].write) {
     return { error: "You don't have permission to start a meeting." };
   }
   if (!isVideoSdkConfigured()) {
@@ -137,7 +147,8 @@ export async function startInstantMeetingAction(title: string, requireAdmission:
       status: "live",
       require_admission: requireAdmission,
       started_at: new Date().toISOString(),
-      max_duration_minutes: plan.kmeetMaxDurationMinutes,
+      max_duration_minutes: maxDurationMinutesForMode(mode, plan),
+      mode,
       created_by: user.id,
     })
     .select("id")
@@ -145,7 +156,7 @@ export async function startInstantMeetingAction(title: string, requireAdmission:
 
   if (error || !data) return { error: "Couldn't start that meeting. Please try again." };
 
-  revalidatePath(KMEET_PATH);
+  revalidatePath(dashboardBasePathForMode(mode));
   return { meetingId: data.id };
 }
 
@@ -158,6 +169,7 @@ export interface JoinMeetingResult {
   requireAdmission?: boolean;
   startedAt?: string;
   maxDurationMinutes?: number | null;
+  mode?: KmeetMode;
 }
 
 interface ResolvedRoom {
@@ -165,6 +177,7 @@ interface ResolvedRoom {
   requireAdmission: boolean;
   startedAt: string;
   maxDurationMinutes: number | null;
+  mode: KmeetMode;
 }
 
 // Shared by both join actions below — resolves the meeting's VideoSDK
@@ -176,7 +189,7 @@ async function resolveMeetingRoom(meetingId: string): Promise<ResolvedRoom | { e
   const admin = createAdminClient();
   const { data: meeting } = await admin
     .from("kmeet_meetings")
-    .select("id, room_id, status, organization_id, require_admission, started_at, max_duration_minutes")
+    .select("id, room_id, status, organization_id, require_admission, started_at, max_duration_minutes, mode")
     .eq("id", meetingId)
     .maybeSingle();
 
@@ -195,7 +208,7 @@ async function resolveMeetingRoom(meetingId: string): Promise<ResolvedRoom | { e
     }
     const plan = await getPlanLimits(meeting.organization_id);
     startedAt = new Date().toISOString();
-    maxDurationMinutes = plan.kmeetMaxDurationMinutes;
+    maxDurationMinutes = maxDurationMinutesForMode(meeting.mode, plan);
     await admin
       .from("kmeet_meetings")
       .update({ room_id: roomId, status: "live", started_at: startedAt, max_duration_minutes: maxDurationMinutes })
@@ -204,7 +217,13 @@ async function resolveMeetingRoom(meetingId: string): Promise<ResolvedRoom | { e
     await admin.from("kmeet_meetings").update({ status: "live" }).eq("id", meetingId);
   }
 
-  return { roomId, requireAdmission: meeting.require_admission, startedAt: startedAt ?? new Date().toISOString(), maxDurationMinutes };
+  return {
+    roomId,
+    requireAdmission: meeting.require_admission,
+    startedAt: startedAt ?? new Date().toISOString(),
+    maxDurationMinutes,
+    mode: meeting.mode,
+  };
 }
 
 // Called from the call page right before mounting the VideoSDK call UI.
@@ -213,22 +232,23 @@ export async function joinMeetingAction(meetingId: string): Promise<JoinMeetingR
   const [membership, profile] = await Promise.all([requireOrganization(), getProfile()]);
   const organizationId = membership.organization.id;
 
-  const access = await checkTabAccess(organizationId, "kmeet", "read");
-  if (!access.ok) return { error: access.message };
-
   const admin = createAdminClient();
   const { data: meeting } = await admin
     .from("kmeet_meetings")
-    .select("id")
+    .select("id, mode")
     .eq("organization_id", organizationId)
     .eq("id", meetingId)
     .maybeSingle();
   if (!meeting) return { error: "That meeting could not be found." };
 
+  const tabKey = tabKeyForMode(meeting.mode);
+  const access = await checkTabAccess(organizationId, tabKey, "read");
+  if (!access.ok) return { error: access.message };
+
   const resolved = await resolveMeetingRoom(meetingId);
   if ("error" in resolved) return { error: resolved.error };
 
-  const isModerator = membership.tabAccess.kmeet.write;
+  const isModerator = membership.tabAccess[tabKey].write;
   const displayName = profile ? `${profile.first_name} ${profile.last_name}`.trim() : (user.email ?? "Guest");
   const permissions = participantPermissionsFor(isModerator, resolved.requireAdmission);
 
@@ -240,6 +260,7 @@ export async function joinMeetingAction(meetingId: string): Promise<JoinMeetingR
     requireAdmission: resolved.requireAdmission,
     startedAt: resolved.startedAt,
     maxDurationMinutes: resolved.maxDurationMinutes,
+    mode: resolved.mode,
   };
 }
 
@@ -267,7 +288,14 @@ export async function joinMeetingAsGuestAction(meetingId: string, guestName: str
     requireAdmission: resolved.requireAdmission,
     startedAt: resolved.startedAt,
     maxDurationMinutes: resolved.maxDurationMinutes,
+    mode: resolved.mode,
   };
+}
+
+async function meetingModeOrNull(organizationId: string, meetingId: string): Promise<KmeetMode | null> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("kmeet_meetings").select("mode").eq("organization_id", organizationId).eq("id", meetingId).maybeSingle();
+  return data?.mode ?? null;
 }
 
 export async function toggleAdmissionModeAction(meetingId: string, requireAdmission: boolean): Promise<void> {
@@ -275,7 +303,9 @@ export async function toggleAdmissionModeAction(meetingId: string, requireAdmiss
   const membership = await requireOrganization();
   const organizationId = membership.organization.id;
 
-  const access = await checkTabAccess(organizationId, "kmeet", "write");
+  const mode = await meetingModeOrNull(organizationId, meetingId);
+  if (!mode) return;
+  const access = await checkTabAccess(organizationId, tabKeyForMode(mode), "write");
   if (!access.ok) return;
 
   const supabase = await createClient();
@@ -287,7 +317,9 @@ export async function endMeetingAction(meetingId: string): Promise<void> {
   const membership = await requireOrganization();
   const organizationId = membership.organization.id;
 
-  const access = await checkTabAccess(organizationId, "kmeet", "write");
+  const mode = await meetingModeOrNull(organizationId, meetingId);
+  if (!mode) return;
+  const access = await checkTabAccess(organizationId, tabKeyForMode(mode), "write");
   if (!access.ok) return;
 
   const supabase = await createClient();
@@ -297,7 +329,7 @@ export async function endMeetingAction(meetingId: string): Promise<void> {
     .eq("organization_id", organizationId)
     .eq("id", meetingId);
 
-  revalidatePath(KMEET_PATH);
+  revalidatePath(dashboardBasePathForMode(mode));
 }
 
 export async function cancelMeetingAction(meetingId: string): Promise<void> {
@@ -305,11 +337,13 @@ export async function cancelMeetingAction(meetingId: string): Promise<void> {
   const membership = await requireOrganization();
   const organizationId = membership.organization.id;
 
-  const access = await checkTabAccess(organizationId, "kmeet", "delete");
+  const mode = await meetingModeOrNull(organizationId, meetingId);
+  if (!mode) return;
+  const access = await checkTabAccess(organizationId, tabKeyForMode(mode), "delete");
   if (!access.ok) return;
 
   const supabase = await createClient();
   await supabase.from("kmeet_meetings").delete().eq("organization_id", organizationId).eq("id", meetingId);
 
-  revalidatePath(KMEET_PATH);
+  revalidatePath(dashboardBasePathForMode(mode));
 }

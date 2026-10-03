@@ -6,29 +6,29 @@ import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 import { KmeetCall } from "@/components/kmeet/KmeetCallLoader";
 
 export const metadata: Metadata = {
-  title: "K-meet | KingdomFlow",
+  title: "K-Audio | KingdomFlow",
 };
 
-export default async function KmeetCallPage({ params }: { params: Promise<{ meetingId: string }> }) {
+export default async function KaudioCallPage({ params }: { params: Promise<{ meetingId: string }> }) {
   const { meetingId } = await params;
   const membership = await requireOrganization();
   const organizationId = membership.organization.id;
 
-  if (!membership.tabAccess.kmeet.read) {
-    return <AccessRestricted label="K-meet" />;
+  if (!membership.tabAccess.kaudio.read) {
+    return <AccessRestricted label="K-Audio" />;
   }
 
-  const meeting = await getKmeetMeeting(organizationId, meetingId, "video");
+  const meeting = await getKmeetMeeting(organizationId, meetingId, "audio");
   if (!meeting) notFound();
 
   return (
     <KmeetCall
-      mode="video"
+      mode="audio"
       meetingId={meeting.id}
       title={meeting.title}
       alreadyEnded={meeting.status === "ended"}
-      canEnd={membership.tabAccess.kmeet.write}
-      backHref="/dashboard/kmeet"
+      canEnd={membership.tabAccess.kaudio.write}
+      backHref="/dashboard/kaudio"
     />
   );
 }

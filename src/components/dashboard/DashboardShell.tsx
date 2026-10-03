@@ -40,6 +40,7 @@ import {
   House,
   Compass,
   Webcam,
+  Headphones,
   ShieldCheck,
   Smartphone,
   ClipboardList,
@@ -118,6 +119,7 @@ const NAV_GROUPS = [
     items: [
       { href: "/dashboard/planner", itemKey: "planner" as const, icon: ClipboardList, tab: "planner" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/kmeet", itemKey: "kmeet" as const, icon: Webcam, tab: "kmeet" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/kaudio", itemKey: "kaudio" as const, icon: Headphones, tab: "kaudio" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/forms", itemKey: "forms" as const, icon: FileText, tab: "forms" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/folder", itemKey: "folder" as const, icon: FolderOpen, tab: "folder" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/attendance", itemKey: "attendance" as const, icon: ClipboardCheck, tab: "attendance" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },

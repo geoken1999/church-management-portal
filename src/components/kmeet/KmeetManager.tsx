@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Video, Plus, Calendar, Trash2, Link as LinkIcon, Check } from "lucide-react";
+import { Video, Headphones, Plus, Calendar, Trash2, Link as LinkIcon, Check } from "lucide-react";
 import { scheduleMeetingAction, startInstantMeetingAction, cancelMeetingAction, type KmeetFormState } from "@/lib/kmeet/actions";
-import type { KmeetMeetingStatus } from "@/types/database";
+import { dashboardBasePathForMode, publicBasePathForMode, labelForMode } from "@/lib/kmeet/mode";
+import type { KmeetMeetingStatus, KmeetMode } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,24 +33,25 @@ export interface KmeetMeetingRow {
 
 const initialFormState: KmeetFormState = {};
 
-function InstantMeetingButton({ disabled }: { disabled: boolean }) {
+function InstantMeetingButton({ mode, disabled }: { mode: KmeetMode; disabled: boolean }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [requireAdmission, setRequireAdmission] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
+  const Icon = mode === "audio" ? Headphones : Video;
 
   function handleStart() {
     setError(null);
     startTransition(async () => {
-      const result = await startInstantMeetingAction(title, requireAdmission);
+      const result = await startInstantMeetingAction(title, requireAdmission, mode);
       if (result.error) {
         setError(result.error);
         return;
       }
       setOpen(false);
-      router.push(`/dashboard/kmeet/${result.meetingId}`);
+      router.push(`${dashboardBasePathForMode(mode)}/${result.meetingId}`);
     });
   }
 
@@ -58,8 +60,8 @@ function InstantMeetingButton({ disabled }: { disabled: boolean }) {
       <DialogTrigger
         render={
           <Button type="button" variant="outline" disabled={disabled}>
-            <Video className="size-4" />
-            Start instant meeting
+            <Icon className="size-4" />
+            Start instant {mode === "audio" ? "call" : "meeting"}
           </Button>
         }
       />
@@ -91,7 +93,7 @@ function InstantMeetingButton({ disabled }: { disabled: boolean }) {
   );
 }
 
-function ScheduleMeetingDialog({ events, disabled }: { events: KmeetEventOption[]; disabled: boolean }) {
+function ScheduleMeetingDialog({ mode, events, disabled }: { mode: KmeetMode; events: KmeetEventOption[]; disabled: boolean }) {
   const router = useRouter();
   const [state, setState] = useState<KmeetFormState>(initialFormState);
   const [pending, startTransition] = useTransition();
@@ -108,6 +110,7 @@ function ScheduleMeetingDialog({ events, disabled }: { events: KmeetEventOption[
   function handleSubmit(formData: FormData) {
     if (eventId !== "none") formData.set("eventId", eventId);
     formData.set("requireAdmission", String(requireAdmission));
+    formData.set("mode", mode);
     startTransition(async () => {
       const result = await scheduleMeetingAction(state, formData);
       setState(result);
@@ -131,13 +134,13 @@ function ScheduleMeetingDialog({ events, disabled }: { events: KmeetEventOption[
         render={
           <Button type="button" disabled={disabled}>
             <Plus className="size-4" />
-            Schedule a meeting
+            Schedule {mode === "audio" ? "a call" : "a meeting"}
           </Button>
         }
       />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Schedule a meeting</DialogTitle>
+          <DialogTitle>Schedule {mode === "audio" ? "a call" : "a meeting"}</DialogTitle>
           <DialogDescription>
             Gets a join link now — the call itself starts when the first person joins at that time. Also shows up on your Events calendar
             automatically.
@@ -200,7 +203,7 @@ function statusBadge(status: KmeetMeetingStatus) {
   return <Badge variant="outline">Scheduled</Badge>;
 }
 
-function MeetingCard({ meeting, canManage }: { meeting: KmeetMeetingRow; canManage: boolean }) {
+function MeetingCard({ mode, meeting, canManage }: { mode: KmeetMode; meeting: KmeetMeetingRow; canManage: boolean }) {
   const [pending, startTransition] = useTransition();
   const [copied, setCopied] = useState(false);
 
@@ -212,7 +215,7 @@ function MeetingCard({ meeting, canManage }: { meeting: KmeetMeetingRow; canMana
   }
 
   async function handleCopyLink() {
-    const url = `${window.location.origin}/kmeet/${meeting.id}`;
+    const url = `${window.location.origin}${publicBasePathForMode(mode)}/${meeting.id}`;
     try {
       await navigator.clipboard.writeText(url);
     } catch {
@@ -244,7 +247,7 @@ function MeetingCard({ meeting, canManage }: { meeting: KmeetMeetingRow; canMana
             <Button type="button" size="icon" variant="ghost" onClick={handleCopyLink} title="Copy invite link">
               {copied ? <Check className="size-4" /> : <LinkIcon className="size-4" />}
             </Button>
-            <Button type="button" size="sm" nativeButton={false} render={<a href={`/dashboard/kmeet/${meeting.id}`} />}>
+            <Button type="button" size="sm" nativeButton={false} render={<a href={`${dashboardBasePathForMode(mode)}/${meeting.id}`} />}>
               Join
             </Button>
           </>
@@ -260,12 +263,14 @@ function MeetingCard({ meeting, canManage }: { meeting: KmeetMeetingRow; canMana
 }
 
 export function KmeetManager({
+  mode,
   canWrite,
   available,
   events,
   upcoming,
   past,
 }: {
+  mode: KmeetMode;
   canWrite: boolean;
   available: boolean;
   events: KmeetEventOption[];
@@ -276,13 +281,15 @@ export function KmeetManager({
     <div className="space-y-6">
       {!available && (
         <Alert variant="destructive">
-          <AlertDescription>Video calling isn&apos;t configured yet — ask your developer to set it up.</AlertDescription>
+          <AlertDescription>
+            {mode === "audio" ? "Audio" : "Video"} calling isn&apos;t configured yet — ask your developer to set it up.
+          </AlertDescription>
         </Alert>
       )}
       {canWrite && (
         <div className="flex flex-wrap gap-2">
-          <ScheduleMeetingDialog events={events} disabled={!available} />
-          <InstantMeetingButton disabled={!available} />
+          <ScheduleMeetingDialog mode={mode} events={events} disabled={!available} />
+          <InstantMeetingButton mode={mode} disabled={!available} />
         </div>
       )}
 
@@ -292,7 +299,7 @@ export function KmeetManager({
             <Calendar className="size-4 text-primary" />
             Upcoming &amp; live
           </CardTitle>
-          <CardDescription>Scheduled meetings and any that are currently live.</CardDescription>
+          <CardDescription>Scheduled {labelForMode(mode)} calls and any that are currently live.</CardDescription>
         </CardHeader>
         <CardContent>
           {upcoming.length === 0 ? (
@@ -300,7 +307,7 @@ export function KmeetManager({
           ) : (
             <div className="divide-y divide-border">
               {upcoming.map((meeting) => (
-                <MeetingCard key={meeting.id} meeting={meeting} canManage={canWrite} />
+                <MeetingCard key={meeting.id} mode={mode} meeting={meeting} canManage={canWrite} />
               ))}
             </div>
           )}
@@ -315,7 +322,7 @@ export function KmeetManager({
           <CardContent>
             <div className="divide-y divide-border">
               {past.map((meeting) => (
-                <MeetingCard key={meeting.id} meeting={meeting} canManage={canWrite} />
+                <MeetingCard key={meeting.id} mode={mode} meeting={meeting} canManage={canWrite} />
               ))}
             </div>
           </CardContent>

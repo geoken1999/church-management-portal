@@ -2,20 +2,41 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MeetingProvider, MeetingConsumer, useMeeting, useParticipant } from "@videosdk.live/react-sdk";
-import { Mic, MicOff, Video as VideoIcon, VideoOff, ScreenShare, ScreenShareOff, PhoneOff, Loader2, Link as LinkIcon, Check } from "lucide-react";
-import { joinMeetingAction, joinMeetingAsGuestAction, endMeetingAction } from "@/lib/kmeet/actions";
+import { MeetingProvider, useMeeting, useParticipant, usePubSub } from "@videosdk.live/react-sdk";
+import {
+  Mic,
+  MicOff,
+  Video as VideoIcon,
+  VideoOff,
+  ScreenShare,
+  ScreenShareOff,
+  PhoneOff,
+  Loader2,
+  Link as LinkIcon,
+  Check,
+  MessageSquare,
+  Send,
+  UserX,
+  ShieldCheck,
+  ShieldAlert,
+  Clock,
+  X,
+} from "lucide-react";
+import { joinMeetingAction, joinMeetingAsGuestAction, endMeetingAction, toggleAdmissionModeAction } from "@/lib/kmeet/actions";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-// A participant's video (via VideoPlayer-equivalent rendering below) and
-// audio are separate concerns in this SDK — video goes through a <video>
-// element bound to webcamStream, audio is wired manually to an <audio>
-// element the same way VideoSDK's own reference implementation does
-// (construct a fresh MediaStream from the track, since the SDK doesn't
-// auto-play audio for you).
-function ParticipantTile({ participantId }: { participantId: string }) {
-  const { displayName, webcamOn, webcamStream, micOn, micStream, isLocal, screenShareOn, screenShareStream } = useParticipant(participantId);
+const REACTIONS = ["👍", "❤️", "😂", "👏", "🎉"];
+
+// A participant's video and audio are separate concerns in this SDK —
+// video goes through a <video> element bound to webcamStream, audio is
+// wired manually to an <audio> element the same way VideoSDK's own
+// reference implementation does (construct a fresh MediaStream from the
+// track, since the SDK doesn't auto-play audio for you).
+function ParticipantTile({ participantId, isModerator }: { participantId: string; isModerator: boolean }) {
+  const { displayName, webcamOn, webcamStream, micOn, micStream, isLocal, screenShareOn, screenShareStream, disableMic, disableWebcam, remove } =
+    useParticipant(participantId);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const screenRef = useRef<HTMLVideoElement>(null);
@@ -53,6 +74,8 @@ function ParticipantTile({ participantId }: { participantId: string }) {
     }
   }, [screenShareOn, screenShareStream]);
 
+  const showModControls = isModerator && !isLocal;
+
   return (
     <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-muted">
       {screenShareOn ? (
@@ -70,6 +93,40 @@ function ParticipantTile({ participantId }: { participantId: string }) {
         {isLocal ? " (you)" : ""}
         {!micOn && " · muted"}
       </div>
+      {showModControls && (
+        <div className="absolute top-1.5 right-1.5 flex gap-1">
+          {micOn && (
+            <button
+              type="button"
+              onClick={() => disableMic()}
+              title={`Mute ${displayName}`}
+              className="flex size-6 items-center justify-center rounded bg-black/60 text-white hover:bg-black/80"
+            >
+              <MicOff className="size-3.5" />
+            </button>
+          )}
+          {webcamOn && (
+            <button
+              type="button"
+              onClick={() => disableWebcam()}
+              title={`Turn off ${displayName}'s camera`}
+              className="flex size-6 items-center justify-center rounded bg-black/60 text-white hover:bg-black/80"
+            >
+              <VideoOff className="size-3.5" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm(`Remove ${displayName} from the meeting?`)) remove();
+            }}
+            title={`Remove ${displayName}`}
+            className="flex size-6 items-center justify-center rounded bg-black/60 text-white hover:bg-destructive"
+          >
+            <UserX className="size-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -97,7 +154,178 @@ function CopyInviteLinkButton({ meetingId }: { meetingId: string }) {
   );
 }
 
-function CallControls({ meetingId, canEnd, onLeft }: { meetingId: string; canEnd: boolean; onLeft: () => void }) {
+// basic/premium limit the call length (20/40 minutes); pro has none.
+// startedAt is locked in the moment the room was actually created, so a
+// mid-call plan change never shifts an already-visible countdown.
+function CallTimer({ startedAt, maxDurationMinutes, onExpire }: { startedAt: string; maxDurationMinutes: number | null; onExpire: () => void }) {
+  const [now, setNow] = useState(() => Date.now());
+  const firedRef = useRef(false);
+  const endsAt = maxDurationMinutes ? new Date(startedAt).getTime() + maxDurationMinutes * 60_000 : null;
+  const remainingMs = endsAt ? Math.max(0, endsAt - now) : null;
+
+  useEffect(() => {
+    if (!maxDurationMinutes) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [maxDurationMinutes]);
+
+  useEffect(() => {
+    if (remainingMs !== null && remainingMs <= 0 && !firedRef.current) {
+      firedRef.current = true;
+      onExpire();
+    }
+  }, [remainingMs, onExpire]);
+
+  if (!maxDurationMinutes || remainingMs === null) {
+    return (
+      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+        <Clock className="size-3.5" />
+        Unlimited
+      </span>
+    );
+  }
+
+  const remainingSeconds = Math.floor(remainingMs / 1000);
+  const minutes = Math.floor(remainingSeconds / 60);
+  const seconds = remainingSeconds % 60;
+  const low = remainingSeconds <= 60;
+
+  return (
+    <span className={`flex items-center gap-1 text-xs ${low ? "font-medium text-destructive" : "text-muted-foreground"}`}>
+      <Clock className="size-3.5" />
+      {minutes}:{seconds.toString().padStart(2, "0")} left
+    </span>
+  );
+}
+
+interface ChatMessage {
+  id: string;
+  message: string;
+  senderName: string;
+  timestamp: string;
+}
+
+function ChatPanel({ onClose }: { onClose: () => void }) {
+  const [draft, setDraft] = useState("");
+  const { publish, messages } = usePubSub("CHAT");
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
+  }, [messages.length]);
+
+  function handleSend() {
+    const trimmed = draft.trim();
+    if (!trimmed) return;
+    publish(trimmed, { persist: true });
+    setDraft("");
+  }
+
+  return (
+    <div className="flex h-full w-72 shrink-0 flex-col border-l border-border bg-background">
+      <div className="flex items-center justify-between border-b border-border p-2">
+        <p className="text-sm font-medium">Chat</p>
+        <Button type="button" size="icon-sm" variant="ghost" onClick={onClose}>
+          <X className="size-4" />
+        </Button>
+      </div>
+      <div ref={listRef} className="flex-1 space-y-2 overflow-y-auto p-2">
+        {(messages as ChatMessage[]).length === 0 ? (
+          <p className="py-6 text-center text-xs text-muted-foreground">No messages yet.</p>
+        ) : (
+          (messages as ChatMessage[]).map((m) => (
+            <div key={m.id} className="text-sm">
+              <p className="text-xs font-medium text-muted-foreground">{m.senderName}</p>
+              <p className="whitespace-pre-wrap">{m.message}</p>
+            </div>
+          ))
+        )}
+      </div>
+      <div className="flex items-center gap-2 border-t border-border p-2">
+        <Input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Message everyone..."
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSend();
+          }}
+        />
+        <Button type="button" size="icon" onClick={handleSend} disabled={!draft.trim()}>
+          <Send className="size-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function FloatingReactions() {
+  const [burst, setBurst] = useState<{ id: string; emoji: string; from: string }[]>([]);
+
+  usePubSub("REACTIONS", {
+    onMessageReceived: (msg) => {
+      setBurst((prev) => [...prev, { id: msg.id, emoji: msg.message, from: msg.senderName }]);
+      setTimeout(() => setBurst((prev) => prev.filter((b) => b.id !== msg.id)), 2500);
+    },
+  });
+
+  if (burst.length === 0) return null;
+
+  return (
+    <div className="pointer-events-none absolute right-4 bottom-20 flex flex-col items-end gap-1">
+      {burst.map((b) => (
+        <div key={b.id} className="animate-bounce rounded-full bg-black/60 px-2 py-1 text-sm text-white">
+          {b.emoji} <span className="text-xs opacity-80">{b.from}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ReactionBar() {
+  const { publish } = usePubSub("REACTIONS");
+  return (
+    <div className="flex items-center gap-1">
+      {REACTIONS.map((emoji) => (
+        <button
+          key={emoji}
+          type="button"
+          onClick={() => publish(emoji, { persist: false })}
+          className="rounded px-1 text-base hover:bg-muted"
+          title={`React ${emoji}`}
+        >
+          {emoji}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+interface EntryRequest {
+  participantId: string;
+  name: string;
+  allow: () => void;
+  deny: () => void;
+}
+
+function CallControls({
+  meetingId,
+  canEnd,
+  isModerator,
+  requireAdmission,
+  onToggleAdmission,
+  chatOpen,
+  onToggleChat,
+  onLeft,
+}: {
+  meetingId: string;
+  canEnd: boolean;
+  isModerator: boolean;
+  requireAdmission: boolean;
+  onToggleAdmission: () => void;
+  chatOpen: boolean;
+  onToggleChat: () => void;
+  onLeft: () => void;
+}) {
   const { leave, end, toggleMic, toggleWebcam, toggleScreenShare, localMicOn, localWebcamOn, localScreenShareOn } = useMeeting();
 
   function handleLeave() {
@@ -123,7 +351,17 @@ function CallControls({ meetingId, canEnd, onLeft }: { meetingId: string; canEnd
       <Button type="button" variant={localScreenShareOn ? "default" : "outline"} size="icon" onClick={() => toggleScreenShare()} title="Share your screen">
         {localScreenShareOn ? <ScreenShareOff className="size-4" /> : <ScreenShare className="size-4" />}
       </Button>
+      <ReactionBar />
+      <Button type="button" variant={chatOpen ? "default" : "outline"} size="icon" onClick={onToggleChat} title="Chat">
+        <MessageSquare className="size-4" />
+      </Button>
       <CopyInviteLinkButton meetingId={meetingId} />
+      {isModerator && (
+        <Button type="button" variant="outline" size="sm" onClick={onToggleAdmission} title="Toggle whether new joiners need to be admitted">
+          {requireAdmission ? <ShieldAlert className="size-3.5" /> : <ShieldCheck className="size-3.5" />}
+          {requireAdmission ? "Admission required" : "Open for all"}
+        </Button>
+      )}
       <Button type="button" variant="destructive" onClick={handleLeave}>
         <PhoneOff className="size-4" />
         Leave
@@ -137,12 +375,32 @@ function CallControls({ meetingId, canEnd, onLeft }: { meetingId: string; canEnd
   );
 }
 
-function CallView({ meetingId, canEnd, onLeft }: { meetingId: string; canEnd: boolean; onLeft: () => void }) {
+function CallView({
+  meetingId,
+  canEnd,
+  isModerator,
+  initialRequireAdmission,
+  startedAt,
+  maxDurationMinutes,
+  onLeft,
+}: {
+  meetingId: string;
+  canEnd: boolean;
+  isModerator: boolean;
+  initialRequireAdmission: boolean;
+  startedAt: string;
+  maxDurationMinutes: number | null;
+  onLeft: () => void;
+}) {
   const [joined, setJoined] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [deniedEntry, setDeniedEntry] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<EntryRequest[]>([]);
+  const [requireAdmission, setRequireAdmission] = useState(initialRequireAdmission);
+  const [chatOpen, setChatOpen] = useState(false);
   const retriedRef = useRef(false);
 
-  const { join, participants } = useMeeting({
+  const { join, leave, end, participants } = useMeeting({
     onMeetingJoined: () => setJoined(true),
     onError: (data: { code: string; message: string }) => {
       // code 4002 (INVALID_TOKEN) right at the start is almost always this
@@ -172,7 +430,36 @@ function CallView({ meetingId, canEnd, onLeft }: { meetingId: string; canEnd: bo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function handleToggleAdmission() {
+    const next = !requireAdmission;
+    setRequireAdmission(next);
+    toggleAdmissionModeAction(meetingId, next);
+  }
+
+  function handleExpire() {
+    if (isModerator) {
+      end();
+      endMeetingAction(meetingId);
+    } else {
+      leave();
+    }
+    onLeft();
+  }
+
   const participantIds = [...participants.keys()];
+
+  if (deniedEntry) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+        <Alert variant="destructive" className="max-w-md">
+          <AlertDescription>The host didn&apos;t admit you to this meeting.</AlertDescription>
+        </Alert>
+        <Button type="button" variant="outline" onClick={onLeft}>
+          Back
+        </Button>
+      </div>
+    );
+  }
 
   if (connectionError && !joined) {
     return (
@@ -188,29 +475,114 @@ function CallView({ meetingId, canEnd, onLeft }: { meetingId: string; canEnd: bo
   }
 
   return (
-    <div className="flex h-full flex-col">
-      {connectionError && (
-        <Alert variant="destructive" className="m-2">
-          <AlertDescription>{connectionError}</AlertDescription>
-        </Alert>
-      )}
-      <div className="flex-1 overflow-y-auto p-4">
-        {!joined || participantIds.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
-            <Loader2 className="size-5 animate-spin" />
-            Connecting to the call...
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {participantIds.map((id) => (
-              <ParticipantTile key={id} participantId={id} />
+    <EntryRequestListener
+      isModerator={isModerator}
+      onRequest={(req) => setPendingRequests((prev) => [...prev, req])}
+      onResolved={(participantId) => setPendingRequests((prev) => prev.filter((r) => r.participantId !== participantId))}
+      onDenied={() => setDeniedEntry(true)}
+    >
+      <div className="flex h-full flex-col">
+        {connectionError && (
+          <Alert variant="destructive" className="m-2">
+            <AlertDescription>{connectionError}</AlertDescription>
+          </Alert>
+        )}
+        {isModerator && pendingRequests.length > 0 && (
+          <div className="space-y-1 border-b border-border bg-accent/50 p-2">
+            {pendingRequests.map((req) => (
+              <div key={req.participantId} className="flex items-center justify-between gap-2 text-sm">
+                <span>
+                  <strong>{req.name}</strong> wants to join
+                </span>
+                <div className="flex gap-1">
+                  <Button type="button" size="sm" onClick={req.allow}>
+                    Admit
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={req.deny}>
+                    Deny
+                  </Button>
+                </div>
+              </div>
             ))}
           </div>
         )}
+        <div className="flex items-center justify-end gap-3 border-b border-border px-3 py-1.5">
+          <CallTimer startedAt={startedAt} maxDurationMinutes={maxDurationMinutes} onExpire={handleExpire} />
+        </div>
+        <div className="relative flex min-h-0 flex-1">
+          <div className="flex-1 overflow-y-auto p-4">
+            {!joined || participantIds.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+                <Loader2 className="size-5 animate-spin" />
+                {requireAdmission && !isModerator ? "Waiting for the host to let you in..." : "Connecting to the call..."}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {participantIds.map((id) => (
+                  <ParticipantTile key={id} participantId={id} isModerator={isModerator} />
+                ))}
+              </div>
+            )}
+            <FloatingReactions />
+          </div>
+          {chatOpen && <ChatPanel onClose={() => setChatOpen(false)} />}
+        </div>
+        <CallControls
+          meetingId={meetingId}
+          canEnd={canEnd}
+          isModerator={isModerator}
+          requireAdmission={requireAdmission}
+          onToggleAdmission={handleToggleAdmission}
+          chatOpen={chatOpen}
+          onToggleChat={() => setChatOpen((v) => !v)}
+          onLeft={onLeft}
+        />
       </div>
-      <CallControls meetingId={meetingId} canEnd={canEnd} onLeft={onLeft} />
-    </div>
+    </EntryRequestListener>
   );
+}
+
+// A separate component (rather than adding these callbacks to CallView's
+// own useMeeting() call) purely so its props stay stable without an extra
+// dependency array to maintain. onEntryRequested only ever fires to
+// participants who already have allow_join — i.e. only moderators in an
+// admission-required room (everyone else there has ask_join) — so no
+// extra isModerator check is strictly needed to decide who sees requests,
+// but it's checked anyway as a defensive no-op guard.
+function EntryRequestListener({
+  isModerator,
+  onRequest,
+  onResolved,
+  onDenied,
+  children,
+}: {
+  isModerator: boolean;
+  onRequest: (req: EntryRequest) => void;
+  onResolved: (participantId: string) => void;
+  onDenied: () => void;
+  children: React.ReactNode;
+}) {
+  useMeeting({
+    onEntryRequested: ({ participantId, name, allow, deny }) => {
+      if (!isModerator) return;
+      onRequest({
+        participantId,
+        name,
+        allow: () => {
+          allow();
+          onResolved(participantId);
+        },
+        deny: () => {
+          deny();
+          onResolved(participantId);
+        },
+      });
+    },
+    onEntryResponded: ({ decision }) => {
+      if (decision && decision !== "allowed") onDenied();
+    },
+  });
+  return <>{children}</>;
 }
 
 export interface KmeetCallProps {
@@ -226,9 +598,19 @@ export interface KmeetCallProps {
   backHref: string;
 }
 
+interface JoinInfo {
+  roomId: string;
+  token: string;
+  displayName: string;
+  isModerator: boolean;
+  requireAdmission: boolean;
+  startedAt: string;
+  maxDurationMinutes: number | null;
+}
+
 export function KmeetCall({ meetingId, title, alreadyEnded, canEnd, guestName, backHref }: KmeetCallProps) {
   const router = useRouter();
-  const [joinInfo, setJoinInfo] = useState<{ roomId: string; token: string; displayName: string } | null>(null);
+  const [joinInfo, setJoinInfo] = useState<JoinInfo | null>(null);
   const [error, setError] = useState<string | null>(alreadyEnded ? "This meeting has already ended." : null);
   const [left, setLeft] = useState(false);
 
@@ -236,11 +618,19 @@ export function KmeetCall({ meetingId, title, alreadyEnded, canEnd, guestName, b
     if (alreadyEnded) return;
     const join = guestName ? joinMeetingAsGuestAction(meetingId, guestName) : joinMeetingAction(meetingId);
     join.then((result) => {
-      if (result.error || !result.roomId || !result.token) {
+      if (result.error || !result.roomId || !result.token || !result.startedAt) {
         setError(result.error ?? "Couldn't join this meeting.");
         return;
       }
-      setJoinInfo({ roomId: result.roomId, token: result.token, displayName: result.displayName ?? "Guest" });
+      setJoinInfo({
+        roomId: result.roomId,
+        token: result.token,
+        displayName: result.displayName ?? "Guest",
+        isModerator: result.isModerator ?? false,
+        requireAdmission: result.requireAdmission ?? false,
+        startedAt: result.startedAt,
+        maxDurationMinutes: result.maxDurationMinutes ?? null,
+      });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meetingId, alreadyEnded]);
@@ -277,8 +667,25 @@ export function KmeetCall({ meetingId, title, alreadyEnded, canEnd, guestName, b
 
   return (
     <div className="flex h-[calc(100vh-6rem)] flex-col overflow-hidden rounded-lg border border-border">
-      <MeetingProvider config={{ meetingId: joinInfo.roomId, micEnabled: true, webcamEnabled: true, name: joinInfo.displayName, debugMode: false }} token={joinInfo.token}>
-        <MeetingConsumer>{() => <CallView meetingId={meetingId} canEnd={canEnd} onLeft={handleLeft} />}</MeetingConsumer>
+      <MeetingProvider
+        config={{
+          meetingId: joinInfo.roomId,
+          micEnabled: true,
+          webcamEnabled: true,
+          name: joinInfo.displayName,
+          debugMode: false,
+        }}
+        token={joinInfo.token}
+      >
+        <CallView
+          meetingId={meetingId}
+          canEnd={canEnd}
+          isModerator={joinInfo.isModerator}
+          initialRequireAdmission={joinInfo.requireAdmission}
+          startedAt={joinInfo.startedAt}
+          maxDurationMinutes={joinInfo.maxDurationMinutes}
+          onLeft={handleLeft}
+        />
       </MeetingProvider>
     </div>
   );

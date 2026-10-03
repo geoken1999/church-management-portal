@@ -34,8 +34,9 @@ export function generateServerToken(): string {
 
 // Used client-side to actually join a call — scoped to one room, so a
 // leaked token can't be reused to join (or moderate) a different org's
-// meeting.
-export function generateParticipantToken(roomId: string): string {
+// meeting. `permissions` varies by who's joining — see
+// participantPermissionsFor in kmeet/actions.ts.
+export function generateParticipantToken(roomId: string, permissions: string[]): string {
   const { apiKey, secret } = getVideoSdkEnv();
-  return signHS256Jwt({ apikey: apiKey, permissions: ["allow_join"], version: 2, roomId }, secret, TWO_HOURS);
+  return signHS256Jwt({ apikey: apiKey, permissions, version: 2, roomId }, secret, TWO_HOURS);
 }

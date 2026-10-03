@@ -768,6 +768,15 @@ export type KmeetMeeting = {
   scheduled_at: string | null;
   room_id: string | null;
   status: KmeetMeetingStatus;
+  // When true, anyone without moderator permissions (any guest, and any
+  // org member without kmeet write access) must be let in by a moderator
+  // before they can join — otherwise everyone joins directly.
+  require_admission: boolean;
+  // Both set once, the moment the room is actually created (see
+  // resolveMeetingRoom) — max_duration_minutes is a snapshot of the org's
+  // plan limit at that moment, not re-read live.
+  started_at: string | null;
+  max_duration_minutes: number | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

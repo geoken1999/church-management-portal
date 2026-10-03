@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
@@ -34,6 +35,7 @@ const initialFormState: KmeetFormState = {};
 function InstantMeetingButton({ disabled }: { disabled: boolean }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
+  const [requireAdmission, setRequireAdmission] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
@@ -41,7 +43,7 @@ function InstantMeetingButton({ disabled }: { disabled: boolean }) {
   function handleStart() {
     setError(null);
     startTransition(async () => {
-      const result = await startInstantMeetingAction(title);
+      const result = await startInstantMeetingAction(title, requireAdmission);
       if (result.error) {
         setError(result.error);
         return;
@@ -75,6 +77,10 @@ function InstantMeetingButton({ disabled }: { disabled: boolean }) {
           <Label htmlFor="instant-title">Title (optional)</Label>
           <Input id="instant-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Quick sync" />
         </div>
+        <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <Checkbox checked={requireAdmission} onCheckedChange={(checked) => setRequireAdmission(checked === true)} />
+          Require admission (host must let each person in)
+        </label>
         <DialogFooter>
           <Button type="button" onClick={handleStart} disabled={pending}>
             {pending ? "Starting..." : "Start meeting"}
@@ -91,14 +97,17 @@ function ScheduleMeetingDialog({ events, disabled }: { events: KmeetEventOption[
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [eventId, setEventId] = useState<string>("none");
+  const [requireAdmission, setRequireAdmission] = useState(false);
 
   function reset() {
     setState(initialFormState);
     setEventId("none");
+    setRequireAdmission(false);
   }
 
   function handleSubmit(formData: FormData) {
     if (eventId !== "none") formData.set("eventId", eventId);
+    formData.set("requireAdmission", String(requireAdmission));
     startTransition(async () => {
       const result = await scheduleMeetingAction(state, formData);
       setState(result);
@@ -129,7 +138,10 @@ function ScheduleMeetingDialog({ events, disabled }: { events: KmeetEventOption[
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Schedule a meeting</DialogTitle>
-          <DialogDescription>Gets a join link now — the call itself starts when the first person joins at that time.</DialogDescription>
+          <DialogDescription>
+            Gets a join link now — the call itself starts when the first person joins at that time. Also shows up on your Events calendar
+            automatically.
+          </DialogDescription>
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           {state.error && (
@@ -151,13 +163,13 @@ function ScheduleMeetingDialog({ events, disabled }: { events: KmeetEventOption[
           </div>
           {events.length > 0 && (
             <div className="space-y-1.5">
-              <Label className="text-xs">Link to an event (optional)</Label>
+              <Label className="text-xs">Attach to an existing event (optional)</Label>
               <Select value={eventId} onValueChange={(v) => setEventId(v ?? "none")}>
                 <SelectTrigger className="w-full">
-                  <SelectValue>{() => (eventId === "none" ? "No linked event" : (events.find((e) => e.id === eventId)?.title ?? "No linked event"))}</SelectValue>
+                  <SelectValue>{() => (eventId === "none" ? "Create a new event for this" : (events.find((e) => e.id === eventId)?.title ?? "Create a new event for this"))}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No linked event</SelectItem>
+                  <SelectItem value="none">Create a new event for this</SelectItem>
                   {events.map((event) => (
                     <SelectItem key={event.id} value={event.id}>
                       {event.title}
@@ -167,6 +179,10 @@ function ScheduleMeetingDialog({ events, disabled }: { events: KmeetEventOption[
               </Select>
             </div>
           )}
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <Checkbox checked={requireAdmission} onCheckedChange={(checked) => setRequireAdmission(checked === true)} />
+            Require admission (host must let each person in)
+          </label>
           <DialogFooter>
             <Button type="submit" disabled={pending}>
               {pending ? "Scheduling..." : "Schedule"}

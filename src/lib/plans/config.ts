@@ -34,6 +34,12 @@ export interface PlanLimits {
   instagramAccountLimit: number;
   youtubeAccountLimit: number;
   storageBytes: number;
+  // How long a single K-meet call can run before it's automatically ended
+  // for everyone — null means unlimited. Snapshotted onto the meeting row
+  // the moment its call actually starts (see kmeet/actions.ts), not
+  // re-read live, so a mid-call plan change never changes an
+  // already-running call's countdown.
+  kmeetMaxDurationMinutes: number | null;
   // How many logins an owner/admin can add beyond themselves (invited
   // members, and now manually-issued logins) — the org creator's own seat
   // doesn't count against this.
@@ -81,6 +87,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
     instagramAccountLimit: 1,
     youtubeAccountLimit: 1,
     storageBytes: 1 * 1024 * 1024 * 1024, // 1GB
+    kmeetMaxDurationMinutes: 20,
     maxAdditionalTeamMembers: 3,
     financeEnabled: false,
     socialMediaEnabled: false,
@@ -94,6 +101,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
     instagramAccountLimit: 3,
     youtubeAccountLimit: 3,
     storageBytes: 10 * 1024 * 1024 * 1024, // 10GB
+    kmeetMaxDurationMinutes: 40,
     maxAdditionalTeamMembers: 10,
     financeEnabled: true,
     socialMediaEnabled: false,
@@ -107,6 +115,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
     instagramAccountLimit: 2,
     youtubeAccountLimit: 2,
     storageBytes: 50 * 1024 * 1024 * 1024, // 50GB
+    kmeetMaxDurationMinutes: null,
     maxAdditionalTeamMembers: 50,
     financeEnabled: true,
     socialMediaEnabled: true,

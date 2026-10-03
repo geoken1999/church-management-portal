@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getMetaWhatsAppEnv } from "@/lib/whatsapp/env";
+import { parseGraphError, GraphApiError, describeWhatsAppError } from "@/lib/whatsapp/graph-error";
 
 // Meta documents recipient numbers without a leading '+' in request
 // bodies (e.g. "16505551234"), and sends inbound `from` the same way —
@@ -23,15 +24,7 @@ async function postToGraphMessages(body: Record<string, unknown>): Promise<strin
   });
 
   if (!res.ok) {
-    const errorBody = await res.text();
-    let message = errorBody;
-    try {
-      const parsed = JSON.parse(errorBody) as { error?: { message?: string } };
-      if (parsed.error?.message) message = parsed.error.message;
-    } catch {
-      // Not JSON — fall back to the raw body text above.
-    }
-    throw new Error(message || `WhatsApp send failed (${res.status}).`);
+    throw await parseGraphError(res);
   }
 
   const data = (await res.json()) as { messages?: { id?: string }[] };
@@ -98,12 +91,21 @@ export async function sendBulkTemplateMessage(params: {
   let sentCount = 0;
   const failed: { phone: string; error: string }[] = [];
 
-  for (const phone of params.recipients) {
+  for (const [index, phone] of params.recipients.entries()) {
     try {
       await sendTemplateMessage({ to: phone, templateName: params.templateName, languageCode: params.languageCode, bodyParams: params.bodyParams });
       sentCount += 1;
     } catch (err) {
-      failed.push({ phone, error: err instanceof Error ? err.message : "Send failed." });
+      failed.push({ phone, error: describeWhatsAppError(err).message });
+      // An invalid/expired access token fails identically for every
+      // recipient — stop immediately instead of repeating the same
+      // doomed call (and its rate-limit cost) for everyone left in the
+      // list, and mark the rest failed with the same reason.
+      if (err instanceof GraphApiError && err.isAuthError) {
+        const remaining = params.recipients.slice(index + 1);
+        failed.push(...remaining.map((p) => ({ phone: p, error: describeWhatsAppError(err).message })));
+        break;
+      }
     }
   }
 

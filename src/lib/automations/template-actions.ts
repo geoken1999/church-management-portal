@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { createMetaTemplate, deleteMetaTemplate, fetchMetaTemplateStatus } from "@/lib/whatsapp/templates-client";
+import { describeWhatsAppError } from "@/lib/whatsapp/graph-error";
 import { extractVariableNames, toPositionalBody } from "@/lib/automations/template-mapping";
 import { validateAutomationTemplateName, validateAutomationTemplateBody, validateAutomationTemplateKind } from "@/lib/automations/validation";
 import type { AutomationTemplateKind, WhatsAppTemplateCategory } from "@/types/database";
@@ -71,9 +72,15 @@ export async function createAutomationTemplateAction(params: {
   try {
     metaResult = await createMetaTemplate({ name, language: "en_US", category: params.category, bodyText: positionalBody, exampleValues });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Couldn't submit that template to WhatsApp.";
-    await logPlatformEvent({ level: "error", source: "automation_send", message: `Template create failed: ${message}`, organizationId: params.organizationId, metadata: { name } });
-    return { error: message };
+    const detail = describeWhatsAppError(err);
+    await logPlatformEvent({
+      level: "error",
+      source: "automation_send",
+      message: `Template create failed: ${err instanceof Error ? err.message : "unknown error"}`,
+      organizationId: params.organizationId,
+      metadata: { name, code: detail.code, type: detail.type },
+    });
+    return { error: detail.message };
   }
 
   const { error: insertError } = await admin.from("automation_templates").insert({
@@ -118,7 +125,7 @@ export async function refreshAutomationTemplateStatusAction(templateId: string):
     const { status, rejectedReason } = await fetchMetaTemplateStatus(template.meta_template_id);
     await admin.from("automation_templates").update({ status, rejected_reason: rejectedReason }).eq("id", templateId);
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Couldn't check the template's status." };
+    return { error: describeWhatsAppError(err).message };
   }
 
   revalidatePath(AUTOMATIONS_PATH);
@@ -146,7 +153,14 @@ export async function deleteAutomationTemplateAction(templateId: string): Promis
   } catch (err) {
     // Don't block deleting our own record if Meta's side is already gone
     // (e.g. removed independently) — same tradeoff whatsapp/actions.ts makes.
-    await logPlatformEvent({ level: "warning", source: "automation_send", message: `Template delete on Meta failed: ${err instanceof Error ? err.message : "unknown error"}`, organizationId: template.organization_id });
+    const detail = describeWhatsAppError(err);
+    await logPlatformEvent({
+      level: "warning",
+      source: "automation_send",
+      message: `Template delete on Meta failed: ${err instanceof Error ? err.message : "unknown error"}`,
+      organizationId: template.organization_id,
+      metadata: { code: detail.code, type: detail.type },
+    });
   }
 
   const { error } = await admin.from("automation_templates").delete().eq("id", templateId);

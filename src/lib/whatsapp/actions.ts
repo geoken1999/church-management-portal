@@ -19,6 +19,7 @@ import {
   countTemplateVariables,
 } from "@/lib/whatsapp/validation";
 import { generateReply } from "@/lib/ai/openai";
+import { describeWhatsAppError } from "@/lib/whatsapp/graph-error";
 import type { WhatsAppCampaignStatus, WhatsAppTemplateCategory } from "@/types/database";
 
 const WHATSAPP_PATH = "/dashboard/whatsapp";
@@ -87,9 +88,15 @@ export async function createWhatsAppTemplateAction(_prevState: TemplateFormState
   try {
     metaResult = await createMetaTemplate({ name, language: "en_US", category, bodyText, exampleValues: exampleValues.slice(0, variableCount) });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Couldn't submit that template to WhatsApp.";
-    await logPlatformEvent({ level: "error", source: "whatsapp_template", message: `Template create failed: ${message}`, organizationId, metadata: { name } });
-    return { error: message };
+    const detail = describeWhatsAppError(err);
+    await logPlatformEvent({
+      level: "error",
+      source: "whatsapp_template",
+      message: `Template create failed: ${err instanceof Error ? err.message : "unknown error"}`,
+      organizationId,
+      metadata: { name, code: detail.code, type: detail.type },
+    });
+    return { error: detail.message };
   }
 
   // Meta's create response only ever returns {id, status} — never a
@@ -228,7 +235,7 @@ export async function refreshWhatsAppTemplateStatusAction(templateId: string): P
     const { status, rejectedReason } = await fetchMetaTemplateStatus(template.meta_template_id);
     await admin.from("whatsapp_templates").update({ status, rejected_reason: rejectedReason }).eq("id", templateId);
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Couldn't check the template's status." };
+    return { error: describeWhatsAppError(err).message };
   }
 
   revalidatePath(WHATSAPP_PATH);
@@ -257,7 +264,14 @@ export async function deleteWhatsAppTemplateAction(templateId: string): Promise<
     // If Meta already doesn't have it (e.g. the create call above
     // succeeded in our DB but the template was removed on Meta's side
     // independently), don't block deleting our own record over it.
-    await logPlatformEvent({ level: "warning", source: "whatsapp_template", message: `Template delete on Meta failed: ${err instanceof Error ? err.message : "unknown error"}`, organizationId: template.organization_id });
+    const detail = describeWhatsAppError(err);
+    await logPlatformEvent({
+      level: "warning",
+      source: "whatsapp_template",
+      message: `Template delete on Meta failed: ${err instanceof Error ? err.message : "unknown error"}`,
+      organizationId: template.organization_id,
+      metadata: { code: detail.code, type: detail.type },
+    });
   }
 
   await admin.from("whatsapp_templates").delete().eq("id", templateId);
@@ -351,15 +365,15 @@ export async function sendBulkWhatsAppAction(formData: FormData): Promise<SendWh
   try {
     result = await sendBulkTemplateMessage({ templateName: template.name, languageCode: template.language, bodyParams: variableValues.slice(0, template.variable_count), recipients });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Couldn't send that message.";
+    const detail = describeWhatsAppError(err);
     await logPlatformEvent({
       level: "error",
       source: "whatsapp_send",
-      message: `WhatsApp send failed: ${message}`,
+      message: `WhatsApp send failed: ${err instanceof Error ? err.message : "unknown error"}`,
       organizationId,
-      metadata: { recipientCount: recipients.length, templateId },
+      metadata: { recipientCount: recipients.length, templateId, code: detail.code, type: detail.type },
     });
-    return { error: message };
+    return { error: detail.message };
   }
 
   const status: WhatsAppCampaignStatus =
@@ -425,8 +439,10 @@ export async function sendWhatsAppReplyAction(conversationId: string, body: stri
   } catch (err) {
     // The most common cause here is WhatsApp's 24-hour customer-service
     // window having closed since their last message — free text can only
-    // ever be sent as a reply inside that window.
-    return { error: err instanceof Error ? err.message : "Couldn't send that reply." };
+    // ever be sent as a reply inside that window. describeWhatsAppError
+    // covers the other common cause (an invalid/expired access token)
+    // with its own clearer message instead of Meta's raw wording.
+    return { error: describeWhatsAppError(err).message };
   }
 
   await admin.from("whatsapp_messages").insert({

@@ -9,6 +9,7 @@ import { getOrganizationContextForAi } from "@/lib/ai/organization-context";
 import { getAiModeForWebhook, setAiTypingForWebhook } from "@/lib/whatsapp/automation";
 import { hasAiCreditAvailableForWebhook, recordAiReplyUsageForWebhook } from "@/lib/plans/dal";
 import { sendTextMessage } from "@/lib/whatsapp/client";
+import { describeWhatsAppError } from "@/lib/whatsapp/graph-error";
 import { createNotificationForWebhook } from "@/lib/notifications/create";
 import { recordMessageDelivery } from "@/lib/platform-events/delivery";
 
@@ -159,11 +160,13 @@ async function handleWhatsAppAiReply(organizationId: string, phoneNumber: string
       });
     }
   } catch (err) {
+    const detail = describeWhatsAppError(err);
     await logPlatformEvent({
       level: "warning",
       source: "whatsapp_webhook",
       message: `AI auto-reply failed: ${err instanceof Error ? err.message : "unknown error"}`,
       organizationId,
+      metadata: { code: detail.code, type: detail.type },
     });
   } finally {
     await setAiTypingForWebhook(organizationId, phoneNumber, false);

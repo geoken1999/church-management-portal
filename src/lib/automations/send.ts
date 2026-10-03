@@ -3,6 +3,7 @@ import "server-only";
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { sendTemplateMessage, sendBulkTemplateMessage } from "@/lib/whatsapp/client";
 import { normalizePhoneNumber } from "@/lib/whatsapp/validation";
+import { describeWhatsAppError } from "@/lib/whatsapp/graph-error";
 import { resolveBodyParams } from "@/lib/automations/template-mapping";
 import { buildCelebrantList, buildDirectIdempotencyKey, buildDigestIdempotencyKey } from "@/lib/automations/date-logic";
 import { logPlatformEvent } from "@/lib/platform-events/log";
@@ -61,9 +62,15 @@ export async function sendDirectMemberMessage(
     const { id } = await sendTemplateMessage({ to: phone, templateName: template.meta_template_name, languageCode: template.language, bodyParams });
     await admin.from("automation_executions").update({ meta_message_id: id }).eq("id", reserved.id);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Send failed.";
-    await admin.from("automation_executions").update({ status: "failed", error_message: message }).eq("id", reserved.id);
-    await logPlatformEvent({ level: "error", source: "automation_send", message, organizationId: trigger.organization_id, metadata: { memberId: member.id, triggerId: trigger.id } });
+    const detail = describeWhatsAppError(err);
+    await admin.from("automation_executions").update({ status: "failed", error_message: detail.message }).eq("id", reserved.id);
+    await logPlatformEvent({
+      level: "error",
+      source: "automation_send",
+      message: err instanceof Error ? err.message : "Send failed.",
+      organizationId: trigger.organization_id,
+      metadata: { memberId: member.id, triggerId: trigger.id, code: detail.code, type: detail.type },
+    });
   }
 }
 

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getMetaWhatsAppEnv } from "@/lib/whatsapp/env";
+import { parseGraphError } from "@/lib/whatsapp/graph-error";
 import type { WhatsAppTemplateCategory, WhatsAppTemplateStatus } from "@/types/database";
 
 function metaStatusToLocal(status: string): WhatsAppTemplateStatus {
@@ -15,16 +16,6 @@ async function graphFetch(path: string, init: RequestInit): Promise<Response> {
     ...init,
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", ...init.headers },
   });
-}
-
-async function readGraphError(res: Response): Promise<string> {
-  const text = await res.text();
-  try {
-    const parsed = JSON.parse(text) as { error?: { message?: string } };
-    return parsed.error?.message || text;
-  } catch {
-    return text;
-  }
 }
 
 export interface CreateTemplateResult {
@@ -54,7 +45,7 @@ export async function createMetaTemplate(params: {
     body: JSON.stringify({ name: params.name, language: params.language, category: params.category, components }),
   });
 
-  if (!res.ok) throw new Error(await readGraphError(res));
+  if (!res.ok) throw await parseGraphError(res);
 
   const data = (await res.json()) as { id?: string; status?: string };
   if (!data.id) throw new Error("Meta did not return a template id.");
@@ -63,7 +54,7 @@ export async function createMetaTemplate(params: {
 
 export async function fetchMetaTemplateStatus(metaTemplateId: string): Promise<{ status: WhatsAppTemplateStatus; rejectedReason: string | null }> {
   const res = await graphFetch(`${metaTemplateId}?fields=status,rejected_reason`, { method: "GET" });
-  if (!res.ok) throw new Error(await readGraphError(res));
+  if (!res.ok) throw await parseGraphError(res);
 
   const data = (await res.json()) as { status?: string; rejected_reason?: string };
   return { status: data.status ? metaStatusToLocal(data.status) : "pending_review", rejectedReason: data.rejected_reason ?? null };
@@ -74,5 +65,5 @@ export async function fetchMetaTemplateStatus(metaTemplateId: string): Promise<{
 export async function deleteMetaTemplate(name: string): Promise<void> {
   const { businessAccountId } = getMetaWhatsAppEnv();
   const res = await graphFetch(`${businessAccountId}/message_templates?name=${encodeURIComponent(name)}`, { method: "DELETE" });
-  if (!res.ok) throw new Error(await readGraphError(res));
+  if (!res.ok) throw await parseGraphError(res);
 }

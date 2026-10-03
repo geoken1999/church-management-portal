@@ -8,10 +8,14 @@ export interface AiDataAccessRules {
   allowAttendance: boolean;
   allowMembers: boolean;
   allowFinance: boolean;
-  // Ask Aura's own access — independent of whichever public channels
-  // below are also allowed to use the same data.
+  // Ask Aura's own access to each — independent of whichever public
+  // channels below are also allowed to use the same data. Full access by
+  // default, same as everything else.
   allowFundraisers: boolean;
   allowEvents: boolean;
+  allowMinistries: boolean;
+  allowBranches: boolean;
+  allowForms: boolean;
   // Instagram and WhatsApp controlled independently, so an org can e.g.
   // share fundraisers over WhatsApp but not Instagram.
   allowFundraisersInstagram: boolean;
@@ -32,6 +36,9 @@ export const DEFAULT_AI_DATA_ACCESS_RULES: AiDataAccessRules = {
   allowFinance: true,
   allowFundraisers: true,
   allowEvents: true,
+  allowMinistries: true,
+  allowBranches: true,
+  allowForms: true,
   allowFundraisersInstagram: true,
   allowFundraisersWhatsapp: true,
   allowEventsInstagram: true,
@@ -64,6 +71,9 @@ export const getAiDataAccessRules = cache(async (organizationId: string): Promis
     allowFinance: data.allow_finance,
     allowFundraisers: data.allow_fundraisers,
     allowEvents: data.allow_events,
+    allowMinistries: data.allow_ministries,
+    allowBranches: data.allow_branches,
+    allowForms: data.allow_forms,
     allowFundraisersInstagram: data.allow_fundraisers_instagram,
     allowFundraisersWhatsapp: data.allow_fundraisers_whatsapp,
     allowEventsInstagram: data.allow_events_instagram,

@@ -14,8 +14,7 @@ interface RuleRow {
   description: string;
   // Each column is optional per row — Attendance/Members/Finance have no
   // Instagram/WhatsApp equivalent (deliberately excluded there for
-  // privacy, regardless of this page), and Ministries/Branches/Forms have
-  // no Ask Aura tool to gate in the first place.
+  // privacy, regardless of this page).
   aura?: keyof AiDataAccessRules;
   instagram?: keyof AiDataAccessRules;
   whatsapp?: keyof AiDataAccessRules;
@@ -42,18 +41,21 @@ const RULE_ROWS: RuleRow[] = [
   {
     label: "Ministries",
     description: "Ministry names, vision, and mission statements.",
+    aura: "allowMinistries",
     instagram: "allowMinistriesInstagram",
     whatsapp: "allowMinistriesWhatsapp",
   },
   {
     label: "Branches & contacts",
     description: "Branch locations and their manager's published contact info.",
+    aura: "allowBranches",
     instagram: "allowBranchesInstagram",
     whatsapp: "allowBranchesWhatsapp",
   },
   {
     label: "Forms",
     description: "Public form names, descriptions, and links.",
+    aura: "allowForms",
     instagram: "allowFormsInstagram",
     whatsapp: "allowFormsWhatsapp",
   },

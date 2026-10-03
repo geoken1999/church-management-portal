@@ -5,6 +5,9 @@ import { getAttendanceSessions, getAttendanceSession, getAttendanceRecords, getA
 import { getEvents } from "@/lib/events/dal";
 import { getOccurrencesInRange } from "@/lib/events/recurrence";
 import { getFinanceOverviewStats, getFundraisers } from "@/lib/finance/dal";
+import { getMinistries } from "@/lib/ministries/dal";
+import { getBranches } from "@/lib/branches/dal";
+import { getForms } from "@/lib/forms/dal";
 import { getAiDataAccessRules, type AiDataAccessRules } from "@/lib/ai-rules/dal";
 import type { ToolDefinition } from "@/lib/ai/openai";
 
@@ -30,6 +33,9 @@ const TOOL_CATEGORY: Record<string, keyof AiDataAccessRules> = {
   get_member_count: "allowMembers",
   get_finance_summary: "allowFinance",
   list_fundraisers: "allowFundraisers",
+  list_ministries: "allowMinistries",
+  list_branches: "allowBranches",
+  list_forms: "allowForms",
 };
 
 const AURA_TOOLS_BASE: ToolDefinition[] = [
@@ -107,6 +113,46 @@ const AURA_TOOLS_BASE: ToolDefinition[] = [
         properties: {
           status: { type: "string", enum: ["active", "completed", "cancelled", "all"], description: "Defaults to active." },
           limit: { type: "integer", description: "Max fundraisers to return. Defaults to 10." },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_ministries",
+      description: "List the organization's ministries with their type, who manages them, and their vision/mission statements.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "integer", description: "Max ministries to return. Defaults to 20." },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_branches",
+      description: "List the organization's branches with their location, member count, and leader's contact info.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "integer", description: "Max branches to return. Defaults to 20." },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_forms",
+      description: "List the organization's custom forms with their status and response counts.",
+      parameters: {
+        type: "object",
+        properties: {
+          status: { type: "string", enum: ["draft", "published", "closed", "all"], description: "Defaults to published." },
+          limit: { type: "integer", description: "Max forms to return. Defaults to 20." },
         },
       },
     },
@@ -231,6 +277,44 @@ async function listFundraisers(organizationId: string, args: ToolArgs) {
   }));
 }
 
+async function listMinistries(organizationId: string, args: ToolArgs) {
+  const limit = asInt(args.limit, 20);
+  const ministries = await getMinistries(organizationId);
+  return ministries.slice(0, limit).map((m) => ({
+    title: m.title,
+    type: m.type,
+    managed_by: m.members ? `${m.members.first_name} ${m.members.last_name}` : null,
+    vision: m.vision,
+    mission: m.mission,
+  }));
+}
+
+async function listBranches(organizationId: string, args: ToolArgs) {
+  const limit = asInt(args.limit, 20);
+  const branches = await getBranches(organizationId);
+  return branches.slice(0, limit).map((b) => ({
+    name: b.name,
+    location: b.location,
+    member_count: b.member_count,
+    leader_name: b.leader_name,
+    leader_phone: b.leader_phone,
+  }));
+}
+
+async function listForms(organizationId: string, args: ToolArgs) {
+  const status = asString(args.status) ?? "published";
+  const limit = asInt(args.limit, 20);
+  const forms = await getForms(organizationId);
+  const filtered = status === "all" ? forms : forms.filter((f) => f.status === status);
+
+  return filtered.slice(0, limit).map((f) => ({
+    title: f.title,
+    description: f.description,
+    status: f.status,
+    response_count: f.responseCount,
+  }));
+}
+
 export async function executeAuraTool(organizationId: string, name: string, args: ToolArgs): Promise<unknown> {
   const category = TOOL_CATEGORY[name];
   if (category) {
@@ -253,6 +337,12 @@ export async function executeAuraTool(organizationId: string, name: string, args
       return getFinanceSummary(organizationId);
     case "list_fundraisers":
       return listFundraisers(organizationId, args);
+    case "list_ministries":
+      return listMinistries(organizationId, args);
+    case "list_branches":
+      return listBranches(organizationId, args);
+    case "list_forms":
+      return listForms(organizationId, args);
     default:
       return { error: `Unknown tool "${name}".` };
   }

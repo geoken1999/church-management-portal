@@ -436,15 +436,18 @@ export type AiDataAccessRules = {
   allow_attendance: boolean;
   allow_members: boolean;
   allow_finance: boolean;
-  // Ask Aura has tools for these two, so they keep their own flag
-  // independent of whichever public channels are also allowed to use them.
+  // Ask Aura has its own tool for each of these five, so each keeps its
+  // own flag independent of whichever public channels are also allowed
+  // to use the same underlying data.
   allow_fundraisers: boolean;
   allow_events: boolean;
+  allow_ministries: boolean;
+  allow_branches: boolean;
+  allow_forms: boolean;
   allow_fundraisers_instagram: boolean;
   allow_fundraisers_whatsapp: boolean;
   allow_events_instagram: boolean;
   allow_events_whatsapp: boolean;
-  // Ask Aura has no tool for these — Instagram/WhatsApp only.
   allow_ministries_instagram: boolean;
   allow_ministries_whatsapp: boolean;
   allow_branches_instagram: boolean;

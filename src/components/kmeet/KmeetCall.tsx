@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MeetingProvider, MeetingConsumer, useMeeting, useParticipant } from "@videosdk.live/react-sdk";
-import { Mic, MicOff, Video as VideoIcon, VideoOff, ScreenShare, ScreenShareOff, PhoneOff, Loader2 } from "lucide-react";
-import { joinMeetingAction, endMeetingAction } from "@/lib/kmeet/actions";
+import { Mic, MicOff, Video as VideoIcon, VideoOff, ScreenShare, ScreenShareOff, PhoneOff, Loader2, Link as LinkIcon, Check } from "lucide-react";
+import { joinMeetingAction, joinMeetingAsGuestAction, endMeetingAction } from "@/lib/kmeet/actions";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -74,6 +74,29 @@ function ParticipantTile({ participantId }: { participantId: string }) {
   );
 }
 
+function CopyInviteLinkButton({ meetingId }: { meetingId: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    const url = `${window.location.origin}/kmeet/${meetingId}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      window.prompt("Copy this link:", url);
+      return;
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <Button type="button" variant="outline" size="sm" onClick={handleCopy}>
+      {copied ? <Check className="size-3.5" /> : <LinkIcon className="size-3.5" />}
+      {copied ? "Copied" : "Invite link"}
+    </Button>
+  );
+}
+
 function CallControls({ meetingId, canEnd, onLeft }: { meetingId: string; canEnd: boolean; onLeft: () => void }) {
   const { leave, end, toggleMic, toggleWebcam, toggleScreenShare, localMicOn, localWebcamOn, localScreenShareOn } = useMeeting();
 
@@ -90,7 +113,7 @@ function CallControls({ meetingId, canEnd, onLeft }: { meetingId: string; canEnd
   }
 
   return (
-    <div className="flex items-center justify-center gap-2 border-t border-border bg-background p-3">
+    <div className="flex flex-wrap items-center justify-center gap-2 border-t border-border bg-background p-3">
       <Button type="button" variant={localMicOn ? "outline" : "destructive"} size="icon" onClick={() => toggleMic()} title={localMicOn ? "Mute" : "Unmute"}>
         {localMicOn ? <Mic className="size-4" /> : <MicOff className="size-4" />}
       </Button>
@@ -100,6 +123,7 @@ function CallControls({ meetingId, canEnd, onLeft }: { meetingId: string; canEnd
       <Button type="button" variant={localScreenShareOn ? "default" : "outline"} size="icon" onClick={() => toggleScreenShare()} title="Share your screen">
         {localScreenShareOn ? <ScreenShareOff className="size-4" /> : <ScreenShare className="size-4" />}
       </Button>
+      <CopyInviteLinkButton meetingId={meetingId} />
       <Button type="button" variant="destructive" onClick={handleLeave}>
         <PhoneOff className="size-4" />
         Leave
@@ -114,7 +138,16 @@ function CallControls({ meetingId, canEnd, onLeft }: { meetingId: string; canEnd
 }
 
 function CallView({ meetingId, canEnd, onLeft }: { meetingId: string; canEnd: boolean; onLeft: () => void }) {
-  const { join, participants } = useMeeting();
+  const [joined, setJoined] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+
+  const { join, participants } = useMeeting({
+    onMeetingJoined: () => setJoined(true),
+    onError: (data: { code: string; message: string }) => {
+      console.error("VideoSDK error:", data);
+      setConnectionError(data.message || "Something went wrong with the call connection.");
+    },
+  });
 
   useEffect(() => {
     join();
@@ -123,11 +156,32 @@ function CallView({ meetingId, canEnd, onLeft }: { meetingId: string; canEnd: bo
 
   const participantIds = [...participants.keys()];
 
+  if (connectionError && !joined) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+        <Alert variant="destructive" className="max-w-md">
+          <AlertDescription>Couldn&apos;t connect to the call: {connectionError}</AlertDescription>
+        </Alert>
+        <Button type="button" variant="outline" onClick={onLeft}>
+          Back to K-meet
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full flex-col">
+      {connectionError && (
+        <Alert variant="destructive" className="m-2">
+          <AlertDescription>{connectionError}</AlertDescription>
+        </Alert>
+      )}
       <div className="flex-1 overflow-y-auto p-4">
-        {participantIds.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Joining...</div>
+        {!joined || participantIds.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+            <Loader2 className="size-5 animate-spin" />
+            Connecting to the call...
+          </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {participantIds.map((id) => (
@@ -141,7 +195,20 @@ function CallView({ meetingId, canEnd, onLeft }: { meetingId: string; canEnd: bo
   );
 }
 
-export function KmeetCall({ meetingId, title, alreadyEnded, canEnd }: { meetingId: string; title: string; alreadyEnded: boolean; canEnd: boolean }) {
+export interface KmeetCallProps {
+  meetingId: string;
+  title: string;
+  alreadyEnded: boolean;
+  canEnd: boolean;
+  // Dashboard members join via joinMeetingAction (requires a session);
+  // the public /kmeet/[meetingId] page passes guestName instead, which
+  // routes through joinMeetingAsGuestAction (no session needed) — the
+  // call itself is identical either way.
+  guestName?: string;
+  backHref: string;
+}
+
+export function KmeetCall({ meetingId, title, alreadyEnded, canEnd, guestName, backHref }: KmeetCallProps) {
   const router = useRouter();
   const [joinInfo, setJoinInfo] = useState<{ roomId: string; token: string; displayName: string } | null>(null);
   const [error, setError] = useState<string | null>(alreadyEnded ? "This meeting has already ended." : null);
@@ -149,18 +216,20 @@ export function KmeetCall({ meetingId, title, alreadyEnded, canEnd }: { meetingI
 
   useEffect(() => {
     if (alreadyEnded) return;
-    joinMeetingAction(meetingId).then((result) => {
+    const join = guestName ? joinMeetingAsGuestAction(meetingId, guestName) : joinMeetingAction(meetingId);
+    join.then((result) => {
       if (result.error || !result.roomId || !result.token) {
         setError(result.error ?? "Couldn't join this meeting.");
         return;
       }
       setJoinInfo({ roomId: result.roomId, token: result.token, displayName: result.displayName ?? "Guest" });
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meetingId, alreadyEnded]);
 
   function handleLeft() {
     setLeft(true);
-    router.push("/dashboard/kmeet");
+    router.push(backHref);
   }
 
   if (left) return null;
@@ -172,8 +241,8 @@ export function KmeetCall({ meetingId, title, alreadyEnded, canEnd }: { meetingI
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
-        <Button type="button" variant="outline" onClick={() => router.push("/dashboard/kmeet")}>
-          Back to K-meet
+        <Button type="button" variant="outline" onClick={() => router.push(backHref)}>
+          Back
         </Button>
       </div>
     );

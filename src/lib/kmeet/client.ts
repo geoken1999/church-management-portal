@@ -12,9 +12,12 @@ export async function createVideoSdkRoom(): Promise<string> {
       Authorization: generateServerToken(),
       "Content-Type": "application/json",
     },
+    body: JSON.stringify({}),
   });
 
   if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error(`VideoSDK room creation failed (${res.status}): ${body}`);
     throw new Error(`Couldn't create a video room (${res.status}).`);
   }
 

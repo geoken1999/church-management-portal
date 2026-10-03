@@ -106,25 +106,13 @@ export interface JoinMeetingResult {
   displayName?: string;
 }
 
-// Called from the call page right before mounting the VideoSDK call UI —
-// lazily creates the room for a scheduled meeting the first time anyone
-// actually joins it (an instant meeting already has one from the moment
-// it was started).
-export async function joinMeetingAction(meetingId: string): Promise<JoinMeetingResult> {
-  const user = await requireUser();
-  const [membership, profile] = await Promise.all([requireOrganization(), getProfile()]);
-  const organizationId = membership.organization.id;
-
-  const access = await checkTabAccess(organizationId, "kmeet", "read");
-  if (!access.ok) return { error: access.message };
-
+// Shared by both join actions below — resolves the meeting's VideoSDK
+// room, creating one lazily (and marking the meeting "live") the first
+// time anyone actually joins a scheduled meeting; an instant meeting
+// already has one from the moment it was started.
+async function resolveMeetingRoom(meetingId: string): Promise<{ roomId: string } | { error: string }> {
   const admin = createAdminClient();
-  const { data: meeting } = await admin
-    .from("kmeet_meetings")
-    .select("id, room_id, status")
-    .eq("organization_id", organizationId)
-    .eq("id", meetingId)
-    .maybeSingle();
+  const { data: meeting } = await admin.from("kmeet_meetings").select("id, room_id, status").eq("id", meetingId).maybeSingle();
 
   if (!meeting) return { error: "That meeting could not be found." };
   if (meeting.status === "ended") return { error: "This meeting has already ended." };
@@ -141,9 +129,49 @@ export async function joinMeetingAction(meetingId: string): Promise<JoinMeetingR
     await admin.from("kmeet_meetings").update({ status: "live" }).eq("id", meetingId);
   }
 
+  return { roomId };
+}
+
+// Called from the call page right before mounting the VideoSDK call UI.
+export async function joinMeetingAction(meetingId: string): Promise<JoinMeetingResult> {
+  const user = await requireUser();
+  const [membership, profile] = await Promise.all([requireOrganization(), getProfile()]);
+  const organizationId = membership.organization.id;
+
+  const access = await checkTabAccess(organizationId, "kmeet", "read");
+  if (!access.ok) return { error: access.message };
+
+  const admin = createAdminClient();
+  const { data: meeting } = await admin
+    .from("kmeet_meetings")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("id", meetingId)
+    .maybeSingle();
+  if (!meeting) return { error: "That meeting could not be found." };
+
+  const resolved = await resolveMeetingRoom(meetingId);
+  if ("error" in resolved) return { error: resolved.error };
+
   const displayName = profile ? `${profile.first_name} ${profile.last_name}`.trim() : (user.email ?? "Guest");
 
-  return { roomId, token: generateParticipantToken(roomId), displayName };
+  return { roomId: resolved.roomId, token: generateParticipantToken(resolved.roomId), displayName };
+}
+
+// No session required — this is what the public /kmeet/[meetingId] page
+// calls after someone types in their name, so anyone with the link can
+// join (not just logged-in org members). The meeting itself still has to
+// exist and not have ended; there's no further access control beyond
+// that, same as every other invite-link-based feature in this app
+// (/join/[slug], /events/register/[token], /give/[token]).
+export async function joinMeetingAsGuestAction(meetingId: string, guestName: string): Promise<JoinMeetingResult> {
+  const trimmedName = guestName.trim().slice(0, 80);
+  if (!trimmedName) return { error: "Enter your name to join." };
+
+  const resolved = await resolveMeetingRoom(meetingId);
+  if ("error" in resolved) return { error: resolved.error };
+
+  return { roomId: resolved.roomId, token: generateParticipantToken(resolved.roomId), displayName: trimmedName };
 }
 
 export async function endMeetingAction(meetingId: string): Promise<void> {

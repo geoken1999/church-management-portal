@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getEvents } from "@/lib/events/dal";
 
 export const getKmeetMeetings = cache(async (organizationId: string) => {
@@ -54,5 +55,15 @@ export const getKmeetMeeting = cache(async (organizationId: string, meetingId: s
     .eq("id", meetingId)
     .maybeSingle();
 
+  return data;
+});
+
+// Public — no org/session check, used only by the /kmeet/[meetingId]
+// guest-join page. Only title/status are selected (nothing from any
+// other org-scoped table), same minimal-exposure shape as this app's
+// other invite-link pages (/join/[slug], /events/register/[token]).
+export const getPublicKmeetMeeting = cache(async (meetingId: string) => {
+  const admin = createAdminClient();
+  const { data } = await admin.from("kmeet_meetings").select("id, title, status").eq("id", meetingId).maybeSingle();
   return data;
 });

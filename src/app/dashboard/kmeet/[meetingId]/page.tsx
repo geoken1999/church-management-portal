@@ -21,5 +21,13 @@ export default async function KmeetCallPage({ params }: { params: Promise<{ meet
   const meeting = await getKmeetMeeting(organizationId, meetingId);
   if (!meeting) notFound();
 
-  return <KmeetCall meetingId={meeting.id} title={meeting.title} alreadyEnded={meeting.status === "ended"} canEnd={membership.tabAccess.kmeet.write} />;
+  return (
+    <KmeetCall
+      meetingId={meeting.id}
+      title={meeting.title}
+      alreadyEnded={meeting.status === "ended"}
+      canEnd={membership.tabAccess.kmeet.write}
+      backHref="/dashboard/kmeet"
+    />
+  );
 }

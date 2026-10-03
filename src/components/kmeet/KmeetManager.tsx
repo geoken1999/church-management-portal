@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Video, Plus, Calendar, Trash2 } from "lucide-react";
+import { Video, Plus, Calendar, Trash2, Link as LinkIcon, Check } from "lucide-react";
 import { scheduleMeetingAction, startInstantMeetingAction, cancelMeetingAction, type KmeetFormState } from "@/lib/kmeet/actions";
 import type { KmeetMeetingStatus } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -186,12 +186,25 @@ function statusBadge(status: KmeetMeetingStatus) {
 
 function MeetingCard({ meeting, canManage }: { meeting: KmeetMeetingRow; canManage: boolean }) {
   const [pending, startTransition] = useTransition();
+  const [copied, setCopied] = useState(false);
 
   function handleCancel() {
     if (!window.confirm(`Cancel "${meeting.title}"?`)) return;
     startTransition(() => {
       cancelMeetingAction(meeting.id);
     });
+  }
+
+  async function handleCopyLink() {
+    const url = `${window.location.origin}/kmeet/${meeting.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      window.prompt("Copy this link:", url);
+      return;
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -211,9 +224,14 @@ function MeetingCard({ meeting, canManage }: { meeting: KmeetMeetingRow; canMana
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {meeting.status !== "ended" && (
-          <Button type="button" size="sm" nativeButton={false} render={<a href={`/dashboard/kmeet/${meeting.id}`} />}>
-            Join
-          </Button>
+          <>
+            <Button type="button" size="icon" variant="ghost" onClick={handleCopyLink} title="Copy invite link">
+              {copied ? <Check className="size-4" /> : <LinkIcon className="size-4" />}
+            </Button>
+            <Button type="button" size="sm" nativeButton={false} render={<a href={`/dashboard/kmeet/${meeting.id}`} />}>
+              Join
+            </Button>
+          </>
         )}
         {canManage && meeting.status === "scheduled" && (
           <Button type="button" size="icon" variant="ghost" onClick={handleCancel} disabled={pending} title="Cancel meeting">

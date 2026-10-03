@@ -25,9 +25,21 @@ import {
 import { joinMeetingAction, joinMeetingAsGuestAction, endMeetingAction, toggleAdmissionModeAction } from "@/lib/kmeet/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const REACTIONS = ["👍", "❤️", "😂", "👏", "🎉"];
+
+// A video tile's aspect ratio follows the actual camera stream's own
+// orientation (read off the MediaStreamTrack's settings) rather than the
+// viewer's own window width — a phone's camera is portrait regardless of
+// how wide the person looking at it has their browser, and vice versa.
+function orientationFromTrack(track: MediaStreamTrack | undefined): "portrait" | "landscape" {
+  const settings = track?.getSettings?.();
+  if (settings?.width && settings?.height && settings.height > settings.width) return "portrait";
+  return "landscape";
+}
 
 // A participant's video and audio are separate concerns in this SDK —
 // video goes through a <video> element bound to webcamStream, audio is
@@ -40,6 +52,11 @@ function ParticipantTile({ participantId, isModerator }: { participantId: string
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const screenRef = useRef<HTMLVideoElement>(null);
+  // Derived straight from the track on every render rather than cached in
+  // state — a plain, pure read of the track's current settings, and some
+  // devices renegotiate resolution mid-call, so re-deriving naturally
+  // stays correct without an effect to keep it in sync.
+  const orientation = webcamOn && webcamStream ? orientationFromTrack(webcamStream.track) : "landscape";
 
   useEffect(() => {
     if (!videoRef.current) return;
@@ -75,9 +92,12 @@ function ParticipantTile({ participantId, isModerator }: { participantId: string
   }, [screenShareOn, screenShareStream]);
 
   const showModControls = isModerator && !isLocal;
+  // Screen shares stay landscape-shaped regardless of the sharer's device —
+  // only the camera feed follows the participant's own orientation.
+  const aspectClass = screenShareOn ? "aspect-video" : orientation === "portrait" ? "aspect-[9/16] max-w-xs" : "aspect-video";
 
   return (
-    <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-muted">
+    <div className={`relative mx-auto flex w-full items-center justify-center overflow-hidden rounded-lg bg-muted ${aspectClass}`}>
       {screenShareOn ? (
         <video ref={screenRef} autoPlay playsInline className="h-full w-full object-contain" />
       ) : webcamOn ? (
@@ -222,7 +242,7 @@ function ChatPanel({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="flex h-full w-72 shrink-0 flex-col border-l border-border bg-background">
+    <div className="absolute inset-0 z-10 flex flex-col border-l border-border bg-background sm:static sm:inset-auto sm:z-auto sm:h-full sm:w-72 sm:shrink-0">
       <div className="flex items-center justify-between border-b border-border p-2">
         <p className="text-sm font-medium">Chat</p>
         <Button type="button" size="icon-sm" variant="ghost" onClick={onClose}>
@@ -382,6 +402,8 @@ function CallView({
   initialRequireAdmission,
   startedAt,
   maxDurationMinutes,
+  cameraId,
+  micId,
   onLeft,
 }: {
   meetingId: string;
@@ -390,6 +412,8 @@ function CallView({
   initialRequireAdmission: boolean;
   startedAt: string;
   maxDurationMinutes: number | null;
+  cameraId: string;
+  micId: string;
   onLeft: () => void;
 }) {
   const [joined, setJoined] = useState(false);
@@ -399,8 +423,9 @@ function CallView({
   const [requireAdmission, setRequireAdmission] = useState(initialRequireAdmission);
   const [chatOpen, setChatOpen] = useState(false);
   const retriedRef = useRef(false);
+  const deviceAppliedRef = useRef(false);
 
-  const { join, leave, end, participants } = useMeeting({
+  const { join, leave, end, participants, changeWebcam, changeMic } = useMeeting({
     onMeetingJoined: () => setJoined(true),
     onError: (data: { code: string; message: string }) => {
       // code 4002 (INVALID_TOKEN) right at the start is almost always this
@@ -429,6 +454,19 @@ function CallView({
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Switches to the specific camera/mic chosen in the pre-join lobby —
+  // deferred until after a successful join (rather than passed as a
+  // custom track at join time) since VideoSDK's own produce pipeline only
+  // reliably accepts tracks it created itself via changeWebcam/changeMic,
+  // not an externally-supplied MediaStream (confirmed live:
+  // ERROR_WEBCAM_PRODUCE_FAILED when attempted at join time).
+  useEffect(() => {
+    if (!joined || deviceAppliedRef.current) return;
+    deviceAppliedRef.current = true;
+    if (cameraId) changeWebcam(cameraId).catch(() => {});
+    if (micId) changeMic(micId).catch(() => {});
+  }, [joined, cameraId, micId, changeWebcam, changeMic]);
 
   function handleToggleAdmission() {
     const next = !requireAdmission;
@@ -585,6 +623,164 @@ function EntryRequestListener({
   return <>{children}</>;
 }
 
+export interface LobbyChoice {
+  micOn: boolean;
+  camOn: boolean;
+  cameraId: string;
+  micId: string;
+}
+
+// A camera-preview "green room" before actually joining — check your mic/
+// camera and pick a device while the join request resolves in the
+// background, rather than being dropped straight into a live call. Only
+// the device IDs and on/off choice carry over to the live call (via
+// useMeeting's changeWebcam/changeMic once joined, see CallView) — the
+// preview's own getUserMedia stream is always stopped once this unmounts,
+// never handed off directly. An earlier version tried handing the raw
+// MediaStream straight to MeetingProvider's customCameraVideoTrack config;
+// confirmed live that VideoSDK's internal track handling doesn't tolerate
+// a track it didn't create itself (ERROR_WEBCAM_PRODUCE_FAILED), so this
+// lets the SDK create its own track as it always has and just points it
+// at the chosen device afterward.
+function PreJoinLobby({ title, canJoin, onJoin }: { title: string; canJoin: boolean; onJoin: (choice: LobbyChoice) => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [micOn, setMicOn] = useState(true);
+  const [camOn, setCamOn] = useState(true);
+  const orientation = stream ? orientationFromTrack(stream.getVideoTracks()[0]) : "landscape";
+  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
+  const [mics, setMics] = useState<MediaDeviceInfo[]>([]);
+  const [cameraId, setCameraId] = useState("");
+  const [micId, setMicId] = useState("");
+  const [permissionError, setPermissionError] = useState<string | null>(null);
+
+  // Acquire and release live in the SAME effect, closing over the exact
+  // stream this particular effect invocation created — not a separate
+  // mount-only cleanup effect reading a shared ref. React 18 Strict Mode
+  // runs every effect through mount -> cleanup -> mount once in dev, and a
+  // getUserMedia stream can't tolerate that: a shared-ref cleanup stops
+  // whatever the ref currently points to, which during that simulated
+  // cleanup can be a stream a *different* invocation is still using.
+  // This stream is only ever used for the lobby's own preview — it's
+  // always released on unmount, never hand off to the live call itself
+  // (see the LobbyChoice comment above for why).
+  useEffect(() => {
+    let cancelled = false;
+    let acquiredStream: MediaStream | null = null;
+
+    async function startPreview() {
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          video: cameraId ? { deviceId: { exact: cameraId } } : true,
+          audio: micId ? { deviceId: { exact: micId } } : true,
+        });
+        if (cancelled) {
+          newStream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+        acquiredStream = newStream;
+        streamRef.current = newStream;
+        setStream(newStream);
+        setPermissionError(null);
+
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        if (cancelled) return;
+        setCameras(devices.filter((d) => d.kind === "videoinput"));
+        setMics(devices.filter((d) => d.kind === "audioinput"));
+      } catch {
+        if (!cancelled) setPermissionError("Couldn't access your camera or microphone — check your browser's permission settings for this site.");
+      }
+    }
+
+    startPreview();
+    return () => {
+      cancelled = true;
+      acquiredStream?.getTracks().forEach((t) => t.stop());
+    };
+  }, [cameraId, micId]);
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.srcObject = camOn ? stream : null;
+  }, [stream, camOn]);
+
+  useEffect(() => {
+    stream?.getAudioTracks().forEach((t) => {
+      t.enabled = micOn;
+    });
+  }, [stream, micOn]);
+
+  function handleJoin() {
+    onJoin({ micOn, camOn, cameraId, micId });
+  }
+
+  const aspectClass = orientation === "portrait" ? "aspect-[9/16] max-w-xs" : "aspect-video";
+
+  return (
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
+      <h1 className="font-heading text-2xl font-bold">{title}</h1>
+      {permissionError && (
+        <Alert variant="destructive">
+          <AlertDescription>{permissionError}</AlertDescription>
+        </Alert>
+      )}
+      <div className={`relative mx-auto flex w-full items-center justify-center overflow-hidden rounded-lg bg-black ${aspectClass}`}>
+        {camOn && stream ? (
+          <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+        ) : (
+          <p className="text-sm text-white/70">{permissionError ? "No camera" : "The camera is off"}</p>
+        )}
+        <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-2">
+          <Button type="button" variant={micOn ? "secondary" : "destructive"} size="icon" onClick={() => setMicOn((v) => !v)} title={micOn ? "Mute" : "Unmute"}>
+            {micOn ? <Mic className="size-4" /> : <MicOff className="size-4" />}
+          </Button>
+          <Button type="button" variant={camOn ? "secondary" : "destructive"} size="icon" onClick={() => setCamOn((v) => !v)} title={camOn ? "Turn off camera" : "Turn on camera"}>
+            {camOn ? <VideoIcon className="size-4" /> : <VideoOff className="size-4" />}
+          </Button>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label className="text-xs">Camera</Label>
+          <Select value={cameraId || "default"} onValueChange={(v) => setCameraId(v === "default" ? "" : (v ?? ""))}>
+            <SelectTrigger className="w-full">
+              <SelectValue>{() => cameras.find((c) => c.deviceId === cameraId)?.label || "Default camera"}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">Default camera</SelectItem>
+              {cameras.map((c) => (
+                <SelectItem key={c.deviceId} value={c.deviceId}>
+                  {c.label || "Camera"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">Microphone</Label>
+          <Select value={micId || "default"} onValueChange={(v) => setMicId(v === "default" ? "" : (v ?? ""))}>
+            <SelectTrigger className="w-full">
+              <SelectValue>{() => mics.find((m) => m.deviceId === micId)?.label || "Default microphone"}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">Default microphone</SelectItem>
+              {mics.map((m) => (
+                <SelectItem key={m.deviceId} value={m.deviceId}>
+                  {m.label || "Microphone"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <Button type="button" onClick={handleJoin} disabled={!canJoin}>
+        {canJoin ? "Join now" : "Preparing your meeting..."}
+      </Button>
+    </div>
+  );
+}
+
 export interface KmeetCallProps {
   meetingId: string;
   title: string;
@@ -613,6 +809,7 @@ export function KmeetCall({ meetingId, title, alreadyEnded, canEnd, guestName, b
   const [joinInfo, setJoinInfo] = useState<JoinInfo | null>(null);
   const [error, setError] = useState<string | null>(alreadyEnded ? "This meeting has already ended." : null);
   const [left, setLeft] = useState(false);
+  const [lobbyChoice, setLobbyChoice] = useState<LobbyChoice | null>(null);
 
   useEffect(() => {
     if (alreadyEnded) return;
@@ -656,6 +853,10 @@ export function KmeetCall({ meetingId, title, alreadyEnded, canEnd, guestName, b
     );
   }
 
+  if (!lobbyChoice) {
+    return <PreJoinLobby title={title} canJoin={!!joinInfo} onJoin={setLobbyChoice} />;
+  }
+
   if (!joinInfo) {
     return (
       <div className="flex h-[70vh] flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
@@ -670,8 +871,8 @@ export function KmeetCall({ meetingId, title, alreadyEnded, canEnd, guestName, b
       <MeetingProvider
         config={{
           meetingId: joinInfo.roomId,
-          micEnabled: true,
-          webcamEnabled: true,
+          micEnabled: lobbyChoice.micOn,
+          webcamEnabled: lobbyChoice.camOn,
           name: joinInfo.displayName,
           debugMode: false,
         }}
@@ -684,6 +885,8 @@ export function KmeetCall({ meetingId, title, alreadyEnded, canEnd, guestName, b
           initialRequireAdmission={joinInfo.requireAdmission}
           startedAt={joinInfo.startedAt}
           maxDurationMinutes={joinInfo.maxDurationMinutes}
+          cameraId={lobbyChoice.cameraId}
+          micId={lobbyChoice.micId}
           onLeft={handleLeft}
         />
       </MeetingProvider>

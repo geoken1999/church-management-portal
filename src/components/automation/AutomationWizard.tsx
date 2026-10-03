@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, ArrowRight } from "lucide-react";
 import {
   updateAutomationAction,
   upsertAutomationTriggerAction,
@@ -533,6 +533,23 @@ export function AutomationWizard({
           </CardContent>
         </Card>
       )}
+
+      <div className="flex justify-between">
+        {stepIndex > 0 ? (
+          <Button type="button" variant="outline" onClick={() => setStepIndex((i) => i - 1)}>
+            <ArrowLeft className="size-4" />
+            Back
+          </Button>
+        ) : (
+          <span />
+        )}
+        {stepIndex < STEPS.length - 1 && (
+          <Button type="button" onClick={() => setStepIndex((i) => i + 1)}>
+            Next
+            <ArrowRight className="size-4" />
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

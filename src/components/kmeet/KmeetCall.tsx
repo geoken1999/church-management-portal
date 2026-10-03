@@ -109,16 +109,22 @@ function ParticipantTile({ participantId, isModerator }: { participantId: string
   }, [screenShareOn, screenShareStream]);
 
   const showModControls = isModerator && !isLocal;
-  // Screen shares stay landscape-shaped regardless of the sharer's device —
-  // only the camera feed follows the participant's own orientation.
-  const aspectClass = screenShareOn ? "aspect-video" : orientation === "portrait" ? "aspect-[9/16] max-w-xs" : "aspect-video";
+  // Every tile stays a uniform landscape cell — a grid that resizes one
+  // cell into a tall portrait box per participant looks broken next to
+  // everyone else's, the opposite of what real video-calling apps do (a
+  // consistent grid regardless of who's on mobile vs. desktop). A
+  // portrait camera is fit *inside* that landscape cell with
+  // object-contain instead — the full portrait frame stays visible,
+  // centered, rather than being cropped top/bottom by object-cover or the
+  // whole cell being resized around it.
+  const videoFitClass = orientation === "portrait" ? "object-contain" : "object-cover";
 
   return (
-    <div className={`relative mx-auto flex w-full items-center justify-center overflow-hidden rounded-lg bg-muted ${aspectClass}`}>
+    <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg bg-muted">
       {screenShareOn ? (
         <video ref={screenRef} autoPlay playsInline className="h-full w-full object-contain" />
       ) : webcamOn ? (
-        <video ref={videoRef} autoPlay playsInline muted={isLocal} className="h-full w-full object-cover" />
+        <video ref={videoRef} autoPlay playsInline muted={isLocal} className={`h-full w-full ${videoFitClass}`} />
       ) : (
         <div className="flex size-14 items-center justify-center rounded-full bg-primary/10 text-lg font-semibold text-primary">
           {(displayName || "?").charAt(0).toUpperCase()}
@@ -732,7 +738,10 @@ function PreJoinLobby({ title, canJoin, onJoin }: { title: string; canJoin: bool
     onJoin({ micOn, camOn, cameraId, micId });
   }
 
-  const aspectClass = orientation === "portrait" ? "aspect-[9/16] max-w-xs" : "aspect-video";
+  // Same reasoning as ParticipantTile: the preview box stays a uniform
+  // landscape frame, a portrait camera is fit inside it rather than
+  // resizing the box.
+  const videoFitClass = orientation === "portrait" ? "object-contain" : "object-cover";
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
@@ -742,9 +751,9 @@ function PreJoinLobby({ title, canJoin, onJoin }: { title: string; canJoin: bool
           <AlertDescription>{permissionError}</AlertDescription>
         </Alert>
       )}
-      <div className={`relative mx-auto flex w-full items-center justify-center overflow-hidden rounded-lg bg-black ${aspectClass}`}>
+      <div className="relative mx-auto flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg bg-black">
         {camOn && stream ? (
-          <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+          <video ref={videoRef} autoPlay playsInline muted className={`h-full w-full ${videoFitClass}`} />
         ) : (
           <p className="text-sm text-white/70">{permissionError ? "No camera" : "The camera is off"}</p>
         )}

@@ -140,17 +140,35 @@ function CallControls({ meetingId, canEnd, onLeft }: { meetingId: string; canEnd
 function CallView({ meetingId, canEnd, onLeft }: { meetingId: string; canEnd: boolean; onLeft: () => void }) {
   const [joined, setJoined] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const retriedRef = useRef(false);
 
   const { join, participants } = useMeeting({
     onMeetingJoined: () => setJoined(true),
     onError: (data: { code: string; message: string }) => {
+      // code 4002 (INVALID_TOKEN) right at the start is almost always this
+      // SDK's own config effect (a parent effect) not having run yet when
+      // join() fires from a child effect — React runs effects child-first
+      // within a commit, so the very first join() can race ahead of it.
+      // One retry, a tick later, is enough; a second 4002 is a genuine bad
+      // token, not a timing issue.
+      if (data.code === "4002" && !joined && !retriedRef.current) {
+        retriedRef.current = true;
+        setTimeout(() => join(), 150);
+        return;
+      }
       console.error("VideoSDK error:", data);
       setConnectionError(data.message || "Something went wrong with the call connection.");
     },
   });
 
   useEffect(() => {
-    join();
+    // Deferred to a macrotask so this runs after every effect from this
+    // commit (including the SDK's own MeetingProvider config effect, a
+    // parent effect that otherwise hasn't necessarily run yet) — see the
+    // onError comment above for why calling join() synchronously here
+    // raced ahead of it.
+    const timer = setTimeout(() => join(), 0);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

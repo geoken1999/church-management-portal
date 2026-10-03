@@ -54,6 +54,7 @@ function ArticleRow({ article, query, defaultOpen }: { article: DocArticle; quer
 export function DocumentationBrowser({
   categories = DOC_CATEGORIES,
   heroTitle = "How can we help?",
+  tagline,
   heroDescription = "Search how-to guides across every part of KingdomFlow, or browse by category below.",
   searchPlaceholder = "Search documentation...",
   // A plain template string, not a function — a Server Component (like
@@ -63,6 +64,9 @@ export function DocumentationBrowser({
 }: {
   categories?: DocCategory[];
   heroTitle?: string;
+  // Optional, left unset by the platform-admin runbook — that's an
+  // internal ops page, not a church-facing one, so it has no tagline.
+  tagline?: string;
   heroDescription?: string;
   searchPlaceholder?: string;
   emptyStateTemplate?: string;
@@ -93,6 +97,7 @@ export function DocumentationBrowser({
           </div>
           <div>
             <h2 className="font-heading text-2xl font-bold tracking-tight">{heroTitle}</h2>
+            {tagline && <p className="mt-1 text-xs font-semibold tracking-wide text-primary uppercase">{tagline}</p>}
             <p className="mt-1 text-sm text-muted-foreground">{heroDescription}</p>
           </div>
           <div className="relative w-full">

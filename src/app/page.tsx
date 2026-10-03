@@ -7,7 +7,7 @@ import { RecoveryHashRedirect } from "@/components/auth/RecoveryHashHandler";
 export const metadata: Metadata = {
   title: "KingdomFlow — Church management, connected",
   description:
-    "Members, ministries, giving, and communication in one platform built for churches. Free to start.",
+    "Members, ministries, giving, and communication in one platform. Built for the churches, by the church. Free to start.",
 };
 
 export default async function Home() {

@@ -270,6 +270,7 @@ export function LandingPage() {
               Shepherd your church with{" "}
               <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">clarity</span>.
             </h1>
+            <p className="mt-3 text-sm font-semibold tracking-wide text-primary uppercase">Built for the churches, by the church.</p>
             <p className="mt-5 text-lg text-muted-foreground text-balance">
               KingdomFlow brings your congregation, ministries, attendance, giving, and communication into one
               connected platform — so your team spends less time on spreadsheets and more time on people.
@@ -530,7 +531,10 @@ export function LandingPage() {
 
       <footer className="border-t border-border px-4 py-10 sm:px-6">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-6">
-          <Logo size="sm" />
+          <div>
+            <Logo size="sm" />
+            <p className="mt-1 text-xs text-muted-foreground">Built for the churches, by the church.</p>
+          </div>
           <nav className="flex flex-wrap items-center gap-6">
             <a href="#features" className="text-sm text-muted-foreground hover:text-foreground">
               Features

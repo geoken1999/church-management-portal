@@ -11,7 +11,7 @@ export default async function DocumentationPage() {
 
   return (
     <div className="space-y-8">
-      <DocumentationBrowser />
+      <DocumentationBrowser tagline="Built for the churches, by the church." />
     </div>
   );
 }

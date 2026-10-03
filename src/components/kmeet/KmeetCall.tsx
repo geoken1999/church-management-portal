@@ -24,6 +24,7 @@ import {
   Headphones,
 } from "lucide-react";
 import { joinMeetingAction, joinMeetingAsGuestAction, endMeetingAction, toggleAdmissionModeAction } from "@/lib/kmeet/actions";
+import { publicBasePathForMode } from "@/lib/kmeet/mode";
 import type { KmeetMode } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -176,11 +177,11 @@ function ParticipantTile({ participantId, isModerator }: { participantId: string
   );
 }
 
-function CopyInviteLinkButton({ meetingId }: { meetingId: string }) {
+function CopyInviteLinkButton({ meetingId, audioOnly }: { meetingId: string; audioOnly: boolean }) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
-    const url = `${window.location.origin}/kmeet/${meetingId}`;
+    const url = `${window.location.origin}${publicBasePathForMode(audioOnly ? "audio" : "video")}/${meetingId}`;
     try {
       await navigator.clipboard.writeText(url);
     } catch {
@@ -404,7 +405,7 @@ function CallControls({
       <Button type="button" variant={chatOpen ? "default" : "outline"} size="icon" onClick={onToggleChat} title="Chat">
         <MessageSquare className="size-4" />
       </Button>
-      <CopyInviteLinkButton meetingId={meetingId} />
+      <CopyInviteLinkButton meetingId={meetingId} audioOnly={audioOnly} />
       {isModerator && (
         <Button type="button" variant="outline" size="sm" onClick={onToggleAdmission} title="Toggle whether new joiners need to be admitted">
           {requireAdmission ? <ShieldAlert className="size-3.5" /> : <ShieldCheck className="size-3.5" />}

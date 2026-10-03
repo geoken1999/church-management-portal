@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, UserRound, Repeat, Clock, MapPin, Video, Phone } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, UserRound, Repeat, Clock, MapPin, Video, Phone, Webcam } from "lucide-react";
 import { cn } from "cn";
 import { createEvent, updateEvent, deleteEvent, type EventFormState } from "@/lib/events/actions";
 import { getOccurrencesInRange, occurrenceLabel } from "@/lib/events/recurrence";
@@ -33,6 +33,7 @@ import {
 type MemberBasic = Pick<Member, "id" | "first_name" | "last_name">;
 type BranchBasic = Pick<Branch, "id" | "name">;
 type EventRow = Event & { members: MemberBasic | null; branches: BranchBasic | null };
+type KmeetBadge = { id: string; title: string; status: string };
 
 const OPEN_MEETING_LABEL = "Open meeting (not branch-specific)";
 
@@ -623,12 +624,14 @@ function EventCard({
   branches,
   canManage,
   siteUrl,
+  kmeetMeetings,
 }: {
   event: EventRow;
   members: MemberBasic[];
   branches: BranchBasic[];
   canManage: boolean;
   siteUrl: string;
+  kmeetMeetings: KmeetBadge[];
 }) {
   const start = new Date(event.start_at);
   const end = event.end_at ? new Date(event.end_at) : null;
@@ -685,6 +688,21 @@ function EventCard({
               </a>
             )}
           </div>
+          {kmeetMeetings.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <Webcam className="size-3.5 shrink-0" />
+              {kmeetMeetings.map((meeting) => (
+                <a
+                  key={meeting.id}
+                  href={`/dashboard/kmeet/${meeting.id}`}
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  K-meet: {meeting.title}
+                  {meeting.status === "live" ? " (live)" : meeting.status === "ended" ? " (ended)" : ""}
+                </a>
+              ))}
+            </div>
+          )}
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <UserRound className="size-3.5 shrink-0" />
             {personName(event.members)}
@@ -730,12 +748,14 @@ function EventsListTab({
   branches,
   canManage,
   siteUrl,
+  kmeetByEventId,
 }: {
   events: EventRow[];
   members: MemberBasic[];
   branches: BranchBasic[];
   canManage: boolean;
   siteUrl: string;
+  kmeetByEventId: Record<string, KmeetBadge[]>;
 }) {
   if (events.length === 0) {
     return (
@@ -750,7 +770,15 @@ function EventsListTab({
   return (
     <div className="space-y-4">
       {events.map((event) => (
-        <EventCard key={event.id} event={event} members={members} branches={branches} canManage={canManage} siteUrl={siteUrl} />
+        <EventCard
+          key={event.id}
+          event={event}
+          members={members}
+          branches={branches}
+          canManage={canManage}
+          siteUrl={siteUrl}
+          kmeetMeetings={kmeetByEventId[event.id] ?? []}
+        />
       ))}
     </div>
   );
@@ -883,6 +911,7 @@ export function EventsManager({
   events,
   canManage,
   siteUrl,
+  kmeetByEventId,
 }: {
   organizationId: string;
   members: MemberBasic[];
@@ -890,6 +919,7 @@ export function EventsManager({
   events: EventRow[];
   canManage: boolean;
   siteUrl: string;
+  kmeetByEventId: Record<string, KmeetBadge[]>;
 }) {
   return (
     <div className="space-y-4">
@@ -906,7 +936,7 @@ export function EventsManager({
           <EventCalendar events={events} />
         </TabsPanel>
         <TabsPanel value="list">
-          <EventsListTab events={events} members={members} branches={branches} canManage={canManage} siteUrl={siteUrl} />
+          <EventsListTab events={events} members={members} branches={branches} canManage={canManage} siteUrl={siteUrl} kmeetByEventId={kmeetByEventId} />
         </TabsPanel>
       </Tabs>
     </div>

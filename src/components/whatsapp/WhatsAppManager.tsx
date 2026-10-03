@@ -12,10 +12,11 @@ import {
   createWhatsAppTemplateAction,
   refreshWhatsAppTemplateStatusAction,
   deleteWhatsAppTemplateAction,
+  generateWhatsAppTemplateBodyAction,
   type SendWhatsAppState,
   type TemplateFormState,
 } from "@/lib/whatsapp/actions";
-import { normalizePhoneNumber, countTemplateVariables } from "@/lib/whatsapp/validation";
+import { normalizePhoneNumber, countTemplateVariables, validateWhatsAppTemplatePlaceholders } from "@/lib/whatsapp/validation";
 import type { WhatsAppTemplateCategory, WhatsAppTemplateStatus } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,6 +108,93 @@ function templateStatusBadge(status: WhatsAppTemplateStatus) {
   return <Badge variant="outline">Draft</Badge>;
 }
 
+// Ready-made starting points, already in the numbered-placeholder format
+// Meta requires — the easiest way to avoid the INVALID_FORMAT rejection
+// a hand-written {{name}}-style placeholder causes (see
+// validateWhatsAppTemplatePlaceholders). Covers the three most common
+// church use cases; editable after picking one.
+const TEMPLATE_PRESETS: { label: string; category: WhatsAppTemplateCategory; bodyText: string; exampleValues: string[] }[] = [
+  {
+    label: "Sunday service reminder",
+    category: "utility",
+    bodyText: "Hi {{1}}, our service starts at 10 AM every Sunday. We'd love to see you there on time to receive the blessings!",
+    exampleValues: ["John"],
+  },
+  {
+    label: "Event invitation",
+    category: "marketing",
+    bodyText: "Hi {{1}}, you're invited to {{2}} on {{3}}. We hope to see you there!",
+    exampleValues: ["John", "Youth Camp 2026", "March 14"],
+  },
+  {
+    label: "General announcement",
+    category: "utility",
+    bodyText: "Hi {{1}}, {{2}}",
+    exampleValues: ["John", "we have an important update for you."],
+  },
+];
+
+function AiTemplateGenerator({
+  organizationId,
+  onGenerated,
+}: {
+  organizationId: string;
+  onGenerated: (result: { bodyText: string; exampleValues: string[] }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function handleGenerate() {
+    setError(null);
+    startTransition(async () => {
+      const result = await generateWhatsAppTemplateBodyAction(organizationId, draft);
+      if (result.error || !result.bodyText) {
+        setError(result.error ?? "Couldn't generate a template. Try again.");
+        return;
+      }
+      onGenerated({ bodyText: result.bodyText, exampleValues: result.exampleValues ?? [] });
+      setOpen(false);
+      setDraft("");
+    });
+  }
+
+  if (!open) {
+    return (
+      <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
+        <Sparkles className="size-3.5" />
+        Generate with AI
+      </Button>
+    );
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
+      <Label className="text-xs">Describe the message in plain English</Label>
+      <Textarea
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder="Remind members that Sunday service starts at 10 AM and they should come on time"
+        rows={2}
+      />
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      <div className="flex gap-2">
+        <Button type="button" size="sm" onClick={handleGenerate} disabled={pending || !draft.trim()}>
+          {pending ? "Generating..." : "Generate"}
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function NewTemplateForm({ organizationId }: { organizationId: string }) {
   const [state, setState] = useState<TemplateFormState>(templateInitialState);
   const [pending, startTransition] = useTransition();
@@ -117,11 +205,23 @@ function NewTemplateForm({ organizationId }: { organizationId: string }) {
   const [exampleValues, setExampleValues] = useState<string[]>([]);
 
   const variableCount = countTemplateVariables(bodyText);
+  const placeholderError = bodyText.trim() ? validateWhatsAppTemplatePlaceholders(bodyText) : undefined;
 
   function handleBodyChange(value: string) {
     setBodyText(value);
     const count = countTemplateVariables(value);
     setExampleValues((prev) => Array.from({ length: count }, (_, i) => prev[i] ?? ""));
+  }
+
+  function applyPreset(preset: (typeof TEMPLATE_PRESETS)[number]) {
+    setCategory(preset.category);
+    setBodyText(preset.bodyText);
+    setExampleValues(preset.exampleValues);
+  }
+
+  function applyGenerated(result: { bodyText: string; exampleValues: string[] }) {
+    setBodyText(result.bodyText);
+    setExampleValues(result.exampleValues);
   }
 
   function handleSubmit() {
@@ -159,8 +259,9 @@ function NewTemplateForm({ organizationId }: { organizationId: string }) {
         <CardTitle className="text-sm">New WhatsApp template</CardTitle>
         <CardDescription>
           Submitted to WhatsApp for review — approval usually takes a few minutes to a few hours, sometimes longer. Use{" "}
-          <code className="rounded bg-muted px-1 py-0.5">{"{{1}}"}</code>, <code className="rounded bg-muted px-1 py-0.5">{"{{2}}"}</code>, etc. for
-          fill-in-the-blank placeholders.
+          <code className="rounded bg-muted px-1 py-0.5">{"{{1}}"}</code>, <code className="rounded bg-muted px-1 py-0.5">{"{{2}}"}</code>, etc., in
+          order, for fill-in-the-blank placeholders — never a named one like <code className="rounded bg-muted px-1 py-0.5">{"{{name}}"}</code>, which
+          WhatsApp rejects. Pick a quick-start template below, or describe your message and let AI format it correctly.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -197,6 +298,17 @@ function NewTemplateForm({ organizationId }: { organizationId: string }) {
           </div>
         </div>
         <div className="space-y-1.5">
+          <Label className="text-xs">Quick start</Label>
+          <div className="flex flex-wrap gap-2">
+            {TEMPLATE_PRESETS.map((preset) => (
+              <Button key={preset.label} type="button" variant="outline" size="sm" onClick={() => applyPreset(preset)}>
+                {preset.label}
+              </Button>
+            ))}
+            <AiTemplateGenerator organizationId={organizationId} onGenerated={applyGenerated} />
+          </div>
+        </div>
+        <div className="space-y-1.5">
           <Label htmlFor="template-body" className="text-xs">
             Message
           </Label>
@@ -207,6 +319,7 @@ function NewTemplateForm({ organizationId }: { organizationId: string }) {
             placeholder="Hi {{1}}, this Sunday's service starts at 10am. See you there!"
             rows={3}
           />
+          {placeholderError && <p className="text-xs text-destructive">{placeholderError}</p>}
         </div>
         {variableCount > 0 && (
           <div className="space-y-2">
@@ -228,7 +341,7 @@ function NewTemplateForm({ organizationId }: { organizationId: string }) {
           </div>
         )}
         <div className="flex gap-2">
-          <Button type="button" size="sm" onClick={handleSubmit} disabled={pending || !name.trim() || !bodyText.trim()}>
+          <Button type="button" size="sm" onClick={handleSubmit} disabled={pending || !name.trim() || !bodyText.trim() || !!placeholderError}>
             {pending ? "Submitting..." : "Submit for review"}
           </Button>
           <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>

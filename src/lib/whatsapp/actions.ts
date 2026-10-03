@@ -10,7 +10,15 @@ import { logPlatformEvent } from "@/lib/platform-events/log";
 import { sendBulkTemplateMessage, sendTextMessage } from "@/lib/whatsapp/client";
 import { createMetaTemplate, deleteMetaTemplate, fetchMetaTemplateStatus } from "@/lib/whatsapp/templates-client";
 import { getAiMode, setAiMode, getAiTypingState } from "@/lib/whatsapp/automation";
-import { normalizePhoneNumber, validateWhatsAppBody, validateWhatsAppTemplateName, validateWhatsAppTemplateBody, countTemplateVariables } from "@/lib/whatsapp/validation";
+import {
+  normalizePhoneNumber,
+  validateWhatsAppBody,
+  validateWhatsAppTemplateName,
+  validateWhatsAppTemplateBody,
+  validateWhatsAppTemplatePlaceholders,
+  countTemplateVariables,
+} from "@/lib/whatsapp/validation";
+import { generateReply } from "@/lib/ai/openai";
 import type { WhatsAppCampaignStatus, WhatsAppTemplateCategory } from "@/types/database";
 
 const WHATSAPP_PATH = "/dashboard/whatsapp";
@@ -123,6 +131,80 @@ export async function createWhatsAppTemplateAction(_prevState: TemplateFormState
 
   revalidatePath(WHATSAPP_PATH);
   return { success: true };
+}
+
+export interface GenerateTemplateBodyResult {
+  error?: string;
+  bodyText?: string;
+  exampleValues?: string[];
+}
+
+// Meta rejects a template whose {{...}} placeholders aren't plain
+// sequential numbers — the natural way to write one by hand is
+// {{name}}, {{date}}, which is exactly what fails (see
+// validateWhatsAppTemplatePlaceholders's own comment). This turns a
+// plain-English description into a correctly-numbered draft so an admin
+// never has to get that syntax right themselves. Admin-only, same bar as
+// creating a template directly — not metered against the org's AI-reply
+// credit pool (that pool is for messages actually sent to end users; this
+// is a one-off drafting aid an admin triggers rarely, and it's already
+// gated to admins only).
+const TEMPLATE_AI_SYSTEM_PROMPT = `You write WhatsApp Business message templates for churches, in the exact format Meta's WhatsApp Business API requires.
+
+Rules you must follow exactly:
+- Output ONLY a single JSON object, no markdown code fences, no commentary before or after it.
+- Shape: {"body": "...", "variables": ["...", "..."]}
+- "body" is the message text. Any place a value is personalized per recipient (a name, a date, an amount, etc.) must be written as a numbered placeholder: {{1}}, {{2}}, {{3}}, in order of first appearance — never a named placeholder like {{name}}, and never skip a number.
+- "variables" is one short plain-English description per placeholder, in the same order (e.g. "the member's first name"), used as example text for Meta's reviewers. Include exactly one entry per placeholder in the body, no more, no fewer.
+- Keep the user's intent, tone, and specific details (times, days, places) exactly as given — you are formatting their message correctly, not rewriting its meaning.
+- The body must not start or end with a placeholder — keep plain text at the very start and end.
+- Keep it concise and avoid promotional superlatives ("best", "amazing", "don't miss out") unless the user's own text already uses them.
+- Do not invent a recipient's name, a link, or any detail the user didn't provide.`;
+
+export async function generateWhatsAppTemplateBodyAction(organizationId: string, rawText: string): Promise<GenerateTemplateBodyResult> {
+  const user = await requireUser();
+
+  if (!(await requireOrgAdmin(organizationId, user.id))) {
+    return { error: "Only an owner or admin can generate a template with AI." };
+  }
+
+  const trimmed = rawText.trim();
+  if (!trimmed) return { error: "Describe the message you want to send." };
+
+  let raw: string | null;
+  try {
+    raw = await generateReply(TEMPLATE_AI_SYSTEM_PROMPT, [{ role: "user", content: trimmed }]);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Couldn't reach the AI service.";
+    await logPlatformEvent({ level: "error", source: "whatsapp_template", message: `AI template generation failed: ${message}`, organizationId });
+    return { error: "Couldn't reach the AI service. Try again, or write the template by hand." };
+  }
+  if (!raw) return { error: "The AI didn't return anything. Try rephrasing your message." };
+
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return { error: "Couldn't understand the AI's response. Try again." };
+
+  let parsed: { body?: unknown; variables?: unknown };
+  try {
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch {
+    return { error: "Couldn't understand the AI's response. Try again." };
+  }
+
+  const bodyText = typeof parsed.body === "string" ? parsed.body.trim() : "";
+  const exampleValues = Array.isArray(parsed.variables) ? parsed.variables.map((v) => String(v)) : [];
+
+  if (!bodyText) return { error: "The AI didn't produce any message text. Try again." };
+
+  // Defensive — the AI occasionally still gets the numbering wrong;
+  // surface it as an ordinary validation error rather than handing back a
+  // draft that would just fail at Meta anyway.
+  const placeholderError = validateWhatsAppTemplatePlaceholders(bodyText);
+  if (placeholderError) {
+    return { error: `The AI's draft wasn't quite right: ${placeholderError}` };
+  }
+
+  return { bodyText, exampleValues };
 }
 
 export async function refreshWhatsAppTemplateStatusAction(templateId: string): Promise<TemplateFormState> {

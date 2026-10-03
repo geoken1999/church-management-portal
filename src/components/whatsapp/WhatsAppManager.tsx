@@ -1,21 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { MessageCircle, Search, Send, Sparkles, TriangleAlert, Landmark, User } from "lucide-react";
+import { MessageCircle, Search, Send, Sparkles, TriangleAlert, FileText, RefreshCw, Trash2, User } from "lucide-react";
 import {
-  saveOwnWhatsAppAccount,
-  removeOwnWhatsAppAccount,
   sendBulkWhatsAppAction,
   sendWhatsAppReplyAction,
   markWhatsAppConversationRead,
   getWhatsAppAiMode,
   setWhatsAppAiMode,
   getWhatsAppAiTypingState,
-  type WhatsAppAccountState,
+  createWhatsAppTemplateAction,
+  refreshWhatsAppTemplateStatusAction,
+  deleteWhatsAppTemplateAction,
   type SendWhatsAppState,
+  type TemplateFormState,
 } from "@/lib/whatsapp/actions";
-import { normalizePhoneNumber } from "@/lib/whatsapp/validation";
-import type { WhatsAppMode } from "@/types/database";
+import { normalizePhoneNumber, countTemplateVariables } from "@/lib/whatsapp/validation";
+import type { WhatsAppTemplateCategory, WhatsAppTemplateStatus } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,9 +42,18 @@ export interface WhatsAppBranchOption {
   name: string;
 }
 
+export interface WhatsAppTemplateRow {
+  id: string;
+  name: string;
+  category: WhatsAppTemplateCategory;
+  body_text: string;
+  variable_count: number;
+  status: WhatsAppTemplateStatus;
+  rejected_reason: string | null;
+}
+
 export interface WhatsAppCampaignRow {
   id: string;
-  mode: WhatsAppMode;
   body: string;
   recipient_count: number;
   sent_count: number;
@@ -51,6 +61,7 @@ export interface WhatsAppCampaignRow {
   status: "sent" | "partial_failure" | "failed";
   created_at: string;
   profiles: { first_name: string; last_name: string } | null;
+  whatsapp_templates: { name: string } | null;
 }
 
 export interface WhatsAppMessageRow {
@@ -82,112 +93,225 @@ function parseExtraNumbers(raw: string, countryCode: string | null): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Own account connection card
+// Templates
 // ---------------------------------------------------------------------------
 
-const accountInitialState: WhatsAppAccountState = {};
+const templateInitialState: TemplateFormState = {};
 
-function OwnAccountCard({
-  organizationId,
-  connected,
-  whatsappNumber,
-}: {
-  organizationId: string;
-  connected: boolean;
-  whatsappNumber: string | null;
-}) {
-  const [state, setState] = useState<WhatsAppAccountState>(accountInitialState);
+function templateStatusBadge(status: WhatsAppTemplateStatus) {
+  if (status === "approved") return <Badge variant="secondary">Approved</Badge>;
+  if (status === "pending_review") return <Badge variant="outline">Pending review</Badge>;
+  if (status === "rejected") return <Badge variant="destructive">Rejected</Badge>;
+  if (status === "disabled" || status === "paused") return <Badge variant="destructive">{status === "disabled" ? "Disabled" : "Paused"}</Badge>;
+  return <Badge variant="outline">Draft</Badge>;
+}
+
+function NewTemplateForm({ organizationId }: { organizationId: string }) {
+  const [state, setState] = useState<TemplateFormState>(templateInitialState);
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState<WhatsAppTemplateCategory>("utility");
+  const [bodyText, setBodyText] = useState("");
+  const [exampleValues, setExampleValues] = useState<string[]>([]);
 
-  function handleSubmit(formData: FormData) {
+  const variableCount = countTemplateVariables(bodyText);
+
+  function handleBodyChange(value: string) {
+    setBodyText(value);
+    const count = countTemplateVariables(value);
+    setExampleValues((prev) => Array.from({ length: count }, (_, i) => prev[i] ?? ""));
+  }
+
+  function handleSubmit() {
+    setState({});
+    const formData = new FormData();
+    formData.set("organizationId", organizationId);
+    formData.set("name", name);
+    formData.set("category", category);
+    formData.set("bodyText", bodyText);
+    formData.set("exampleValues", JSON.stringify(exampleValues));
+
     startTransition(async () => {
-      const result = await saveOwnWhatsAppAccount(state, formData);
+      const result = await createWhatsAppTemplateAction(state, formData);
       setState(result);
-      if (result.success) setOpen(false);
+      if (result.success) {
+        setOpen(false);
+        setName("");
+        setBodyText("");
+        setExampleValues([]);
+      }
     });
+  }
+
+  if (!open) {
+    return (
+      <Button type="button" size="sm" onClick={() => setOpen(true)}>
+        New template
+      </Button>
+    );
   }
 
   return (
     <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">New WhatsApp template</CardTitle>
+        <CardDescription>
+          Submitted to WhatsApp for review — approval usually takes a few minutes to a few hours, sometimes longer. Use{" "}
+          <code className="rounded bg-muted px-1 py-0.5">{"{{1}}"}</code>, <code className="rounded bg-muted px-1 py-0.5">{"{{2}}"}</code>, etc. for
+          fill-in-the-blank placeholders.
+        </CardDescription>
+      </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent">
-              <Landmark className="size-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-heading text-sm font-bold">Your WhatsApp number</h3>
-              <p className="text-xs text-muted-foreground">
-                {connected
-                  ? `Connected — ${whatsappNumber}. Campaigns are unmetered, and you get a two-way chat inbox for replies.`
-                  : "Connect a WhatsApp-enabled Twilio number for unmetered campaigns and a two-way chat inbox."}
-              </p>
-            </div>
+        {state.error && (
+          <Alert variant="destructive">
+            <AlertDescription>{state.error}</AlertDescription>
+          </Alert>
+        )}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="template-name" className="text-xs">
+              Name
+            </Label>
+            <Input
+              id="template-name"
+              value={name}
+              onChange={(e) => setName(e.target.value.toLowerCase())}
+              placeholder="sunday_reminder"
+              pattern="[a-z0-9_]+"
+            />
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {!open && (
-              <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
-                {connected ? "Update" : "Connect"}
-              </Button>
-            )}
-            {connected && !open && (
-              <form action={removeOwnWhatsAppAccount}>
-                <input type="hidden" name="organizationId" value={organizationId} />
-                <Button type="submit" size="sm" variant="ghost">
-                  Disconnect
-                </Button>
-              </form>
-            )}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Category</Label>
+            <Select value={category} onValueChange={(v) => setCategory((v ?? "utility") as WhatsAppTemplateCategory)}>
+              <SelectTrigger className="w-full">
+                <SelectValue>{() => category.charAt(0).toUpperCase() + category.slice(1)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="utility">Utility</SelectItem>
+                <SelectItem value="marketing">Marketing</SelectItem>
+                <SelectItem value="authentication">Authentication</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
-
-        {open && (
-          <form action={handleSubmit} className="space-y-3 border-t border-border pt-3">
-            <input type="hidden" name="organizationId" value={organizationId} />
-            {state.error && (
-              <Alert variant="destructive">
-                <AlertDescription>{state.error}</AlertDescription>
-              </Alert>
-            )}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="accountSid" className="text-xs">
-                  Account SID
-                </Label>
-                <Input id="accountSid" name="accountSid" placeholder="ACxxxxxxxxxxxxxxxx" required />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="authToken" className="text-xs">
-                  Auth Token
-                </Label>
-                <Input id="authToken" name="authToken" type="password" placeholder="••••••••••••" required />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="whatsappNumber" className="text-xs">
-                WhatsApp-enabled number
-              </Label>
-              <Input id="whatsappNumber" name="whatsappNumber" placeholder="+14155552671" required />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              From your Twilio Console. The number must already be WhatsApp-enabled — set your Twilio number&apos;s
-              WhatsApp webhook to{" "}
-              <code className="rounded bg-muted px-1 py-0.5">
-                {typeof window !== "undefined" ? window.location.origin : ""}/api/whatsapp/webhook/{organizationId}
-              </code>{" "}
-              to receive replies here.
-            </p>
-            <div className="flex gap-2">
-              <Button type="submit" size="sm" disabled={pending}>
-                {pending ? "Saving..." : "Save"}
-              </Button>
-              <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-            </div>
-          </form>
+        <div className="space-y-1.5">
+          <Label htmlFor="template-body" className="text-xs">
+            Message
+          </Label>
+          <Textarea
+            id="template-body"
+            value={bodyText}
+            onChange={(e) => handleBodyChange(e.target.value)}
+            placeholder="Hi {{1}}, this Sunday's service starts at 10am. See you there!"
+            rows={3}
+          />
+        </div>
+        {variableCount > 0 && (
+          <div className="space-y-2">
+            <Label className="text-xs">Example values (shown to WhatsApp&apos;s reviewers)</Label>
+            {Array.from({ length: variableCount }, (_, i) => (
+              <Input
+                key={i}
+                value={exampleValues[i] ?? ""}
+                onChange={(e) =>
+                  setExampleValues((prev) => {
+                    const next = [...prev];
+                    next[i] = e.target.value;
+                    return next;
+                  })
+                }
+                placeholder={`Example for {{${i + 1}}}`}
+              />
+            ))}
+          </div>
         )}
+        <div className="flex gap-2">
+          <Button type="button" size="sm" onClick={handleSubmit} disabled={pending || !name.trim() || !bodyText.trim()}>
+            {pending ? "Submitting..." : "Submit for review"}
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TemplateRow({ template, canManage }: { template: WhatsAppTemplateRow; canManage: boolean }) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function handleRefresh() {
+    setError(null);
+    startTransition(async () => {
+      const result = await refreshWhatsAppTemplateStatusAction(template.id);
+      if (result.error) setError(result.error);
+    });
+  }
+
+  function handleDelete() {
+    if (!window.confirm(`Delete the "${template.name}" template? This can't be undone.`)) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await deleteWhatsAppTemplateAction(template.id);
+      if (result.error) setError(result.error);
+    });
+  }
+
+  return (
+    <div className="space-y-1.5 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-sm font-medium">{template.name}</span>
+            {templateStatusBadge(template.status)}
+            <Badge variant="outline">{template.category}</Badge>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">{template.body_text}</p>
+          {template.status === "rejected" && template.rejected_reason && <p className="mt-1 text-xs text-destructive">Rejected: {template.rejected_reason}</p>}
+        </div>
+        {canManage && (
+          <div className="flex shrink-0 items-center gap-1">
+            {template.status === "pending_review" && (
+              <Button type="button" size="icon" variant="ghost" onClick={handleRefresh} disabled={pending} title="Check for a status update">
+                <RefreshCw className="size-4" />
+              </Button>
+            )}
+            <Button type="button" size="icon" variant="ghost" onClick={handleDelete} disabled={pending} title="Delete template">
+              <Trash2 className="size-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+function TemplatesManager({ organizationId, templates, canManage }: { organizationId: string; templates: WhatsAppTemplateRow[]; canManage: boolean }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FileText className="size-4 text-primary" />
+          Message templates
+        </CardTitle>
+        <CardDescription>
+          Campaigns can only send a pre-approved template — WhatsApp requires this for any message to someone who hasn&apos;t messaged you in the last 24
+          hours.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {canManage && <NewTemplateForm organizationId={organizationId} />}
+        <div className="divide-y divide-border">
+          {templates.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">No templates yet.</p>
+          ) : (
+            templates.map((template) => <TemplateRow key={template.id} template={template} canManage={canManage} />)
+          )}
+        </div>
       </CardContent>
     </Card>
   );
@@ -300,27 +424,28 @@ function Composer({
   organizationId,
   members,
   branches,
-  sharedAvailable,
-  ownAvailable,
+  templates,
+  available,
   whatsappRemaining,
   orgCountryCode,
 }: {
   organizationId: string;
   members: WhatsAppRecipientOption[];
   branches: WhatsAppBranchOption[];
-  sharedAvailable: boolean;
-  ownAvailable: boolean;
+  templates: WhatsAppTemplateRow[];
+  available: boolean;
   whatsappRemaining: number;
   orgCountryCode: string | null;
 }) {
-  const [body, setBody] = useState("");
-  const [mode, setMode] = useState<WhatsAppMode>(ownAvailable ? "own" : "shared");
+  const [templateId, setTemplateId] = useState<string>(templates[0]?.id ?? "");
+  const [variableValues, setVariableValues] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [extraNumbers, setExtraNumbers] = useState("");
   const [result, setResult] = useState<{ error?: string; success?: string } | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const disabled = mode === "shared" ? !sharedAvailable : !ownAvailable;
+  const template = templates.find((t) => t.id === templateId) ?? null;
+  const disabled = !available || templates.length === 0;
   const membersById = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
   const extraCount = parseExtraNumbers(extraNumbers, orgCountryCode).length;
   const totalRecipients = selectedIds.size + extraCount;
@@ -328,6 +453,12 @@ function Composer({
   const selectedWithoutCountry = Array.from(selectedIds)
     .map((id) => membersById.get(id))
     .filter((m): m is WhatsAppRecipientOption => Boolean(m && !m.countryCode));
+
+  function handleSelectTemplate(id: string) {
+    setTemplateId(id);
+    const next = templates.find((t) => t.id === id);
+    setVariableValues(Array.from({ length: next?.variable_count ?? 0 }, () => ""));
+  }
 
   function toggle(id: string) {
     setSelectedIds((prev) => {
@@ -367,8 +498,8 @@ function Composer({
 
     const formData = new FormData();
     formData.set("organizationId", organizationId);
-    formData.set("mode", mode);
-    formData.set("body", body);
+    formData.set("templateId", templateId);
+    formData.set("variableValues", JSON.stringify(variableValues));
     formData.set("recipients", JSON.stringify(recipients));
 
     startTransition(async () => {
@@ -378,13 +509,12 @@ function Composer({
         return;
       }
       setResult({ success: `Sent to ${response.sentCount} recipient${response.sentCount === 1 ? "" : "s"}${response.failedCount ? ` (${response.failedCount} failed)` : ""}.` });
-      setBody("");
       setSelectedIds(new Set());
       setExtraNumbers("");
     });
   }
 
-  const canSend = !disabled && body.trim().length > 0 && totalRecipients > 0 && selectedWithoutCountry.length === 0;
+  const canSend = !disabled && Boolean(template) && variableValues.every((v) => v.trim().length > 0) && totalRecipients > 0 && selectedWithoutCountry.length === 0;
 
   return (
     <Card>
@@ -394,39 +524,22 @@ function Composer({
           Compose
           {disabled ? <Badge variant="destructive">Offline</Badge> : <Badge variant="secondary">Online</Badge>}
         </CardTitle>
-        <CardDescription>
-          Send a WhatsApp announcement or reminder. Free-form text only reaches someone who&apos;s messaged you within
-          the last 24 hours — outside that window, WhatsApp requires a pre-approved message template.
-        </CardDescription>
+        <CardDescription>Send an announcement or reminder using an approved WhatsApp template.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {(sharedAvailable || ownAvailable) && (
-          <div className="space-y-1.5">
-            <Label className="text-xs">Send using</Label>
-            <Select value={mode} onValueChange={(v) => setMode((v ?? "shared") as WhatsAppMode)}>
-              <SelectTrigger className="w-full sm:w-64">
-                <SelectValue>{() => (mode === "own" ? "Your WhatsApp number" : "Shared service (KingdomFlow number)")}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {ownAvailable && <SelectItem value="own">Your WhatsApp number (unmetered)</SelectItem>}
-                <SelectItem value="shared">Shared service (KingdomFlow number)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {disabled && (
+        {templates.length === 0 && (
           <Alert variant="destructive">
-            <AlertDescription>
-              {mode === "own"
-                ? "Connect your WhatsApp number above to send from it."
-                : "Shared WhatsApp sending is offline — either it isn't configured, or your plan's monthly limit has been reached. Connect your own number, or upgrade your plan."}
-            </AlertDescription>
+            <AlertDescription>No approved templates yet — create one in the Templates tab and wait for WhatsApp to approve it before sending a campaign.</AlertDescription>
           </Alert>
         )}
-        {!disabled && mode === "shared" && whatsappRemaining <= 20 && (
+        {!available && templates.length > 0 && (
+          <Alert variant="destructive">
+            <AlertDescription>WhatsApp sending is offline — either it isn&apos;t configured, or your plan&apos;s monthly limit has been reached. Upgrade your plan or buy an add-on pack.</AlertDescription>
+          </Alert>
+        )}
+        {available && whatsappRemaining <= 20 && (
           <Alert>
-            <AlertDescription>{whatsappRemaining.toLocaleString()} shared WhatsApp messages left this month.</AlertDescription>
+            <AlertDescription>{whatsappRemaining.toLocaleString()} WhatsApp messages left this month.</AlertDescription>
           </Alert>
         )}
         {result?.error && (
@@ -440,10 +553,45 @@ function Composer({
           </Alert>
         )}
 
-        <div className="space-y-1.5">
-          <Label htmlFor="whatsapp-body">Message</Label>
-          <Textarea id="whatsapp-body" value={body} onChange={(e) => setBody(e.target.value)} placeholder="This Sunday's service starts at 10am. See you there!" rows={4} disabled={disabled} />
-        </div>
+        {templates.length > 0 && (
+          <div className="space-y-1.5">
+            <Label className="text-xs">Template</Label>
+            <Select value={templateId} onValueChange={(v) => handleSelectTemplate(v ?? "")} disabled={disabled}>
+              <SelectTrigger className="w-full">
+                <SelectValue>{() => template?.name ?? "Select a template"}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {templates.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {template && <p className="text-sm text-muted-foreground">{template.body_text}</p>}
+          </div>
+        )}
+
+        {template && template.variable_count > 0 && (
+          <div className="space-y-2">
+            <Label className="text-xs">Fill in the template</Label>
+            {Array.from({ length: template.variable_count }, (_, i) => (
+              <Input
+                key={i}
+                value={variableValues[i] ?? ""}
+                onChange={(e) =>
+                  setVariableValues((prev) => {
+                    const next = [...prev];
+                    next[i] = e.target.value;
+                    return next;
+                  })
+                }
+                placeholder={`Value for {{${i + 1}}}`}
+                disabled={disabled}
+              />
+            ))}
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <Label>Recipients</Label>
@@ -489,8 +637,8 @@ function WhatsAppHistory({ campaigns }: { campaigns: WhatsAppCampaignRow[] }) {
                 <div className="min-w-0 flex-1">
                   <p className="line-clamp-2 text-sm font-medium">{campaign.body}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {new Date(campaign.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · {campaign.sent_count}/{campaign.recipient_count} delivered ·{" "}
-                    {campaign.mode === "own" ? "your number" : "shared"}
+                    {new Date(campaign.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · {campaign.sent_count}/{campaign.recipient_count} delivered
+                    {campaign.whatsapp_templates ? ` · ${campaign.whatsapp_templates.name}` : ""}
                     {campaign.profiles ? ` · ${campaign.profiles.first_name} ${campaign.profiles.last_name}` : ""}
                   </p>
                 </div>
@@ -505,7 +653,7 @@ function WhatsAppHistory({ campaigns }: { campaigns: WhatsAppCampaignRow[] }) {
 }
 
 // ---------------------------------------------------------------------------
-// Chat — 'own' mode only
+// Chat
 // ---------------------------------------------------------------------------
 
 const AI_TYPING_POLL_MS = 2000;
@@ -657,9 +805,7 @@ function ChatInbox({ organizationId, conversations }: { organizationId: string; 
           <MessageCircle className="size-8 text-muted-foreground" />
           <div>
             <h3 className="font-heading text-base font-bold">No conversations yet</h3>
-            <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-              Once someone messages your connected WhatsApp number, their conversation will show up here.
-            </p>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">Once someone messages your WhatsApp number, their conversation will show up here.</p>
           </div>
         </CardContent>
       </Card>
@@ -719,13 +865,11 @@ export function WhatsAppManager({
   organizationId,
   canSend,
   isOrgAdmin,
-  hasOwnAccount,
-  ownWhatsAppNumber,
-  sharedAvailable,
-  ownAvailable,
+  available,
   whatsappRemaining,
   members,
   branches,
+  templates,
   campaigns,
   conversations,
   orgCountryCode,
@@ -733,28 +877,25 @@ export function WhatsAppManager({
   organizationId: string;
   canSend: boolean;
   isOrgAdmin: boolean;
-  hasOwnAccount: boolean;
-  ownWhatsAppNumber: string | null;
-  sharedAvailable: boolean;
-  ownAvailable: boolean;
+  available: boolean;
   whatsappRemaining: number;
   members: WhatsAppRecipientOption[];
   branches: WhatsAppBranchOption[];
+  templates: WhatsAppTemplateRow[];
   campaigns: WhatsAppCampaignRow[];
   conversations: WhatsAppConversationRow[];
   orgCountryCode: string | null;
 }) {
+  const approvedTemplates = templates.filter((t) => t.status === "approved");
+
   return (
     <div className="space-y-6">
-      {isOrgAdmin && <OwnAccountCard organizationId={organizationId} connected={hasOwnAccount} whatsappNumber={ownWhatsAppNumber} />}
-
       <Tabs defaultValue="campaigns">
         <TabsList>
           <TabsIndicator />
           <TabsTab value="campaigns">Campaigns</TabsTab>
-          <TabsTab value="chat" disabled={!hasOwnAccount}>
-            Chat {!hasOwnAccount && "(connect your number)"}
-          </TabsTab>
+          <TabsTab value="templates">Templates</TabsTab>
+          <TabsTab value="chat">Chat</TabsTab>
         </TabsList>
         <TabsPanel value="campaigns">
           <div className="space-y-6">
@@ -763,8 +904,8 @@ export function WhatsAppManager({
                 organizationId={organizationId}
                 members={members}
                 branches={branches}
-                sharedAvailable={sharedAvailable}
-                ownAvailable={ownAvailable}
+                templates={approvedTemplates}
+                available={available}
                 whatsappRemaining={whatsappRemaining}
                 orgCountryCode={orgCountryCode}
               />
@@ -778,16 +919,11 @@ export function WhatsAppManager({
             <WhatsAppHistory campaigns={campaigns} />
           </div>
         </TabsPanel>
+        <TabsPanel value="templates">
+          <TemplatesManager organizationId={organizationId} templates={templates} canManage={isOrgAdmin} />
+        </TabsPanel>
         <TabsPanel value="chat">
-          {hasOwnAccount ? (
-            <ChatInbox organizationId={organizationId} conversations={conversations} />
-          ) : (
-            <Card>
-              <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                Connect your own WhatsApp number above to get a chat inbox for incoming queries.
-              </CardContent>
-            </Card>
-          )}
+          <ChatInbox organizationId={organizationId} conversations={conversations} />
         </TabsPanel>
       </Tabs>
     </div>

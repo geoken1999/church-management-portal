@@ -2,13 +2,7 @@ import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getMembers } from "@/lib/members/dal";
 import { getBranches } from "@/lib/branches/dal";
-import {
-  getWhatsAppAccount,
-  getWhatsAppCampaigns,
-  getWhatsAppSendAvailability,
-  getWhatsAppConversations,
-  getWhatsAppConversationMessages,
-} from "@/lib/whatsapp/dal";
+import { getWhatsAppCampaigns, getWhatsAppSendAvailability, getWhatsAppTemplates, getWhatsAppConversations, getWhatsAppConversationMessages } from "@/lib/whatsapp/dal";
 import { resolvePhoneCountry } from "@/lib/whatsapp/validation";
 import { WhatsAppManager } from "@/components/whatsapp/WhatsAppManager";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
@@ -27,28 +21,21 @@ export default async function WhatsAppPage() {
     return <AccessRestricted label="WhatsApp" />;
   }
 
-  const [members, branches, account, campaigns, conversations] = await Promise.all([
+  const [members, branches, campaigns, templates, conversations, availability] = await Promise.all([
     getMembers(organizationId),
     getBranches(organizationId),
-    getWhatsAppAccount(organizationId),
     getWhatsAppCampaigns(organizationId),
+    getWhatsAppTemplates(organizationId),
     getWhatsAppConversations(organizationId),
+    getWhatsAppSendAvailability(organizationId),
   ]);
 
-  const hasOwnAccount = Boolean(account);
-  const availability = await getWhatsAppSendAvailability(organizationId, hasOwnAccount);
-
-  // Chat is 'own'-mode only (see migration 0058) — no conversations exist
-  // for orgs without a connected account, so this only fetches messages
-  // when there's actually something to show.
-  const conversationsWithMessages = hasOwnAccount
-    ? await Promise.all(
-        conversations.map(async (conversation) => ({
-          ...conversation,
-          messages: await getWhatsAppConversationMessages(organizationId, conversation.id),
-        })),
-      )
-    : [];
+  const conversationsWithMessages = await Promise.all(
+    conversations.map(async (conversation) => ({
+      ...conversation,
+      messages: await getWhatsAppConversationMessages(organizationId, conversation.id),
+    })),
+  );
 
   const branchCountryById = new Map(branches.map((branch) => [branch.id, branch.country]));
 
@@ -76,13 +63,11 @@ export default async function WhatsAppPage() {
         organizationId={organizationId}
         canSend={membership.tabAccess.whatsapp.write}
         isOrgAdmin={isOrgAdmin}
-        hasOwnAccount={hasOwnAccount}
-        ownWhatsAppNumber={account?.whatsapp_number ?? null}
-        sharedAvailable={availability.sharedAvailable}
-        ownAvailable={availability.ownAvailable}
+        available={availability.available}
         whatsappRemaining={availability.whatsappRemaining}
         members={recipientOptions}
         branches={branchOptions}
+        templates={templates}
         campaigns={campaigns}
         conversations={conversationsWithMessages}
         orgCountryCode={orgCountry}

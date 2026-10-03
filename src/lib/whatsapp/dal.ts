@@ -5,24 +5,11 @@ import { createClient } from "@/lib/supabase/server";
 import { isWhatsAppConfigured } from "@/lib/whatsapp/env";
 import { getPlanUsage } from "@/lib/plans/dal";
 
-// Only the account_sid + whatsapp_number for display — auth_token is as
-// sensitive as a password and never leaves this query.
-export const getWhatsAppAccount = cache(async (organizationId: string) => {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("organization_whatsapp_accounts")
-    .select("account_sid, whatsapp_number, created_at")
-    .eq("organization_id", organizationId)
-    .maybeSingle();
-
-  return data;
-});
-
 export const getWhatsAppCampaigns = cache(async (organizationId: string) => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("whatsapp_campaigns")
-    .select("*, profiles(first_name, last_name)")
+    .select("*, profiles(first_name, last_name), whatsapp_templates(name)")
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -30,24 +17,33 @@ export const getWhatsAppCampaigns = cache(async (organizationId: string) => {
   return data ?? [];
 });
 
-// A 'shared' send is available while the platform's Twilio WhatsApp
-// number is configured and this month's quota isn't exhausted; an org's
-// own connected account is always available regardless of the shared
-// quota (same shape as isSmsAvailable, plus the 'own' bypass email's SMTP
-// path already established).
-export async function getWhatsAppSendAvailability(organizationId: string, hasOwnAccount: boolean) {
+// One shared platform number for everyone now (see migration 0097) — no
+// more "own account unmetered" bypass, just a single monthly quota check.
+export async function getWhatsAppSendAvailability(organizationId: string) {
   const usage = await getPlanUsage(organizationId);
-  const sharedAvailable = isWhatsAppConfigured() && usage.whatsappRemaining > 0;
-  return {
-    sharedAvailable,
-    ownAvailable: hasOwnAccount,
-    anyAvailable: sharedAvailable || hasOwnAccount,
-    whatsappRemaining: usage.whatsappRemaining,
-  };
+  const available = isWhatsAppConfigured() && usage.whatsappRemaining > 0;
+  return { available, whatsappRemaining: usage.whatsappRemaining };
 }
 
+export const getWhatsAppTemplates = cache(async (organizationId: string) => {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("whatsapp_templates")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .order("created_at", { ascending: false });
+
+  return data ?? [];
+});
+
+export const getApprovedWhatsAppTemplates = cache(async (organizationId: string) => {
+  const templates = await getWhatsAppTemplates(organizationId);
+  return templates.filter((t) => t.status === "approved");
+});
+
 // ---------------------------------------------------------------------------
-// Chat — 'own' mode only (see migration 0058 for why)
+// Chat — available to every org now; a conversation only ever exists for a
+// phone number once it's been routed here (see whatsapp/routing.ts).
 // ---------------------------------------------------------------------------
 
 export const getWhatsAppConversations = cache(async (organizationId: string) => {

@@ -12,6 +12,7 @@ export type PlatformEventSource =
   | "sms_send"
   | "email_send"
   | "whatsapp_send"
+  | "whatsapp_template"
   | "quota"
   | "addon_purchase"
   | "fundraiser_giving"

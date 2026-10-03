@@ -1,11 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  validateWhatsAppBody,
-  validateWhatsAppAccountSid,
-  validateWhatsAppAuthToken,
-  validateWhatsAppNumber,
-  normalizePhoneNumber,
-} from "./validation";
+import { validateWhatsAppBody, validateWhatsAppTemplateName, validateWhatsAppTemplateBody, countTemplateVariables, normalizePhoneNumber } from "./validation";
 
 describe("validateWhatsAppBody", () => {
   it("rejects an empty message", () => {
@@ -21,29 +15,41 @@ describe("validateWhatsAppBody", () => {
   });
 });
 
-describe("validateWhatsAppAccountSid / validateWhatsAppAuthToken", () => {
-  it("reject empty values", () => {
-    expect(validateWhatsAppAccountSid("")).toBeDefined();
-    expect(validateWhatsAppAuthToken("")).toBeDefined();
+describe("validateWhatsAppTemplateName", () => {
+  it("rejects an empty name", () => {
+    expect(validateWhatsAppTemplateName("")).toBeDefined();
   });
 
-  it("accept non-empty values", () => {
-    expect(validateWhatsAppAccountSid("ACxxxxxxxxxxxxxxxx")).toBeUndefined();
-    expect(validateWhatsAppAuthToken("some-token")).toBeUndefined();
+  it("rejects a name with spaces or uppercase letters", () => {
+    expect(validateWhatsAppTemplateName("Sunday Reminder")).toBeDefined();
+  });
+
+  it("accepts a lowercase, underscore-separated name", () => {
+    expect(validateWhatsAppTemplateName("sunday_reminder")).toBeUndefined();
   });
 });
 
-describe("validateWhatsAppNumber", () => {
-  it("rejects an empty number", () => {
-    expect(validateWhatsAppNumber("")).toBeDefined();
+describe("validateWhatsAppTemplateBody", () => {
+  it("rejects an empty body", () => {
+    expect(validateWhatsAppTemplateBody("")).toBeDefined();
   });
 
-  it("rejects a number that doesn't parse as valid E.164", () => {
-    expect(validateWhatsAppNumber("not-a-number")).toBeDefined();
+  it("accepts a non-empty body", () => {
+    expect(validateWhatsAppTemplateBody("Hi {{1}}, see you Sunday!")).toBeUndefined();
+  });
+});
+
+describe("countTemplateVariables", () => {
+  it("returns 0 for a template with no placeholders", () => {
+    expect(countTemplateVariables("See you Sunday!")).toBe(0);
   });
 
-  it("accepts a valid E.164-parseable number", () => {
-    expect(validateWhatsAppNumber("+14155552671")).toBeUndefined();
+  it("returns the highest placeholder index used", () => {
+    expect(countTemplateVariables("Hi {{1}}, your order {{2}} ships on {{3}}.")).toBe(3);
+  });
+
+  it("doesn't double-count a reused placeholder", () => {
+    expect(countTemplateVariables("{{1}} and {{1}} again")).toBe(1);
   });
 });
 

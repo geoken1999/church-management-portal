@@ -1,54 +1,106 @@
 import "server-only";
 
-import twilio from "twilio";
-import { getSiteUrl } from "@/lib/site-url";
+import { getMetaWhatsAppEnv } from "@/lib/whatsapp/env";
 
-export interface WhatsAppCredentials {
-  accountSid: string;
-  authToken: string;
-  fromNumber: string;
+// Meta documents recipient numbers without a leading '+' in request
+// bodies (e.g. "16505551234"), and sends inbound `from` the same way —
+// stored numbers in this app are E.164 with a leading '+', so this strips
+// it only at the API boundary.
+function toMetaRecipient(e164: string): string {
+  return e164.startsWith("+") ? e164.slice(1) : e164;
 }
 
-function statusCallbackUrl(organizationId: string, mode: "own" | "shared"): string {
-  return `${getSiteUrl()}/api/twilio/status-callback?organizationId=${organizationId}&channel=whatsapp&mode=${mode}`;
+async function postToGraphMessages(body: Record<string, unknown>): Promise<string> {
+  const { accessToken, phoneNumberId, apiVersion } = getMetaWhatsAppEnv();
+
+  const res = await fetch(`https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", ...body }),
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    let message = errorBody;
+    try {
+      const parsed = JSON.parse(errorBody) as { error?: { message?: string } };
+      if (parsed.error?.message) message = parsed.error.message;
+    } catch {
+      // Not JSON — fall back to the raw body text above.
+    }
+    throw new Error(message || `WhatsApp send failed (${res.status}).`);
+  }
+
+  const data = (await res.json()) as { messages?: { id?: string }[] };
+  const id = data.messages?.[0]?.id;
+  if (!id) throw new Error("WhatsApp send returned no message id.");
+  return id;
 }
 
-function toWhatsAppAddress(e164: string): string {
-  return e164.startsWith("whatsapp:") ? e164 : `whatsapp:${e164}`;
+export interface SendResult {
+  id: string;
 }
 
-export interface SendBulkWhatsAppResult {
+// Free text — only deliverable within 24 hours of the recipient's last
+// message to this number (WhatsApp's "customer service window"); outside
+// that window Meta rejects it and sendTemplateMessage must be used
+// instead. Used for chat replies and the AI auto-reply, both of which only
+// ever fire in direct response to an inbound message.
+export async function sendTextMessage(params: { to: string; body: string }): Promise<SendResult> {
+  const id = await postToGraphMessages({
+    to: toMetaRecipient(params.to),
+    type: "text",
+    text: { body: params.body },
+  });
+  return { id };
+}
+
+// Business-initiated sends (campaigns) must use a pre-approved template —
+// see whatsapp/templates-client.ts for creating/approving one. `bodyParams`
+// fills the template body's {{1}}, {{2}}, ... placeholders in order, the
+// same values for every recipient (not personalized per-recipient).
+export async function sendTemplateMessage(params: {
+  to: string;
+  templateName: string;
+  languageCode: string;
+  bodyParams: string[];
+}): Promise<SendResult> {
+  const id = await postToGraphMessages({
+    to: toMetaRecipient(params.to),
+    type: "template",
+    template: {
+      name: params.templateName,
+      language: { code: params.languageCode },
+      ...(params.bodyParams.length > 0
+        ? { components: [{ type: "body", parameters: params.bodyParams.map((text) => ({ type: "text", text })) }] }
+        : {}),
+    },
+  });
+  return { id };
+}
+
+export interface SendBulkTemplateResult {
   sentCount: number;
   failed: { phone: string; error: string }[];
 }
 
-// Same shape as sendBulkSms (src/lib/sms/client.ts) — one messages.create()
-// per recipient, sequential to avoid bursting Twilio's rate limits.
-// Credentials are passed in explicitly (rather than read from env here)
-// since a campaign can run against either the shared platform account or
-// an org's own connected Twilio account.
-export async function sendBulkWhatsApp(params: {
-  credentials: WhatsAppCredentials;
-  body: string;
+// Sequential, one Graph API call per recipient — same shape as the old
+// Twilio sendBulkWhatsApp, to avoid bursting Meta's rate limits.
+export async function sendBulkTemplateMessage(params: {
+  templateName: string;
+  languageCode: string;
+  bodyParams: string[];
   recipients: string[];
-  organizationId: string;
-  mode: "own" | "shared";
-}): Promise<SendBulkWhatsAppResult> {
-  const { accountSid, authToken, fromNumber } = params.credentials;
-  const client = twilio(accountSid, authToken);
-  const statusCallback = statusCallbackUrl(params.organizationId, params.mode);
-
+}): Promise<SendBulkTemplateResult> {
   let sentCount = 0;
   const failed: { phone: string; error: string }[] = [];
 
   for (const phone of params.recipients) {
     try {
-      await client.messages.create({
-        to: toWhatsAppAddress(phone),
-        from: toWhatsAppAddress(fromNumber),
-        body: params.body,
-        statusCallback,
-      });
+      await sendTemplateMessage({ to: phone, templateName: params.templateName, languageCode: params.languageCode, bodyParams: params.bodyParams });
       sentCount += 1;
     } catch (err) {
       failed.push({ phone, error: err instanceof Error ? err.message : "Send failed." });
@@ -56,30 +108,4 @@ export async function sendBulkWhatsApp(params: {
   }
 
   return { sentCount, failed };
-}
-
-export interface SendWhatsAppMessageResult {
-  sid: string;
-}
-
-// Single-recipient send, used for chat replies (as opposed to
-// sendBulkWhatsApp's campaign loop) — chat is own-mode only (see migration
-// 0058), so the status callback is always tagged mode=own.
-export async function sendWhatsAppMessage(params: {
-  credentials: WhatsAppCredentials;
-  to: string;
-  body: string;
-  organizationId: string;
-}): Promise<SendWhatsAppMessageResult> {
-  const { accountSid, authToken, fromNumber } = params.credentials;
-  const client = twilio(accountSid, authToken);
-
-  const message = await client.messages.create({
-    to: toWhatsAppAddress(params.to),
-    from: toWhatsAppAddress(fromNumber),
-    body: params.body,
-    statusCallback: statusCallbackUrl(params.organizationId, "own"),
-  });
-
-  return { sid: message.sid };
 }

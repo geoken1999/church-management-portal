@@ -1,21 +1,34 @@
 import "server-only";
 
-// The shared-mode WhatsApp sender — same Twilio account already used for
-// SMS (TWILIO_ACCOUNT_SID/AUTH_TOKEN), but WhatsApp needs its own
-// WhatsApp-enabled sender number, hence the separate env var rather than
-// reusing TWILIO_FROM_NUMBER (an SMS-only number can't send WhatsApp).
-export function getWhatsAppEnv() {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const fromNumber = process.env.TWILIO_WHATSAPP_FROM_NUMBER;
+// One platform-wide WhatsApp Business number via Meta's Cloud API,
+// shared by every org on KingdomFlow — there's no per-org "own number"
+// concept anymore (see migration 0097), so these are plain env vars, not
+// a per-org connection table.
+export function getMetaWhatsAppEnv() {
+  const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN;
+  const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
+  const businessAccountId = process.env.META_WHATSAPP_BUSINESS_ACCOUNT_ID;
+  const appSecret = process.env.META_WHATSAPP_APP_SECRET;
+  const apiVersion = process.env.META_WHATSAPP_API_VERSION || "v21.0";
 
-  if (!accountSid || !authToken || !fromNumber) {
-    throw new Error("TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_WHATSAPP_FROM_NUMBER must be set to send WhatsApp messages.");
+  if (!accessToken || !phoneNumberId || !businessAccountId || !appSecret) {
+    throw new Error(
+      "META_WHATSAPP_ACCESS_TOKEN, META_WHATSAPP_PHONE_NUMBER_ID, META_WHATSAPP_BUSINESS_ACCOUNT_ID, and META_WHATSAPP_APP_SECRET must be set to use WhatsApp.",
+    );
   }
 
-  return { accountSid, authToken, fromNumber };
+  return { accessToken, phoneNumberId, businessAccountId, appSecret, apiVersion };
 }
 
 export function isWhatsAppConfigured(): boolean {
-  return Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_FROM_NUMBER);
+  return Boolean(
+    process.env.META_WHATSAPP_ACCESS_TOKEN &&
+      process.env.META_WHATSAPP_PHONE_NUMBER_ID &&
+      process.env.META_WHATSAPP_BUSINESS_ACCOUNT_ID &&
+      process.env.META_WHATSAPP_APP_SECRET,
+  );
+}
+
+export function getMetaWhatsAppWebhookVerifyToken(): string | undefined {
+  return process.env.META_WHATSAPP_WEBHOOK_VERIFY_TOKEN;
 }

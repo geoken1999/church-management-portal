@@ -7,24 +7,18 @@ import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { checkWhatsAppQuota } from "@/lib/plans/dal";
 import { logPlatformEvent } from "@/lib/platform-events/log";
-import { sendBulkWhatsApp, sendWhatsAppMessage } from "@/lib/whatsapp/client";
-import { resolveWhatsAppCredentials } from "@/lib/whatsapp/credentials";
+import { sendBulkTemplateMessage, sendTextMessage } from "@/lib/whatsapp/client";
+import { createMetaTemplate, deleteMetaTemplate, fetchMetaTemplateStatus } from "@/lib/whatsapp/templates-client";
 import { getAiMode, setAiMode, getAiTypingState } from "@/lib/whatsapp/automation";
-import {
-  normalizePhoneNumber,
-  validateWhatsAppBody,
-  validateWhatsAppAccountSid,
-  validateWhatsAppAuthToken,
-  validateWhatsAppNumber,
-} from "@/lib/whatsapp/validation";
-import type { WhatsAppCampaignStatus, WhatsAppMode } from "@/types/database";
+import { normalizePhoneNumber, validateWhatsAppBody, validateWhatsAppTemplateName, validateWhatsAppTemplateBody, countTemplateVariables } from "@/lib/whatsapp/validation";
+import type { WhatsAppCampaignStatus, WhatsAppTemplateCategory } from "@/types/database";
 
 const WHATSAPP_PATH = "/dashboard/whatsapp";
 
-// Connecting/removing the org's own Twilio account is owner/admin-only —
-// same reasoning and shape as requireOrgAdmin in finance/actions.ts for
-// Razorpay credentials: it controls where real API credentials go, so the
-// tab-permissions matrix shouldn't be able to delegate it to regular staff.
+// A bad template hurts the one shared WhatsApp number's quality rating
+// for every org on the platform, so creating/deleting one is admin-only —
+// same bar as connecting/disconnecting a social account elsewhere in this
+// app.
 async function requireOrgAdmin(organizationId: string, authUserId: string): Promise<boolean> {
   const supabase = await createClient();
   const { data } = await supabase
@@ -37,62 +31,136 @@ async function requireOrgAdmin(organizationId: string, authUserId: string): Prom
 }
 
 // ---------------------------------------------------------------------------
-// Own account
+// Templates
 // ---------------------------------------------------------------------------
 
-export interface WhatsAppAccountState {
+export interface TemplateFormState {
   error?: string;
   success?: boolean;
 }
 
-export async function saveOwnWhatsAppAccount(_prevState: WhatsAppAccountState, formData: FormData): Promise<WhatsAppAccountState> {
+export async function createWhatsAppTemplateAction(_prevState: TemplateFormState, formData: FormData): Promise<TemplateFormState> {
   const user = await requireUser();
   const organizationId = String(formData.get("organizationId") ?? "");
 
   if (!(await requireOrgAdmin(organizationId, user.id))) {
-    return { error: "Only an owner or admin can connect a WhatsApp number." };
+    return { error: "Only an owner or admin can create a WhatsApp template." };
   }
 
-  const accountSid = String(formData.get("accountSid") ?? "").trim();
-  const authToken = String(formData.get("authToken") ?? "").trim();
-  const numberRaw = String(formData.get("whatsappNumber") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim().toLowerCase();
+  const category = String(formData.get("category") ?? "utility") as WhatsAppTemplateCategory;
+  const bodyText = String(formData.get("bodyText") ?? "").trim();
+  const exampleValuesRaw = String(formData.get("exampleValues") ?? "[]");
 
-  const sidError = validateWhatsAppAccountSid(accountSid);
-  if (sidError) return { error: sidError };
-  const tokenError = validateWhatsAppAuthToken(authToken);
-  if (tokenError) return { error: tokenError };
-  const numberError = validateWhatsAppNumber(numberRaw);
-  if (numberError) return { error: numberError };
+  const nameError = validateWhatsAppTemplateName(name);
+  if (nameError) return { error: nameError };
+  const bodyError = validateWhatsAppTemplateBody(bodyText);
+  if (bodyError) return { error: bodyError };
+  if (category !== "marketing" && category !== "utility" && category !== "authentication") {
+    return { error: "Select a valid template category." };
+  }
 
-  const whatsappNumber = normalizePhoneNumber(numberRaw);
-  if (!whatsappNumber) return { error: "Enter a valid phone number, e.g. +14155552671." };
+  const variableCount = countTemplateVariables(bodyText);
+  let exampleValues: string[] = [];
+  try {
+    const parsed = JSON.parse(exampleValuesRaw);
+    if (Array.isArray(parsed)) exampleValues = parsed.map((v) => String(v));
+  } catch {
+    // Leave exampleValues empty — Meta will reject the create call below
+    // with a clear error if the template actually needs examples.
+  }
+  if (variableCount > 0 && exampleValues.length < variableCount) {
+    return { error: `Provide an example value for each of the ${variableCount} placeholder${variableCount === 1 ? "" : "s"} in your message.` };
+  }
 
   const admin = createAdminClient();
-  const { error } = await admin
-    .from("organization_whatsapp_accounts")
-    .upsert(
-      { organization_id: organizationId, account_sid: accountSid, auth_token: authToken, whatsapp_number: whatsappNumber, connected_by: user.id },
-      { onConflict: "organization_id" },
-    );
 
-  if (error) {
-    return { error: "Couldn't save that WhatsApp number. Please try again." };
+  let metaResult;
+  try {
+    metaResult = await createMetaTemplate({ name, language: "en_US", category, bodyText, exampleValues: exampleValues.slice(0, variableCount) });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Couldn't submit that template to WhatsApp.";
+    await logPlatformEvent({ level: "error", source: "whatsapp_template", message: `Template create failed: ${message}`, organizationId, metadata: { name } });
+    return { error: message };
+  }
+
+  const { error: insertError } = await admin.from("whatsapp_templates").insert({
+    organization_id: organizationId,
+    name,
+    language: "en_US",
+    category,
+    body_text: bodyText,
+    variable_count: variableCount,
+    meta_template_id: metaResult.metaTemplateId,
+    status: metaResult.status,
+    created_by: user.id,
+  });
+
+  if (insertError) {
+    return { error: insertError.message.includes("duplicate") ? "A template with that name already exists." : "Couldn't save that template." };
   }
 
   revalidatePath(WHATSAPP_PATH);
   return { success: true };
 }
 
-export async function removeOwnWhatsAppAccount(formData: FormData) {
-  const user = await requireUser();
-  const organizationId = String(formData.get("organizationId") ?? "");
-
-  if (!(await requireOrgAdmin(organizationId, user.id))) return;
+export async function refreshWhatsAppTemplateStatusAction(templateId: string): Promise<TemplateFormState> {
+  await requireUser();
 
   const admin = createAdminClient();
-  await admin.from("organization_whatsapp_accounts").delete().eq("organization_id", organizationId);
+  const { data: template } = await admin
+    .from("whatsapp_templates")
+    .select("organization_id, meta_template_id")
+    .eq("id", templateId)
+    .maybeSingle();
+
+  if (!template) return { error: "That template could not be found." };
+
+  const access = await checkTabAccess(template.organization_id, "whatsapp", "read");
+  if (!access.ok) return { error: access.message };
+
+  if (!template.meta_template_id) return { error: "This template was never submitted to WhatsApp." };
+
+  try {
+    const { status, rejectedReason } = await fetchMetaTemplateStatus(template.meta_template_id);
+    await admin.from("whatsapp_templates").update({ status, rejected_reason: rejectedReason }).eq("id", templateId);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Couldn't check the template's status." };
+  }
 
   revalidatePath(WHATSAPP_PATH);
+  return { success: true };
+}
+
+export async function deleteWhatsAppTemplateAction(templateId: string): Promise<TemplateFormState> {
+  const user = await requireUser();
+
+  const admin = createAdminClient();
+  const { data: template } = await admin
+    .from("whatsapp_templates")
+    .select("organization_id, name")
+    .eq("id", templateId)
+    .maybeSingle();
+
+  if (!template) return { error: "That template could not be found." };
+
+  if (!(await requireOrgAdmin(template.organization_id, user.id))) {
+    return { error: "Only an owner or admin can delete a WhatsApp template." };
+  }
+
+  try {
+    await deleteMetaTemplate(template.name);
+  } catch (err) {
+    // If Meta already doesn't have it (e.g. the create call above
+    // succeeded in our DB but the template was removed on Meta's side
+    // independently), don't block deleting our own record over it.
+    await logPlatformEvent({ level: "warning", source: "whatsapp_template", message: `Template delete on Meta failed: ${err instanceof Error ? err.message : "unknown error"}`, organizationId: template.organization_id });
+  }
+
+  await admin.from("whatsapp_templates").delete().eq("id", templateId);
+
+  revalidatePath(WHATSAPP_PATH);
+  return { success: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -115,12 +183,17 @@ export async function sendBulkWhatsAppAction(formData: FormData): Promise<SendWh
     return { error: access.message };
   }
 
-  const body = String(formData.get("body") ?? "").trim();
-  const bodyError = validateWhatsAppBody(body);
-  if (bodyError) return { error: bodyError };
+  const templateId = String(formData.get("templateId") ?? "");
+  if (!templateId) return { error: "Select a message template." };
 
-  const modeRaw = String(formData.get("mode") ?? "shared");
-  const mode: WhatsAppMode = modeRaw === "own" ? "own" : "shared";
+  const variableValuesRaw = String(formData.get("variableValues") ?? "[]");
+  let variableValues: string[] = [];
+  try {
+    const parsed = JSON.parse(variableValuesRaw);
+    if (Array.isArray(parsed)) variableValues = parsed.map((v) => String(v));
+  } catch {
+    return { error: "Couldn't read the template's fill-in values." };
+  }
 
   const recipientsRaw = String(formData.get("recipients") ?? "[]");
   let rawRecipients: unknown;
@@ -150,19 +223,30 @@ export async function sendBulkWhatsAppAction(formData: FormData): Promise<SendWh
     return { error: "Select at least one valid recipient." };
   }
 
-  if (mode === "shared") {
-    const quotaError = await checkWhatsAppQuota(organizationId, recipients.length);
-    if (quotaError) return { error: quotaError };
+  const quotaError = await checkWhatsAppQuota(organizationId, recipients.length);
+  if (quotaError) return { error: quotaError };
+
+  const admin = createAdminClient();
+  const { data: template } = await admin
+    .from("whatsapp_templates")
+    .select("id, name, language, body_text, variable_count, status")
+    .eq("id", templateId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  if (!template) return { error: "That template could not be found." };
+  if (template.status !== "approved") return { error: "This template hasn't been approved by WhatsApp yet." };
+  if (variableValues.length < template.variable_count) {
+    return { error: `Fill in all ${template.variable_count} placeholder${template.variable_count === 1 ? "" : "s"} before sending.` };
   }
 
-  const credentials = await resolveWhatsAppCredentials(organizationId, mode);
-  if (!credentials) {
-    return { error: mode === "own" ? "Connect your WhatsApp number first." : "WhatsApp isn't configured yet — ask your developer to set it up." };
-  }
+  // What actually gets stored/shown in history — the template body with
+  // its {{n}} placeholders filled in, not the raw template source.
+  const renderedBody = template.body_text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_match, index: string) => variableValues[Number(index) - 1] ?? `{{${index}}}`);
 
   let result;
   try {
-    result = await sendBulkWhatsApp({ credentials, body, recipients, organizationId, mode });
+    result = await sendBulkTemplateMessage({ templateName: template.name, languageCode: template.language, bodyParams: variableValues.slice(0, template.variable_count), recipients });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Couldn't send that message.";
     await logPlatformEvent({
@@ -170,7 +254,7 @@ export async function sendBulkWhatsAppAction(formData: FormData): Promise<SendWh
       source: "whatsapp_send",
       message: `WhatsApp send failed: ${message}`,
       organizationId,
-      metadata: { recipientCount: recipients.length, mode },
+      metadata: { recipientCount: recipients.length, templateId },
     });
     return { error: message };
   }
@@ -178,15 +262,11 @@ export async function sendBulkWhatsAppAction(formData: FormData): Promise<SendWh
   const status: WhatsAppCampaignStatus =
     result.failed.length === 0 ? "sent" : result.sentCount === 0 ? "failed" : "partial_failure";
 
-  // RLS-restricted to admins by default — the admin client performs the
-  // actual insert so a "member" role granted whatsapp write via the tab
-  // permissions matrix can still send; checkTabAccess above is what
-  // actually gates who gets here (same pattern as sms_campaigns).
-  const admin = createAdminClient();
   await admin.from("whatsapp_campaigns").insert({
     organization_id: organizationId,
-    mode,
-    body,
+    body: renderedBody,
+    template_id: template.id,
+    template_variables: variableValues.slice(0, template.variable_count),
     recipient_count: recipients.length,
     sent_count: result.sentCount,
     failed_count: result.failed.length,
@@ -205,7 +285,7 @@ export async function sendBulkWhatsAppAction(formData: FormData): Promise<SendWh
 }
 
 // ---------------------------------------------------------------------------
-// Chat — 'own' mode only
+// Chat
 // ---------------------------------------------------------------------------
 
 export interface SendWhatsAppReplyState {
@@ -235,16 +315,14 @@ export async function sendWhatsAppReplyAction(conversationId: string, body: stri
     return { error: access.message };
   }
 
-  const credentials = await resolveWhatsAppCredentials(conversation.organization_id, "own");
-  if (!credentials) {
-    return { error: "Your WhatsApp number isn't connected anymore — reconnect it to keep replying." };
-  }
-
-  let sid: string;
+  let messageId: string;
   try {
-    const result = await sendWhatsAppMessage({ credentials, to: conversation.phone_number, body, organizationId: conversation.organization_id });
-    sid = result.sid;
+    const result = await sendTextMessage({ to: conversation.phone_number, body });
+    messageId = result.id;
   } catch (err) {
+    // The most common cause here is WhatsApp's 24-hour customer-service
+    // window having closed since their last message — free text can only
+    // ever be sent as a reply inside that window.
     return { error: err instanceof Error ? err.message : "Couldn't send that reply." };
   }
 
@@ -253,7 +331,7 @@ export async function sendWhatsAppReplyAction(conversationId: string, body: stri
     organization_id: conversation.organization_id,
     direction: "outbound",
     body,
-    twilio_sid: sid,
+    twilio_sid: messageId,
     status: "sent",
   });
 
@@ -290,9 +368,9 @@ export async function getWhatsAppAiMode(organizationId: string, phoneNumber: str
 }
 
 // Turning this on hands the conversation to the webhook handler entirely
-// (see /api/whatsapp/webhook/[organizationId]'s POST) — every inbound
-// message from this number gets an AI-generated reply sent automatically,
-// with no human review, for as long as it stays enabled.
+// (see /api/whatsapp/webhook's POST) — every inbound message from this
+// number gets an AI-generated reply sent automatically, with no human
+// review, for as long as it stays enabled.
 export async function setWhatsAppAiMode(organizationId: string, phoneNumber: string, enabled: boolean): Promise<void> {
   await requireUser();
   await setAiMode(organizationId, phoneNumber, enabled);

@@ -539,8 +539,14 @@ export type SmsCampaign = {
   created_at: string;
 };
 
+// 'own'/'shared' mode is a dead concept, kept only so historical rows
+// (from the Twilio era) still typecheck — new campaigns no longer set it.
 export type WhatsAppMode = "own" | "shared";
 
+// Dead table (migration 0058) — stored per-org Twilio credentials for the
+// old "own number" mode. Left in the DB (see migration 0097) but nothing
+// reads or writes it anymore now that WhatsApp sends through the one
+// shared Meta WhatsApp Cloud API number.
 export type OrganizationWhatsAppAccount = {
   id: string;
   organization_id: string;
@@ -552,12 +558,31 @@ export type OrganizationWhatsAppAccount = {
   updated_at: string;
 };
 
+export type WhatsAppTemplateCategory = "marketing" | "utility" | "authentication";
+export type WhatsAppTemplateStatus = "draft" | "pending_review" | "approved" | "rejected" | "paused" | "disabled";
+
+export type WhatsAppTemplate = {
+  id: string;
+  organization_id: string;
+  name: string;
+  language: string;
+  category: WhatsAppTemplateCategory;
+  body_text: string;
+  variable_count: number;
+  meta_template_id: string | null;
+  status: WhatsAppTemplateStatus;
+  rejected_reason: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type WhatsAppCampaignStatus = "sent" | "partial_failure" | "failed";
 
 export type WhatsAppCampaign = {
   id: string;
   organization_id: string;
-  mode: WhatsAppMode;
+  mode: WhatsAppMode | null;
   body: string;
   recipient_count: number;
   sent_count: number;
@@ -565,6 +590,12 @@ export type WhatsAppCampaign = {
   failed_recipients: { phone: string; error: string }[];
   status: WhatsAppCampaignStatus;
   sent_by: string | null;
+  // The template actually sent, and the values filled into its {{n}}
+  // placeholders (one shared set for the whole campaign, not personalized
+  // per recipient) — null/[] for historical freeform campaigns sent
+  // before this migration.
+  template_id: string | null;
+  template_variables: string[];
   created_at: string;
 };
 
@@ -588,6 +619,9 @@ export type WhatsAppMessage = {
   organization_id: string;
   direction: WhatsAppMessageDirection;
   body: string;
+  // Despite the name (kept from the Twilio era rather than renaming a live
+  // column), this now holds Meta's own message id ("wamid...") — matched
+  // against webhook status updates the same way Twilio's SID was.
   twilio_sid: string | null;
   status: string | null;
   created_at: string;
@@ -2312,7 +2346,7 @@ export type Database = {
       };
       whatsapp_campaigns: {
         Row: WhatsAppCampaign;
-        Insert: Partial<WhatsAppCampaign> & Pick<WhatsAppCampaign, "organization_id" | "mode" | "body" | "status">;
+        Insert: Partial<WhatsAppCampaign> & Pick<WhatsAppCampaign, "organization_id" | "body" | "status">;
         Update: Partial<WhatsAppCampaign>;
         Relationships: [
           {
@@ -2328,6 +2362,27 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["auth_user_id"];
+          },
+          {
+            foreignKeyName: "whatsapp_campaigns_template_id_fkey";
+            columns: ["template_id"];
+            isOneToOne: false;
+            referencedRelation: "whatsapp_templates";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      whatsapp_templates: {
+        Row: WhatsAppTemplate;
+        Insert: Partial<WhatsAppTemplate> & Pick<WhatsAppTemplate, "organization_id" | "name" | "category" | "body_text">;
+        Update: Partial<WhatsAppTemplate>;
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_templates_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
           },
         ];
       };

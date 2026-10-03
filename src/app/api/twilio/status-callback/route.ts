@@ -1,49 +1,31 @@
 import { NextResponse } from "next/server";
 import twilio from "twilio";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { getSmsEnv } from "@/lib/sms/env";
-import { getWhatsAppEnv } from "@/lib/whatsapp/env";
 import { recordMessageDelivery } from "@/lib/platform-events/delivery";
 
-// Shared async delivery-status endpoint for both SMS and WhatsApp sends —
-// same Twilio payload shape either way (MessageSid, MessageStatus, To,
-// From, ErrorCode, ErrorMessage), just routed by query params set when the
-// message was created (see sendBulkSms/sendBulkWhatsApp's statusCallback
-// URL). This is what actually catches delivery failures — client.messages
+// Async delivery-status endpoint for SMS sends (MessageSid, MessageStatus,
+// To, From, ErrorCode, ErrorMessage) — see sendBulkSms's statusCallback
+// URL. This is what actually catches delivery failures — client.messages
 // .create() resolving only means Twilio ACCEPTED the send, not that it
 // reached the recipient; that verdict arrives later, here.
 //
-// The auth token used to verify the signature depends on whose Twilio
-// account sent the message: the platform's shared one for SMS and
-// shared-mode WhatsApp, or the org's own connected account for
-// own-mode WhatsApp — so which one to check has to be resolved from the
-// query params before the signature can be verified at all.
+// WhatsApp used to share this endpoint too, back when it sent through
+// Twilio — it now sends through Meta's Cloud API directly (see migration
+// 0097), whose delivery-status updates arrive via src/app/api/whatsapp/
+// webhook's own `statuses` handling instead, so the "channel" branching
+// this route used to have is gone.
 export async function POST(request: Request) {
   const url = new URL(request.url);
   const organizationId = url.searchParams.get("organizationId");
   const channel = url.searchParams.get("channel");
-  const mode = url.searchParams.get("mode");
 
-  if (!organizationId || (channel !== "sms" && channel !== "whatsapp")) {
+  if (!organizationId || channel !== "sms") {
     return new NextResponse("Bad request", { status: 400 });
   }
 
   let authToken: string;
   try {
-    if (channel === "sms") {
-      authToken = getSmsEnv().authToken;
-    } else if (mode === "own") {
-      const admin = createAdminClient();
-      const { data: account } = await admin
-        .from("organization_whatsapp_accounts")
-        .select("auth_token")
-        .eq("organization_id", organizationId)
-        .maybeSingle();
-      if (!account) return new NextResponse("Not found", { status: 404 });
-      authToken = account.auth_token;
-    } else {
-      authToken = getWhatsAppEnv().authToken;
-    }
+    authToken = getSmsEnv().authToken;
   } catch {
     return new NextResponse("Not configured", { status: 500 });
   }

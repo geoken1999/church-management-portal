@@ -50,6 +50,7 @@ export interface WhatsAppTemplateRow {
   variable_count: number;
   status: WhatsAppTemplateStatus;
   rejected_reason: string | null;
+  meta_template_id: string | null;
 }
 
 export interface WhatsAppCampaignRow {
@@ -270,11 +271,20 @@ function TemplateRow({ template, canManage }: { template: WhatsAppTemplateRow; c
             <Badge variant="outline">{template.category}</Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">{template.body_text}</p>
-          {template.status === "rejected" && template.rejected_reason && <p className="mt-1 text-xs text-destructive">Rejected: {template.rejected_reason}</p>}
+          {template.status === "rejected" &&
+            (template.rejected_reason ? (
+              <p className="mt-1 text-xs text-destructive">Rejected: {template.rejected_reason}</p>
+            ) : (
+              <p className="mt-1 text-xs text-destructive">Rejected — click refresh to see why.</p>
+            ))}
         </div>
         {canManage && (
           <div className="flex shrink-0 items-center gap-1">
-            {template.status === "pending_review" && (
+            {/* Shown for anything short of approved, not just
+                pending_review — a template can come back REJECTED
+                immediately on creation (synchronous policy violations),
+                and this is the only way to fetch why. */}
+            {template.meta_template_id && template.status !== "approved" && (
               <Button type="button" size="icon" variant="ghost" onClick={handleRefresh} disabled={pending} title="Check for a status update">
                 <RefreshCw className="size-4" />
               </Button>

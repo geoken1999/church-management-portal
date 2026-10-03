@@ -84,6 +84,26 @@ export async function createWhatsAppTemplateAction(_prevState: TemplateFormState
     return { error: message };
   }
 
+  // Meta's create response only ever returns {id, status} — never a
+  // rejection reason — but a template can come back already REJECTED
+  // (obvious policy violations are rejected synchronously, not just after
+  // async review). Without this follow-up GET, rejected_reason stays null
+  // forever unless the admin happens to click "Refresh status" — which
+  // historically wasn't even shown for rejected templates (see the fix in
+  // WhatsAppManager.tsx's TemplateRow). Best-effort: a failure here just
+  // leaves rejected_reason null, same as before this fix.
+  let rejectedReason: string | null = null;
+  if (metaResult.status !== "pending_review" && metaResult.status !== "approved") {
+    try {
+      const detail = await fetchMetaTemplateStatus(metaResult.metaTemplateId);
+      rejectedReason = detail.rejectedReason;
+      metaResult = { ...metaResult, status: detail.status };
+    } catch {
+      // Leave rejectedReason null — the now-always-visible refresh button
+      // (for any non-approved status) lets the admin retry later.
+    }
+  }
+
   const { error: insertError } = await admin.from("whatsapp_templates").insert({
     organization_id: organizationId,
     name,
@@ -93,6 +113,7 @@ export async function createWhatsAppTemplateAction(_prevState: TemplateFormState
     variable_count: variableCount,
     meta_template_id: metaResult.metaTemplateId,
     status: metaResult.status,
+    rejected_reason: rejectedReason,
     created_by: user.id,
   });
 

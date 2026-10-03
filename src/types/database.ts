@@ -1172,6 +1172,89 @@ export type Notification = {
   created_at: string;
 };
 
+export type AutomationTemplateKind = "member_direct" | "staff_digest";
+
+export type AutomationTemplate = {
+  id: string;
+  organization_id: string;
+  meta_template_name: string;
+  language: string;
+  category: WhatsAppTemplateCategory;
+  body_text_named: string;
+  variable_names: string[];
+  kind: AutomationTemplateKind;
+  meta_template_id: string | null;
+  status: WhatsAppTemplateStatus;
+  rejected_reason: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AutomationType = "birthday_anniversary";
+export type AutomationStatus = "draft" | "active" | "paused";
+
+export type Automation = {
+  id: string;
+  organization_id: string;
+  type: AutomationType;
+  name: string;
+  status: AutomationStatus;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AutomationDateFieldSource = "built_in" | "custom_field";
+export type AutomationBuiltInField = "date_of_birth" | "wedding_date";
+
+export type AutomationTrigger = {
+  id: string;
+  automation_id: string;
+  organization_id: string;
+  date_field_source: AutomationDateFieldSource;
+  built_in_field: AutomationBuiltInField | null;
+  date_field_id: string | null;
+  occasion_label: string;
+  days_offset: number;
+  template_id: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AutomationDestinationKind = "direct_member" | "staff_digest";
+
+export type AutomationDestination = {
+  id: string;
+  automation_id: string;
+  organization_id: string;
+  kind: AutomationDestinationKind;
+  is_active: boolean;
+  recipient_phones: string[] | null;
+  digest_template_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AutomationExecutionStatus = "sent" | "failed" | "skipped";
+
+export type AutomationExecution = {
+  id: string;
+  organization_id: string;
+  automation_id: string;
+  destination_kind: AutomationDestinationKind;
+  trigger_id: string | null;
+  member_id: string | null;
+  idempotency_key: string;
+  status: AutomationExecutionStatus;
+  error_message: string | null;
+  meta_message_id: string | null;
+  recipient_count: number;
+  sent_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -2595,6 +2678,104 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["auth_user_id"];
+          },
+        ];
+      };
+      automation_templates: {
+        Row: AutomationTemplate;
+        Insert: Partial<AutomationTemplate> & Pick<AutomationTemplate, "organization_id" | "meta_template_name" | "category" | "body_text_named" | "kind">;
+        Update: Partial<AutomationTemplate>;
+        Relationships: [
+          {
+            foreignKeyName: "automation_templates_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      automations: {
+        Row: Automation;
+        Insert: Partial<Automation> & Pick<Automation, "organization_id" | "name">;
+        Update: Partial<Automation>;
+        Relationships: [
+          {
+            foreignKeyName: "automations_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      automation_triggers: {
+        Row: AutomationTrigger;
+        Insert: Partial<AutomationTrigger> & Pick<AutomationTrigger, "automation_id" | "organization_id" | "date_field_source" | "occasion_label">;
+        Update: Partial<AutomationTrigger>;
+        Relationships: [
+          {
+            foreignKeyName: "automation_triggers_automation_id_fkey";
+            columns: ["automation_id"];
+            isOneToOne: false;
+            referencedRelation: "automations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "automation_triggers_date_field_id_fkey";
+            columns: ["date_field_id"];
+            isOneToOne: false;
+            referencedRelation: "member_field_definitions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "automation_triggers_template_id_fkey";
+            columns: ["template_id"];
+            isOneToOne: false;
+            referencedRelation: "automation_templates";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      automation_destinations: {
+        Row: AutomationDestination;
+        Insert: Partial<AutomationDestination> & Pick<AutomationDestination, "automation_id" | "organization_id" | "kind">;
+        Update: Partial<AutomationDestination>;
+        Relationships: [
+          {
+            foreignKeyName: "automation_destinations_automation_id_fkey";
+            columns: ["automation_id"];
+            isOneToOne: false;
+            referencedRelation: "automations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "automation_destinations_digest_template_id_fkey";
+            columns: ["digest_template_id"];
+            isOneToOne: false;
+            referencedRelation: "automation_templates";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      automation_executions: {
+        Row: AutomationExecution;
+        Insert: Partial<AutomationExecution> & Pick<AutomationExecution, "organization_id" | "automation_id" | "destination_kind" | "idempotency_key" | "status">;
+        Update: Partial<AutomationExecution>;
+        Relationships: [
+          {
+            foreignKeyName: "automation_executions_automation_id_fkey";
+            columns: ["automation_id"];
+            isOneToOne: false;
+            referencedRelation: "automations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "automation_executions_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
           },
         ];
       };

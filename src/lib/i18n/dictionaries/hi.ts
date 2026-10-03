@@ -56,6 +56,7 @@ export const hi: Dictionary = {
       kmeet: "K-meet",
       askAura: "Ask Aura",
       aiRules: "AI नियम",
+      automations: "ऑटोमेशन",
       forms: "फ़ॉर्म",
       folder: "फ़ोल्डर",
       attendance: "उपस्थिति",

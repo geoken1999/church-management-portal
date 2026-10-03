@@ -56,6 +56,7 @@ export const ta: Dictionary = {
       kmeet: "K-meet",
       askAura: "Ask Aura",
       aiRules: "AI விதிகள்",
+      automations: "ஆட்டோமேஷன்",
       forms: "படிவங்கள்",
       folder: "கோப்புறை",
       attendance: "வருகை",

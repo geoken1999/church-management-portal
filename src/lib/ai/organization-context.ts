@@ -3,6 +3,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOccurrencesInRange } from "@/lib/events/recurrence";
 import { getSiteUrl } from "@/lib/site-url";
+import { getAiDataAccessRules } from "@/lib/ai-rules/dal";
 
 // Shared by every channel's AI auto-reply (Instagram DMs, WhatsApp) — gives
 // the model real organization data to answer from instead of generic
@@ -30,35 +31,43 @@ const MAX_EVENTS_IN_CONTEXT = 8;
 export async function getOrganizationContextForAi(organizationId: string): Promise<string> {
   const supabase = createAdminClient();
   const siteUrl = getSiteUrl();
+  const rules = await getAiDataAccessRules(organizationId);
 
+  // Each category this organization has turned off in AI Rules is never
+  // even queried, not just hidden from the assembled text below — the
+  // model shouldn't have that data in memory at all, not merely be told
+  // not to mention it.
   const [{ data: org }, { data: events }, { data: ministries }, { data: branches }, { data: fundraisers }, { data: forms }] =
     await Promise.all([
       supabase.from("organizations").select("name").eq("id", organizationId).maybeSingle(),
-      supabase
-        .from("events")
-        .select(
-          "title, description, start_at, end_at, is_recurring, recurrence_frequency, recurrence_end_date, venue, meeting_mode",
-        )
-        .eq("organization_id", organizationId)
-        .neq("status", "cancelled"),
-      supabase
-        .from("ministries")
-        .select("title, type, vision, mission, started_on, future_plans")
-        .eq("organization_id", organizationId),
-      supabase
-        .from("branches")
-        .select("name, location, member_count, country, members!branches_managed_by_fkey(first_name, last_name, phone)")
-        .eq("organization_id", organizationId),
-      supabase
-        .from("fundraisers")
-        .select("id, title, description, goal_amount, start_date, end_date, share_token, payment_link_enabled, payment_mode")
-        .eq("organization_id", organizationId)
-        .eq("status", "active"),
-      supabase
-        .from("forms")
-        .select("title, description, slug, fields")
-        .eq("organization_id", organizationId)
-        .eq("status", "published"),
+      rules.allowEvents
+        ? supabase
+            .from("events")
+            .select(
+              "title, description, start_at, end_at, is_recurring, recurrence_frequency, recurrence_end_date, venue, meeting_mode",
+            )
+            .eq("organization_id", organizationId)
+            .neq("status", "cancelled")
+        : Promise.resolve({ data: null }),
+      rules.allowMinistries
+        ? supabase.from("ministries").select("title, type, vision, mission, started_on, future_plans").eq("organization_id", organizationId)
+        : Promise.resolve({ data: null }),
+      rules.allowBranches
+        ? supabase
+            .from("branches")
+            .select("name, location, member_count, country, members!branches_managed_by_fkey(first_name, last_name, phone)")
+            .eq("organization_id", organizationId)
+        : Promise.resolve({ data: null }),
+      rules.allowFundraisers
+        ? supabase
+            .from("fundraisers")
+            .select("id, title, description, goal_amount, start_date, end_date, share_token, payment_link_enabled, payment_mode")
+            .eq("organization_id", organizationId)
+            .eq("status", "active")
+        : Promise.resolve({ data: null }),
+      rules.allowForms
+        ? supabase.from("forms").select("title, description, slug, fields").eq("organization_id", organizationId).eq("status", "published")
+        : Promise.resolve({ data: null }),
     ]);
 
   const now = new Date();
@@ -123,12 +132,8 @@ export async function getOrganizationContextForAi(organizationId: string): Promi
   });
   const formsBlock = formLines.length > 0 ? formLines.join("\n") : null;
 
-  const sections = [
-    `Organization name: ${org?.name ?? "this organization"}`,
-    "",
-    "Upcoming events:",
-    eventsBlock,
-  ];
+  const sections = [`Organization name: ${org?.name ?? "this organization"}`];
+  if (rules.allowEvents) sections.push("", "Upcoming events:", eventsBlock);
   if (ministriesBlock) sections.push("", "Ministries:", ministriesBlock);
   if (branchesBlock) sections.push("", "Locations/branches:", branchesBlock);
   if (fundraisersBlock) sections.push("", "Active fundraisers (share the link when relevant):", fundraisersBlock);

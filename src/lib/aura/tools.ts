@@ -5,6 +5,7 @@ import { getAttendanceSessions, getAttendanceSession, getAttendanceRecords, getA
 import { getEvents } from "@/lib/events/dal";
 import { getOccurrencesInRange } from "@/lib/events/recurrence";
 import { getFinanceOverviewStats, getFundraisers } from "@/lib/finance/dal";
+import { getAiDataAccessRules, type AiDataAccessRules } from "@/lib/ai-rules/dal";
 import type { ToolDefinition } from "@/lib/ai/openai";
 
 // Every tool below runs with the session-scoped client (not the admin
@@ -17,7 +18,21 @@ import type { ToolDefinition } from "@/lib/ai/openai";
 // Aura talks only to a logged-in team member, reusing the data access they
 // already have.
 
-export const AURA_TOOLS: ToolDefinition[] = [
+// Which AI Rules category gates each tool — checked twice: getAuraTools
+// below filters the list offered to the model in the first place (so a
+// disabled category is never even known to exist, not just refused), and
+// executeAuraTool checks again defensively before actually running one,
+// in case the model was mid-conversation when an admin flipped a toggle.
+const TOOL_CATEGORY: Record<string, keyof AiDataAccessRules> = {
+  list_attendance_sessions: "allowAttendance",
+  get_attendance_detail: "allowAttendance",
+  list_upcoming_events: "allowEvents",
+  get_member_count: "allowMembers",
+  get_finance_summary: "allowFinance",
+  list_fundraisers: "allowFundraisers",
+};
+
+const AURA_TOOLS_BASE: ToolDefinition[] = [
   {
     type: "function",
     function: {
@@ -97,6 +112,11 @@ export const AURA_TOOLS: ToolDefinition[] = [
     },
   },
 ];
+
+export async function getAuraTools(organizationId: string): Promise<ToolDefinition[]> {
+  const rules = await getAiDataAccessRules(organizationId);
+  return AURA_TOOLS_BASE.filter((tool) => rules[TOOL_CATEGORY[tool.function.name]]);
+}
 
 type ToolArgs = Record<string, unknown>;
 
@@ -212,6 +232,14 @@ async function listFundraisers(organizationId: string, args: ToolArgs) {
 }
 
 export async function executeAuraTool(organizationId: string, name: string, args: ToolArgs): Promise<unknown> {
+  const category = TOOL_CATEGORY[name];
+  if (category) {
+    const rules = await getAiDataAccessRules(organizationId);
+    if (!rules[category]) {
+      return { error: "This data category has been turned off in AI Rules for this organization." };
+    }
+  }
+
   switch (name) {
     case "list_attendance_sessions":
       return listAttendanceSessions(organizationId, args);

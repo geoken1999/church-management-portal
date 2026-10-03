@@ -57,6 +57,7 @@ export const en = {
       planner: "Planner",
       kmeet: "K-meet",
       askAura: "Ask Aura",
+      aiRules: "AI Rules",
       forms: "Forms",
       folder: "Folder",
       attendance: "Attendance",

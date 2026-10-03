@@ -40,6 +40,7 @@ import {
   House,
   Compass,
   Webcam,
+  ShieldCheck,
   Smartphone,
   ClipboardList,
 } from "lucide-react";
@@ -152,6 +153,7 @@ const NAV_GROUPS = [
     groupKey: "aiTools" as const,
     items: [
       { href: "/dashboard/ask-aura", itemKey: "askAura" as const, icon: Sparkles, tab: "aitools" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/ai-rules", itemKey: "aiRules" as const, icon: ShieldCheck, tab: "airules" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
   {

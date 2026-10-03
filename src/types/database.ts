@@ -427,6 +427,23 @@ export type WhatsAppAiMode = {
   updated_at: string;
 };
 
+// Governs which categories of org data the AI features (Ask Aura's
+// tool-calling, and the Instagram/WhatsApp DM auto-reply's org-context)
+// are allowed to draw from — see src/lib/ai-rules/dal.ts.
+export type AiDataAccessRules = {
+  organization_id: string;
+  allow_attendance: boolean;
+  allow_members: boolean;
+  allow_finance: boolean;
+  allow_fundraisers: boolean;
+  allow_events: boolean;
+  allow_ministries: boolean;
+  allow_branches: boolean;
+  allow_forms: boolean;
+  updated_by: string | null;
+  updated_at: string;
+};
+
 export type InstagramCommentAutomation = {
   id: string;
   organization_id: string;
@@ -2232,6 +2249,20 @@ export type Database = {
             foreignKeyName: "whatsapp_ai_mode_organization_id_fkey";
             columns: ["organization_id"];
             isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_data_access_rules: {
+        Row: AiDataAccessRules;
+        Insert: Partial<AiDataAccessRules> & Pick<AiDataAccessRules, "organization_id">;
+        Update: Partial<AiDataAccessRules>;
+        Relationships: [
+          {
+            foreignKeyName: "ai_data_access_rules_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: true;
             referencedRelation: "organizations";
             referencedColumns: ["id"];
           },

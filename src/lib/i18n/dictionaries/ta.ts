@@ -53,6 +53,7 @@ export const ta: Dictionary = {
       events: "நிகழ்வுகள்",
       todos: "செய்ய வேண்டியவை",
       planner: "திட்டமிடுபவர்",
+      kmeet: "K-meet",
       askAura: "Ask Aura",
       forms: "படிவங்கள்",
       folder: "கோப்புறை",

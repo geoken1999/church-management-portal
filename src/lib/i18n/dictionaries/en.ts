@@ -55,6 +55,7 @@ export const en = {
       events: "Events",
       todos: "To Do",
       planner: "Planner",
+      kmeet: "K-meet",
       askAura: "Ask Aura",
       forms: "Forms",
       folder: "Folder",

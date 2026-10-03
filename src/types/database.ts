@@ -757,6 +757,23 @@ export type Plan = {
   updated_at: string;
 };
 
+export type KmeetMeetingStatus = "scheduled" | "live" | "ended";
+
+export type KmeetMeeting = {
+  id: string;
+  organization_id: string;
+  title: string;
+  description: string | null;
+  event_id: string | null;
+  scheduled_at: string | null;
+  room_id: string | null;
+  status: KmeetMeetingStatus;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  ended_at: string | null;
+};
+
 export type DevicePlatform = "ios" | "android";
 
 export type DevicePushToken = {
@@ -2091,6 +2108,34 @@ export type Database = {
           },
           {
             foreignKeyName: "plans_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["auth_user_id"];
+          },
+        ];
+      };
+      kmeet_meetings: {
+        Row: KmeetMeeting;
+        Insert: Partial<KmeetMeeting> & Pick<KmeetMeeting, "organization_id" | "title">;
+        Update: Partial<KmeetMeeting>;
+        Relationships: [
+          {
+            foreignKeyName: "kmeet_meetings_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "kmeet_meetings_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "kmeet_meetings_created_by_fkey";
             columns: ["created_by"];
             isOneToOne: false;
             referencedRelation: "profiles";

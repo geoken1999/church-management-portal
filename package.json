@@ -17,6 +17,7 @@
     "@tiptap/pm": "^3.31.3",
     "@tiptap/react": "^3.31.3",
     "@tiptap/starter-kit": "^3.31.3",
+    "@videosdk.live/react-sdk": "^1.1.1",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.3.0",
     "firebase-admin": "^14.5.0",

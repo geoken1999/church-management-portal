@@ -2,7 +2,8 @@ import "server-only";
 
 import twilio from "twilio";
 import { isSmsConfigured } from "@/lib/sms/env";
-import { isWhatsAppConfigured } from "@/lib/whatsapp/env";
+import { isWhatsAppConfigured, getMetaWhatsAppEnv } from "@/lib/whatsapp/env";
+import { parseGraphError } from "@/lib/whatsapp/graph-error";
 import { isEmailConfigured, getEmailEnv } from "@/lib/email/env";
 import { isRazorpayConfigured } from "@/lib/billing/env";
 import { createRazorpayClient } from "@/lib/billing/razorpay";
@@ -34,39 +35,61 @@ function configuredOnly(name: string, configured: boolean): IntegrationHealth {
   return configured ? { name, status: "operational", liveChecked: false } : unconfigured(name);
 }
 
-// Twilio backs both SMS and (in shared mode) WhatsApp off the same
-// Account SID/Auth Token — fetching the account once covers both, with
-// each channel's own row still reflecting its own additional requirement
-// (a from-number/messaging service for SMS, a WhatsApp-enabled sender for
-// WhatsApp).
-async function checkTwilio(): Promise<[IntegrationHealth, IntegrationHealth]> {
-  const smsConfigured = isSmsConfigured();
-  const whatsappConfigured = isWhatsAppConfigured();
+// SMS only — WhatsApp moved off Twilio entirely onto Meta's Cloud API
+// directly (migration 0097); it used to ride on this same Account SID/
+// Auth Token in "shared" mode, but checking Twilio's account status now
+// says nothing about whether WhatsApp actually works (see
+// checkMetaWhatsApp below for the real check).
+async function checkTwilioSms(): Promise<IntegrationHealth> {
+  const name = "Twilio SMS";
+  if (!isSmsConfigured()) return unconfigured(name);
+
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
+  if (!accountSid || !authToken) return unconfigured(name);
 
-  if (!accountSid || !authToken) {
-    return [unconfigured("Twilio SMS"), unconfigured("Twilio WhatsApp (shared)")];
-  }
-
-  let accountStatus: string | null = null;
-  let error: string | null = null;
   try {
     const client = twilio(accountSid, authToken, { timeout: CHECK_TIMEOUT_MS });
     const account = await client.api.v2010.accounts(accountSid).fetch();
-    accountStatus = account.status;
-  } catch (err) {
-    error = err instanceof Error ? err.message : "Couldn't reach Twilio.";
-  }
-
-  const build = (name: string, configured: boolean): IntegrationHealth => {
-    if (!configured) return unconfigured(name);
-    if (error) return { name, status: "down", detail: error, liveChecked: true };
-    if (accountStatus !== "active") return { name, status: "degraded", detail: `Account status: ${accountStatus}`, liveChecked: true };
+    if (account.status !== "active") return { name, status: "degraded", detail: `Account status: ${account.status}`, liveChecked: true };
     return { name, status: "operational", liveChecked: true };
-  };
+  } catch (err) {
+    return { name, status: "down", detail: err instanceof Error ? err.message : "Couldn't reach Twilio.", liveChecked: true };
+  }
+}
 
-  return [build("Twilio SMS", smsConfigured), build("Twilio WhatsApp (shared)", whatsappConfigured)];
+// The actual, currently-live WhatsApp integration (Meta Cloud API,
+// direct — see src/lib/whatsapp/client.ts) — a GET against the
+// configured phone number, authenticated with the same access token
+// every real send uses, so an invalid/expired/corrupted token (the exact
+// failure a church admin hit live: Meta's "The access token could not be
+// decrypted") shows up here before it blocks an actual send. Read-only,
+// side-effect-free. Shows Meta's raw error detail (not the softened
+// church-admin-facing message describeWhatsAppError produces elsewhere)
+// since this page's audience is the person who'd actually fix it.
+async function checkMetaWhatsApp(): Promise<IntegrationHealth> {
+  const name = "WhatsApp (Meta Cloud API)";
+  if (!isWhatsAppConfigured()) return unconfigured(name);
+
+  try {
+    const { accessToken, phoneNumberId, apiVersion } = getMetaWhatsAppEnv();
+    const res = await fetch(`https://graph.facebook.com/${apiVersion}/${phoneNumberId}?fields=verified_name,code_verification_status`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      const err = await parseGraphError(res);
+      const detail = err.code || err.type ? `${err.message} (code ${err.code ?? "?"}, ${err.type ?? "unknown type"})` : err.message;
+      return { name, status: "down", detail, liveChecked: true };
+    }
+    const body = (await res.json()) as { code_verification_status?: string };
+    if (body.code_verification_status && body.code_verification_status !== "VERIFIED") {
+      return { name, status: "degraded", detail: `Phone number status: ${body.code_verification_status}`, liveChecked: true };
+    }
+    return { name, status: "operational", liveChecked: true };
+  } catch (err) {
+    return { name, status: "down", detail: err instanceof Error ? err.message : "Couldn't reach Meta's Graph API.", liveChecked: true };
+  }
 }
 
 // Deliberately a raw fetch() rather than the `resend` SDK used everywhere
@@ -158,13 +181,14 @@ function checkYouTube(): IntegrationHealth {
 // deliberately excluded, since the Health page already has dedicated,
 // live-checked cards for both elsewhere on the same page.
 export async function getIntegrationHealth(): Promise<IntegrationHealth[]> {
-  const [twilioResults, resend, razorpay, instagram, facebook] = await Promise.all([
-    checkTwilio(),
+  const [twilioSms, whatsapp, resend, razorpay, instagram, facebook] = await Promise.all([
+    checkTwilioSms(),
+    checkMetaWhatsApp(),
     checkResend(),
     checkRazorpay(),
     checkMetaApp("Instagram", process.env.INSTAGRAM_APP_ID, process.env.INSTAGRAM_APP_SECRET),
     checkMetaApp("Facebook", process.env.FACEBOOK_APP_ID, process.env.FACEBOOK_APP_SECRET),
   ]);
 
-  return [...twilioResults, resend, razorpay, instagram, facebook, checkYouTube()];
+  return [twilioSms, whatsapp, resend, razorpay, instagram, facebook, checkYouTube()];
 }

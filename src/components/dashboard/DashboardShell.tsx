@@ -157,7 +157,7 @@ const NAV_GROUPS = [
     items: [
       { href: "/dashboard/ask-aura", itemKey: "askAura" as const, icon: Sparkles, tab: "aitools" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/ai-rules", itemKey: "aiRules" as const, icon: ShieldCheck, tab: "airules" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/automations", itemKey: "automations" as const, icon: Workflow, tab: "automations" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/automation", itemKey: "automations" as const, icon: Workflow, tab: "automations" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
   {

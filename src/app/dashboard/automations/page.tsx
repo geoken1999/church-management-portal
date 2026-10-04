@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Plus, History, Settings } from "lucide-react";
+import { ArrowLeft, Plus, History, Settings } from "lucide-react";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getAutomations } from "@/lib/automations/dal";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import type { AutomationStatus } from "@/types/database";
 
 export const metadata: Metadata = {
-  title: "Automations | KingdomFlow",
+  title: "Automate Wishes for Members | KingdomFlow",
 };
 
 function statusBadge(status: AutomationStatus) {
@@ -34,10 +34,14 @@ export default async function AutomationsPage() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold tracking-tight">Automations</h1>
+          <Button variant="ghost" size="sm" className="-ml-2 mb-2" nativeButton={false} render={<Link href="/dashboard/automation" />}>
+            <ArrowLeft className="size-4" />
+            Automation
+          </Button>
+          <h1 className="font-heading text-3xl font-bold tracking-tight">Automate Wishes for Members</h1>
           <p className="mt-1 text-muted-foreground">
-            Recurring tasks that run on their own, without anyone having to remember to do them by hand. Birthday &amp; anniversary wishes over
-            WhatsApp is the first one available — more automation types are on the way.
+            Automatically send birthday and anniversary wishes to members over WhatsApp — no group messaging exists, so messages go directly to the
+            member and/or a staff digest.
           </p>
         </div>
         <div className="flex gap-2">

@@ -59,7 +59,7 @@ export const en = {
       kaudio: "K-Audio",
       askAura: "Ask Aura",
       aiRules: "AI Rules",
-      automations: "Automations",
+      automations: "Automation",
       forms: "Forms",
       folder: "Folder",
       attendance: "Attendance",

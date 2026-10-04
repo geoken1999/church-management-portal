@@ -2,13 +2,25 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Check, X } from "lucide-react";
+import { Check, X, Sparkles } from "lucide-react";
 import { PLANS, priceForInterval, type BillingInterval } from "@/lib/plans/config";
 import { PLAN_ORDER, planFeatureRows, planDescription } from "@/lib/plans/display";
+import { CustomPlanRequestDialog } from "@/components/landing/CustomPlanRequestDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTab, TabsIndicator } from "@/components/ui/tabs";
+
+// Shown alongside Starter/Growth/Pro, but entirely outside the real
+// plan config — "completely manual": no PlanId, no price, no limits, no
+// Razorpay plan. Raising a request just emails the team directly (see
+// src/lib/custom-plan/actions.ts); whatever this account ends up on is
+// then set by hand, same mechanism as comping a plan from Platform Admin.
+const CUSTOM_PLAN_HIGHLIGHTS = [
+  "Tailored limits for your church's size and needs",
+  "Dedicated onboarding and setup support",
+  "A plan we work out together, not a fixed tier",
+];
 
 const FEATURED_PLAN_ID = "premium";
 
@@ -37,7 +49,7 @@ export function PricingSection() {
         </Tabs>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
         {PLAN_ORDER.map((planId) => {
           const plan = PLANS[planId];
           const featured = planId === FEATURED_PLAN_ID;
@@ -75,6 +87,28 @@ export function PricingSection() {
             </Card>
           );
         })}
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">Custom</CardTitle>
+              <Sparkles className="size-4 text-primary" />
+            </div>
+            <p className="font-heading text-3xl font-bold">Let&apos;s talk</p>
+            <CardDescription>For churches that need something outside the standard plans.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <ul className="space-y-2.5 text-sm">
+              {CUSTOM_PLAN_HIGHLIGHTS.map((highlight) => (
+                <li key={highlight} className="flex items-start gap-2">
+                  <Check className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <span>{highlight}</span>
+                </li>
+              ))}
+            </ul>
+            <CustomPlanRequestDialog triggerLabel="Request a Custom plan" triggerClassName="w-full" />
+          </CardContent>
+        </Card>
       </div>
     </>
   );

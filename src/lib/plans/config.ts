@@ -215,6 +215,27 @@ export function kaudioMaxDurationMinutes(plan: PlanLimits): number | null {
   return plan.kmeetMaxDurationMinutes === null ? null : plan.kmeetMaxDurationMinutes + 10;
 }
 
+// A platform admin's per-org override for a negotiated "Custom" deal
+// (see the landing page's Custom tier, which is otherwise entirely
+// manual — no PlanId, no price). Covers every rule PLANS tiers set,
+// deliberately excluding identity/pricing fields: a Custom org's price
+// stays whatever was comped manually (via setTenantPlan), only the
+// *rules* vary here. Stored as-is in organizations.custom_plan_limits.
+export type CustomPlanOverrides = Omit<
+  PlanLimits,
+  "id" | "name" | "priceInRupees" | "priceLabel" | "priceInRupeesAnnual" | "priceLabelAnnual"
+>;
+
+// The single place "what limits does this org actually have" is
+// computed — used by both getPlanAccess (src/lib/plans/dal.ts) and
+// getTenantUsage (src/lib/platform-admin/dal.ts), which used to each do
+// their own plain PLANS[planId] lookup with no override concept.
+export function resolvePlanLimits(planId: PlanId, customOverrides: CustomPlanOverrides | null): PlanLimits {
+  const basePlan = PLANS[planId];
+  if (!customOverrides) return basePlan;
+  return { ...basePlan, ...customOverrides, name: "Custom" };
+}
+
 export function isPlanId(value: string): value is PlanId {
   return value === "basic" || value === "premium" || value === "pro";
 }

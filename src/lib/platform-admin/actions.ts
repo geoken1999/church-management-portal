@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
-import { isPlanId } from "@/lib/plans/config";
+import { isPlanId, type CustomPlanOverrides } from "@/lib/plans/config";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { notifyOrgOfSupportReply } from "@/lib/support/notify-org";
 import { sendEventPayoutProcessedEmail } from "@/lib/billing/receipts";
@@ -153,6 +153,107 @@ export async function setTenantPlan(_prevState: SetTenantPlanState, formData: Fo
 
   revalidatePath(TENANTS_PATH);
   return { success: true };
+}
+
+export interface SetTenantCustomPlanLimitsState {
+  error?: string;
+  success?: boolean;
+}
+
+// Empty string means "unlimited" (null) for the nullable-number rule
+// fields (kmeetMaxDurationMinutes, branchLimit, memberLimit, formsLimit,
+// automationLimit) — the dialog always submits a complete object, so a
+// blank field is a deliberate "no cap" choice, not a missing one.
+function readNullableInt(formData: FormData, key: string): number | null {
+  const raw = String(formData.get(key) ?? "").trim();
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function readInt(formData: FormData, key: string, fallback = 0): number {
+  const parsed = Number(formData.get(key) ?? "");
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+// Overrides individual plan "rules" for one org — fulfillment for the
+// landing page's Custom tier, which is otherwise entirely manual. Price
+// stays whatever the org is comped to via setTenantPlan above; only the
+// rule fields (quotas, caps, feature flags, SLA) are overridden here. See
+// resolvePlanLimits (src/lib/plans/config.ts) for how this gets merged
+// back in everywhere the app reads an org's effective plan.
+export async function setTenantCustomPlanLimits(
+  _prevState: SetTenantCustomPlanLimitsState,
+  formData: FormData,
+): Promise<SetTenantCustomPlanLimitsState> {
+  const platformAdmin = await requirePlatformAdmin();
+  const organizationId = String(formData.get("organizationId") ?? "");
+
+  // storageGb is the form's human-friendly unit — converted to bytes,
+  // the unit every other quota check in this app already expects
+  // (checkStorageQuota, formatBytes, etc.).
+  const storageGb = Number(formData.get("storageGb") ?? "0");
+
+  const overrides: CustomPlanOverrides = {
+    emailsPerMonth: readInt(formData, "emailsPerMonth"),
+    smsPerMonth: readInt(formData, "smsPerMonth"),
+    whatsappPerMonth: readInt(formData, "whatsappPerMonth"),
+    aiRepliesPerMonth: readInt(formData, "aiRepliesPerMonth"),
+    instagramAccountLimit: readInt(formData, "instagramAccountLimit"),
+    youtubeAccountLimit: readInt(formData, "youtubeAccountLimit"),
+    storageBytes: Number.isFinite(storageGb) ? Math.round(storageGb * 1024 * 1024 * 1024) : 0,
+    kmeetMaxDurationMinutes: readNullableInt(formData, "kmeetMaxDurationMinutes"),
+    maxAdditionalAdmins: readInt(formData, "maxAdditionalAdmins"),
+    maxAdditionalStaff: readInt(formData, "maxAdditionalStaff"),
+    branchLimit: readNullableInt(formData, "branchLimit"),
+    memberLimit: readNullableInt(formData, "memberLimit"),
+    formsLimit: readNullableInt(formData, "formsLimit"),
+    financeEnabled: formData.get("financeEnabled") === "on",
+    ownPaymentGatewayEnabled: formData.get("ownPaymentGatewayEnabled") === "on",
+    socialMediaEnabled: formData.get("socialMediaEnabled") === "on",
+    customSmtpEnabled: formData.get("customSmtpEnabled") === "on",
+    automationLimit: readNullableInt(formData, "automationLimit"),
+    supportSlaDays: readInt(formData, "supportSlaDays", 5),
+  };
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("organizations").update({ custom_plan_limits: overrides }).eq("id", organizationId);
+
+  if (error) {
+    return { error: "Couldn't save those custom rules. Please try again." };
+  }
+
+  await logPlatformEvent({
+    level: "info",
+    source: "platform_admin",
+    message: `Platform admin (${platformAdmin.email ?? "unknown"}) set custom plan rules`,
+    organizationId,
+    metadata: { overrides },
+  });
+
+  revalidatePath(TENANTS_PATH);
+  revalidatePath(`${TENANTS_PATH}/${organizationId}`);
+  return { success: true };
+}
+
+// Reverts an org back to its plain named plan (Starter/Growth/Pro) —
+// whatever custom rules were set are discarded, not preserved for reuse.
+export async function clearTenantCustomPlanLimits(formData: FormData) {
+  const platformAdmin = await requirePlatformAdmin();
+  const organizationId = String(formData.get("organizationId") ?? "");
+
+  const admin = createAdminClient();
+  await admin.from("organizations").update({ custom_plan_limits: null }).eq("id", organizationId);
+
+  await logPlatformEvent({
+    level: "info",
+    source: "platform_admin",
+    message: `Platform admin (${platformAdmin.email ?? "unknown"}) reverted custom plan rules to the standard plan`,
+    organizationId,
+  });
+
+  revalidatePath(TENANTS_PATH);
+  revalidatePath(`${TENANTS_PATH}/${organizationId}`);
 }
 
 export interface ExtendTenantTrialState {

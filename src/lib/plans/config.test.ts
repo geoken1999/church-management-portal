@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ADDON_PACKS, getAddonPack, addonPacksFor, kaudioMaxDurationMinutes, PLANS } from "./config";
+import { ADDON_PACKS, getAddonPack, addonPacksFor, kaudioMaxDurationMinutes, resolvePlanLimits, PLANS } from "./config";
 
 describe("kaudioMaxDurationMinutes", () => {
   it("adds 10 minutes to a finite K-meet limit", () => {
@@ -9,6 +9,26 @@ describe("kaudioMaxDurationMinutes", () => {
 
   it("stays unlimited when K-meet's limit is unlimited", () => {
     expect(kaudioMaxDurationMinutes(PLANS.pro)).toBeNull(); // pro: null -> null
+  });
+});
+
+describe("resolvePlanLimits", () => {
+  it("returns the plain plan unchanged when there are no custom overrides", () => {
+    expect(resolvePlanLimits("premium", null)).toBe(PLANS.premium);
+  });
+
+  it("merges overrides on top of the base plan and renames it to Custom", () => {
+    const merged = resolvePlanLimits("basic", {
+      ...PLANS.basic,
+      branchLimit: 999,
+      automationLimit: 3,
+    });
+    expect(merged.name).toBe("Custom");
+    expect(merged.branchLimit).toBe(999);
+    expect(merged.automationLimit).toBe(3);
+    // Unrelated fields still come from the base plan.
+    expect(merged.id).toBe("basic");
+    expect(merged.priceInRupees).toBe(PLANS.basic.priceInRupees);
   });
 });
 

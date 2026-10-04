@@ -41,6 +41,12 @@ export type Organization = {
   // in. Defaults to Asia/Kolkata (see migration 0108) for every org that
   // hasn't explicitly changed it.
   timezone: string;
+  // A platform admin's per-org override for a negotiated "Custom" plan
+  // deal — null means "use the plain named plan (Starter/Growth/Pro)
+  // unchanged." Shape owned by CustomPlanOverrides (src/lib/plans/
+  // config.ts), not duplicated here, same as custom_fields above —
+  // resolvePlanLimits is the only place this gets interpreted.
+  custom_plan_limits: Record<string, unknown> | null;
   // Basic-tier access without a subscription until this passes — see
   // getPlanAccess in src/lib/plans/dal.ts.
   trial_ends_at: string | null;

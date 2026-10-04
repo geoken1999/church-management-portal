@@ -2,7 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sharedServiceNetAmount } from "@/lib/finance/fees";
-import { PLANS, isPlanId } from "@/lib/plans/config";
+import { PLANS, isPlanId, resolvePlanLimits, type CustomPlanOverrides, type PlanLimits } from "@/lib/plans/config";
 import type { PlatformEvent, PlatformEventLevel, SupportTicketStatus, PayoutMethod } from "@/types/database";
 
 // Where to actually wire a pending request's money — a snapshot taken at
@@ -202,6 +202,7 @@ export interface TenantRow {
   slug: string;
   plan: string;
   planName: string;
+  isCustom: boolean;
   trialEndsAt: string | null;
   subscriptionStatus: string | null;
   memberCount: number;
@@ -216,7 +217,7 @@ export const getAllTenants = async (): Promise<TenantRow[]> => {
   const [{ data: organizations }, { data: subscriptions }, { data: owners }, { data: members }] = await Promise.all([
     admin
       .from("organizations")
-      .select("id, name, slug, plan, trial_ends_at, created_at")
+      .select("id, name, slug, plan, trial_ends_at, created_at, custom_plan_limits")
       .order("created_at", { ascending: false }),
     admin.from("organization_subscriptions").select("organization_id, status"),
     admin
@@ -241,12 +242,14 @@ export const getAllTenants = async (): Promise<TenantRow[]> => {
   return (organizations ?? []).map((org) => {
     const owner = ownerByOrg.get(org.id) ?? null;
     const planId = org.plan && isPlanId(org.plan) ? org.plan : "basic";
+    const isCustom = org.custom_plan_limits !== null;
     return {
       id: org.id,
       name: org.name,
       slug: org.slug,
       plan: planId,
-      planName: PLANS[planId].name,
+      planName: isCustom ? "Custom" : PLANS[planId].name,
+      isCustom,
       trialEndsAt: org.trial_ends_at,
       subscriptionStatus: subscriptionByOrg.get(org.id) ?? null,
       memberCount: memberCountByOrg.get(org.id) ?? 0,
@@ -266,6 +269,11 @@ export interface TenantUsage {
   createdAt: string;
   plan: string;
   planName: string;
+  // The fully-resolved effective limits (base plan, or merged with a
+  // custom override) — what the Custom Plan dialog prefills from, and
+  // what the rest of the app actually enforces for this org.
+  planLimits: PlanLimits;
+  customPlanLimits: CustomPlanOverrides | null;
   subscriptionStatus: string | null;
   trialEndsAt: string | null;
   congregationMembers: number;
@@ -341,7 +349,9 @@ export async function getTenantUsage(organizationId: string): Promise<TenantUsag
   ] = await Promise.all([
     admin
       .from("organizations")
-      .select("id, name, slug, logo_url, country, plan, trial_ends_at, branch_count, created_at, addon_sms_credits, addon_email_credits, addon_whatsapp_credits, addon_storage_bytes")
+      .select(
+        "id, name, slug, logo_url, country, plan, trial_ends_at, branch_count, created_at, addon_sms_credits, addon_email_credits, addon_whatsapp_credits, addon_storage_bytes, custom_plan_limits",
+      )
       .eq("id", organizationId)
       .maybeSingle(),
     admin.from("organization_subscriptions").select("status").eq("organization_id", organizationId).maybeSingle(),
@@ -371,7 +381,8 @@ export async function getTenantUsage(organizationId: string): Promise<TenantUsag
   if (!organization) return null;
 
   const planId = organization.plan && isPlanId(organization.plan) ? organization.plan : "basic";
-  const plan = PLANS[planId];
+  const customPlanLimits = (organization.custom_plan_limits ?? null) as CustomPlanOverrides | null;
+  const plan = resolvePlanLimits(planId, customPlanLimits);
 
   const sumSentCount = (rows: { sent_count: number }[] | null) => (rows ?? []).reduce((sum, r) => sum + r.sent_count, 0);
   const sumAmount = (rows: { amount: number }[] | null) => (rows ?? []).reduce((sum, r) => sum + r.amount, 0);
@@ -389,6 +400,8 @@ export async function getTenantUsage(organizationId: string): Promise<TenantUsag
     createdAt: organization.created_at,
     plan: planId,
     planName: plan.name,
+    planLimits: plan,
+    customPlanLimits,
     subscriptionStatus: subscription?.status ?? null,
     trialEndsAt: organization.trial_ends_at,
     congregationMembers: congregationMembers ?? 0,

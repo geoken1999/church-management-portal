@@ -3,7 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { PLANS, isPlanId, type PlanLimits } from "@/lib/plans/config";
+import { isPlanId, resolvePlanLimits, type PlanLimits, type CustomPlanOverrides } from "@/lib/plans/config";
 import { formatBytes } from "@/lib/plans/format";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 
@@ -48,7 +48,7 @@ export const getPlanAccess = cache(async (organizationId: string): Promise<PlanA
     supabase
       .from("organizations")
       .select(
-        "plan, trial_ends_at, addon_sms_credits, addon_email_credits, addon_whatsapp_credits, addon_storage_bytes, addon_ai_credits",
+        "plan, trial_ends_at, addon_sms_credits, addon_email_credits, addon_whatsapp_credits, addon_storage_bytes, addon_ai_credits, custom_plan_limits",
       )
       .eq("id", organizationId)
       .maybeSingle(),
@@ -63,10 +63,15 @@ export const getPlanAccess = cache(async (organizationId: string): Promise<PlanA
     addonAiCredits: org?.addon_ai_credits ?? 0,
   };
 
+  // Applied regardless of subscription status below — a platform
+  // admin's custom override for a negotiated deal isn't tied to whether
+  // Razorpay happens to think the subscription is active.
+  const customOverrides = (org?.custom_plan_limits ?? null) as CustomPlanOverrides | null;
+
   if (subscription?.status === "active") {
     const planId = org?.plan;
     return {
-      plan: PLANS[planId && isPlanId(planId) ? planId : "basic"],
+      plan: resolvePlanLimits(planId && isPlanId(planId) ? planId : "basic", customOverrides),
       accessStatus: "active",
       trialEndsAt: org?.trial_ends_at ?? null,
       ...addonBalances,
@@ -77,7 +82,7 @@ export const getPlanAccess = cache(async (organizationId: string): Promise<PlanA
   const stillTrialing = trialEndsAt ? new Date(trialEndsAt) > new Date() : false;
 
   return {
-    plan: PLANS.basic,
+    plan: resolvePlanLimits("basic", customOverrides),
     accessStatus: stillTrialing ? "trial" : "expired",
     trialEndsAt,
     ...addonBalances,
@@ -464,11 +469,12 @@ export async function recordAiReplyUsage(
 async function resolveEffectivePlanForWebhook(organizationId: string): Promise<PlanLimits> {
   const admin = createAdminClient();
   const [{ data: org }, { data: subscription }] = await Promise.all([
-    admin.from("organizations").select("plan").eq("id", organizationId).maybeSingle(),
+    admin.from("organizations").select("plan, custom_plan_limits").eq("id", organizationId).maybeSingle(),
     admin.from("organization_subscriptions").select("status").eq("organization_id", organizationId).maybeSingle(),
   ]);
-  if (subscription?.status !== "active") return PLANS.basic;
-  return PLANS[org?.plan && isPlanId(org.plan) ? org.plan : "basic"];
+  const customOverrides = (org?.custom_plan_limits ?? null) as CustomPlanOverrides | null;
+  if (subscription?.status !== "active") return resolvePlanLimits("basic", customOverrides);
+  return resolvePlanLimits(org?.plan && isPlanId(org.plan) ? org.plan : "basic", customOverrides);
 }
 
 function startOfCurrentMonthIso(): string {

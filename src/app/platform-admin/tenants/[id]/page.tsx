@@ -7,6 +7,7 @@ import { getTenantUsage } from "@/lib/platform-admin/dal";
 import { exportTenantReport } from "@/lib/platform-admin/report-actions";
 import { formatBytes } from "@/lib/plans/format";
 import { ReportExportButtons } from "@/components/platform-admin/ReportExportButtons";
+import { CustomPlanDialog } from "@/components/platform-admin/CustomPlanDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -48,13 +49,16 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="font-heading text-3xl font-bold tracking-tight">{usage.name}</h1>
             <Badge variant={statusVariant}>{statusLabel}</Badge>
-            <Badge variant="outline">{usage.planName}</Badge>
+            <Badge variant={usage.customPlanLimits ? "default" : "outline"}>{usage.planName}</Badge>
           </div>
           <p className="mt-1 text-muted-foreground">
             Joined {new Date(usage.createdAt).toLocaleDateString()}
             {usage.country && ` · ${usage.country}`}
             {usage.trialEndsAt && stillTrialing && ` · Trial ends ${new Date(usage.trialEndsAt).toLocaleDateString()}`}
           </p>
+          <div className="mt-2">
+            <CustomPlanDialog organizationId={usage.id} effectiveLimits={usage.planLimits} hasCustomPlan={usage.customPlanLimits !== null} />
+          </div>
         </div>
         <ReportExportButtons onExport={exportTenantReport.bind(null, usage.id)} />
       </div>

@@ -48,7 +48,7 @@ export default async function PlatformAdminTenantsPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-heading text-base font-bold">{tenant.name}</h3>
                     {statusBadge(tenant)}
-                    <Badge variant="outline">{tenant.planName}</Badge>
+                    <Badge variant={tenant.isCustom ? "default" : "outline"}>{tenant.planName}</Badge>
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                     <span>

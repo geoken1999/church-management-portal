@@ -961,6 +961,12 @@ export type EventPayoutRequest = {
   status: EventPayoutRequestStatus;
   requested_by: string | null;
   resolved_payout_id: string | null;
+  payout_method: PayoutMethod | null;
+  upi_id: string | null;
+  bank_account_holder: string | null;
+  bank_account_number: string | null;
+  bank_ifsc: string | null;
+  bank_name: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -1019,6 +1025,25 @@ export type OrganizationRazorpayAccount = {
   updated_at: string;
 };
 
+export type PayoutMethod = "upi" | "bank_transfer";
+
+// Where the platform should actually wire money for a Fund Raiser or
+// Event payout — one shared profile per org, independent of which
+// feature collected the money.
+export type OrganizationPayoutDetailsRow = {
+  id: string;
+  organization_id: string;
+  payout_method: PayoutMethod;
+  upi_id: string | null;
+  bank_account_holder: string | null;
+  bank_account_number: string | null;
+  bank_ifsc: string | null;
+  bank_name: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type FundraiserPaymentOrderStatus = "created" | "paid" | "failed";
 
 export type FundraiserPaymentOrder = {
@@ -1058,6 +1083,16 @@ export type FundraiserPayoutRequest = {
   status: FundraiserPayoutRequestStatus;
   requested_by: string | null;
   resolved_payout_id: string | null;
+  // Snapshot of where to send this specific payout — the org's saved
+  // organization_payout_details profile can change later, so the
+  // request keeps its own fixed copy. Null for requests made before
+  // this field existed.
+  payout_method: PayoutMethod | null;
+  upi_id: string | null;
+  bank_account_holder: string | null;
+  bank_account_number: string | null;
+  bank_ifsc: string | null;
+  bank_name: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -1761,6 +1796,20 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "organization_razorpay_accounts_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: true;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      organization_payout_details: {
+        Row: OrganizationPayoutDetailsRow;
+        Insert: Partial<OrganizationPayoutDetailsRow> & Pick<OrganizationPayoutDetailsRow, "organization_id" | "payout_method">;
+        Update: Partial<OrganizationPayoutDetailsRow>;
+        Relationships: [
+          {
+            foreignKeyName: "organization_payout_details_organization_id_fkey";
             columns: ["organization_id"];
             isOneToOne: true;
             referencedRelation: "organizations";

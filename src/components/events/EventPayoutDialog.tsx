@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useActionState, useState } from "react";
 import { IndianRupee } from "lucide-react";
 import { requestEventPayout, cancelEventPayoutRequest, type EventPayoutRequestState } from "@/lib/events/registration-actions";
 import { SHARED_SERVICE_FEE_RATE, sharedServiceFee } from "@/lib/finance/fees";
+import {
+  PayoutDetailsFields,
+  payoutDetailsSummary,
+  type PayoutDetailsDefaultValues,
+} from "@/components/organizations/PayoutDetailsFields";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -65,6 +70,7 @@ export function EventPayoutDialog({
   owed,
   pendingPayoutRequest,
   payoutHistory,
+  savedPayoutDetails,
 }: {
   eventId: string;
   eventTitle: string;
@@ -72,19 +78,10 @@ export function EventPayoutDialog({
   owed: number;
   pendingPayoutRequest: { id: string; amount: number } | null;
   payoutHistory: PayoutHistoryEntry[];
+  savedPayoutDetails: PayoutDetailsDefaultValues | null;
 }) {
-  const [state, setState] = useState<EventPayoutRequestState>(initialState);
-  const [pending, startTransition] = useTransition();
-
-  function handleRequest() {
-    setState(initialState);
-    const formData = new FormData();
-    formData.set("eventId", eventId);
-    startTransition(async () => {
-      const result = await requestEventPayout(state, formData);
-      setState(result);
-    });
-  }
+  const [state, formAction, pending] = useActionState(requestEventPayout, initialState);
+  const [editing, setEditing] = useState(!savedPayoutDetails);
 
   return (
     <Dialog>
@@ -111,27 +108,38 @@ export function EventPayoutDialog({
               {formatCurrency(collected)} collected · {SHARED_SERVICE_FEE_PERCENT} fee ({formatCurrency(sharedServiceFee(collected))}) ·{" "}
               {formatCurrency(owed)} owed to you
             </p>
-            <div>
-              {pendingPayoutRequest ? (
-                <form action={cancelEventPayoutRequest} className="flex items-center gap-2">
-                  <input type="hidden" name="requestId" value={pendingPayoutRequest.id} />
-                  <Badge variant="secondary">Requested — {formatCurrency(pendingPayoutRequest.amount)}</Badge>
-                  <Button type="submit" size="sm" variant="ghost">
-                    Cancel
-                  </Button>
-                </form>
-              ) : owed > 0 ? (
-                <Button type="button" size="sm" variant="outline" onClick={handleRequest} disabled={pending}>
+            {pendingPayoutRequest ? (
+              <form action={cancelEventPayoutRequest} className="flex items-center gap-2">
+                <input type="hidden" name="requestId" value={pendingPayoutRequest.id} />
+                <Badge variant="secondary">Requested — {formatCurrency(pendingPayoutRequest.amount)}</Badge>
+                <Button type="submit" size="sm" variant="ghost">
+                  Cancel
+                </Button>
+              </form>
+            ) : owed > 0 ? (
+              <form action={formAction} className="space-y-3">
+                <input type="hidden" name="eventId" value={eventId} />
+                {state.error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{state.error}</AlertDescription>
+                  </Alert>
+                )}
+                {editing ? (
+                  <PayoutDetailsFields defaultValues={savedPayoutDetails ?? undefined} errors={state.fieldErrors} showSaveForFutureCheckbox />
+                ) : (
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                    <span>We&apos;ll send this to: {payoutDetailsSummary(savedPayoutDetails!)}</span>
+                    <button type="button" onClick={() => setEditing(true)} className="font-medium text-primary hover:underline">
+                      Change
+                    </button>
+                  </div>
+                )}
+                <Button type="submit" size="sm" variant="outline" disabled={pending}>
                   {pending ? "Requesting..." : "Request payout"}
                 </Button>
-              ) : (
-                <Badge variant="secondary">Fully paid out</Badge>
-              )}
-            </div>
-            {state.error && (
-              <Alert variant="destructive">
-                <AlertDescription>{state.error}</AlertDescription>
-              </Alert>
+              </form>
+            ) : (
+              <Badge variant="secondary">Fully paid out</Badge>
             )}
             <PayoutHistoryList payouts={payoutHistory} />
           </div>

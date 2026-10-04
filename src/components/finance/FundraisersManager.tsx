@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useActionState, useState, useTransition } from "react";
 import { Plus, Pencil, Trash2, Target, UserRound, MapPin, CalendarDays, Link2, Landmark, Wallet } from "lucide-react";
 import {
   createFundraiser,
@@ -18,6 +18,11 @@ import {
 } from "@/lib/finance/actions";
 import { FUNDRAISER_STATUSES } from "@/lib/finance/validation";
 import { SHARED_SERVICE_FEE_RATE, sharedServiceFee, sharedServiceNetAmount } from "@/lib/finance/fees";
+import {
+  PayoutDetailsFields,
+  payoutDetailsSummary,
+  type PayoutDetailsDefaultValues,
+} from "@/components/organizations/PayoutDetailsFields";
 import type { Branch, Fundraiser, FundraiserPaymentMode, FundraiserStatus, Member } from "@/types/database";
 
 const SHARED_SERVICE_FEE_PERCENT = `${(SHARED_SERVICE_FEE_RATE * 100).toString()}%`;
@@ -336,6 +341,7 @@ function PayoutRequestRow({
   sharedOwed,
   pendingPayoutRequest,
   payoutHistory,
+  savedPayoutDetails,
 }: {
   fundraiserId: string;
   fundraiserTitle: string;
@@ -343,19 +349,13 @@ function PayoutRequestRow({
   sharedOwed: number;
   pendingPayoutRequest: { id: string; amount: number } | null;
   payoutHistory: PayoutHistoryEntry[];
+  savedPayoutDetails: PayoutDetailsDefaultValues | null;
 }) {
-  const [state, setState] = useState<PayoutRequestState>(payoutRequestInitialState);
-  const [pending, startTransition] = useTransition();
-
-  function handleRequest() {
-    setState(payoutRequestInitialState);
-    const formData = new FormData();
-    formData.set("fundraiserId", fundraiserId);
-    startTransition(async () => {
-      const result = await requestFundraiserPayout(state, formData);
-      setState(result);
-    });
-  }
+  const [state, formAction, pending] = useActionState(requestFundraiserPayout, payoutRequestInitialState);
+  // Open by default when there's nothing saved yet — otherwise collapsed
+  // behind a one-line summary + "Change" link, so requesting again
+  // doesn't re-prompt for the same details every time.
+  const [editing, setEditing] = useState(!savedPayoutDetails);
 
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
@@ -375,27 +375,47 @@ function PayoutRequestRow({
               Cancel
             </Button>
           </form>
-        ) : sharedOwed > 0 ? (
-          <Button type="button" size="sm" variant="outline" onClick={handleRequest} disabled={pending}>
+        ) : sharedOwed <= 0 ? (
+          <Badge variant="secondary">{sharedCollected > 0 ? "Fully paid out" : "No gifts yet"}</Badge>
+        ) : null}
+      </div>
+
+      {!pendingPayoutRequest && sharedOwed > 0 && (
+        <form action={formAction} className="space-y-3">
+          <input type="hidden" name="fundraiserId" value={fundraiserId} />
+          {state.error && (
+            <Alert variant="destructive">
+              <AlertDescription>{state.error}</AlertDescription>
+            </Alert>
+          )}
+          {editing ? (
+            <PayoutDetailsFields defaultValues={savedPayoutDetails ?? undefined} errors={state.fieldErrors} showSaveForFutureCheckbox />
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>We&apos;ll send this to: {payoutDetailsSummary(savedPayoutDetails!)}</span>
+              <button type="button" onClick={() => setEditing(true)} className="font-medium text-primary hover:underline">
+                Change
+              </button>
+            </div>
+          )}
+          <Button type="submit" size="sm" variant="outline" disabled={pending}>
             {pending ? "Requesting..." : "Request payout"}
           </Button>
-        ) : sharedCollected > 0 ? (
-          <Badge variant="secondary">Fully paid out</Badge>
-        ) : (
-          <Badge variant="secondary">No gifts yet</Badge>
-        )}
-      </div>
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
+        </form>
       )}
+
       <PayoutHistoryList payouts={payoutHistory} />
     </div>
   );
 }
 
-function WalletBalanceButton({ fundraisers }: { fundraisers: FundraiserRow[] }) {
+function WalletBalanceButton({
+  fundraisers,
+  savedPayoutDetails,
+}: {
+  fundraisers: FundraiserRow[];
+  savedPayoutDetails: PayoutDetailsDefaultValues | null;
+}) {
   // Shows as soon as a fundraiser is set to shared mode, not only once
   // something's actually been collected — otherwise the wallet is
   // invisible exactly when someone's checking whether it's working.
@@ -436,6 +456,7 @@ function WalletBalanceButton({ fundraisers }: { fundraisers: FundraiserRow[] }) 
               sharedOwed={fundraiser.sharedOwed}
               pendingPayoutRequest={fundraiser.pendingPayoutRequest}
               payoutHistory={fundraiser.payoutHistory}
+              savedPayoutDetails={savedPayoutDetails}
             />
           ))}
         </div>
@@ -831,6 +852,7 @@ export function FundraisersManager({
   hasOwnAccount,
   canWrite,
   canDelete,
+  savedPayoutDetails,
 }: {
   organizationId: string;
   fundraisers: FundraiserRow[];
@@ -841,6 +863,7 @@ export function FundraisersManager({
   hasOwnAccount: boolean;
   canWrite: boolean;
   canDelete: boolean;
+  savedPayoutDetails: PayoutDetailsDefaultValues | null;
 }) {
   return (
     <div className="space-y-4">
@@ -848,7 +871,7 @@ export function FundraisersManager({
 
       {canWrite && (
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <WalletBalanceButton fundraisers={fundraisers} />
+          <WalletBalanceButton fundraisers={fundraisers} savedPayoutDetails={savedPayoutDetails} />
           <AddFundraiserDialog organizationId={organizationId} branches={branches} members={members} />
         </div>
       )}

@@ -3,7 +3,22 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sharedServiceNetAmount } from "@/lib/finance/fees";
 import { PLANS, isPlanId } from "@/lib/plans/config";
-import type { PlatformEvent, PlatformEventLevel, SupportTicketStatus } from "@/types/database";
+import type { PlatformEvent, PlatformEventLevel, SupportTicketStatus, PayoutMethod } from "@/types/database";
+
+// Where to actually wire a pending request's money — a snapshot taken at
+// request time (see fundraiser_payout_requests/event_payout_requests),
+// so the admin can read it directly off the ledger card without opening
+// anything else.
+export interface PendingPayoutRequest {
+  id: string;
+  amount: number;
+  payoutMethod: PayoutMethod | null;
+  upiId: string | null;
+  bankAccountHolder: string | null;
+  bankAccountNumber: string | null;
+  bankIfsc: string | null;
+  bankName: string | null;
+}
 
 export interface SharedFundraiserLedgerEntry {
   fundraiserId: string;
@@ -13,7 +28,7 @@ export interface SharedFundraiserLedgerEntry {
   collected: number;
   paidOut: number;
   owed: number;
-  pendingRequest: { id: string; amount: number } | null;
+  pendingRequest: PendingPayoutRequest | null;
 }
 
 // Spans every organization on the platform, so this always uses the
@@ -30,7 +45,10 @@ export async function getSharedFundraiserLedger(): Promise<SharedFundraiserLedge
       .eq("payment_mode", "shared"),
     admin.from("donations").select("fundraiser_id, amount").eq("payment_mode", "shared").not("fundraiser_id", "is", null),
     admin.from("fundraiser_payouts").select("fundraiser_id, amount"),
-    admin.from("fundraiser_payout_requests").select("id, fundraiser_id, amount").eq("status", "pending"),
+    admin
+      .from("fundraiser_payout_requests")
+      .select("id, fundraiser_id, amount, payout_method, upi_id, bank_account_holder, bank_account_number, bank_ifsc, bank_name")
+      .eq("status", "pending"),
   ]);
 
   const collectedByFundraiser = new Map<string, number>();
@@ -44,9 +62,18 @@ export async function getSharedFundraiserLedger(): Promise<SharedFundraiserLedge
     paidOutByFundraiser.set(payout.fundraiser_id, (paidOutByFundraiser.get(payout.fundraiser_id) ?? 0) + payout.amount);
   }
 
-  const pendingByFundraiser = new Map<string, { id: string; amount: number }>();
+  const pendingByFundraiser = new Map<string, PendingPayoutRequest>();
   for (const request of pendingRequests ?? []) {
-    pendingByFundraiser.set(request.fundraiser_id, { id: request.id, amount: request.amount });
+    pendingByFundraiser.set(request.fundraiser_id, {
+      id: request.id,
+      amount: request.amount,
+      payoutMethod: request.payout_method,
+      upiId: request.upi_id,
+      bankAccountHolder: request.bank_account_holder,
+      bankAccountNumber: request.bank_account_number,
+      bankIfsc: request.bank_ifsc,
+      bankName: request.bank_name,
+    });
   }
 
   return (fundraisers ?? [])
@@ -91,7 +118,7 @@ export interface EventPayoutLedgerEntry {
   collected: number;
   paidOut: number;
   owed: number;
-  pendingRequest: { id: string; amount: number } | null;
+  pendingRequest: PendingPayoutRequest | null;
 }
 
 // Mirrors getSharedFundraiserLedger exactly, for platform-gateway paid
@@ -111,7 +138,10 @@ export async function getEventPayoutLedgerAdmin(): Promise<EventPayoutLedgerEntr
       .eq("payment_gateway", "platform"),
     admin.from("event_registration_payment_orders").select("event_id, amount").eq("status", "paid"),
     admin.from("event_payouts").select("event_id, amount"),
-    admin.from("event_payout_requests").select("id, event_id, amount").eq("status", "pending"),
+    admin
+      .from("event_payout_requests")
+      .select("id, event_id, amount, payout_method, upi_id, bank_account_holder, bank_account_number, bank_ifsc, bank_name")
+      .eq("status", "pending"),
   ]);
 
   const collectedByEvent = new Map<string, number>();
@@ -124,9 +154,18 @@ export async function getEventPayoutLedgerAdmin(): Promise<EventPayoutLedgerEntr
     paidOutByEvent.set(payout.event_id, (paidOutByEvent.get(payout.event_id) ?? 0) + payout.amount);
   }
 
-  const pendingByEvent = new Map<string, { id: string; amount: number }>();
+  const pendingByEvent = new Map<string, PendingPayoutRequest>();
   for (const request of pendingRequests ?? []) {
-    pendingByEvent.set(request.event_id, { id: request.id, amount: request.amount });
+    pendingByEvent.set(request.event_id, {
+      id: request.id,
+      amount: request.amount,
+      payoutMethod: request.payout_method,
+      upiId: request.upi_id,
+      bankAccountHolder: request.bank_account_holder,
+      bankAccountNumber: request.bank_account_number,
+      bankIfsc: request.bank_ifsc,
+      bankName: request.bank_name,
+    });
   }
 
   return (events ?? [])

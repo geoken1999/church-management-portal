@@ -19,7 +19,8 @@ import {
   type OfferingFieldErrors,
   type DonationFieldErrors,
 } from "@/lib/finance/validation";
-import type { DonationMethod, FundraiserPaymentMode, FundraiserStatus } from "@/types/database";
+import { validatePayoutDetails, type PayoutDetailsErrors } from "@/lib/organizations/payout-details";
+import type { DonationMethod, FundraiserPaymentMode, FundraiserStatus, PayoutMethod } from "@/types/database";
 
 const FUNDRAISERS_PATH = "/dashboard/fundraisers";
 const OFFERINGS_PATH = "/dashboard/offerings";
@@ -598,6 +599,7 @@ export async function updateFundraiserPaymentSettings(
 
 export interface PayoutRequestState {
   error?: string;
+  fieldErrors?: PayoutDetailsErrors;
   success?: boolean;
 }
 
@@ -623,6 +625,20 @@ export async function requestFundraiserPayout(
   if (!access.ok) {
     return { error: access.message };
   }
+
+  const payoutDetails = {
+    payoutMethod: String(formData.get("payoutMethod") ?? ""),
+    upiId: String(formData.get("upiId") ?? "").trim(),
+    bankAccountHolder: String(formData.get("bankAccountHolder") ?? "").trim(),
+    bankAccountNumber: String(formData.get("bankAccountNumber") ?? "").trim(),
+    bankIfsc: String(formData.get("bankIfsc") ?? "").trim(),
+    bankName: String(formData.get("bankName") ?? "").trim(),
+  };
+  const fieldErrors = validatePayoutDetails(payoutDetails);
+  if (Object.values(fieldErrors).some(Boolean)) {
+    return { fieldErrors };
+  }
+  const saveForFuture = formData.get("saveForFuture") === "on";
 
   const admin = createAdminClient();
 
@@ -650,15 +666,42 @@ export async function requestFundraiserPayout(
     return { error: "There's nothing owed to request a payout for." };
   }
 
+  const isUpi = payoutDetails.payoutMethod === "upi";
   const { error } = await admin.from("fundraiser_payout_requests").insert({
     organization_id: organizationId,
     fundraiser_id: fundraiserId,
     amount: owed,
     requested_by: user.id,
+    payout_method: payoutDetails.payoutMethod as PayoutMethod,
+    upi_id: isUpi ? payoutDetails.upiId : null,
+    bank_account_holder: isUpi ? null : payoutDetails.bankAccountHolder,
+    bank_account_number: isUpi ? null : payoutDetails.bankAccountNumber,
+    bank_ifsc: isUpi ? null : payoutDetails.bankIfsc,
+    bank_name: isUpi ? null : payoutDetails.bankName,
   });
 
   if (error) {
     return { error: "Couldn't submit that payout request. Please try again." };
+  }
+
+  // Saving the org's standing profile is admin-only (same bar as
+  // connecting a Razorpay account) — a non-admin with fundraisers "write"
+  // access can still request this specific payout, just not overwrite the
+  // org's saved default for next time.
+  if (saveForFuture && (await requireOrgAdmin(organizationId, user.id))) {
+    await admin.from("organization_payout_details").upsert(
+      {
+        organization_id: organizationId,
+        payout_method: payoutDetails.payoutMethod as PayoutMethod,
+        upi_id: isUpi ? payoutDetails.upiId : null,
+        bank_account_holder: isUpi ? null : payoutDetails.bankAccountHolder,
+        bank_account_number: isUpi ? null : payoutDetails.bankAccountNumber,
+        bank_ifsc: isUpi ? null : payoutDetails.bankIfsc,
+        bank_name: isUpi ? null : payoutDetails.bankName,
+        updated_by: user.id,
+      },
+      { onConflict: "organization_id" },
+    );
   }
 
   revalidatePath(FUNDRAISERS_PATH);

@@ -5,8 +5,10 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { getPlanUsage } from "@/lib/plans/dal";
 import { getOrganizationSubscription } from "@/lib/billing/dal";
 import { isRazorpayConfigured } from "@/lib/billing/env";
+import { getOrganizationPayoutDetails } from "@/lib/organizations/payout-details-dal";
 import { BillingManager } from "@/components/billing/BillingManager";
 import { AddonsManager } from "@/components/billing/AddonsManager";
+import { PayoutDetailsCard } from "@/components/billing/PayoutDetailsCard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export const metadata: Metadata = {
@@ -21,9 +23,10 @@ export default async function BillingPage() {
     redirect("/dashboard");
   }
 
-  const [planUsage, subscription] = await Promise.all([
+  const [planUsage, subscription, payoutDetails] = await Promise.all([
     getPlanUsage(membership.organization.id),
     getOrganizationSubscription(membership.organization.id),
+    getOrganizationPayoutDetails(membership.organization.id),
   ]);
 
   return (
@@ -71,6 +74,8 @@ export default async function BillingPage() {
           ai: planUsage.addonAiCredits,
         }}
       />
+
+      <PayoutDetailsCard organizationId={membership.organization.id} defaultValues={payoutDetails} />
     </div>
   );
 }

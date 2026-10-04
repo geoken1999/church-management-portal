@@ -3,6 +3,7 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { getLeaderMembers } from "@/lib/leaders/dal";
 import { getBranches } from "@/lib/branches/dal";
 import { getEvents, getEventPayoutLedger } from "@/lib/events/dal";
+import { getOrganizationPayoutDetails } from "@/lib/organizations/payout-details-dal";
 import { getKmeetMeetingsByEvent } from "@/lib/kmeet/dal";
 import { getPlanLimits } from "@/lib/plans/dal";
 import { getSiteUrl } from "@/lib/site-url";
@@ -24,13 +25,14 @@ export default async function EventsPage() {
 
   // Event managers are picked from Leaders, not the full members list —
   // see /dashboard/leaders.
-  const [assignableMembers, branches, events, kmeetByEvent, plan, payoutLedger] = await Promise.all([
+  const [assignableMembers, branches, events, kmeetByEvent, plan, payoutLedger, payoutDetails] = await Promise.all([
     getLeaderMembers(organizationId),
     getBranches(organizationId),
     getEvents(organizationId),
     getKmeetMeetingsByEvent(organizationId),
     getPlanLimits(organizationId),
     getEventPayoutLedger(organizationId),
+    getOrganizationPayoutDetails(organizationId),
   ]);
 
   const eventsWithPayouts = events.map((event) => ({
@@ -56,6 +58,7 @@ export default async function EventsPage() {
         siteUrl={getSiteUrl()}
         kmeetByEventId={Object.fromEntries(kmeetByEvent)}
         financeEnabled={plan.financeEnabled}
+        savedPayoutDetails={payoutDetails}
       />
     </div>
   );

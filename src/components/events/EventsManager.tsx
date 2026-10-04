@@ -8,6 +8,7 @@ import { getOccurrencesInRange, occurrenceLabel } from "@/lib/events/recurrence"
 import { RECURRENCE_FREQUENCIES, EVENT_STATUSES } from "@/lib/events/validation";
 import { EventRegistrationDialog } from "@/components/events/EventRegistrationDialog";
 import { EventPayoutDialog, type PayoutHistoryEntry } from "@/components/events/EventPayoutDialog";
+import type { PayoutDetailsDefaultValues } from "@/components/organizations/PayoutDetailsFields";
 import { AddToAttendanceButton } from "@/components/events/AddToAttendanceButton";
 import { MEETING_MODE_LABELS } from "@/lib/events/location";
 import type { Branch, Event, EventMeetingMode, EventRecurrenceFrequency, EventStatus, Member } from "@/types/database";
@@ -634,6 +635,7 @@ function EventCard({
   siteUrl,
   kmeetMeetings,
   financeEnabled,
+  savedPayoutDetails,
 }: {
   event: EventRow;
   members: MemberBasic[];
@@ -642,6 +644,7 @@ function EventCard({
   siteUrl: string;
   kmeetMeetings: KmeetBadge[];
   financeEnabled: boolean;
+  savedPayoutDetails: PayoutDetailsDefaultValues | null;
 }) {
   const start = new Date(event.start_at);
   const end = event.end_at ? new Date(event.end_at) : null;
@@ -677,6 +680,7 @@ function EventCard({
                 owed={event.owed}
                 pendingPayoutRequest={event.pendingPayoutRequest}
                 payoutHistory={event.payoutHistory}
+                savedPayoutDetails={savedPayoutDetails}
               />
             )}
           </div>
@@ -770,6 +774,7 @@ function EventsListTab({
   siteUrl,
   kmeetByEventId,
   financeEnabled,
+  savedPayoutDetails,
 }: {
   events: EventRow[];
   members: MemberBasic[];
@@ -778,6 +783,7 @@ function EventsListTab({
   siteUrl: string;
   kmeetByEventId: Record<string, KmeetBadge[]>;
   financeEnabled: boolean;
+  savedPayoutDetails: PayoutDetailsDefaultValues | null;
 }) {
   if (events.length === 0) {
     return (
@@ -801,6 +807,7 @@ function EventsListTab({
           siteUrl={siteUrl}
           kmeetMeetings={kmeetByEventId[event.id] ?? []}
           financeEnabled={financeEnabled}
+          savedPayoutDetails={savedPayoutDetails}
         />
       ))}
     </div>
@@ -936,6 +943,7 @@ export function EventsManager({
   siteUrl,
   kmeetByEventId,
   financeEnabled,
+  savedPayoutDetails,
 }: {
   organizationId: string;
   members: MemberBasic[];
@@ -945,6 +953,7 @@ export function EventsManager({
   siteUrl: string;
   kmeetByEventId: Record<string, KmeetBadge[]>;
   financeEnabled: boolean;
+  savedPayoutDetails: PayoutDetailsDefaultValues | null;
 }) {
   return (
     <div className="space-y-4">
@@ -969,6 +978,7 @@ export function EventsManager({
             siteUrl={siteUrl}
             kmeetByEventId={kmeetByEventId}
             financeEnabled={financeEnabled}
+            savedPayoutDetails={savedPayoutDetails}
           />
         </TabsPanel>
       </Tabs>

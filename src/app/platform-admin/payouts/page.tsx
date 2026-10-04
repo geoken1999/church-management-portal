@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
-import { getSharedFundraiserLedger, getEventPayoutLedgerAdmin } from "@/lib/platform-admin/dal";
+import { getSharedFundraiserLedger, getEventPayoutLedgerAdmin, type PendingPayoutRequest } from "@/lib/platform-admin/dal";
 import { SHARED_SERVICE_FEE_RATE, sharedServiceFee } from "@/lib/finance/fees";
 import { RecordPayoutDialog } from "@/components/platform-admin/RecordPayoutDialog";
 import { RecordEventPayoutDialog } from "@/components/platform-admin/RecordEventPayoutDialog";
@@ -15,6 +15,20 @@ export const metadata: Metadata = {
 
 function formatMoney(amount: number): string {
   return amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Where to actually wire this request's money — read straight off the
+// request's own snapshot (see PendingPayoutRequest), not the org's
+// current saved profile, which may have changed since the request went in.
+function formatPayoutDestination(request: PendingPayoutRequest): string | null {
+  if (request.payoutMethod === "bank_transfer") {
+    const last4 = (request.bankAccountNumber ?? "").slice(-4);
+    return `Bank transfer — ${request.bankAccountHolder} · ...${last4} · IFSC ${request.bankIfsc} · ${request.bankName}`;
+  }
+  if (request.payoutMethod === "upi") {
+    return `UPI — ${request.upiId}`;
+  }
+  return null;
 }
 
 export default async function PlatformAdminPayoutsPage() {
@@ -53,6 +67,11 @@ export default async function PlatformAdminPayoutsPage() {
                     </span>
                     <span>₹{formatMoney(entry.paidOut)} paid out</span>
                   </div>
+                  {entry.pendingRequest && formatPayoutDestination(entry.pendingRequest) && (
+                    <p className="mt-1 text-xs font-medium text-foreground">
+                      Send via {formatPayoutDestination(entry.pendingRequest)}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   {entry.pendingRequest && <Badge variant="destructive">Payout requested</Badge>}
@@ -99,6 +118,11 @@ export default async function PlatformAdminPayoutsPage() {
                     </span>
                     <span>₹{formatMoney(entry.paidOut)} paid out</span>
                   </div>
+                  {entry.pendingRequest && formatPayoutDestination(entry.pendingRequest) && (
+                    <p className="mt-1 text-xs font-medium text-foreground">
+                      Send via {formatPayoutDestination(entry.pendingRequest)}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   {entry.pendingRequest && <Badge variant="destructive">Payout requested</Badge>}

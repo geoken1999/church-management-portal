@@ -10,6 +10,17 @@ function metaStatusToLocal(status: string): WhatsAppTemplateStatus {
   return "pending_review";
 }
 
+// Meta's message_templates endpoint requires category as uppercase
+// ("MARKETING" | "UTILITY" | "AUTHENTICATION") — this app's own type/DB
+// enum stays lowercase (matches the rest of the UI/validation), so this
+// converts only at the API boundary. Sending it lowercase doesn't error
+// clearly — it comes back as a bare, generic "Invalid parameter" (code
+// 100) with nothing pointing at which field was wrong, which is exactly
+// what every template-create call failed with live until this fix.
+function toMetaCategory(category: WhatsAppTemplateCategory): string {
+  return category.toUpperCase();
+}
+
 async function graphFetch(path: string, init: RequestInit): Promise<Response> {
   const { accessToken, apiVersion } = getMetaWhatsAppEnv();
   return fetch(`https://graph.facebook.com/${apiVersion}/${path}`, {
@@ -42,7 +53,7 @@ export async function createMetaTemplate(params: {
 
   const res = await graphFetch(`${businessAccountId}/message_templates`, {
     method: "POST",
-    body: JSON.stringify({ name: params.name, language: params.language, category: params.category, components }),
+    body: JSON.stringify({ name: params.name, language: params.language, category: toMetaCategory(params.category), components }),
   });
 
   if (!res.ok) throw await parseGraphError(res);

@@ -23,6 +23,26 @@ describe("parseGraphError", () => {
     expect(err.isAuthError).toBe(false);
   });
 
+  // Pins a real misdiagnosis this app made live: a template-category
+  // casing bug (lowercase "utility" sent where Meta requires "UTILITY")
+  // produced exactly this code+type combination for hours — type
+  // "OAuthException" alone is NOT sufficient to mean "the token is bad";
+  // only code 190 is.
+  it("does not flag code 100 as an auth error even when type is OAuthException", async () => {
+    const res = jsonResponse({ error: { message: "Invalid parameter", type: "OAuthException", code: 100 } });
+    const err = await parseGraphError(res);
+    expect(err.isAuthError).toBe(false);
+  });
+
+  it("extracts error_user_msg when Meta provides one", async () => {
+    const res = jsonResponse({
+      error: { message: "Invalid parameter", type: "OAuthException", code: 100, error_subcode: 2388043, error_user_msg: "Category is not valid." },
+    });
+    const err = await parseGraphError(res);
+    expect(err.subcode).toBe(2388043);
+    expect(err.userMessage).toBe("Category is not valid.");
+  });
+
   it("falls back to the raw response body when it isn't JSON", async () => {
     const res = new Response("Bad Gateway", { status: 502 });
     const err = await parseGraphError(res);
@@ -43,6 +63,11 @@ describe("describeWhatsAppError", () => {
   it("passes through a non-auth GraphApiError's own message", () => {
     const err = new GraphApiError("Invalid parameter", 100, "GraphMethodException");
     expect(describeWhatsAppError(err).message).toBe("Invalid parameter");
+  });
+
+  it("prefers Meta's error_user_msg over the generic message when present", () => {
+    const err = new GraphApiError("Invalid parameter", 100, "OAuthException", 2388043, "Category is not valid.");
+    expect(describeWhatsAppError(err).message).toBe("Category is not valid.");
   });
 
   it("handles a plain Error", () => {

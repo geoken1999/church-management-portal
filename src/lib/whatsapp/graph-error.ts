@@ -3,36 +3,51 @@
 // matching whatsapp/validation.ts's same unguarded style. Keeping it
 // importable from anywhere also means it stays directly unit-testable.
 
-// Meta's OAuthException family (code 190 — covers "could not be
-// decrypted", "expired", "malformed", "invalidated", etc.) all mean the
-// same actionable thing regardless of which API call hit it: the
-// configured META_WHATSAPP_ACCESS_TOKEN itself is bad, not whatever the
-// caller was trying to do (send a message, create a template, ...).
-// Carrying code/type through a typed error — rather than just a message
-// string — lets every call site detect this one category centrally
-// instead of each guessing at Meta's wording.
+// Meta's error response can include `error_user_msg` — a short,
+// reviewer-facing explanation meant to be shown directly to an end user
+// (e.g. a specific reason a template body was rejected) — which is far
+// more actionable than the generic top-level `message` (often just
+// "Invalid parameter" with no indication of which parameter). Surfaced
+// separately so callers can prefer it when present.
 export class GraphApiError extends Error {
   code?: number;
   type?: string;
+  subcode?: number;
+  userMessage?: string;
 
-  constructor(message: string, code?: number, type?: string) {
+  constructor(message: string, code?: number, type?: string, subcode?: number, userMessage?: string) {
     super(message);
     this.name = "GraphApiError";
     this.code = code;
     this.type = type;
+    this.subcode = subcode;
+    this.userMessage = userMessage;
   }
 
+  // Code 190 specifically is Meta's "invalid OAuth 2.0 access token"
+  // family (covers "could not be decrypted", "expired", "malformed",
+  // "invalidated", etc.) — the actual token is bad, regardless of which
+  // API call hit it. Deliberately narrow: `type: "OAuthException"` alone
+  // is NOT enough to mean this — Meta also returns that type for plenty
+  // of other auth-adjacent failures that have nothing to do with the
+  // token's validity (e.g. code 100 "Invalid parameter" for a malformed
+  // request body, confirmed live: a template-category casing bug kept
+  // producing exactly that code+type for hours after the real token
+  // problem had already been fixed, and this check originally treated it
+  // as the same issue — a real misdiagnosis, not a hypothetical one).
   get isAuthError(): boolean {
-    return this.code === 190 || this.type === "OAuthException";
+    return this.code === 190;
   }
 }
 
 export async function parseGraphError(res: Response): Promise<GraphApiError> {
   const text = await res.text();
   try {
-    const parsed = JSON.parse(text) as { error?: { message?: string; code?: number; type?: string } };
+    const parsed = JSON.parse(text) as {
+      error?: { message?: string; code?: number; type?: string; error_subcode?: number; error_user_msg?: string };
+    };
     if (parsed.error?.message) {
-      return new GraphApiError(parsed.error.message, parsed.error.code, parsed.error.type);
+      return new GraphApiError(parsed.error.message, parsed.error.code, parsed.error.type, parsed.error.error_subcode, parsed.error.error_user_msg);
     }
   } catch {
     // Not JSON — fall through to the raw text below.
@@ -52,7 +67,8 @@ export function metaAuthErrorMessage(): string {
 // and, via `code`/`type` on the return value, the detail worth logging.
 export function describeWhatsAppError(err: unknown): { message: string; code?: number; type?: string } {
   if (err instanceof GraphApiError) {
-    return { message: err.isAuthError ? metaAuthErrorMessage() : err.message, code: err.code, type: err.type };
+    const message = err.isAuthError ? metaAuthErrorMessage() : err.userMessage || err.message;
+    return { message, code: err.code, type: err.type };
   }
   return { message: err instanceof Error ? err.message : "Something went wrong talking to WhatsApp." };
 }

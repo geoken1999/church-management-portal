@@ -45,6 +45,8 @@ import {
   Smartphone,
   ClipboardList,
   Workflow,
+  Cake,
+  ChevronDown,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { YouTubeIcon } from "@/components/icons/YouTubeIcon";
@@ -68,10 +70,76 @@ import type { AppLocale } from "@/lib/i18n/config";
 import type { Notification, Organization, TabAccess } from "@/types/database";
 import type { OrganizationMembership } from "@/lib/organizations/dal";
 import type { TabKey } from "@/lib/permissions/tabs";
+import type { Dictionary } from "@/lib/i18n/dictionary";
 
 const NO_TAB = null as TabKey | null;
 type PlanFeature = "finance" | "socialMedia" | null;
 const NO_PLAN_FEATURE = null as PlanFeature;
+
+// A leaf link — every nav item was this shape until Automation needed a
+// submenu (it's a general framework now, not just birthday wishes; more
+// automation types will each get their own leaf here over time).
+type NavIcon = typeof Workflow;
+type NavItemKey = keyof Dictionary["nav"]["items"];
+interface LeafNavItem {
+  href: string;
+  itemKey: NavItemKey;
+  icon: NavIcon;
+  tab: TabKey | null;
+  planFeature: PlanFeature;
+  managerOnly: boolean;
+}
+// A non-navigating parent that expands to reveal leaves — itemKey is
+// still used to look up its own label, it just has no href of its own.
+interface ParentNavItem {
+  itemKey: NavItemKey;
+  icon: NavIcon;
+  children: LeafNavItem[];
+}
+type NavItem = LeafNavItem | ParentNavItem;
+function isParentNavItem(item: NavItem): item is ParentNavItem {
+  return "children" in item;
+}
+
+function NavLeafLink({
+  item,
+  label,
+  pathname,
+  planFeatures,
+  nested,
+  onNavigate,
+}: {
+  item: LeafNavItem;
+  label: string;
+  pathname: string;
+  planFeatures: { finance: boolean; socialMedia: boolean };
+  nested: boolean;
+  onNavigate: () => void;
+}) {
+  const active = pathname === item.href;
+  // A plan-gated item still links through to its page — that's where the
+  // actual "upgrade to unlock" content lives — this just signals it's
+  // locked rather than hiding it outright.
+  const locked = Boolean(item.planFeature && !planFeatures[item.planFeature]);
+  return (
+    <Link
+      href={item.href}
+      data-tour-target={item.href}
+      onClick={onNavigate}
+      className={`flex items-center gap-2.5 rounded-lg py-2 text-sm font-medium transition-colors ${nested ? "pr-3 pl-2.5" : "px-3"} ${
+        active
+          ? "bg-accent text-accent-foreground"
+          : locked
+            ? "text-muted-foreground/60 hover:bg-accent hover:text-accent-foreground"
+            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+      }`}
+    >
+      <item.icon className="size-4" />
+      <span className="flex-1">{label}</span>
+      {locked && <Lock className="size-3" />}
+    </Link>
+  );
+}
 
 // `itemKey`/`groupKey` (not display text) — the actual label is looked up
 // from the current locale's dictionary at render time (t.nav.groups/items),
@@ -157,7 +225,16 @@ const NAV_GROUPS = [
     items: [
       { href: "/dashboard/ask-aura", itemKey: "askAura" as const, icon: Sparkles, tab: "aitools" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/ai-rules", itemKey: "aiRules" as const, icon: ShieldCheck, tab: "airules" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/automations", itemKey: "automations" as const, icon: Workflow, tab: "automations" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      {
+        itemKey: "automations" as const,
+        icon: Workflow,
+        // A submenu since Automation is a general framework, not just
+        // birthday wishes — more automation types land as sibling leaves
+        // here over time, same page/tab/feature underneath each.
+        children: [
+          { href: "/dashboard/automations", itemKey: "automateWishes" as const, icon: Cake, tab: "automations" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+        ],
+      },
     ],
   },
   {
@@ -242,7 +319,27 @@ function DashboardShellInner({
   const [spotlightOpen, setSpotlightOpen] = useState(false);
   const [, startTourTransition] = useTransition();
   const [navSearch, setNavSearch] = useState("");
+  // Explicit open/closed overrides for a submenu parent, keyed by its
+  // itemKey — absent means "derive from the current route" (see
+  // isParentOpen), so visiting a child's page auto-expands its parent
+  // without that needing its own state entry.
+  const [parentOverrides, setParentOverrides] = useState<Partial<Record<NavItemKey, boolean>>>({});
   const pathname = usePathname();
+
+  function isParentOpen(item: ParentNavItem): boolean {
+    const override = parentOverrides[item.itemKey];
+    if (override !== undefined) return override;
+    return item.children.some((child) => pathname === child.href || pathname.startsWith(`${child.href}/`));
+  }
+
+  function toggleParent(item: ParentNavItem) {
+    setParentOverrides((prev) => ({ ...prev, [item.itemKey]: !isParentOpen(item) }));
+  }
+
+  function isLeafVisible(item: LeafNavItem): boolean {
+    if (item.managerOnly && !canManage) return false;
+    return !item.tab || tabAccess[item.tab]?.read;
+  }
 
   function markTourDone() {
     startTourTransition(() => {
@@ -270,16 +367,25 @@ function DashboardShellInner({
 
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => {
-      if (item.managerOnly && !canManage) return false;
-      return !item.tab || tabAccess[item.tab]?.read;
-    }),
+    items: (group.items as NavItem[])
+      .map((item) => (isParentNavItem(item) ? { ...item, children: item.children.filter(isLeafVisible) } : item))
+      .filter((item) => (isParentNavItem(item) ? item.children.length > 0 : isLeafVisible(item))),
   })).filter((group) => group.items.length > 0);
 
   const query = navSearch.trim().toLowerCase();
   const filteredGroups = query
     ? visibleGroups
-        .map((group) => ({ ...group, items: group.items.filter((item) => t.nav.items[item.itemKey].toLowerCase().includes(query)) }))
+        .map((group) => ({
+          ...group,
+          items: group.items
+            .map((item) => {
+              if (!isParentNavItem(item)) return item;
+              const parentMatches = t.nav.items[item.itemKey].toLowerCase().includes(query);
+              const children = parentMatches ? item.children : item.children.filter((child) => t.nav.items[child.itemKey].toLowerCase().includes(query));
+              return { ...item, children };
+            })
+            .filter((item) => (isParentNavItem(item) ? item.children.length > 0 : t.nav.items[item.itemKey].toLowerCase().includes(query))),
+        }))
         .filter((group) => group.items.length > 0)
     : visibleGroups;
 
@@ -301,29 +407,48 @@ function DashboardShellInner({
         <div key={group.groupKey} className="flex flex-col gap-1">
           <p className="px-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{t.nav.groups[group.groupKey]}</p>
           {group.items.map((item) => {
-            const active = pathname === item.href;
-            // A plan-gated item still links through to its page — that's
-            // where the actual "upgrade to unlock" content lives — this
-            // just signals it's locked rather than hiding it outright.
-            const locked = Boolean(item.planFeature && !planFeatures[item.planFeature]);
+            if (isParentNavItem(item)) {
+              const open = isParentOpen(item);
+              return (
+                <div key={item.itemKey}>
+                  <button
+                    type="button"
+                    onClick={() => toggleParent(item)}
+                    aria-expanded={open}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <item.icon className="size-4" />
+                    <span className="flex-1">{t.nav.items[item.itemKey]}</span>
+                    <ChevronDown className={`size-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+                  </button>
+                  {open && (
+                    <div className="ml-4 flex flex-col gap-1 border-l border-border pl-2">
+                      {item.children.map((child) => (
+                        <NavLeafLink
+                          key={child.href}
+                          item={child}
+                          label={t.nav.items[child.itemKey]}
+                          pathname={pathname}
+                          planFeatures={planFeatures}
+                          nested
+                          onNavigate={() => setMobileOpen(false)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
             return (
-              <Link
+              <NavLeafLink
                 key={item.href}
-                href={item.href}
-                data-tour-target={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  active
-                    ? "bg-accent text-accent-foreground"
-                    : locked
-                      ? "text-muted-foreground/60 hover:bg-accent hover:text-accent-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                }`}
-              >
-                <item.icon className="size-4" />
-                <span className="flex-1">{t.nav.items[item.itemKey]}</span>
-                {locked && <Lock className="size-3" />}
-              </Link>
+                item={item}
+                label={t.nav.items[item.itemKey]}
+                pathname={pathname}
+                planFeatures={planFeatures}
+                nested={false}
+                onNavigate={() => setMobileOpen(false)}
+              />
             );
           })}
         </div>

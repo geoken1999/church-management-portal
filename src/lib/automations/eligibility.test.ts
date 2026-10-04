@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveTargetMonthDay, matchesMonthDay, todayInIST, dateKeyIST } from "./date-logic";
+import { resolveTargetMonthDay, matchesMonthDay, todayInTimezone, dateKeyInOrgTimezone } from "./date-logic";
 
 describe("resolveTargetMonthDay", () => {
   it("matches month/day ignoring year, with no offset", () => {
@@ -44,11 +44,18 @@ describe("matchesMonthDay", () => {
   });
 });
 
-describe("todayInIST / dateKeyIST", () => {
-  it("formats a known UTC instant as its Asia/Kolkata calendar date", () => {
+describe("todayInTimezone / dateKeyInOrgTimezone", () => {
+  it("defaults to Asia/Kolkata when no timezone is given", () => {
     // 2026-03-14T20:00:00Z is 2026-03-15 01:30 IST (UTC+5:30).
     const now = new Date("2026-03-14T20:00:00Z");
-    expect(todayInIST(now)).toEqual({ year: 2026, month: 3, day: 15 });
-    expect(dateKeyIST(now)).toBe("2026-03-15");
+    expect(todayInTimezone(now)).toEqual({ year: 2026, month: 3, day: 15 });
+    expect(dateKeyInOrgTimezone(now)).toBe("2026-03-15");
+  });
+
+  it("uses the given org timezone instead of the default", () => {
+    // 2026-03-14T20:00:00Z is still 2026-03-14 in America/Los_Angeles (UTC-7/8).
+    const now = new Date("2026-03-14T20:00:00Z");
+    expect(todayInTimezone(now, "America/Los_Angeles")).toEqual({ year: 2026, month: 3, day: 14 });
+    expect(dateKeyInOrgTimezone(now, "America/Los_Angeles")).toBe("2026-03-14");
   });
 });

@@ -1,27 +1,21 @@
 // Pure date-matching logic, deliberately free of "server-only" / DB
 // imports so it's directly unit-testable (vitest can't resolve the
 // "server-only" package, which eligibility.ts and send.ts otherwise need).
+// src/lib/organizations/timezone.ts is likewise "server-only"-free, so
+// importing it here doesn't break that.
 
-// "Today" is computed in Asia/Kolkata, matching
-// src/app/api/cron/event-reminders/route.ts's istParts() helper — no
-// per-org timezone column exists anywhere in this schema, so every
-// date-sensitive cron in this app already assumes IST. Wrong near
-// midnight for a non-India org; a pre-existing platform limitation, not
-// introduced here.
-export function todayInIST(now: Date = new Date()): { year: number; month: number; day: number } {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(now);
-  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? "0");
-  return { year: get("year"), month: get("month"), day: get("day") };
+import { partsInTimezone, dateKeyInTimezone, DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
+
+// "Today" in the given org's own timezone — previously hardcoded to
+// Asia/Kolkata for every org (every date-sensitive cron in this app used
+// to assume IST, since no per-org timezone column existed at all).
+export function todayInTimezone(now: Date = new Date(), timeZone: string = DEFAULT_TIMEZONE): { year: number; month: number; day: number } {
+  const { year, month, day } = partsInTimezone(now, timeZone);
+  return { year, month, day };
 }
 
-export function dateKeyIST(now: Date = new Date()): string {
-  const { year, month, day } = todayInIST(now);
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+export function dateKeyInOrgTimezone(now: Date = new Date(), timeZone: string = DEFAULT_TIMEZONE): string {
+  return dateKeyInTimezone(now, timeZone);
 }
 
 export function isLeapYear(year: number): boolean {
@@ -72,8 +66,8 @@ export function buildDirectIdempotencyKey(triggerId: string, memberId: string, o
   return `direct:${triggerId}:${memberId}:${occurrenceYear}`;
 }
 
-export function buildDigestIdempotencyKey(automationId: string, now: Date = new Date()): string {
-  return `digest:${automationId}:${dateKeyIST(now)}`;
+export function buildDigestIdempotencyKey(automationId: string, now: Date = new Date(), timeZone: string = DEFAULT_TIMEZONE): string {
+  return `digest:${automationId}:${dateKeyInOrgTimezone(now, timeZone)}`;
 }
 
 export function buildCelebrantList(celebrants: { name: string; occasionLabel: string }[], maxLines = 30): string {

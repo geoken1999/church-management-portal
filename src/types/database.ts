@@ -36,6 +36,11 @@ export type Organization = {
   // ISO 3166-1 alpha-2 (e.g. "US") — the default country code for
   // resolving members' phone numbers when their branch has none set.
   country: string | null;
+  // IANA zone id (e.g. "Asia/Kolkata") — what "7 PM" means when creating
+  // an event, and what every reminder/automation/email displays times
+  // in. Defaults to Asia/Kolkata (see migration 0108) for every org that
+  // hasn't explicitly changed it.
+  timezone: string;
   // Basic-tier access without a subscription until this passes — see
   // getPlanAccess in src/lib/plans/dal.ts.
   trial_ends_at: string | null;
@@ -3146,6 +3151,7 @@ export type Database = {
           status: EventStatus;
           organization_name: string;
           organization_logo_url: string | null;
+          organization_timezone: string;
         }[];
       };
       submit_event_registration: {

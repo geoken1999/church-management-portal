@@ -116,6 +116,7 @@ export default async function ProfilePage() {
                   memberCountRange={membership.organization.member_count_range}
                   branchCount={membership.organization.branch_count}
                   country={membership.organization.country}
+                  timezone={membership.organization.timezone}
                 />
               </>
             )}

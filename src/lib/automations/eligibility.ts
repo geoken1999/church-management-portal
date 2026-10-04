@@ -2,9 +2,10 @@ import "server-only";
 
 import type { createAdminClient } from "@/lib/supabase/admin";
 import type { AutomationTrigger, Member } from "@/types/database";
-import { todayInIST, resolveTargetMonthDay, matchesMonthDay } from "@/lib/automations/date-logic";
+import { todayInTimezone, resolveTargetMonthDay, matchesMonthDay } from "@/lib/automations/date-logic";
+import { DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 
-export { todayInIST, dateKeyIST, resolveTargetMonthDay } from "@/lib/automations/date-logic";
+export { todayInTimezone, dateKeyInOrgTimezone, resolveTargetMonthDay } from "@/lib/automations/date-logic";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -25,7 +26,8 @@ export async function findEligibleMembersForTrigger(
   trigger: AutomationTrigger,
   now: Date = new Date(),
 ): Promise<EligibleOccurrence[]> {
-  const today = todayInIST(now);
+  const { data: org } = await admin.from("organizations").select("timezone").eq("id", trigger.organization_id).maybeSingle();
+  const today = todayInTimezone(now, org?.timezone || DEFAULT_TIMEZONE);
   const { month, day, occurrenceYear, matchFeb29Day } = resolveTargetMonthDay(today, trigger.days_offset);
 
   if (trigger.date_field_source === "built_in") {

@@ -59,6 +59,7 @@ export default async function EventsPage() {
         kmeetByEventId={Object.fromEntries(kmeetByEvent)}
         financeEnabled={plan.financeEnabled}
         savedPayoutDetails={payoutDetails}
+        organizationTimezone={membership.organization.timezone}
       />
     </div>
   );

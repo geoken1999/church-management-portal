@@ -22,6 +22,7 @@ import {
 import { checkStorageQuota, checkTeamMemberQuota } from "@/lib/plans/dal";
 import { sendWelcomeEmail } from "@/lib/organizations/welcome-email";
 import { MOBILE_FEATURE_LIMIT, VALID_MOBILE_FEATURE_KEYS } from "@/lib/organizations/mobile-features";
+import { isKnownTimezone, DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 import type { MemberCountRange, OrganizationRole, TabPermissions } from "@/types/database";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -186,13 +187,18 @@ export interface UpdateOrganizationDetailsState {
   fieldErrors?: {
     memberCountRange?: string;
     branchCount?: string;
+    timezone?: string;
   };
   success?: boolean;
 }
 
 // Deliberately excludes the org name — that stays fixed once created (it's
 // tied to the workspace slug). Congregation size and location count are
-// just informational metadata, safe to let admins update freely.
+// just informational metadata, safe to let admins update freely. Timezone
+// is a step up from "informational" — it's what "7 PM" means when
+// creating an event and what every reminder/automation/email displays
+// times in (see src/lib/organizations/timezone.ts) — but still safe for
+// any admin to change, same bar as country.
 export async function updateOrganizationDetails(
   _prevState: UpdateOrganizationDetailsState,
   formData: FormData,
@@ -203,6 +209,7 @@ export async function updateOrganizationDetails(
   const memberCountRange = String(formData.get("memberCountRange") ?? "");
   const branchCountRaw = String(formData.get("branchCount") ?? "");
   const country = String(formData.get("country") ?? "").trim();
+  const timezone = String(formData.get("timezone") ?? DEFAULT_TIMEZONE);
 
   const fieldErrors: UpdateOrganizationDetailsState["fieldErrors"] = {};
   if (!isMemberCountRange(memberCountRange)) {
@@ -210,6 +217,9 @@ export async function updateOrganizationDetails(
   }
   const branchCountError = validateBranchCount(branchCountRaw);
   if (branchCountError) fieldErrors.branchCount = branchCountError;
+  if (!isKnownTimezone(timezone)) {
+    fieldErrors.timezone = "Choose a valid timezone.";
+  }
 
   if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
@@ -218,12 +228,14 @@ export async function updateOrganizationDetails(
   const supabase = await createClient();
   const { error } = await supabase
     .from("organizations")
-    // Runtime-validated above via isMemberCountRange/validateBranchCount.
-    // country is optional — a blank string here just clears it.
+    // Runtime-validated above via isMemberCountRange/validateBranchCount/
+    // isKnownTimezone. country is optional — a blank string here just
+    // clears it.
     .update({
       member_count_range: memberCountRange as MemberCountRange,
       branch_count: Number(branchCountRaw),
       country: country || null,
+      timezone,
     })
     .eq("id", organizationId);
 

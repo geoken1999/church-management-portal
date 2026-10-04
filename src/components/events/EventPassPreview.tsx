@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Eye, QrCode } from "lucide-react";
+import { formatInTimezone } from "@/lib/organizations/timezone";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,6 +30,7 @@ export function EventPassPreview({
   passColor,
   passMessage,
   backgroundUrl,
+  organizationTimezone,
 }: {
   eventTitle: string;
   startAt: string;
@@ -36,9 +38,10 @@ export function EventPassPreview({
   passColor: string;
   passMessage: string;
   backgroundUrl: string | null;
+  organizationTimezone: string;
 }) {
   const [open, setOpen] = useState(false);
-  const startLabel = new Date(startAt).toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" });
+  const startLabel = formatInTimezone(startAt, organizationTimezone, { dateStyle: "full", timeStyle: "short" });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

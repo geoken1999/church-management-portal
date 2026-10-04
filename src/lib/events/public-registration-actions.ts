@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendRegistrationPassEmail } from "@/lib/events/registration-pass";
 import { eventVenueLabel, eventJoinLink } from "@/lib/events/location";
+import { DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 import type { EventMeetingMode, EventPaymentGateway, EventPaymentTiming } from "@/types/database";
 
 export interface PublicEventRegistrationState {
@@ -37,7 +38,7 @@ export async function sendPassEmailForRegistration(registrationId: string): Prom
   const { data: registration } = await admin
     .from("event_registrations")
     .select(
-      "email, answers, event_id, confirmation_code, events(title, description, start_at, end_at, meeting_mode, meeting_link, venue, map_link, contact_name, contact_phone, organization_id, registration_pass_color, registration_pass_message, registration_pass_background_url, branches(name), organizations(name))",
+      "email, answers, event_id, confirmation_code, events(title, description, start_at, end_at, meeting_mode, meeting_link, venue, map_link, contact_name, contact_phone, organization_id, registration_pass_color, registration_pass_message, registration_pass_background_url, branches(name), organizations(name, timezone))",
     )
     .eq("id", registrationId)
     .maybeSingle();
@@ -60,7 +61,7 @@ export async function sendPassEmailForRegistration(registrationId: string): Prom
     registration_pass_message: string | null;
     registration_pass_background_url: string | null;
     branches: { name: string } | null;
-    organizations: { name: string } | null;
+    organizations: { name: string; timezone: string } | null;
   } | null;
 
   if (!event) return;
@@ -74,6 +75,7 @@ export async function sendPassEmailForRegistration(registrationId: string): Prom
   await sendRegistrationPassEmail({
     organizationId: event.organization_id,
     organizationName: event.organizations?.name ?? "Your church",
+    organizationTimezone: event.organizations?.timezone || DEFAULT_TIMEZONE,
     to: registration.email,
     recipientName,
     eventId: registration.event_id,

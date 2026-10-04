@@ -7,7 +7,14 @@ import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { validateEvent, type EventFieldErrors } from "@/lib/events/validation";
 import { sendPushToUsers } from "@/lib/push/client";
+import { zonedTimeToUtc, DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 import type { EventMeetingMode, EventRecurrenceFrequency, EventStatus } from "@/types/database";
+
+async function organizationTimezoneFor(organizationId: string): Promise<string> {
+  const admin = createAdminClient();
+  const { data } = await admin.from("organizations").select("timezone").eq("id", organizationId).maybeSingle();
+  return data?.timezone ?? DEFAULT_TIMEZONE;
+}
 
 // updateEvent/deleteEvent forms only carry the event id, not
 // organizationId — looked up from the record itself before a permission
@@ -26,11 +33,12 @@ export interface EventFormState {
   success?: boolean;
 }
 
-// startAt/endAt arrive already converted to full ISO strings by the client
-// (see EventsManager) — the datetime-local input has no timezone of its
-// own, so the browser resolves it against the viewer's local time before
-// this ever reaches the server. Parsing it here instead would resolve it
-// against the server's timezone, silently shifting every event.
+// startAt/endAt arrive as raw "YYYY-MM-DDTHH:mm" strings straight from the
+// datetime-local inputs (see EventsManager) — no conversion happens in the
+// browser. They're resolved against the organization's own saved timezone
+// below (zonedTimeToUtc), not the browser's or server's: "7 PM" always
+// means 7 PM at the church, regardless of which timezone the person
+// typing it happens to be physically in.
 function readEventFields(formData: FormData) {
   return {
     title: String(formData.get("title") ?? ""),
@@ -68,6 +76,8 @@ export async function createEvent(_prevState: EventFormState, formData: FormData
     return { fieldErrors };
   }
 
+  const organizationTimezone = await organizationTimezoneFor(organizationId);
+
   const supabase = await createClient();
   const { data: created, error } = await supabase
     .from("events")
@@ -75,8 +85,8 @@ export async function createEvent(_prevState: EventFormState, formData: FormData
       organization_id: organizationId,
       title: fields.title.trim(),
       description: fields.description || null,
-      start_at: new Date(fields.startAt).toISOString(),
-      end_at: fields.endAt ? new Date(fields.endAt).toISOString() : null,
+      start_at: zonedTimeToUtc(fields.startAt, organizationTimezone).toISOString(),
+      end_at: fields.endAt ? zonedTimeToUtc(fields.endAt, organizationTimezone).toISOString() : null,
       is_recurring: fields.isRecurring,
       recurrence_frequency: fields.isRecurring ? (fields.recurrenceFrequency as EventRecurrenceFrequency) : null,
       recurrence_end_date: fields.isRecurring && fields.recurrenceEndDate ? fields.recurrenceEndDate : null,
@@ -143,14 +153,16 @@ export async function updateEvent(_prevState: EventFormState, formData: FormData
     return { fieldErrors };
   }
 
+  const organizationTimezone = await organizationTimezoneFor(organizationId);
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("events")
     .update({
       title: fields.title.trim(),
       description: fields.description || null,
-      start_at: new Date(fields.startAt).toISOString(),
-      end_at: fields.endAt ? new Date(fields.endAt).toISOString() : null,
+      start_at: zonedTimeToUtc(fields.startAt, organizationTimezone).toISOString(),
+      end_at: fields.endAt ? zonedTimeToUtc(fields.endAt, organizationTimezone).toISOString() : null,
       is_recurring: fields.isRecurring,
       recurrence_frequency: fields.isRecurring ? (fields.recurrenceFrequency as EventRecurrenceFrequency) : null,
       recurrence_end_date: fields.isRecurring && fields.recurrenceEndDate ? fields.recurrenceEndDate : null,

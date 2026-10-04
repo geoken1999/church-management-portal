@@ -7,6 +7,7 @@ import { describeWhatsAppError } from "@/lib/whatsapp/graph-error";
 import { resolveBodyParams } from "@/lib/automations/template-mapping";
 import { buildCelebrantList, buildDirectIdempotencyKey, buildDigestIdempotencyKey } from "@/lib/automations/date-logic";
 import { logPlatformEvent } from "@/lib/platform-events/log";
+import { DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 import type { AutomationDestination, AutomationTemplate, AutomationTrigger, Member } from "@/types/database";
 
 export { buildCelebrantList, buildDirectIdempotencyKey, buildDigestIdempotencyKey } from "@/lib/automations/date-logic";
@@ -88,7 +89,8 @@ export async function sendStaffDigest(
   const template = await fetchApprovedTemplate(admin, destination.digest_template_id);
   if (!template) return;
 
-  const key = buildDigestIdempotencyKey(automationId, now);
+  const { data: org } = await admin.from("organizations").select("timezone").eq("id", organizationId).maybeSingle();
+  const key = buildDigestIdempotencyKey(automationId, now, org?.timezone || DEFAULT_TIMEZONE);
   const { data: reserved } = await admin
     .from("automation_executions")
     .insert({

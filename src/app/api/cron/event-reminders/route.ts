@@ -3,24 +3,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getOccurrencesInRange } from "@/lib/events/recurrence";
 import { sendRegistrationReminderEmail } from "@/lib/events/registration-reminder";
 import { eventVenueLabel, eventJoinLink } from "@/lib/events/location";
+import { partsInTimezone, DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 
 const LOOKAHEAD_MS = 25 * 60 * 60 * 1000;
 const OFFSET_MS: Record<string, number> = { "24h": 24 * 60 * 60 * 1000, "1h": 60 * 60 * 1000 };
 
-function istParts(date: Date): { dateKey: string; hour: number } {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    hour12: false,
-  }).formatToParts(date);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  // hour12: false renders midnight as "24" in some ICU builds — treat that
-  // as 0 so the >= 8am check below works whichever way it comes out.
-  const hour = Number(get("hour")) % 24;
-  return { dateKey: `${get("year")}-${get("month")}-${get("day")}`, hour };
+function dateKeyAndHour(date: Date, timeZone: string): { dateKey: string; hour: number } {
+  const { year, month, day, hour } = partsInTimezone(date, timeZone);
+  return { dateKey: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`, hour };
 }
 
 // Vercel Cron hits this once a day at 2:45 UTC = 8:15 AM IST (see
@@ -49,8 +39,10 @@ function istParts(date: Date): { dateKey: string; hour: number } {
 // weekly recurrence — the common case — that has no effect (fixed-day
 // increments land on the same calendar day everywhere); a monthly/yearly
 // event could in principle see its reminder window shift by a few hours
-// near midnight IST. Accepted as a pre-existing limitation of that shared
-// function rather than something to fix here.
+// near its org's midnight. Accepted as a pre-existing limitation of that
+// shared function rather than something to fix here. The "morning of"
+// due-check below, however, now uses each event's own org timezone
+// (previously hardcoded to Asia/Kolkata for every org).
 export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
@@ -66,7 +58,7 @@ export async function GET(request: Request) {
   const { data: events } = await admin
     .from("events")
     .select(
-      "id, title, start_at, end_at, is_recurring, recurrence_frequency, recurrence_end_date, reminder_offset, meeting_mode, meeting_link, venue, map_link, organization_id, registration_pass_color, branches(name), organizations(name)",
+      "id, title, start_at, end_at, is_recurring, recurrence_frequency, recurrence_end_date, reminder_offset, meeting_mode, meeting_link, venue, map_link, organization_id, registration_pass_color, branches(name), organizations(name, timezone)",
     )
     .not("reminder_offset", "is", null)
     .eq("registration_enabled", true)
@@ -77,6 +69,7 @@ export async function GET(request: Request) {
 
   for (const event of events ?? []) {
     eventsChecked += 1;
+    const organizationTimezone = (event.organizations as { timezone: string } | null)?.timezone || DEFAULT_TIMEZONE;
 
     const occurrences = getOccurrencesInRange([event], now, new Date(now.getTime() + LOOKAHEAD_MS));
     if (occurrences.length === 0) continue;
@@ -85,8 +78,8 @@ export async function GET(request: Request) {
 
     let due = false;
     if (event.reminder_offset === "morning_of") {
-      const { dateKey, hour } = istParts(now);
-      const occurrenceDateKey = istParts(occurrenceDate).dateKey;
+      const { dateKey, hour } = dateKeyAndHour(now, organizationTimezone);
+      const occurrenceDateKey = dateKeyAndHour(occurrenceDate, organizationTimezone).dateKey;
       due = dateKey === occurrenceDateKey && hour >= 8;
     } else {
       const offsetMs = OFFSET_MS[event.reminder_offset ?? ""] ?? 0;
@@ -120,6 +113,7 @@ export async function GET(request: Request) {
       await sendRegistrationReminderEmail({
         organizationId: event.organization_id,
         organizationName,
+        organizationTimezone,
         to: registration.email,
         recipientName,
         eventTitle: event.title,

@@ -11,6 +11,7 @@ import { EventPayoutDialog, type PayoutHistoryEntry } from "@/components/events/
 import type { PayoutDetailsDefaultValues } from "@/components/organizations/PayoutDetailsFields";
 import { AddToAttendanceButton } from "@/components/events/AddToAttendanceButton";
 import { MEETING_MODE_LABELS } from "@/lib/events/location";
+import { partsInTimezone, formatInTimezone } from "@/lib/organizations/timezone";
 import type { Branch, Event, EventMeetingMode, EventRecurrenceFrequency, EventStatus, Member } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,28 +76,19 @@ function locationName(branch: BranchBasic | null): string {
   return branch ? branch.name : OPEN_MEETING_LABEL;
 }
 
-function toDateTimeLocalValue(iso: string | null): string {
+// Renders in the ORG's timezone, not the editor's own browser-local —
+// otherwise re-opening an event for editing from a different timezone
+// than whoever created it would show (and on save, re-save) a shifted
+// time. The datetime-local input itself has no timezone of its own; the
+// server resolves this same string against the org's saved timezone
+// (see createEvent/updateEvent in src/lib/events/actions.ts) rather than
+// the browser converting it before submit — that's what used to cause
+// "7 PM" to mean something different depending on who typed it.
+function toDateTimeLocalValue(iso: string | null, organizationTimezone: string): string {
   if (!iso) return "";
-  const d = new Date(iso);
+  const { year, month, day, hour, minute } = partsInTimezone(new Date(iso), organizationTimezone);
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-// The datetime-local inputs have no timezone of their own — resolve them
-// against the viewer's local time here in the browser (where "local" is
-// unambiguous) before handing off to the server action. Parsing the same
-// string server-side would resolve it against the server's timezone
-// instead, silently shifting every event by the difference between the two.
-function normalizeDateTimeFields(formData: FormData) {
-  for (const key of ["startAt", "endAt"]) {
-    const raw = formData.get(key);
-    if (typeof raw === "string" && raw) {
-      const parsed = new Date(raw);
-      if (!Number.isNaN(parsed.getTime())) {
-        formData.set(key, parsed.toISOString());
-      }
-    }
-  }
+  return `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -260,6 +252,7 @@ function EventFields({
   onStatusChange,
   event,
   errors,
+  organizationTimezone,
 }: {
   members: MemberBasic[];
   branches: BranchBasic[];
@@ -277,6 +270,7 @@ function EventFields({
   onStatusChange: (value: string) => void;
   event?: EventRow;
   errors?: EventFormState["fieldErrors"];
+  organizationTimezone: string;
 }) {
   return (
     <div className="space-y-4">
@@ -320,7 +314,7 @@ function EventFields({
             id="startAt"
             name="startAt"
             type="datetime-local"
-            defaultValue={toDateTimeLocalValue(event?.start_at ?? null)}
+            defaultValue={toDateTimeLocalValue(event?.start_at ?? null, organizationTimezone)}
             required
             aria-invalid={Boolean(errors?.startAt)}
             aria-describedby={errors?.startAt ? "startAt-error" : undefined}
@@ -333,13 +327,16 @@ function EventFields({
             id="endAt"
             name="endAt"
             type="datetime-local"
-            defaultValue={toDateTimeLocalValue(event?.end_at ?? null)}
+            defaultValue={toDateTimeLocalValue(event?.end_at ?? null, organizationTimezone)}
             aria-invalid={Boolean(errors?.endAt)}
             aria-describedby={errors?.endAt ? "endAt-error" : undefined}
           />
           <FieldError id="endAt-error" message={errors?.endAt} />
         </div>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Times are in your organization&apos;s timezone ({organizationTimezone}) — change this from the Profile page.
+      </p>
 
       <div className="space-y-2">
         <Label htmlFor="occurrence">Occurrence</Label>
@@ -438,10 +435,12 @@ function AddEventDialog({
   organizationId,
   members,
   branches,
+  organizationTimezone,
 }: {
   organizationId: string;
   members: MemberBasic[];
   branches: BranchBasic[];
+  organizationTimezone: string;
 }) {
   const [state, setState] = useState<EventFormState>(initialEventState);
   const [pending, startTransition] = useTransition();
@@ -454,7 +453,6 @@ function AddEventDialog({
   const [status, setStatus] = useState("active");
 
   function handleSubmit(formData: FormData) {
-    normalizeDateTimeFields(formData);
     startTransition(async () => {
       const result = await createEvent(state, formData);
       setState(result);
@@ -514,6 +512,7 @@ function AddEventDialog({
             status={status}
             onStatusChange={setStatus}
             errors={state.fieldErrors}
+            organizationTimezone={organizationTimezone}
           />
           <DialogFooter>
             <Button type="submit" disabled={pending}>
@@ -530,10 +529,12 @@ function EditEventDialog({
   event,
   members,
   branches,
+  organizationTimezone,
 }: {
   event: EventRow;
   members: MemberBasic[];
   branches: BranchBasic[];
+  organizationTimezone: string;
 }) {
   const [state, setState] = useState<EventFormState>(initialEventState);
   const [pending, startTransition] = useTransition();
@@ -550,7 +551,6 @@ function EditEventDialog({
   const [status, setStatus] = useState<string>(event.status ?? "active");
 
   function handleSubmit(formData: FormData) {
-    normalizeDateTimeFields(formData);
     startTransition(async () => {
       const result = await updateEvent(state, formData);
       setState(result);
@@ -611,6 +611,7 @@ function EditEventDialog({
             onStatusChange={setStatus}
             event={event}
             errors={state.fieldErrors}
+            organizationTimezone={organizationTimezone}
           />
           <DialogFooter>
             <Button type="submit" disabled={pending}>
@@ -636,6 +637,7 @@ function EventCard({
   kmeetMeetings,
   financeEnabled,
   savedPayoutDetails,
+  organizationTimezone,
 }: {
   event: EventRow;
   members: MemberBasic[];
@@ -645,13 +647,19 @@ function EventCard({
   kmeetMeetings: KmeetBadge[];
   financeEnabled: boolean;
   savedPayoutDetails: PayoutDetailsDefaultValues | null;
+  organizationTimezone: string;
 }) {
-  const start = new Date(event.start_at);
-  const end = event.end_at ? new Date(event.end_at) : null;
-  const sameDay = end ? end.toDateString() === start.toDateString() : false;
-  const dateLabel = start.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-  const endLabel = end
-    ? end.toLocaleString(undefined, { dateStyle: sameDay ? undefined : "medium", timeStyle: "short" })
+  // Formatted in the org's own timezone, not the current viewer's browser
+  // — so a staff member in India and an NRI admin see the same intended
+  // wall-clock time for the same event.
+  const startParts = partsInTimezone(new Date(event.start_at), organizationTimezone);
+  const endParts = event.end_at ? partsInTimezone(new Date(event.end_at), organizationTimezone) : null;
+  const sameDay = endParts
+    ? endParts.year === startParts.year && endParts.month === startParts.month && endParts.day === startParts.day
+    : false;
+  const dateLabel = formatInTimezone(event.start_at, organizationTimezone, { dateStyle: "medium", timeStyle: "short" });
+  const endLabel = event.end_at
+    ? formatInTimezone(event.end_at, organizationTimezone, { dateStyle: sameDay ? undefined : "medium", timeStyle: "short" })
     : null;
 
   return (
@@ -749,8 +757,8 @@ function EventCard({
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <AddToAttendanceButton eventId={event.id} />
-          <EventRegistrationDialog event={event} siteUrl={siteUrl} financeEnabled={financeEnabled} />
-          <EditEventDialog event={event} members={members} branches={branches} />
+          <EventRegistrationDialog event={event} siteUrl={siteUrl} financeEnabled={financeEnabled} organizationTimezone={organizationTimezone} />
+          <EditEventDialog event={event} members={members} branches={branches} organizationTimezone={organizationTimezone} />
           {canManage && (
             <form action={deleteEvent}>
               <input type="hidden" name="id" value={event.id} />
@@ -775,6 +783,7 @@ function EventsListTab({
   kmeetByEventId,
   financeEnabled,
   savedPayoutDetails,
+  organizationTimezone,
 }: {
   events: EventRow[];
   members: MemberBasic[];
@@ -784,6 +793,7 @@ function EventsListTab({
   kmeetByEventId: Record<string, KmeetBadge[]>;
   financeEnabled: boolean;
   savedPayoutDetails: PayoutDetailsDefaultValues | null;
+  organizationTimezone: string;
 }) {
   if (events.length === 0) {
     return (
@@ -808,6 +818,7 @@ function EventsListTab({
           kmeetMeetings={kmeetByEventId[event.id] ?? []}
           financeEnabled={financeEnabled}
           savedPayoutDetails={savedPayoutDetails}
+          organizationTimezone={organizationTimezone}
         />
       ))}
     </div>
@@ -944,6 +955,7 @@ export function EventsManager({
   kmeetByEventId,
   financeEnabled,
   savedPayoutDetails,
+  organizationTimezone,
 }: {
   organizationId: string;
   members: MemberBasic[];
@@ -954,11 +966,12 @@ export function EventsManager({
   kmeetByEventId: Record<string, KmeetBadge[]>;
   financeEnabled: boolean;
   savedPayoutDetails: PayoutDetailsDefaultValues | null;
+  organizationTimezone: string;
 }) {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <AddEventDialog organizationId={organizationId} members={members} branches={branches} />
+        <AddEventDialog organizationId={organizationId} members={members} branches={branches} organizationTimezone={organizationTimezone} />
       </div>
       <Tabs defaultValue="calendar">
         <TabsList>
@@ -979,6 +992,7 @@ export function EventsManager({
             kmeetByEventId={kmeetByEventId}
             financeEnabled={financeEnabled}
             savedPayoutDetails={savedPayoutDetails}
+            organizationTimezone={organizationTimezone}
           />
         </TabsPanel>
       </Tabs>

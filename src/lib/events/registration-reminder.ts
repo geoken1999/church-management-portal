@@ -3,6 +3,7 @@ import "server-only";
 import { sendBulkEmail } from "@/lib/email/client";
 import { isEmailConfigured } from "@/lib/email/env";
 import { logPlatformEvent } from "@/lib/platform-events/log";
+import { formatInTimezone } from "@/lib/organizations/timezone";
 
 // Every value here can come from an organizer's own free text (title, org
 // name) or a registrant's own input (name) — escaped before going into the
@@ -21,6 +22,7 @@ function escapeHtml(value: string): string {
 export async function sendRegistrationReminderEmail(input: {
   organizationId: string;
   organizationName: string;
+  organizationTimezone: string;
   to: string;
   recipientName: string | null;
   eventTitle: string;
@@ -33,7 +35,7 @@ export async function sendRegistrationReminderEmail(input: {
 }): Promise<void> {
   if (!isEmailConfigured()) return;
 
-  const startLabel = new Date(input.startAt).toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" });
+  const startLabel = formatInTimezone(input.startAt, input.organizationTimezone, { dateStyle: "full", timeStyle: "short" });
   const passColor = input.passColor || "#7c3aed";
   const greeting = input.recipientName ? `Hi ${escapeHtml(input.recipientName)},` : "Hi,";
 

@@ -6,6 +6,7 @@ import { PublicBrandHeader, PublicPoweredByFooter } from "@/components/PublicBra
 import { PublicLocaleProvider } from "@/lib/i18n/PublicLocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useLocale } from "@/lib/i18n/LocaleContext";
+import { formatInTimezone } from "@/lib/organizations/timezone";
 import type { EventRegistrationField, EventStatus } from "@/types/database";
 
 export interface PublicEventRegistrationData {
@@ -20,6 +21,7 @@ export interface PublicEventRegistrationData {
   status: EventStatus;
   organization_name: string;
   organization_logo_url: string | null;
+  organization_timezone: string;
 }
 
 function NotFoundCard() {
@@ -73,12 +75,15 @@ function EventContent({ token, data }: { token: string; data: PublicEventRegistr
           <CardHeader>
             <CardTitle className="font-heading text-2xl">{data.title}</CardTitle>
             <CardDescription className="text-base">
-              {/* A fixed locale, not undefined — this renders inside a Client
-                  Component that's server-rendered then hydrated, so an
-                  environment-dependent locale here would format differently
-                  on the server (Node's locale) vs. the browser and trip a
-                  hydration mismatch. */}
-              {new Date(data.start_at).toLocaleString("en-US", { dateStyle: "full", timeStyle: "short" })}
+              {/* A fixed locale AND a fixed (the org's own) timeZone, not
+                  undefined for either — this renders inside a Client
+                  Component that's server-rendered then hydrated, so letting
+                  either default to "whatever the runtime's own timezone/
+                  locale happens to be" would format differently on the
+                  server (Node) vs. the browser and trip a hydration
+                  mismatch, on top of just showing the wrong time to anyone
+                  not in the org's own timezone. */}
+              {formatInTimezone(data.start_at, data.organization_timezone, { dateStyle: "full", timeStyle: "short" }, "en-US")}
             </CardDescription>
             {data.description && <p className="text-sm text-muted-foreground">{data.description}</p>}
           </CardHeader>

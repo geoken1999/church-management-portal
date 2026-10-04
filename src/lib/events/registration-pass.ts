@@ -5,6 +5,7 @@ import { sendBulkEmail } from "@/lib/email/client";
 import { isEmailConfigured } from "@/lib/email/env";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { buildEventRegistrationIcs } from "@/lib/events/registration-ics";
+import { formatInTimezone } from "@/lib/organizations/timezone";
 
 // Every value below can come from an organizer's own free text (title,
 // pass message, org name) or a registrant's own input (name) — escaped
@@ -41,6 +42,7 @@ function darken(hex: string, amount: number): string {
 export async function sendRegistrationPassEmail(input: {
   organizationId: string;
   organizationName: string;
+  organizationTimezone: string;
   to: string;
   recipientName: string | null;
   eventId: string;
@@ -82,7 +84,9 @@ export async function sendRegistrationPassEmail(input: {
     location: [input.venueLabel, input.joinLink].filter(Boolean).join(" · ") || null,
   });
 
-  const startLabel = new Date(input.startAt).toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" });
+  // In the org's own timezone, not the Node runtime's (UTC on Vercel) —
+  // otherwise the email shows a different clock time than the dashboard.
+  const startLabel = formatInTimezone(input.startAt, input.organizationTimezone, { dateStyle: "full", timeStyle: "short" });
   const passColor = input.passColor || "#7c3aed";
   const registeredTo = input.recipientName ? escapeHtml(input.recipientName) : escapeHtml(input.to);
 

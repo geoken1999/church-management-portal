@@ -175,7 +175,17 @@ function FieldEditorRow({
   );
 }
 
-function SettingsTab({ event, siteUrl, financeEnabled }: { event: Event; siteUrl: string; financeEnabled: boolean }) {
+function SettingsTab({
+  event,
+  siteUrl,
+  financeEnabled,
+  organizationTimezone,
+}: {
+  event: Event;
+  siteUrl: string;
+  financeEnabled: boolean;
+  organizationTimezone: string;
+}) {
   const router = useRouter();
   const [fields, setFields] = useState<EventRegistrationField[]>(event.registration_fields);
   const [capacity, setCapacity] = useState(event.registration_capacity ? String(event.registration_capacity) : "");
@@ -298,6 +308,7 @@ function SettingsTab({ event, siteUrl, financeEnabled }: { event: Event; siteUrl
             passColor={passColor}
             passMessage={passMessage}
             backgroundUrl={backgroundPreviewUrl}
+            organizationTimezone={organizationTimezone}
           />
         </CardContent>
       </Card>
@@ -687,10 +698,12 @@ export function EventRegistrationDialog({
   event,
   siteUrl,
   financeEnabled,
+  organizationTimezone,
 }: {
   event: Event;
   siteUrl: string;
   financeEnabled: boolean;
+  organizationTimezone: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -740,7 +753,7 @@ export function EventRegistrationDialog({
               <TabsTab value="registrants">Registrants</TabsTab>
             </TabsList>
             <TabsPanel value="settings">
-              <SettingsTab event={event} siteUrl={siteUrl} financeEnabled={financeEnabled} />
+              <SettingsTab event={event} siteUrl={siteUrl} financeEnabled={financeEnabled} organizationTimezone={organizationTimezone} />
             </TabsPanel>
             <TabsPanel value="registrants">
               <RegistrantsTab eventId={event.id} fields={event.registration_fields} paymentRequired={event.payment_required} />

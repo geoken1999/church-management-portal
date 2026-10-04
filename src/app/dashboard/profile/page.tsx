@@ -161,9 +161,29 @@ export default async function ProfilePage() {
             <ul className="space-y-1 text-xs text-muted-foreground">
               <li>{plan.emailsPerMonth.toLocaleString()} shared emails/month</li>
               <li>{plan.smsPerMonth.toLocaleString()} SMS/month</li>
-              <li>Up to {plan.maxAdditionalTeamMembers} added team members</li>
-              <li>{plan.financeEnabled ? "Finance module included" : "Finance module not included"}</li>
+              <li>
+                Up to {plan.maxAdditionalAdmins} added admin{plan.maxAdditionalAdmins === 1 ? "" : "s"} and{" "}
+                {plan.maxAdditionalStaff} added staff
+              </li>
+              <li>{plan.branchLimit === null ? "Unlimited branches" : `Up to ${plan.branchLimit} branches`}</li>
+              <li>{plan.memberLimit === null ? "Unlimited members" : `Up to ${plan.memberLimit.toLocaleString()} members`}</li>
+              <li>{plan.formsLimit === null ? "Unlimited forms" : `Up to ${plan.formsLimit} forms`}</li>
+              <li>
+                {plan.financeEnabled
+                  ? plan.ownPaymentGatewayEnabled
+                    ? "Finance module included (own or shared gateway)"
+                    : "Finance module included (shared gateway only)"
+                  : "Finance module not included"}
+              </li>
               <li>{plan.socialMediaEnabled ? "Social Media included" : "Social Media not included"}</li>
+              <li>
+                {plan.automationLimit === 0
+                  ? "Automation not included"
+                  : plan.automationLimit === null
+                    ? "Unlimited automations"
+                    : `Up to ${plan.automationLimit} automations`}
+              </li>
+              <li>Support SLA: {plan.supportSlaDays} working day{plan.supportSlaDays === 1 ? "" : "s"}</li>
             </ul>
             {canManage && (
               <Link href="/dashboard/billing" className="text-xs font-medium text-primary hover:underline">

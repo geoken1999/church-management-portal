@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
+import { getPlanLimits, checkAutomationQuota } from "@/lib/plans/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { AutomationDateFieldSource, AutomationBuiltInField, AutomationDestinationKind, AutomationStatus } from "@/types/database";
 
@@ -21,6 +22,12 @@ export async function createAutomationAction(name: string): Promise<AutomationAc
 
   const access = await checkTabAccess(organizationId, "automations", "write");
   if (!access.ok) return { error: access.message };
+
+  const plan = await getPlanLimits(organizationId);
+  if (plan.automationLimit === 0) return { error: `Automation isn't included on the ${plan.name} plan.` };
+
+  const quotaError = await checkAutomationQuota(organizationId);
+  if (quotaError) return { error: quotaError };
 
   if (!name.trim()) return { error: "Give this automation a name." };
 
@@ -44,6 +51,9 @@ export async function updateAutomationAction(params: { id: string; name?: string
 
   const access = await checkTabAccess(organizationId, "automations", "write");
   if (!access.ok) return { error: access.message };
+
+  const plan = await getPlanLimits(organizationId);
+  if (plan.automationLimit === 0) return { error: `Automation isn't included on the ${plan.name} plan.` };
 
   const admin = createAdminClient();
   const update: { name?: string; status?: AutomationStatus; updated_by: string } = { updated_by: user.id };

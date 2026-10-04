@@ -3,7 +3,9 @@ import Link from "next/link";
 import { ArrowLeft, Plus, History, Settings } from "lucide-react";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getAutomations } from "@/lib/automations/dal";
+import { getPlanLimits } from "@/lib/plans/dal";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
+import { UpgradeRequired } from "@/components/dashboard/UpgradeRequired";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -22,6 +24,11 @@ function statusBadge(status: AutomationStatus) {
 export default async function AutomationsPage() {
   const membership = await requireOrganization();
   const organizationId = membership.organization.id;
+
+  const plan = await getPlanLimits(organizationId);
+  if (plan.automationLimit === 0) {
+    return <UpgradeRequired label="Automation" plan={plan.name} />;
+  }
 
   if (!membership.tabAccess.automations.read) {
     return <AccessRestricted label="Automations" />;

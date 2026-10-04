@@ -40,7 +40,7 @@ export default async function TeamPage() {
           <CardDescription>
             {members.length} {members.length === 1 ? "member" : "members"}
             {canManage &&
-              ` — ${planUsage.additionalTeamMembers}/${planUsage.plan.maxAdditionalTeamMembers} added seats used on the ${planUsage.plan.name} plan`}
+              ` — ${planUsage.additionalAdmins}/${planUsage.plan.maxAdditionalAdmins} admin and ${planUsage.additionalStaff}/${planUsage.plan.maxAdditionalStaff} staff seats used on the ${planUsage.plan.name} plan`}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -57,7 +57,8 @@ export default async function TeamPage() {
               <div className="flex justify-end">
                 <CreateLoginForm
                   organizationId={membership.organization.id}
-                  seatsRemaining={planUsage.additionalTeamMembersRemaining}
+                  adminSeatsRemaining={planUsage.additionalAdminsRemaining}
+                  staffSeatsRemaining={planUsage.additionalStaffRemaining}
                 />
               </div>
             </>

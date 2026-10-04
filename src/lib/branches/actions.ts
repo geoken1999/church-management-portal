@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
+import { checkBranchQuota } from "@/lib/plans/dal";
 import { validateBranch, type BranchFieldErrors } from "@/lib/branches/validation";
 
 export interface BranchFormState {
@@ -44,6 +45,11 @@ export async function createBranch(
   const access = await checkTabAccess(organizationId, "branches", "write");
   if (!access.ok) {
     return { error: access.message };
+  }
+
+  const quotaError = await checkBranchQuota(organizationId);
+  if (quotaError) {
+    return { error: quotaError };
   }
 
   const { name, location, memberCount, managedBy, country } = readBranchFields(formData);

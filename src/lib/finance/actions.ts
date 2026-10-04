@@ -68,6 +68,17 @@ export async function requireFinancePlan(organizationId: string): Promise<string
   return null;
 }
 
+// Narrower than requireFinancePlan: an org can have Finance (Fundraisers/
+// Donations/Offerings exist) without being allowed to connect its own
+// Razorpay account — restricted to the platform's shared gateway only.
+export async function requireOwnPaymentGateway(organizationId: string): Promise<string | null> {
+  const { plan } = await getPlanUsage(organizationId);
+  if (!plan.ownPaymentGatewayEnabled) {
+    return `Connecting your own Razorpay account isn't included on the ${plan.name} plan — use the shared gateway, or upgrade your plan.`;
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Fund raisers
 // ---------------------------------------------------------------------------
@@ -485,6 +496,10 @@ export async function saveOwnRazorpayAccount(
 
   if (await requireFinancePlan(organizationId)) {
     return { error: "Finance isn't included on your current plan." };
+  }
+  const ownGatewayError = await requireOwnPaymentGateway(organizationId);
+  if (ownGatewayError) {
+    return { error: ownGatewayError };
   }
   if (!(await requireOrgAdmin(organizationId, user.id))) {
     return { error: "Only an owner or admin can connect a Razorpay account." };

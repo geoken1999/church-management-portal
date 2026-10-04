@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
+import { checkFormsQuota } from "@/lib/plans/dal";
 import { validateFormMeta, sanitizeFormFields } from "@/lib/forms/validation";
 import { slugify, randomSlugSuffix } from "@/lib/organizations/validation";
 import type { FormStatus } from "@/types/database";
@@ -44,6 +45,11 @@ export async function createForm(_prevState: FormMetaState, formData: FormData):
   const access = await checkTabAccess(organizationId, "forms", "write");
   if (!access.ok) {
     return { error: access.message };
+  }
+
+  const quotaError = await checkFormsQuota(organizationId);
+  if (quotaError) {
+    return { error: quotaError };
   }
 
   const title = String(formData.get("title") ?? "");

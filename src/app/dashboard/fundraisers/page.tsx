@@ -54,6 +54,7 @@ export default async function FundraisersPage() {
         members={leaderMembers}
         siteUrl={getSiteUrl()}
         isOrgAdmin={isOrgAdmin}
+        ownPaymentGatewayEnabled={plan.ownPaymentGatewayEnabled}
         hasOwnAccount={Boolean(razorpayAccount)}
         canWrite={membership.tabAccess.fundraisers.write}
         canDelete={membership.tabAccess.fundraisers.delete}

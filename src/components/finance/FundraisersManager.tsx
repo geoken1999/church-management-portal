@@ -849,6 +849,7 @@ export function FundraisersManager({
   members,
   siteUrl,
   isOrgAdmin,
+  ownPaymentGatewayEnabled,
   hasOwnAccount,
   canWrite,
   canDelete,
@@ -860,6 +861,7 @@ export function FundraisersManager({
   members: MemberBasic[];
   siteUrl: string;
   isOrgAdmin: boolean;
+  ownPaymentGatewayEnabled: boolean;
   hasOwnAccount: boolean;
   canWrite: boolean;
   canDelete: boolean;
@@ -867,7 +869,7 @@ export function FundraisersManager({
 }) {
   return (
     <div className="space-y-4">
-      {isOrgAdmin && <RazorpayAccountCard organizationId={organizationId} connected={hasOwnAccount} />}
+      {isOrgAdmin && ownPaymentGatewayEnabled && <RazorpayAccountCard organizationId={organizationId} connected={hasOwnAccount} />}
 
       {canWrite && (
         <div className="flex flex-wrap items-center justify-end gap-2">

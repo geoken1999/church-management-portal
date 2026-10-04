@@ -346,7 +346,7 @@ export async function createMemberLogin(
     return { error: "You don't have permission to create logins for this organization." };
   }
 
-  const quotaError = await checkTeamMemberQuota(organizationId);
+  const quotaError = await checkTeamMemberQuota(organizationId, role);
   if (quotaError) {
     return { error: quotaError };
   }

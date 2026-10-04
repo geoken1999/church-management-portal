@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Cake, ChevronRight } from "lucide-react";
 import { requireOrganization } from "@/lib/organizations/dal";
+import { getPlanLimits } from "@/lib/plans/dal";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
+import { UpgradeRequired } from "@/components/dashboard/UpgradeRequired";
 import { Card, CardContent } from "@/components/ui/card";
 
 export const metadata: Metadata = {
@@ -24,6 +26,11 @@ const AUTOMATION_FEATURES = [
 
 export default async function AutomationPage() {
   const membership = await requireOrganization();
+
+  const plan = await getPlanLimits(membership.organization.id);
+  if (plan.automationLimit === 0) {
+    return <UpgradeRequired label="Automation" plan={plan.name} />;
+  }
 
   if (!membership.tabAccess.automations.read) {
     return <AccessRestricted label="Automation" />;

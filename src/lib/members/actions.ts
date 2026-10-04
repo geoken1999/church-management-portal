@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
+import { checkMemberQuota } from "@/lib/plans/dal";
 import {
   validateFieldDefinition,
   validateMemberBasics,
@@ -226,6 +227,11 @@ export async function createMember(
   const access = await checkTabAccess(organizationId, "members", "write");
   if (!access.ok) {
     return { error: access.message };
+  }
+
+  const quotaError = await checkMemberQuota(organizationId);
+  if (quotaError) {
+    return { error: quotaError };
   }
 
   const firstName = String(formData.get("firstName") ?? "");

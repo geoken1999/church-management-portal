@@ -109,8 +109,10 @@ export interface PlanUsage {
   aiRepliesRemaining: number;
   storageBytesUsed: number;
   storageBytesRemaining: number;
-  additionalTeamMembers: number;
-  additionalTeamMembersRemaining: number;
+  additionalAdmins: number;
+  additionalAdminsRemaining: number;
+  additionalStaff: number;
+  additionalStaffRemaining: number;
   // Add-on pack balances included in the *Remaining totals above — broken
   // out separately too since the Billing page displays them on their own.
   addonSmsCredits: number;
@@ -146,7 +148,8 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
     { data: whatsappCampaigns },
     { count: aiRepliesCount },
     { data: storageBytes },
-    { count: teamMemberCount },
+    { count: adminCount },
+    { count: staffCount },
   ] = await Promise.all([
     // Only 'shared' sends count against the quota — an org's own SMTP
     // (provider: 'smtp') doesn't touch our Resend account at all.
@@ -180,12 +183,11 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
       .eq("organization_id", organizationId)
       .gte("created_at", startOfMonth.toISOString()),
     supabase.rpc("get_organization_storage_bytes", { target_org_id: organizationId }),
-    // The owner's own seat doesn't count against the added-members limit.
-    supabase
-      .from("organization_members")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .neq("role", "owner"),
+    // The owner's own seat doesn't count against either added-members
+    // limit — split by role so an exhausted admin cap can't be worked
+    // around by adding more staff instead (see checkTeamMemberQuota).
+    supabase.from("organization_members").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).eq("role", "admin"),
+    supabase.from("organization_members").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).eq("role", "member"),
   ]);
 
   const emailsSentThisMonth = (emailCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0);
@@ -193,7 +195,8 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
   const whatsappSentThisMonth = (whatsappCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0);
   const aiRepliesSentThisMonth = aiRepliesCount ?? 0;
   const storageBytesUsed = storageBytes ?? 0;
-  const additionalTeamMembers = teamMemberCount ?? 0;
+  const additionalAdmins = adminCount ?? 0;
+  const additionalStaff = staffCount ?? 0;
 
   const trialDaysRemaining =
     accessStatus === "trial" && trialEndsAt
@@ -215,8 +218,10 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
     aiRepliesRemaining: Math.max(0, plan.aiRepliesPerMonth - aiRepliesSentThisMonth) + addonAiCredits,
     storageBytesUsed,
     storageBytesRemaining: Math.max(0, plan.storageBytes + addonStorageBytes - storageBytesUsed),
-    additionalTeamMembers,
-    additionalTeamMembersRemaining: Math.max(0, plan.maxAdditionalTeamMembers - additionalTeamMembers),
+    additionalAdmins,
+    additionalAdminsRemaining: Math.max(0, plan.maxAdditionalAdmins - additionalAdmins),
+    additionalStaff,
+    additionalStaffRemaining: Math.max(0, plan.maxAdditionalStaff - additionalStaff),
     addonSmsCredits,
     addonEmailCredits,
     addonWhatsappCredits,
@@ -311,11 +316,20 @@ export async function checkWhatsAppQuota(organizationId: string, recipientCount:
   return null;
 }
 
-// Called right before a new login is issued (see createMemberLogin).
-export async function checkTeamMemberQuota(organizationId: string): Promise<string | null> {
+// Called right before a new login is issued (see createMemberLogin) — the
+// role being added decides which independent cap applies. An org can't
+// cover an exhausted admin seat by adding more staff instead, or vice
+// versa.
+export async function checkTeamMemberQuota(organizationId: string, role: "admin" | "member"): Promise<string | null> {
   const usage = await getPlanUsage(organizationId);
-  if (usage.additionalTeamMembersRemaining <= 0) {
-    return `Your ${usage.plan.name} plan allows up to ${usage.plan.maxAdditionalTeamMembers} added team members. Remove someone or upgrade your plan to add more.`;
+  if (role === "admin") {
+    if (usage.additionalAdminsRemaining <= 0) {
+      return `Your ${usage.plan.name} plan allows up to ${usage.plan.maxAdditionalAdmins} added admin${usage.plan.maxAdditionalAdmins === 1 ? "" : "s"}. Remove someone or upgrade your plan to add more.`;
+    }
+    return null;
+  }
+  if (usage.additionalStaffRemaining <= 0) {
+    return `Your ${usage.plan.name} plan allows up to ${usage.plan.maxAdditionalStaff} added staff member${usage.plan.maxAdditionalStaff === 1 ? "" : "s"}. Remove someone or upgrade your plan to add more.`;
   }
   return null;
 }
@@ -334,6 +348,61 @@ export async function checkStorageQuota(organizationId: string, additionalBytes:
       metadata: { additionalBytes, remaining: usage.storageBytesRemaining },
     });
     return `This would exceed your ${usage.plan.name} plan's ${limitLabel} storage limit (${formatBytes(usage.storageBytesRemaining)} remaining). Buy a storage add-on pack, upgrade your plan, or free up space.`;
+  }
+  return null;
+}
+
+// Called right before adding a branch/congregation member/form — same
+// shape as checkStorageQuota, just a plain row count against a plan
+// field instead of a derived usage number. null on the plan field means
+// unlimited, so these always pass for Premium/Pro.
+export async function checkBranchQuota(organizationId: string): Promise<string | null> {
+  const { plan } = await getPlanUsage(organizationId);
+  if (plan.branchLimit === null) return null;
+  const supabase = await createClient();
+  const { count } = await supabase.from("branches").select("id", { count: "exact", head: true }).eq("organization_id", organizationId);
+  if ((count ?? 0) >= plan.branchLimit) {
+    return `Your ${plan.name} plan allows up to ${plan.branchLimit} branches. Remove one or upgrade your plan to add more.`;
+  }
+  return null;
+}
+
+export async function checkMemberQuota(organizationId: string): Promise<string | null> {
+  const { plan } = await getPlanUsage(organizationId);
+  if (plan.memberLimit === null) return null;
+  const supabase = await createClient();
+  const { count } = await supabase.from("members").select("id", { count: "exact", head: true }).eq("organization_id", organizationId);
+  if ((count ?? 0) >= plan.memberLimit) {
+    return `Your ${plan.name} plan allows up to ${plan.memberLimit.toLocaleString()} members. Upgrade your plan to add more.`;
+  }
+  return null;
+}
+
+export async function checkFormsQuota(organizationId: string): Promise<string | null> {
+  const { plan } = await getPlanUsage(organizationId);
+  if (plan.formsLimit === null) return null;
+  const supabase = await createClient();
+  const { count } = await supabase.from("forms").select("id", { count: "exact", head: true }).eq("organization_id", organizationId);
+  if ((count ?? 0) >= plan.formsLimit) {
+    return `Your ${plan.name} plan allows up to ${plan.formsLimit} forms. Remove one or upgrade your plan to add more.`;
+  }
+  return null;
+}
+
+// Called right before creating a new automation — counts every automation
+// the org has regardless of status (active/paused/draft), same simple
+// total-row-count shape as branches/members/forms above, rather than only
+// counting "active" ones. 0 means the whole module is off (checked
+// separately, before this is ever called, via plan.automationLimit === 0
+// in createAutomationAction) — this function only guards the ceiling once
+// the module is already available.
+export async function checkAutomationQuota(organizationId: string): Promise<string | null> {
+  const { plan } = await getPlanUsage(organizationId);
+  if (plan.automationLimit === null) return null;
+  const supabase = await createClient();
+  const { count } = await supabase.from("automations").select("id", { count: "exact", head: true }).eq("organization_id", organizationId);
+  if ((count ?? 0) >= plan.automationLimit) {
+    return `Your ${plan.name} plan allows up to ${plan.automationLimit} automations. Remove one or upgrade your plan to add more.`;
   }
   return null;
 }

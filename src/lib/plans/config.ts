@@ -6,7 +6,7 @@
 export type PlanId = "basic" | "premium" | "pro";
 export type BillingInterval = "monthly" | "annual";
 
-export const ANNUAL_DISCOUNT = 0.1;
+export const ANNUAL_DISCOUNT = 0.17;
 
 export interface PlanLimits {
   id: PlanId;
@@ -16,7 +16,10 @@ export interface PlanLimits {
   // paise amounts. The label fields are derived from these, not
   // independently set. Annual is monthly × 12, discounted by
   // ANNUAL_DISCOUNT — not an independently chosen price, so the two
-  // intervals can never drift out of the advertised "10% off" ratio.
+  // intervals can never drift out of the advertised "17% off" ratio,
+  // except where a tier passes an explicit annualRupeesOverride (see
+  // tier() below) to hit an exact advertised price the rounded formula
+  // doesn't quite land on.
   priceInRupees: number;
   priceLabel: string;
   priceInRupeesAnnual: number;
@@ -27,10 +30,8 @@ export interface PlanLimits {
   // Each automatic AI-generated Instagram DM reply costs 1 credit.
   aiRepliesPerMonth: number;
   // How many separate Instagram/YouTube accounts an org can have connected
-  // at once (each counted independently — an org on Pro can have 2
-  // Instagram accounts AND 2 YouTube channels, not 2 total). Deliberately
-  // not ascending with price: Premium (cheaper than Pro) gets more
-  // accounts than Pro, per explicit product decision.
+  // at once (each counted independently — an org on Pro can have 5
+  // Instagram accounts AND 5 YouTube channels, not 5 total).
   instagramAccountLimit: number;
   youtubeAccountLimit: number;
   storageBytes: number;
@@ -41,15 +42,37 @@ export interface PlanLimits {
   // already-running call's countdown.
   kmeetMaxDurationMinutes: number | null;
   // How many logins an owner/admin can add beyond themselves (invited
-  // members, and now manually-issued logins) — the org creator's own seat
-  // doesn't count against this.
-  maxAdditionalTeamMembers: number;
+  // members, and now manually-issued logins), split by role — the org
+  // creator's own seat doesn't count against either. Checked
+  // independently (see checkTeamMemberQuota in plans/dal.ts): an org
+  // can't cover an exhausted admin seat by adding more staff instead.
+  maxAdditionalAdmins: number;
+  maxAdditionalStaff: number;
+  // null means unlimited. Branches/members count every row the org has
+  // today regardless of when it was created; forms counts every form
+  // regardless of status (draft/published).
+  branchLimit: number | null;
+  memberLimit: number | null;
+  formsLimit: number | null;
   // Whole-module gates, independent of the tab permissions matrix — that
   // matrix decides who *within* an org can use a tab; this decides whether
   // the org has the tab at all, and applies even to the owner.
   financeEnabled: boolean;
+  // Narrower than financeEnabled: whether an org can connect its OWN
+  // Razorpay account for Fundraisers (saveOwnRazorpayAccount). An org can
+  // have financeEnabled=true (Fundraisers/Donations/Offerings exist) but
+  // ownPaymentGatewayEnabled=false (can only use the platform's shared
+  // gateway, never its own account) — that's exactly Starter's rule.
+  ownPaymentGatewayEnabled: boolean;
   socialMediaEnabled: boolean;
   customSmtpEnabled: boolean;
+  // How many automations an org can have set up at once — 0 means the
+  // module is off entirely (Starter), null means unlimited. Checked by
+  // checkAutomationQuota (plans/dal.ts) before a new one is created.
+  automationLimit: number | null;
+  // Not enforced against a clock anywhere — purely the number shown on
+  // the pricing page and Billing/Profile's plan summary.
+  supportSlaDays: number;
 }
 
 function annualRupeesFor(monthlyRupees: number): number {
@@ -60,8 +83,14 @@ function rupeeLabel(rupees: number, interval: BillingInterval): string {
   return `₹${rupees.toLocaleString("en-IN")}/${interval === "monthly" ? "month" : "year"}`;
 }
 
-function tier(id: PlanId, name: string, monthlyRupees: number, rest: Omit<PlanLimits, "id" | "name" | "priceInRupees" | "priceLabel" | "priceInRupeesAnnual" | "priceLabelAnnual">): PlanLimits {
-  const annualRupees = annualRupeesFor(monthlyRupees);
+function tier(
+  id: PlanId,
+  name: string,
+  monthlyRupees: number,
+  rest: Omit<PlanLimits, "id" | "name" | "priceInRupees" | "priceLabel" | "priceInRupeesAnnual" | "priceLabelAnnual">,
+  annualRupeesOverride?: number,
+): PlanLimits {
+  const annualRupees = annualRupeesOverride ?? annualRupeesFor(monthlyRupees);
   return {
     id,
     name,
@@ -74,53 +103,109 @@ function tier(id: PlanId, name: string, monthlyRupees: number, rest: Omit<PlanLi
 }
 
 export const PLANS: Record<PlanId, PlanLimits> = {
-  basic: tier("basic", "Basic", 499, {
-    emailsPerMonth: 500,
-    // Far smaller than the email quota — SMS costs real money per message
-    // sent through the shared Twilio account, unlike email's Resend free
-    // tier headroom.
-    smsPerMonth: 50,
-    // Same shared-Twilio cost reasoning as SMS — only counts 'shared'-mode
-    // WhatsApp sends; an org's own connected number is unmetered.
-    whatsappPerMonth: 50,
-    aiRepliesPerMonth: 100,
-    instagramAccountLimit: 1,
-    youtubeAccountLimit: 1,
-    storageBytes: 1 * 1024 * 1024 * 1024, // 1GB
-    kmeetMaxDurationMinutes: 20,
-    maxAdditionalTeamMembers: 3,
-    financeEnabled: false,
-    socialMediaEnabled: false,
-    customSmtpEnabled: false,
-  }),
-  premium: tier("premium", "Premium", 2499, {
-    emailsPerMonth: 3000,
-    smsPerMonth: 300,
-    whatsappPerMonth: 300,
-    aiRepliesPerMonth: 500,
-    instagramAccountLimit: 3,
-    youtubeAccountLimit: 3,
-    storageBytes: 10 * 1024 * 1024 * 1024, // 10GB
-    kmeetMaxDurationMinutes: 40,
-    maxAdditionalTeamMembers: 10,
-    financeEnabled: true,
-    socialMediaEnabled: false,
-    customSmtpEnabled: true,
-  }),
-  pro: tier("pro", "Pro", 6999, {
-    emailsPerMonth: 10000,
-    smsPerMonth: 1000,
-    whatsappPerMonth: 1000,
-    aiRepliesPerMonth: 1000,
-    instagramAccountLimit: 2,
-    youtubeAccountLimit: 2,
-    storageBytes: 50 * 1024 * 1024 * 1024, // 50GB
-    kmeetMaxDurationMinutes: null,
-    maxAdditionalTeamMembers: 50,
-    financeEnabled: true,
-    socialMediaEnabled: true,
-    customSmtpEnabled: true,
-  }),
+  // Internal id stays "basic" (the DB column, Razorpay env var keys, and
+  // the cancellation/floor-plan fallback logic across billing all use
+  // this literal) — only the display name, price, and limits changed
+  // when this tier became "Starter".
+  basic: tier(
+    "basic",
+    "Starter",
+    1499,
+    {
+      emailsPerMonth: 500,
+      // Far smaller than the email quota — SMS costs real money per message
+      // sent through the shared Twilio account, unlike email's Resend free
+      // tier headroom.
+      smsPerMonth: 50,
+      // Same shared-Twilio cost reasoning as SMS — only counts 'shared'-mode
+      // WhatsApp sends; an org's own connected number is unmetered.
+      whatsappPerMonth: 50,
+      aiRepliesPerMonth: 100,
+      instagramAccountLimit: 1,
+      youtubeAccountLimit: 1,
+      storageBytes: 10 * 1024 * 1024 * 1024, // 10GB
+      // K-Audio auto-derives to 30 min via kaudioMaxDurationMinutes()
+      // below (always kmeet + 10).
+      kmeetMaxDurationMinutes: 20,
+      maxAdditionalAdmins: 1,
+      maxAdditionalStaff: 2,
+      branchLimit: 3,
+      memberLimit: 350,
+      formsLimit: 20,
+      financeEnabled: true,
+      ownPaymentGatewayEnabled: false,
+      socialMediaEnabled: true,
+      customSmtpEnabled: false,
+      automationLimit: 0,
+      supportSlaDays: 5,
+    },
+    // Explicit override: the 17%-off formula rounds to ₹14,990, one
+    // rupee short of the advertised ₹14,999 — a contractual price, not
+    // advisory rounding, so it's hardcoded here rather than derived.
+    14999,
+  ),
+  // Internal id stays "premium" — only the display name/price/limits
+  // changed when this tier became "Growth".
+  premium: tier(
+    "premium",
+    "Growth",
+    2999,
+    {
+      emailsPerMonth: 5000,
+      smsPerMonth: 500,
+      whatsappPerMonth: 500,
+      aiRepliesPerMonth: 500,
+      instagramAccountLimit: 3,
+      youtubeAccountLimit: 3,
+      storageBytes: 50 * 1024 * 1024 * 1024, // 50GB
+      // K-Audio auto-derives to 50 min via kaudioMaxDurationMinutes().
+      kmeetMaxDurationMinutes: 40,
+      maxAdditionalAdmins: 3,
+      maxAdditionalStaff: 5,
+      branchLimit: 10,
+      memberLimit: 2000,
+      formsLimit: 100,
+      financeEnabled: true,
+      ownPaymentGatewayEnabled: true,
+      socialMediaEnabled: true,
+      customSmtpEnabled: true,
+      automationLimit: 5,
+      supportSlaDays: 3,
+    },
+    // Explicit override: the 17%-off formula rounds to ₹29,870, short of
+    // the advertised ₹29,999.
+    29999,
+  ),
+  // Internal id stays "pro" — only the display name/price/limits changed.
+  pro: tier(
+    "pro",
+    "Pro",
+    4999,
+    {
+      emailsPerMonth: 15000,
+      smsPerMonth: 1000,
+      whatsappPerMonth: 1000,
+      aiRepliesPerMonth: 1000,
+      instagramAccountLimit: 5,
+      youtubeAccountLimit: 5,
+      storageBytes: 150 * 1024 * 1024 * 1024, // 150GB
+      kmeetMaxDurationMinutes: null,
+      maxAdditionalAdmins: 10,
+      maxAdditionalStaff: 20,
+      branchLimit: 20,
+      memberLimit: 10000,
+      formsLimit: null,
+      financeEnabled: true,
+      ownPaymentGatewayEnabled: true,
+      socialMediaEnabled: true,
+      customSmtpEnabled: true,
+      automationLimit: 10,
+      supportSlaDays: 1,
+    },
+    // Explicit override: the 17%-off formula rounds to ₹49,790, short of
+    // the advertised ₹49,999.
+    49999,
+  ),
 };
 
 // K-Audio's limit is always K-meet's limit + 10 minutes (unlimited stays

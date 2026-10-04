@@ -26,10 +26,12 @@ const initialState: CreateLoginState = {};
 
 export function CreateLoginForm({
   organizationId,
-  seatsRemaining,
+  adminSeatsRemaining,
+  staffSeatsRemaining,
 }: {
   organizationId: string;
-  seatsRemaining: number;
+  adminSeatsRemaining: number;
+  staffSeatsRemaining: number;
 }) {
   const [state, setState] = useState<CreateLoginState>(initialState);
   const [pending, startTransition] = useTransition();
@@ -37,7 +39,12 @@ export function CreateLoginForm({
   const [role, setRole] = useState<"admin" | "member">("member");
   const [permissions, setPermissions] = useState<Record<TabKey, TabAccess>>(defaultMemberTabPermissions());
   const [copied, setCopied] = useState(false);
-  const seatsExhausted = seatsRemaining <= 0;
+  // The trigger button can only react to whether EITHER role still has a
+  // seat (role itself is dialog-internal state that doesn't exist yet
+  // before it's opened) — the form inside reacts to the selected role's
+  // own specific cap once it's open.
+  const seatsExhausted = adminSeatsRemaining <= 0 && staffSeatsRemaining <= 0;
+  const roleSeatsExhausted = role === "admin" ? adminSeatsRemaining <= 0 : staffSeatsRemaining <= 0;
 
   function reset() {
     setState(initialState);
@@ -160,12 +167,17 @@ export function CreateLoginForm({
                   ? "Admins have full access to every tab."
                   : "Set exactly what this person can view, edit, and delete below."}
               </p>
+              {roleSeatsExhausted && (
+                <p className="text-xs text-destructive">
+                  No {role === "admin" ? "admin" : "staff"} seats left on your current plan — remove someone or upgrade to add more.
+                </p>
+              )}
             </div>
 
             {role === "member" && <PermissionMatrix value={permissions} onChange={setPermissions} />}
 
             <DialogFooter>
-              <Button type="submit" disabled={pending}>
+              <Button type="submit" disabled={pending || roleSeatsExhausted}>
                 {pending ? "Creating..." : "Create login"}
               </Button>
             </DialogFooter>

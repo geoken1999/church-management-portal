@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { registerForEvent, type PublicEventRegistrationState } from "@/lib/events/public-registration-actions";
+import { EventRegistrationPayment } from "@/components/events/EventRegistrationPayment";
 import { useLocale } from "@/lib/i18n/LocaleContext";
 import type { FormField } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -95,6 +96,30 @@ export function PublicEventRegistrationForm({ token, fields }: { token: string; 
 
   const checkboxKeys = fields.filter((f) => f.field_type === "checkbox").map((f) => f.key);
 
+  if (state.paymentRequired && state.registrationId) {
+    if (state.paymentGateway === "platform") {
+      return <EventRegistrationPayment registrationId={state.registrationId} amount={state.paymentAmount ?? 0} />;
+    }
+
+    return (
+      <div className="flex flex-col items-center gap-4 py-8 text-center duration-300 animate-in fade-in zoom-in-95">
+        <div className="flex size-16 items-center justify-center rounded-full bg-primary/10">
+          <CheckCircle2 className="size-9 text-primary" />
+        </div>
+        <div className="space-y-1">
+          <p className="font-heading text-lg font-bold">{t.publicEvent.registeredPaymentPendingTitle}</p>
+          <p className="text-sm text-muted-foreground">{t.publicEvent.registeredPaymentPendingDescription}</p>
+        </div>
+        {state.externalPaymentUrl && (
+          <Button nativeButton={false} render={<a href={state.externalPaymentUrl} target="_blank" rel="noopener noreferrer" />}>
+            {t.publicEvent.payNow(state.paymentAmount ?? 0)}
+          </Button>
+        )}
+        <p className="text-xs text-muted-foreground">{t.publicEvent.externalPaymentNote}</p>
+      </div>
+    );
+  }
+
   if (state.success) {
     return (
       <div className="flex flex-col items-center gap-4 py-8 text-center duration-300 animate-in fade-in zoom-in-95">
@@ -105,6 +130,17 @@ export function PublicEventRegistrationForm({ token, fields }: { token: string; 
           <p className="font-heading text-lg font-bold">{t.publicEvent.successTitle}</p>
           <p className="text-sm text-muted-foreground">{t.publicEvent.successDescription}</p>
         </div>
+        {state.paymentAmount != null && (
+          <p className="text-sm text-muted-foreground">
+            {state.paymentGateway === "external" && state.externalPaymentUrl ? (
+              <a href={state.externalPaymentUrl} target="_blank" rel="noopener noreferrer" className="underline">
+                {t.publicEvent.paymentDueAtCheckin(state.paymentAmount)}
+              </a>
+            ) : (
+              t.publicEvent.paymentDueAtCheckin(state.paymentAmount)
+            )}
+          </p>
+        )}
       </div>
     );
   }

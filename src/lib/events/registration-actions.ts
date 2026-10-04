@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
-import { checkStorageQuota } from "@/lib/plans/dal";
+import { checkStorageQuota, getPlanUsage } from "@/lib/plans/dal";
 import {
   validateRegistrationSettings,
+  validatePaymentSettings,
   sanitizeRegistrationFields,
   DEFAULT_REGISTRATION_FIELDS,
   MAX_PASS_BACKGROUND_BYTES,
@@ -16,7 +17,8 @@ import {
   type RegistrationSettingsErrors,
 } from "@/lib/events/registration-validation";
 import { getImageDimensions } from "@/lib/events/image-dimensions";
-import type { EventRegistration, EventReminderOffset } from "@/types/database";
+import { sendPassEmailForRegistration } from "@/lib/events/public-registration-actions";
+import type { EventRegistration, EventReminderOffset, EventPaymentGateway, EventPaymentTiming } from "@/types/database";
 
 const EVENTS_PATH = "/dashboard/events";
 
@@ -121,10 +123,31 @@ export async function updateEventRegistrationSettings(
   const passColor = String(formData.get("passColor") ?? "#7c3aed");
   const passMessage = String(formData.get("passMessage") ?? "").trim();
   const reminderOffset = String(formData.get("reminderOffset") ?? "").trim();
+  const paymentRequired = formData.get("paymentRequired") === "true";
+  const paymentGateway = String(formData.get("paymentGateway") ?? "").trim();
+  const paymentAmount = String(formData.get("paymentAmount") ?? "").trim();
+  const externalPaymentUrl = String(formData.get("externalPaymentUrl") ?? "").trim();
+  const paymentTiming = String(formData.get("paymentTiming") ?? "").trim();
 
   const fieldErrors = validateRegistrationSettings({ fields, capacity, closesAt, passColor, reminderOffset });
   if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
+  }
+
+  // Re-checked live (not just trusted from the client) — same defensive
+  // reasoning as createGivingOrder's own re-check: the org's plan can
+  // change between when this form was rendered and when it's submitted.
+  const planAccess = await getPlanUsage(organizationId);
+  const paymentErrors = validatePaymentSettings({
+    paymentRequired,
+    paymentGateway,
+    paymentAmount,
+    externalPaymentUrl,
+    paymentTiming,
+    financeEnabled: planAccess.plan.financeEnabled,
+  });
+  if (Object.values(paymentErrors).some(Boolean)) {
+    return { fieldErrors: paymentErrors };
   }
 
   const admin = createAdminClient();
@@ -137,6 +160,11 @@ export async function updateEventRegistrationSettings(
       registration_pass_color: passColor.trim(),
       registration_pass_message: passMessage || null,
       reminder_offset: (reminderOffset || null) as EventReminderOffset | null,
+      payment_required: paymentRequired,
+      payment_gateway: paymentRequired ? (paymentGateway as EventPaymentGateway) : null,
+      payment_amount: paymentRequired ? Number(paymentAmount) : null,
+      external_payment_url: paymentRequired && paymentGateway === "external" ? externalPaymentUrl : null,
+      payment_timing: paymentRequired ? (paymentTiming as EventPaymentTiming) : null,
     })
     .eq("id", eventId);
 
@@ -176,6 +204,46 @@ export async function markRegistrationCheckedIn(formData: FormData) {
 
   const admin = createAdminClient();
   await admin.from("event_registrations").update({ status: "checked_in", checked_in_at: new Date().toISOString() }).eq("id", registrationId);
+
+  revalidatePath(EVENTS_PATH);
+}
+
+// The only payment-confirmation path for "your own payment link" (no
+// API/webhook into whatever gateway the organizer actually uses, so it's
+// never automatic) — also the fallback for the platform gateway when a
+// Razorpay checkout callback/webhook was missed, or payment came in some
+// other way entirely (bank transfer, cash before the event). Callable
+// from both the Registrants tab and the Attendance check-in screen.
+export async function markRegistrationPaid(formData: FormData) {
+  await requireUser();
+  const registrationId = String(formData.get("registrationId") ?? "");
+  const eventId = String(formData.get("eventId") ?? "");
+
+  const organizationId = await organizationIdForEvent(eventId);
+  if (!organizationId) return;
+  const access = await checkTabAccess(organizationId, "events", "write");
+  if (!access.ok) return;
+
+  const admin = createAdminClient();
+  const { data: registration } = await admin
+    .from("event_registrations")
+    .select("payment_status, events(payment_timing)")
+    .eq("id", registrationId)
+    .maybeSingle();
+
+  if (!registration || registration.payment_status === "paid") return;
+
+  await admin.from("event_registrations").update({ payment_status: "paid", paid_at: new Date().toISOString() }).eq("id", registrationId);
+
+  // "before_registration" withholds the pass until payment is confirmed —
+  // this is the first moment that becomes true for an external-gateway
+  // registration (or a platform-gateway one being reconciled manually).
+  // "at_checkin" registrations already got their pass at registration
+  // time, so there's nothing to send here.
+  const event = registration.events as { payment_timing: string | null } | null;
+  if (event?.payment_timing === "before_registration") {
+    await sendPassEmailForRegistration(registrationId);
+  }
 
   revalidatePath(EVENTS_PATH);
 }

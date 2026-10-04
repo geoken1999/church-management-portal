@@ -879,11 +879,28 @@ export type Event = {
   registration_pass_message: string | null;
   registration_pass_background_url: string | null;
   reminder_offset: EventReminderOffset | null;
+  // Null/false when payment isn't required. "external" has no API/webhook
+  // into whatever gateway the organizer actually uses (Stripe, PayPal,
+  // their own Razorpay Payment Page, ...), so payment there is always
+  // confirmed manually by staff — see EventRegistrationPaymentStatus.
+  payment_required: boolean;
+  payment_gateway: EventPaymentGateway | null;
+  payment_amount: number | null;
+  external_payment_url: string | null;
+  payment_timing: EventPaymentTiming | null;
   created_at: string;
   updated_at: string;
 };
 
+export type EventPaymentGateway = "platform" | "external";
+// "before_registration": the confirmation pass is withheld until
+// payment_status flips to 'paid'. "at_checkin": the pass is sent
+// immediately regardless of payment status; payment is just collected/
+// confirmed later, with no effect on check-in itself (staff discretion).
+export type EventPaymentTiming = "before_registration" | "at_checkin";
+
 export type EventRegistrationStatus = "confirmed" | "cancelled" | "checked_in";
+export type EventRegistrationPaymentStatus = "not_required" | "pending" | "paid";
 
 export type EventRegistration = {
   id: string;
@@ -897,7 +914,25 @@ export type EventRegistration = {
   checked_in_at: string | null;
   last_reminder_occurrence_date: string | null;
   last_reminder_sent_at: string | null;
+  payment_status: EventRegistrationPaymentStatus;
+  payment_amount: number | null;
+  paid_at: string | null;
   created_at: string;
+};
+
+export type EventRegistrationPaymentOrderStatus = "created" | "paid" | "failed";
+
+export type EventRegistrationPaymentOrder = {
+  id: string;
+  organization_id: string;
+  event_id: string;
+  registration_id: string;
+  razorpay_order_id: string;
+  amount: number;
+  status: EventRegistrationPaymentOrderStatus;
+  razorpay_payment_id: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type AttendanceSession = {
@@ -2191,6 +2226,35 @@ export type Database = {
             columns: ["organization_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      event_registration_payment_orders: {
+        Row: EventRegistrationPaymentOrder;
+        Insert: Partial<EventRegistrationPaymentOrder> &
+          Pick<EventRegistrationPaymentOrder, "organization_id" | "event_id" | "registration_id" | "razorpay_order_id" | "amount">;
+        Update: Partial<EventRegistrationPaymentOrder>;
+        Relationships: [
+          {
+            foreignKeyName: "event_registration_payment_orders_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "event_registration_payment_orders_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "event_registration_payment_orders_registration_id_fkey";
+            columns: ["registration_id"];
+            isOneToOne: false;
+            referencedRelation: "event_registrations";
             referencedColumns: ["id"];
           },
         ];

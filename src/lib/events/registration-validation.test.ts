@@ -5,6 +5,7 @@ import {
   validateRegistrationSettings,
   sanitizeRegistrationFields,
   DEFAULT_REGISTRATION_FIELDS,
+  validatePaymentSettings,
 } from "./registration-validation";
 
 describe("hasEmailField", () => {
@@ -75,5 +76,59 @@ describe("sanitizeRegistrationFields", () => {
   it("filters out malformed entries", () => {
     const result = sanitizeRegistrationFields([{ key: "email", label: "Email", field_type: "email", required: true }, { bogus: true }]);
     expect(result).toEqual([{ key: "email", label: "Email", field_type: "email", options: null, required: true, unique: false }]);
+  });
+});
+
+describe("validatePaymentSettings", () => {
+  const platformValid = {
+    paymentRequired: true,
+    paymentGateway: "platform",
+    paymentAmount: "500",
+    externalPaymentUrl: "",
+    paymentTiming: "before_registration",
+    financeEnabled: true,
+  };
+  const externalValid = {
+    paymentRequired: true,
+    paymentGateway: "external",
+    paymentAmount: "250",
+    externalPaymentUrl: "https://razorpay.me/our-church",
+    paymentTiming: "at_checkin",
+    financeEnabled: false,
+  };
+
+  it("passes through free registration without checking anything else", () => {
+    expect(validatePaymentSettings({ ...platformValid, paymentRequired: false, paymentGateway: "", paymentAmount: "" })).toEqual({});
+  });
+
+  it("accepts a valid platform-gateway config", () => {
+    expect(validatePaymentSettings(platformValid)).toEqual({});
+  });
+
+  it("accepts a valid external-gateway config, regardless of the finance plan", () => {
+    expect(validatePaymentSettings(externalValid)).toEqual({});
+  });
+
+  it("rejects the platform gateway when the org isn't on a Finance-enabled plan", () => {
+    const errors = validatePaymentSettings({ ...platformValid, financeEnabled: false });
+    expect(errors.paymentGateway).toBeDefined();
+  });
+
+  it("rejects a zero or negative amount", () => {
+    expect(validatePaymentSettings({ ...platformValid, paymentAmount: "0" }).paymentAmount).toBeDefined();
+    expect(validatePaymentSettings({ ...platformValid, paymentAmount: "-5" }).paymentAmount).toBeDefined();
+    expect(validatePaymentSettings({ ...platformValid, paymentAmount: "" }).paymentAmount).toBeDefined();
+  });
+
+  it("rejects an external gateway with no URL", () => {
+    expect(validatePaymentSettings({ ...externalValid, externalPaymentUrl: "" }).externalPaymentUrl).toBeDefined();
+  });
+
+  it("rejects an external gateway with a malformed URL", () => {
+    expect(validatePaymentSettings({ ...externalValid, externalPaymentUrl: "not-a-url" }).externalPaymentUrl).toBeDefined();
+  });
+
+  it("rejects an invalid timing value", () => {
+    expect(validatePaymentSettings({ ...platformValid, paymentTiming: "whenever" }).paymentTiming).toBeDefined();
   });
 });

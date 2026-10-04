@@ -625,6 +625,7 @@ function EventCard({
   canManage,
   siteUrl,
   kmeetMeetings,
+  financeEnabled,
 }: {
   event: EventRow;
   members: MemberBasic[];
@@ -632,6 +633,7 @@ function EventCard({
   canManage: boolean;
   siteUrl: string;
   kmeetMeetings: KmeetBadge[];
+  financeEnabled: boolean;
 }) {
   const start = new Date(event.start_at);
   const end = event.end_at ? new Date(event.end_at) : null;
@@ -725,7 +727,7 @@ function EventCard({
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <AddToAttendanceButton eventId={event.id} />
-          <EventRegistrationDialog event={event} siteUrl={siteUrl} />
+          <EventRegistrationDialog event={event} siteUrl={siteUrl} financeEnabled={financeEnabled} />
           <EditEventDialog event={event} members={members} branches={branches} />
           {canManage && (
             <form action={deleteEvent}>
@@ -749,6 +751,7 @@ function EventsListTab({
   canManage,
   siteUrl,
   kmeetByEventId,
+  financeEnabled,
 }: {
   events: EventRow[];
   members: MemberBasic[];
@@ -756,6 +759,7 @@ function EventsListTab({
   canManage: boolean;
   siteUrl: string;
   kmeetByEventId: Record<string, KmeetBadge[]>;
+  financeEnabled: boolean;
 }) {
   if (events.length === 0) {
     return (
@@ -778,6 +782,7 @@ function EventsListTab({
           canManage={canManage}
           siteUrl={siteUrl}
           kmeetMeetings={kmeetByEventId[event.id] ?? []}
+          financeEnabled={financeEnabled}
         />
       ))}
     </div>
@@ -912,6 +917,7 @@ export function EventsManager({
   canManage,
   siteUrl,
   kmeetByEventId,
+  financeEnabled,
 }: {
   organizationId: string;
   members: MemberBasic[];
@@ -920,6 +926,7 @@ export function EventsManager({
   canManage: boolean;
   siteUrl: string;
   kmeetByEventId: Record<string, KmeetBadge[]>;
+  financeEnabled: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -936,7 +943,15 @@ export function EventsManager({
           <EventCalendar events={events} />
         </TabsPanel>
         <TabsPanel value="list">
-          <EventsListTab events={events} members={members} branches={branches} canManage={canManage} siteUrl={siteUrl} kmeetByEventId={kmeetByEventId} />
+          <EventsListTab
+            events={events}
+            members={members}
+            branches={branches}
+            canManage={canManage}
+            siteUrl={siteUrl}
+            kmeetByEventId={kmeetByEventId}
+            financeEnabled={financeEnabled}
+          />
         </TabsPanel>
       </Tabs>
     </div>

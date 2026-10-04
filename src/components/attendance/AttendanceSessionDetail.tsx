@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Search, MapPin, CalendarDays, Users, UserPlus, Ticket } from "lucide-react";
+import { Search, MapPin, CalendarDays, Users, UserPlus, Ticket, IndianRupee } from "lucide-react";
 import { toggleAttendanceRecord, updateSessionHeadcount, toggleEventRegistrationCheckIn } from "@/lib/attendance/actions";
+import { markRegistrationPaid } from "@/lib/events/registration-actions";
 import { validateHeadcount } from "@/lib/attendance/validation";
 import type { EventRegistration } from "@/types/database";
 import { Input } from "@/components/ui/input";
@@ -26,7 +27,7 @@ interface SessionInfo {
   notes: string | null;
   headcount: number | null;
   branches: { id: string; name: string } | null;
-  events: { id: string; title: string; registration_enabled: boolean } | null;
+  events: { id: string; title: string; registration_enabled: boolean; payment_required: boolean } | null;
 }
 
 function registrantName(registration: EventRegistration): string {
@@ -37,15 +38,22 @@ function registrantName(registration: EventRegistration): string {
 function RegistrantRow({
   registration,
   sessionId,
+  eventId,
+  paymentRequired,
   canWrite,
   onToggled,
+  onPaid,
 }: {
   registration: EventRegistration;
   sessionId: string;
+  eventId: string;
+  paymentRequired: boolean;
   canWrite: boolean;
   onToggled: (registrationId: string, checkedIn: boolean) => void;
+  onPaid: (registrationId: string) => void;
 }) {
   const [pending, startTransition] = useTransition();
+  const [markingPaid, startMarkingPaid] = useTransition();
   const checkedIn = registration.status === "checked_in";
 
   function handleChange(next: boolean) {
@@ -58,14 +66,40 @@ function RegistrantRow({
     });
   }
 
+  function handleMarkPaid() {
+    startMarkingPaid(async () => {
+      const formData = new FormData();
+      formData.set("registrationId", registration.id);
+      formData.set("eventId", eventId);
+      await markRegistrationPaid(formData);
+      onPaid(registration.id);
+    });
+  }
+
   return (
-    <label className="group flex items-center gap-3 rounded-lg border border-border px-3 py-2 has-data-checked:border-primary/40 has-data-checked:bg-primary/5">
-      <Checkbox checked={checkedIn} disabled={!canWrite || pending} onCheckedChange={(value) => handleChange(value === true)} />
-      <span className="min-w-0 flex-1 text-sm">
-        <span className="block truncate">{registrantName(registration)}</span>
-        <span className="block truncate font-mono text-xs text-muted-foreground">{registration.confirmation_code}</span>
-      </span>
-    </label>
+    <div className="group flex items-center gap-3 rounded-lg border border-border px-3 py-2 has-data-checked:border-primary/40 has-data-checked:bg-primary/5">
+      <label className="flex min-w-0 flex-1 items-center gap-3">
+        <Checkbox checked={checkedIn} disabled={!canWrite || pending} onCheckedChange={(value) => handleChange(value === true)} />
+        <span className="min-w-0 flex-1 text-sm">
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="truncate">{registrantName(registration)}</span>
+            {paymentRequired && registration.payment_status === "paid" && (
+              <Badge className="bg-emerald-600 text-white">Paid{registration.payment_amount ? ` ₹${registration.payment_amount}` : ""}</Badge>
+            )}
+            {paymentRequired && registration.payment_status === "pending" && (
+              <Badge className="bg-amber-500 text-white">Pending{registration.payment_amount ? ` ₹${registration.payment_amount}` : ""}</Badge>
+            )}
+          </span>
+          <span className="block truncate font-mono text-xs text-muted-foreground">{registration.confirmation_code}</span>
+        </span>
+      </label>
+      {paymentRequired && registration.payment_status === "pending" && canWrite && (
+        <Button type="button" variant="ghost" size="sm" disabled={markingPaid} onClick={handleMarkPaid}>
+          <IndianRupee className="size-3.5" />
+          Mark as paid
+        </Button>
+      )}
+    </div>
   );
 }
 
@@ -254,6 +288,12 @@ export function AttendanceSessionDetail({
     );
   }
 
+  function handleRegistrantPaid(registrationId: string) {
+    setRegistrations((current) =>
+      current.map((r) => (r.id === registrationId ? { ...r, payment_status: "paid", paid_at: new Date().toISOString() } : r)),
+    );
+  }
+
   const checkedInCount = registrations.filter((r) => r.status === "checked_in").length;
   const filteredRegistrations = useMemo(() => {
     const query = registrantSearch.trim().toLowerCase();
@@ -345,8 +385,11 @@ export function AttendanceSessionDetail({
                 key={registration.id}
                 registration={registration}
                 sessionId={session.id}
+                eventId={session.events?.id ?? ""}
+                paymentRequired={Boolean(session.events?.payment_required)}
                 canWrite={canWrite}
                 onToggled={handleRegistrantToggled}
+                onPaid={handleRegistrantPaid}
               />
             ))}
           </div>

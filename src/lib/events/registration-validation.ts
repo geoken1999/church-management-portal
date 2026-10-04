@@ -1,4 +1,4 @@
-import type { EventRegistrationField, EventReminderOffset, FormFieldType } from "@/types/database";
+import type { EventRegistrationField, EventReminderOffset, EventPaymentGateway, EventPaymentTiming, FormFieldType } from "@/types/database";
 import { FORM_FIELD_TYPES } from "@/lib/forms/validation";
 
 export { FORM_FIELD_TYPES } from "@/lib/forms/validation";
@@ -125,6 +125,10 @@ export interface RegistrationSettingsErrors {
   closesAt?: string;
   passColor?: string;
   reminderOffset?: string;
+  paymentGateway?: string;
+  paymentAmount?: string;
+  externalPaymentUrl?: string;
+  paymentTiming?: string;
 }
 
 export function validateRegistrationSettings(input: {
@@ -162,6 +166,71 @@ export function validateRegistrationSettings(input: {
 
   if (input.passColor !== undefined && !/^#[0-9a-fA-F]{6}$/.test(input.passColor.trim())) {
     errors.passColor = "Enter a valid hex color, e.g. #7c3aed.";
+  }
+
+  return errors;
+}
+
+export const EVENT_PAYMENT_GATEWAYS: EventPaymentGateway[] = ["platform", "external"];
+export const EVENT_PAYMENT_GATEWAY_LABELS: Record<EventPaymentGateway, string> = {
+  platform: "Our payment gateway",
+  external: "Your own payment link",
+};
+
+export const EVENT_PAYMENT_TIMINGS: EventPaymentTiming[] = ["before_registration", "at_checkin"];
+export const EVENT_PAYMENT_TIMING_LABELS: Record<EventPaymentTiming, string> = {
+  before_registration: "Before registration is confirmed — the pass is held until payment is confirmed",
+  at_checkin: "At check-in — the pass is sent now, payment is collected later",
+};
+
+export interface PaymentSettingsErrors {
+  paymentGateway?: string;
+  paymentAmount?: string;
+  externalPaymentUrl?: string;
+  paymentTiming?: string;
+}
+
+// Mirrors the DB's events_payment_consistency CHECK constraint (migration
+// 0105) so a bad config is caught here with a specific, actionable
+// message rather than surfacing as an opaque database error at save time.
+export function validatePaymentSettings(input: {
+  paymentRequired: boolean;
+  paymentGateway: string;
+  paymentAmount: string;
+  externalPaymentUrl: string;
+  paymentTiming: string;
+  financeEnabled: boolean;
+}): PaymentSettingsErrors {
+  const errors: PaymentSettingsErrors = {};
+  if (!input.paymentRequired) return errors;
+
+  const gateway = input.paymentGateway as EventPaymentGateway;
+  if (!EVENT_PAYMENT_GATEWAYS.includes(gateway)) {
+    errors.paymentGateway = "Choose a payment gateway.";
+  } else if (gateway === "platform" && !input.financeEnabled) {
+    errors.paymentGateway = "Your plan doesn't include online payments — choose your own payment link instead, or upgrade to Premium or Pro.";
+  }
+
+  const amount = Number(input.paymentAmount);
+  if (!input.paymentAmount.trim() || !Number.isFinite(amount) || amount <= 0) {
+    errors.paymentAmount = "Enter an amount greater than 0.";
+  }
+
+  if (gateway === "external") {
+    const url = input.externalPaymentUrl.trim();
+    if (!url) {
+      errors.externalPaymentUrl = "Enter your payment link.";
+    } else {
+      try {
+        new URL(url);
+      } catch {
+        errors.externalPaymentUrl = "Enter a valid URL, starting with https://.";
+      }
+    }
+  }
+
+  if (!EVENT_PAYMENT_TIMINGS.includes(input.paymentTiming as EventPaymentTiming)) {
+    errors.paymentTiming = "Choose when payment is required.";
   }
 
   return errors;

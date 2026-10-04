@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Ticket, Plus, Trash2, Copy, Check, CheckCircle2, Ban, ArrowUp, ArrowDown, Search } from "lucide-react";
+import { Ticket, Plus, Trash2, Copy, Check, CheckCircle2, Ban, ArrowUp, ArrowDown, Search, IndianRupee, Lock } from "lucide-react";
 import {
   enableEventRegistration,
   disableEventRegistration,
   updateEventRegistrationSettings,
   cancelEventRegistration,
   markRegistrationCheckedIn,
+  markRegistrationPaid,
   fetchEventRegistrations,
   type RegistrationSettingsState,
 } from "@/lib/events/registration-actions";
@@ -19,13 +20,17 @@ import {
   isTypeLockedField,
   EVENT_REMINDER_OFFSETS,
   EVENT_REMINDER_OFFSET_LABELS,
+  EVENT_PAYMENT_GATEWAYS,
+  EVENT_PAYMENT_GATEWAY_LABELS,
+  EVENT_PAYMENT_TIMINGS,
+  EVENT_PAYMENT_TIMING_LABELS,
 } from "@/lib/events/registration-validation";
 import { slugifyFieldKey, validateFormField } from "@/lib/forms/validation";
 import { MEETING_MODE_LABELS } from "@/lib/events/location";
 import { QrCodeDialog } from "@/components/members/QrCodeDialog";
 import { EventPassBackgroundUpload } from "@/components/events/EventPassBackgroundUpload";
 import { EventPassPreview } from "@/components/events/EventPassPreview";
-import type { Event, EventRegistration, EventRegistrationField, FormFieldType } from "@/types/database";
+import type { Event, EventRegistration, EventRegistrationField, FormFieldType, EventPaymentGateway, EventPaymentTiming } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -170,7 +175,7 @@ function FieldEditorRow({
   );
 }
 
-function SettingsTab({ event, siteUrl }: { event: Event; siteUrl: string }) {
+function SettingsTab({ event, siteUrl, financeEnabled }: { event: Event; siteUrl: string; financeEnabled: boolean }) {
   const router = useRouter();
   const [fields, setFields] = useState<EventRegistrationField[]>(event.registration_fields);
   const [capacity, setCapacity] = useState(event.registration_capacity ? String(event.registration_capacity) : "");
@@ -179,6 +184,11 @@ function SettingsTab({ event, siteUrl }: { event: Event; siteUrl: string }) {
   const [passMessage, setPassMessage] = useState(event.registration_pass_message ?? "");
   const [backgroundPreviewUrl, setBackgroundPreviewUrl] = useState(event.registration_pass_background_url);
   const [reminderOffset, setReminderOffset] = useState(event.reminder_offset ?? "");
+  const [paymentRequired, setPaymentRequired] = useState(event.payment_required);
+  const [paymentGateway, setPaymentGateway] = useState<EventPaymentGateway>(event.payment_gateway ?? "external");
+  const [paymentAmount, setPaymentAmount] = useState(event.payment_amount ? String(event.payment_amount) : "");
+  const [externalPaymentUrl, setExternalPaymentUrl] = useState(event.external_payment_url ?? "");
+  const [paymentTiming, setPaymentTiming] = useState<EventPaymentTiming>(event.payment_timing ?? "before_registration");
   const [state, setState] = useState<RegistrationSettingsState>(settingsInitialState);
   const [fieldErrors, setFieldErrors] = useState<Record<number, { label?: string; options?: string }>>({});
   const [pending, startTransition] = useTransition();
@@ -334,6 +344,97 @@ function SettingsTab({ event, siteUrl }: { event: Event; siteUrl: string }) {
           </div>
         </div>
 
+        <div className="space-y-3 rounded-md border border-border p-4">
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+            <Checkbox checked={paymentRequired} onCheckedChange={(checked) => setPaymentRequired(checked === true)} />
+            Require payment to register
+          </label>
+          <input type="hidden" name="paymentRequired" value={String(paymentRequired)} />
+
+          {paymentRequired && (
+            <div className="space-y-3 pl-6">
+              <div className="space-y-1.5">
+                <Label>Payment gateway</Label>
+                <input type="hidden" name="paymentGateway" value={paymentGateway} />
+                <Select value={paymentGateway} onValueChange={(v) => setPaymentGateway((v ?? "external") as EventPaymentGateway)}>
+                  <SelectTrigger className="w-full" aria-invalid={Boolean(state.fieldErrors?.paymentGateway)}>
+                    <SelectValue>{() => EVENT_PAYMENT_GATEWAY_LABELS[paymentGateway]}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EVENT_PAYMENT_GATEWAYS.map((gateway) => (
+                      <SelectItem key={gateway} value={gateway} disabled={gateway === "platform" && !financeEnabled}>
+                        {EVENT_PAYMENT_GATEWAY_LABELS[gateway]}
+                        {gateway === "platform" && !financeEnabled ? " (needs the Finance plan)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldError id="paymentGateway-error" message={state.fieldErrors?.paymentGateway} />
+                {paymentGateway === "platform" && !financeEnabled && (
+                  <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Lock className="size-3" />
+                    Upgrade to Premium or Pro to collect payments through KingdomFlow directly.
+                  </p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="paymentAmount">Amount (₹)</Label>
+                  <div className="relative">
+                    <IndianRupee className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="paymentAmount"
+                      name="paymentAmount"
+                      type="number"
+                      min={1}
+                      step="0.01"
+                      className="pl-8"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      aria-invalid={Boolean(state.fieldErrors?.paymentAmount)}
+                    />
+                  </div>
+                  <FieldError id="paymentAmount-error" message={state.fieldErrors?.paymentAmount} />
+                </div>
+                {paymentGateway === "external" && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="externalPaymentUrl">Your payment link</Label>
+                    <Input
+                      id="externalPaymentUrl"
+                      name="externalPaymentUrl"
+                      type="url"
+                      placeholder="https://razorpay.me/your-church"
+                      value={externalPaymentUrl}
+                      onChange={(e) => setExternalPaymentUrl(e.target.value)}
+                      aria-invalid={Boolean(state.fieldErrors?.externalPaymentUrl)}
+                    />
+                    <FieldError id="externalPaymentUrl-error" message={state.fieldErrors?.externalPaymentUrl} />
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>When is payment required?</Label>
+                <input type="hidden" name="paymentTiming" value={paymentTiming} />
+                <Select value={paymentTiming} onValueChange={(v) => setPaymentTiming((v ?? "before_registration") as EventPaymentTiming)}>
+                  <SelectTrigger className="w-full" aria-invalid={Boolean(state.fieldErrors?.paymentTiming)}>
+                    <SelectValue>{() => EVENT_PAYMENT_TIMING_LABELS[paymentTiming]}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EVENT_PAYMENT_TIMINGS.map((timing) => (
+                      <SelectItem key={timing} value={timing}>
+                        {EVENT_PAYMENT_TIMING_LABELS[timing]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldError id="paymentTiming-error" message={state.fieldErrors?.paymentTiming} />
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="space-y-1.5">
           <Label htmlFor="reminderOffset">Reminder email (optional)</Label>
           <input type="hidden" name="reminderOffset" value={reminderOffset} />
@@ -441,7 +542,15 @@ const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | 
   cancelled: "outline",
 };
 
-function RegistrantsTab({ eventId, fields }: { eventId: string; fields: EventRegistrationField[] }) {
+function RegistrantsTab({
+  eventId,
+  fields,
+  paymentRequired,
+}: {
+  eventId: string;
+  fields: EventRegistrationField[];
+  paymentRequired: boolean;
+}) {
   const router = useRouter();
   // null means "not loaded yet" — this dialog is created fresh per event
   // (EventCard renders one per row, keyed by event.id), so eventId never
@@ -527,6 +636,12 @@ function RegistrantsTab({ eventId, fields }: { eventId: string; fields: EventReg
                 <Badge variant={STATUS_VARIANTS[registration.status]} className="capitalize">
                   {registration.status.replace("_", " ")}
                 </Badge>
+                {paymentRequired && registration.payment_status === "paid" && (
+                  <Badge className="bg-emerald-600 text-white">Paid{registration.payment_amount ? ` ₹${registration.payment_amount}` : ""}</Badge>
+                )}
+                {paymentRequired && registration.payment_status === "pending" && (
+                  <Badge className="bg-amber-500 text-white">Pending{registration.payment_amount ? ` ₹${registration.payment_amount}` : ""}</Badge>
+                )}
               </div>
               <p className="font-mono text-xs text-muted-foreground">{registration.confirmation_code}</p>
               {fields
@@ -542,6 +657,12 @@ function RegistrantsTab({ eventId, fields }: { eventId: string; fields: EventReg
                 })}
             </div>
             <div className="flex shrink-0 items-center gap-1">
+              {paymentRequired && registration.payment_status === "pending" && (
+                <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => runAction(markRegistrationPaid, registration.id)}>
+                  <IndianRupee className="size-3.5" />
+                  Mark as paid
+                </Button>
+              )}
               {registration.status !== "checked_in" && (
                 <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => runAction(markRegistrationCheckedIn, registration.id)}>
                   <CheckCircle2 className="size-3.5" />
@@ -562,7 +683,15 @@ function RegistrantsTab({ eventId, fields }: { eventId: string; fields: EventReg
   );
 }
 
-export function EventRegistrationDialog({ event, siteUrl }: { event: Event; siteUrl: string }) {
+export function EventRegistrationDialog({
+  event,
+  siteUrl,
+  financeEnabled,
+}: {
+  event: Event;
+  siteUrl: string;
+  financeEnabled: boolean;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [enabling, startEnabling] = useTransition();
@@ -611,10 +740,10 @@ export function EventRegistrationDialog({ event, siteUrl }: { event: Event; site
               <TabsTab value="registrants">Registrants</TabsTab>
             </TabsList>
             <TabsPanel value="settings">
-              <SettingsTab event={event} siteUrl={siteUrl} />
+              <SettingsTab event={event} siteUrl={siteUrl} financeEnabled={financeEnabled} />
             </TabsPanel>
             <TabsPanel value="registrants">
-              <RegistrantsTab eventId={event.id} fields={event.registration_fields} />
+              <RegistrantsTab eventId={event.id} fields={event.registration_fields} paymentRequired={event.payment_required} />
             </TabsPanel>
           </Tabs>
         )}

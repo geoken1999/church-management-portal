@@ -4,6 +4,7 @@ import { getRazorpayWebhookSecret } from "@/lib/billing/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { finalizeGivingOrderPayment } from "@/lib/finance/razorpay-giving";
 import { finalizeAddonOrderPayment } from "@/lib/billing/addon-actions";
+import { finalizeEventRegistrationPayment } from "@/lib/events/razorpay-registration";
 import { sendSubscriptionActivatedEmail, sendSubscriptionChargedEmail, sendSubscriptionCancelledEmail } from "@/lib/billing/receipts";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { PLANS, isPlanId, isBillingInterval } from "@/lib/plans/config";
@@ -59,6 +60,14 @@ export async function POST(request: Request) {
   // account, so this webhook covers them too.
   if (event === "payment.captured" && paymentEntity?.notes?.kind === "addon_purchase" && paymentEntity.order_id) {
     await finalizeAddonOrderPayment(paymentEntity.order_id, paymentEntity.id);
+    return NextResponse.json({ ok: true });
+  }
+
+  // Backup confirmation path for paid event registration (platform
+  // gateway only — "your own payment link" never touches this app's
+  // Razorpay account at all, so it has nothing to confirm here).
+  if (event === "payment.captured" && paymentEntity?.notes?.kind === "event_registration" && paymentEntity.order_id) {
+    await finalizeEventRegistrationPayment(paymentEntity.order_id, paymentEntity.id);
     return NextResponse.json({ ok: true });
   }
 

@@ -18,7 +18,7 @@ export const getAttendanceSession = cache(async (organizationId: string, session
   const supabase = await createClient();
   const { data } = await supabase
     .from("attendance_sessions")
-    .select("*, branches(id, name), events(id, title, registration_enabled)")
+    .select("*, branches(id, name), events(id, title, registration_enabled, payment_required)")
     .eq("organization_id", organizationId)
     .eq("id", sessionId)
     .maybeSingle();

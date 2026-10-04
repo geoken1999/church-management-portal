@@ -4,6 +4,7 @@ import { getLeaderMembers } from "@/lib/leaders/dal";
 import { getBranches } from "@/lib/branches/dal";
 import { getEvents } from "@/lib/events/dal";
 import { getKmeetMeetingsByEvent } from "@/lib/kmeet/dal";
+import { getPlanLimits } from "@/lib/plans/dal";
 import { getSiteUrl } from "@/lib/site-url";
 import { EventsManagerClient } from "@/components/events/EventsManagerClient";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
@@ -23,11 +24,12 @@ export default async function EventsPage() {
 
   // Event managers are picked from Leaders, not the full members list —
   // see /dashboard/leaders.
-  const [assignableMembers, branches, events, kmeetByEvent] = await Promise.all([
+  const [assignableMembers, branches, events, kmeetByEvent, plan] = await Promise.all([
     getLeaderMembers(organizationId),
     getBranches(organizationId),
     getEvents(organizationId),
     getKmeetMeetingsByEvent(organizationId),
+    getPlanLimits(organizationId),
   ]);
 
   return (
@@ -47,6 +49,7 @@ export default async function EventsPage() {
         canManage={canManage}
         siteUrl={getSiteUrl()}
         kmeetByEventId={Object.fromEntries(kmeetByEvent)}
+        financeEnabled={plan.financeEnabled}
       />
     </div>
   );

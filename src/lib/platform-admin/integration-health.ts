@@ -151,6 +151,19 @@ async function checkRazorpay(): Promise<IntegrationHealth> {
 // token. A GET on the app's own node either echoes its id/name back (valid
 // credentials) or 400s with an OAuthException (invalid) — a genuine,
 // read-only, side-effect-free reachability check.
+// Meta has a documented, reproducible quirk where this exact self-lookup
+// returns a generic "system error" independent of whether the app
+// credentials are actually valid — confirmed live: the identical message
+// came back from three different Meta endpoints (this one, /debug_token,
+// and the standard /oauth/access_token client-credentials grant) against
+// credentials for an app whose real, per-org Instagram connections were
+// demonstrably working at the same time. Treating this specific message
+// as "down" was a false negative — the per-org OAuth tokens actual
+// messaging runs on never touch this app-level lookup at all, so a
+// failure here says nothing about whether Instagram/Facebook messaging
+// itself works.
+const META_APP_SELF_LOOKUP_QUIRK = "cannot get application info due to a system error";
+
 async function checkMetaApp(name: string, appId: string | undefined, appSecret: string | undefined): Promise<IntegrationHealth> {
   if (!appId || !appSecret) return unconfigured(name);
 
@@ -159,7 +172,16 @@ async function checkMetaApp(name: string, appId: string | undefined, appSecret: 
     const res = await fetch(url, { signal: AbortSignal.timeout(CHECK_TIMEOUT_MS) });
     const body = await res.json().catch(() => null);
     if (!res.ok || body?.error) {
-      return { name, status: "down", detail: body?.error?.message ?? `HTTP ${res.status}`, liveChecked: true };
+      const message: string = body?.error?.message ?? `HTTP ${res.status}`;
+      if (message.toLowerCase().includes(META_APP_SELF_LOOKUP_QUIRK)) {
+        return {
+          name,
+          status: "degraded",
+          detail: "Meta's own app-info lookup is returning a known system error — this doesn't verify per-org connections, which run on their own separate OAuth tokens and aren't affected by this.",
+          liveChecked: true,
+        };
+      }
+      return { name, status: "down", detail: message, liveChecked: true };
     }
     return { name, status: "operational", liveChecked: true };
   } catch (err) {

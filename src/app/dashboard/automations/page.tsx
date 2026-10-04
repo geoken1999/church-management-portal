@@ -36,8 +36,8 @@ export default async function AutomationsPage() {
         <div>
           <h1 className="font-heading text-3xl font-bold tracking-tight">Automations</h1>
           <p className="mt-1 text-muted-foreground">
-            Automatically send WhatsApp wishes when a member&apos;s birthday or anniversary comes up — no group messaging exists, so messages go directly
-            to the member and/or a staff digest.
+            Recurring tasks that run on their own, without anyone having to remember to do them by hand. Birthday &amp; anniversary wishes over
+            WhatsApp is the first one available — more automation types are on the way.
           </p>
         </div>
         <div className="flex gap-2">

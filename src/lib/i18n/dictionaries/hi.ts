@@ -108,6 +108,10 @@ export const hi: Dictionary = {
     paymentSuccessDescription: "अपने पंजीकरण पास और QR कोड के लिए अपना ईमेल जांचें।",
     paymentFormLoadError: "भुगतान फ़ॉर्म लोड नहीं हो सका। कृपया पुनः प्रयास करें।",
     paymentFormStillLoading: "भुगतान फ़ॉर्म अभी भी लोड हो रहा है — कुछ क्षण में पुनः प्रयास करें।",
+    payAtCheckinInstead: "मैं चेक-इन पर भुगतान करूंगा",
+    deferringToCheckin: "एक क्षण रुकें...",
+    deferredToCheckinTitle: "आपका पंजीकरण हो गया!",
+    deferredToCheckinDescription: (amount: number) => `अपने पास के लिए अपना ईमेल जांचें। आप चेक-इन पर ₹${amount} का भुगतान कर सकते हैं।`,
   },
   publicGive: {
     notFoundDescription: "यह दान लिंक अमान्य है या अब सक्रिय नहीं है। नए लिंक के लिए चर्च से पूछें।",

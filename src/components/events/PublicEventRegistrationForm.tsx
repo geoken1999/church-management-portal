@@ -1,7 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
-import { registerForEvent, type PublicEventRegistrationState } from "@/lib/events/public-registration-actions";
+import { useActionState, useState, useTransition } from "react";
+import {
+  registerForEvent,
+  deferEventRegistrationToCheckin,
+  type PublicEventRegistrationState,
+} from "@/lib/events/public-registration-actions";
 import { EventRegistrationPayment } from "@/components/events/EventRegistrationPayment";
 import { useLocale } from "@/lib/i18n/LocaleContext";
 import type { FormField } from "@/types/database";
@@ -89,16 +93,61 @@ function PublicFieldInput({ field }: { field: FormField }) {
   );
 }
 
+// The external-gateway counterpart to EventRegistrationPayment's
+// "pay at check-in instead" button — the platform-gateway version lives
+// there since it shares state with the Razorpay checkout flow; this one
+// has nothing else to share state with, so it's local to this file.
+function DeferToCheckinButton({ registrationId, onDeferred }: { registrationId: string; onDeferred: () => void }) {
+  const { t } = useLocale();
+  const [pending, startTransition] = useTransition();
+
+  function handleClick() {
+    startTransition(async () => {
+      await deferEventRegistrationToCheckin(registrationId);
+      onDeferred();
+    });
+  }
+
+  return (
+    <Button type="button" variant="ghost" disabled={pending} onClick={handleClick}>
+      {pending ? t.publicEvent.deferringToCheckin : t.publicEvent.payAtCheckinInstead}
+    </Button>
+  );
+}
+
 export function PublicEventRegistrationForm({ token, fields }: { token: string; fields: FormField[] }) {
   const { t } = useLocale();
   const registerWithToken = registerForEvent.bind(null, token);
   const [state, formAction, pending] = useActionState(registerWithToken, initialState);
+  const [deferredToCheckin, setDeferredToCheckin] = useState(false);
 
   const checkboxKeys = fields.filter((f) => f.field_type === "checkbox").map((f) => f.key);
 
   if (state.paymentRequired && state.registrationId) {
+    const allowDefer = state.paymentTiming === "both";
+
     if (state.paymentGateway === "platform") {
-      return <EventRegistrationPayment registrationId={state.registrationId} amount={state.paymentAmount ?? 0} />;
+      return (
+        <EventRegistrationPayment
+          registrationId={state.registrationId}
+          amount={state.paymentAmount ?? 0}
+          allowDeferToCheckin={allowDefer}
+        />
+      );
+    }
+
+    if (deferredToCheckin) {
+      return (
+        <div className="flex flex-col items-center gap-4 py-8 text-center duration-300 animate-in fade-in zoom-in-95">
+          <div className="flex size-16 items-center justify-center rounded-full bg-primary/10">
+            <CheckCircle2 className="size-9 text-primary" />
+          </div>
+          <div className="space-y-1">
+            <p className="font-heading text-lg font-bold">{t.publicEvent.deferredToCheckinTitle}</p>
+            <p className="text-sm text-muted-foreground">{t.publicEvent.deferredToCheckinDescription(state.paymentAmount ?? 0)}</p>
+          </div>
+        </div>
+      );
     }
 
     return (
@@ -110,11 +159,16 @@ export function PublicEventRegistrationForm({ token, fields }: { token: string; 
           <p className="font-heading text-lg font-bold">{t.publicEvent.registeredPaymentPendingTitle}</p>
           <p className="text-sm text-muted-foreground">{t.publicEvent.registeredPaymentPendingDescription}</p>
         </div>
-        {state.externalPaymentUrl && (
-          <Button nativeButton={false} render={<a href={state.externalPaymentUrl} target="_blank" rel="noopener noreferrer" />}>
-            {t.publicEvent.payNow(state.paymentAmount ?? 0)}
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {state.externalPaymentUrl && (
+            <Button nativeButton={false} render={<a href={state.externalPaymentUrl} target="_blank" rel="noopener noreferrer" />}>
+              {t.publicEvent.payNow(state.paymentAmount ?? 0)}
+            </Button>
+          )}
+          {allowDefer && (
+            <DeferToCheckinButton registrationId={state.registrationId} onDeferred={() => setDeferredToCheckin(true)} />
+          )}
+        </div>
         <p className="text-xs text-muted-foreground">{t.publicEvent.externalPaymentNote}</p>
       </div>
     );

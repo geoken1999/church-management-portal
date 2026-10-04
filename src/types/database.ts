@@ -897,7 +897,10 @@ export type EventPaymentGateway = "platform" | "external";
 // payment_status flips to 'paid'. "at_checkin": the pass is sent
 // immediately regardless of payment status; payment is just collected/
 // confirmed later, with no effect on check-in itself (staff discretion).
-export type EventPaymentTiming = "before_registration" | "at_checkin";
+// "both": the visitor chooses for themselves at registration time — the
+// pass is withheld the same as "before_registration" until they either
+// pay or explicitly defer, at which point it's sent immediately either way.
+export type EventPaymentTiming = "before_registration" | "at_checkin" | "both";
 
 export type EventRegistrationStatus = "confirmed" | "cancelled" | "checked_in";
 export type EventRegistrationPaymentStatus = "not_required" | "pending" | "paid";
@@ -931,6 +934,33 @@ export type EventRegistrationPaymentOrder = {
   amount: number;
   status: EventRegistrationPaymentOrderStatus;
   razorpay_payment_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// Manual payout ledger for platform-gateway events — a platform operator
+// wires money to the church externally and records it here afterwards.
+// Nothing here moves money automatically. Mirrors fundraiser_payouts.
+export type EventPayout = {
+  id: string;
+  organization_id: string;
+  event_id: string;
+  amount: number;
+  note: string | null;
+  paid_by: string | null;
+  created_at: string;
+};
+
+export type EventPayoutRequestStatus = "pending" | "paid" | "cancelled";
+
+export type EventPayoutRequest = {
+  id: string;
+  organization_id: string;
+  event_id: string;
+  amount: number;
+  status: EventPayoutRequestStatus;
+  requested_by: string | null;
+  resolved_payout_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -2255,6 +2285,55 @@ export type Database = {
             columns: ["registration_id"];
             isOneToOne: false;
             referencedRelation: "event_registrations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      event_payouts: {
+        Row: EventPayout;
+        Insert: Partial<EventPayout> & Pick<EventPayout, "organization_id" | "event_id" | "amount">;
+        Update: Partial<EventPayout>;
+        Relationships: [
+          {
+            foreignKeyName: "event_payouts_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "event_payouts_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "events";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      event_payout_requests: {
+        Row: EventPayoutRequest;
+        Insert: Partial<EventPayoutRequest> & Pick<EventPayoutRequest, "organization_id" | "event_id" | "amount">;
+        Update: Partial<EventPayoutRequest>;
+        Relationships: [
+          {
+            foreignKeyName: "event_payout_requests_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "event_payout_requests_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "event_payout_requests_resolved_payout_id_fkey";
+            columns: ["resolved_payout_id"];
+            isOneToOne: false;
+            referencedRelation: "event_payouts";
             referencedColumns: ["id"];
           },
         ];

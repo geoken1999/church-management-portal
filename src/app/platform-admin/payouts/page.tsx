@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
-import { getSharedFundraiserLedger } from "@/lib/platform-admin/dal";
+import { getSharedFundraiserLedger, getEventPayoutLedgerAdmin } from "@/lib/platform-admin/dal";
 import { SHARED_SERVICE_FEE_RATE, sharedServiceFee } from "@/lib/finance/fees";
 import { RecordPayoutDialog } from "@/components/platform-admin/RecordPayoutDialog";
+import { RecordEventPayoutDialog } from "@/components/platform-admin/RecordEventPayoutDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -18,10 +19,10 @@ function formatMoney(amount: number): string {
 
 export default async function PlatformAdminPayoutsPage() {
   await requirePlatformAdmin();
-  const ledger = await getSharedFundraiserLedger();
+  const [ledger, eventLedger] = await Promise.all([getSharedFundraiserLedger(), getEventPayoutLedgerAdmin()]);
 
   return (
-    <div className="max-w-4xl space-y-8">
+    <div className="max-w-4xl space-y-10">
       <div>
         <h1 className="font-heading text-3xl font-bold tracking-tight">Shared fundraiser payouts</h1>
         <p className="mt-1 text-muted-foreground">
@@ -60,6 +61,52 @@ export default async function PlatformAdminPayoutsPage() {
                     fundraiserId={entry.fundraiserId}
                     organizationId={entry.organizationId}
                     fundraiserTitle={entry.fundraiserTitle}
+                    owed={entry.pendingRequest?.amount ?? entry.owed}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <div>
+        <h2 className="font-heading text-2xl font-bold tracking-tight">Event registration payouts</h2>
+        <p className="mt-1 text-muted-foreground">
+          Paid events using KingdomFlow&apos;s own payment gateway. Same {FEE_PERCENT} fee, same manual-wire model —
+          record a payout here once it&apos;s done; the organizer gets a receipt email automatically.
+        </p>
+      </div>
+
+      {eventLedger.length === 0 ? (
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+            No platform-gateway events have collected anything yet.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {eventLedger.map((entry) => (
+            <Card key={entry.eventId}>
+              <CardContent className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">{entry.organizationName}</p>
+                  <h3 className="font-heading text-base font-bold">{entry.eventTitle}</h3>
+                  <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                    <span>₹{formatMoney(entry.collected)} collected</span>
+                    <span>
+                      {FEE_PERCENT} fee (₹{formatMoney(sharedServiceFee(entry.collected))})
+                    </span>
+                    <span>₹{formatMoney(entry.paidOut)} paid out</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {entry.pendingRequest && <Badge variant="destructive">Payout requested</Badge>}
+                  <Badge variant={entry.owed > 0 ? "default" : "secondary"}>₹{formatMoney(entry.owed)} owed</Badge>
+                  <RecordEventPayoutDialog
+                    eventId={entry.eventId}
+                    organizationId={entry.organizationId}
+                    eventTitle={entry.eventTitle}
                     owed={entry.pendingRequest?.amount ?? entry.owed}
                   />
                 </div>

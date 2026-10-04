@@ -131,4 +131,8 @@ describe("validatePaymentSettings", () => {
   it("rejects an invalid timing value", () => {
     expect(validatePaymentSettings({ ...platformValid, paymentTiming: "whenever" }).paymentTiming).toBeDefined();
   });
+
+  it("accepts the 'both' timing — visitor chooses pay-now vs. pay-at-check-in", () => {
+    expect(validatePaymentSettings({ ...platformValid, paymentTiming: "both" })).toEqual({});
+  });
 });

@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendRegistrationPassEmail } from "@/lib/events/registration-pass";
 import { eventVenueLabel, eventJoinLink } from "@/lib/events/location";
-import type { EventMeetingMode, EventPaymentGateway } from "@/types/database";
+import type { EventMeetingMode, EventPaymentGateway, EventPaymentTiming } from "@/types/database";
 
 export interface PublicEventRegistrationState {
   error?: string;
@@ -12,12 +12,15 @@ export interface PublicEventRegistrationState {
   // Set instead of `success` when the event requires payment before the
   // pass is sent — the client renders a payment step (the organizer's
   // external link, or the platform's Razorpay checkout) instead of the
-  // normal "you're registered" state.
+  // normal "you're registered" state. Also set for "both" timing, where
+  // the visitor still needs to choose between paying now or deferring to
+  // check-in before the pass goes out.
   paymentRequired?: boolean;
   registrationId?: string;
   paymentGateway?: EventPaymentGateway;
   paymentAmount?: number;
   externalPaymentUrl?: string | null;
+  paymentTiming?: EventPaymentTiming;
 }
 
 // Shared by two callers: registerForEvent below (immediately, when
@@ -143,7 +146,9 @@ export async function registerForEvent(
     .eq("registration_share_token", token)
     .maybeSingle();
 
-  const paymentPending = Boolean(event?.payment_required) && event?.payment_timing === "before_registration";
+  const paymentPending =
+    Boolean(event?.payment_required) &&
+    (event?.payment_timing === "before_registration" || event?.payment_timing === "both");
 
   if (paymentPending) {
     return {
@@ -152,6 +157,7 @@ export async function registerForEvent(
       paymentGateway: event?.payment_gateway ?? undefined,
       paymentAmount: event?.payment_amount ?? undefined,
       externalPaymentUrl: event?.external_payment_url,
+      paymentTiming: event?.payment_timing ?? undefined,
     };
   }
 
@@ -170,5 +176,33 @@ export async function registerForEvent(
     };
   }
 
+  return { success: true };
+}
+
+export interface DeferEventRegistrationPaymentState {
+  error?: string;
+  success?: boolean;
+}
+
+// The other half of "both" timing's visitor choice — picking "I'll pay at
+// check-in" resolves to exactly the same end state the plain "at_checkin"
+// timing already produces on its own: the pass goes out now, payment_status
+// stays 'pending' until staff marks it paid later (see markRegistrationPaid).
+export async function deferEventRegistrationToCheckin(registrationId: string): Promise<DeferEventRegistrationPaymentState> {
+  const admin = createAdminClient();
+  const { data: registration } = await admin
+    .from("event_registrations")
+    .select("payment_status")
+    .eq("id", registrationId)
+    .maybeSingle();
+
+  if (!registration) {
+    return { error: "That registration could not be found." };
+  }
+  if (registration.payment_status !== "pending") {
+    return { success: true };
+  }
+
+  await sendPassEmailForRegistration(registrationId);
   return { success: true };
 }

@@ -108,6 +108,10 @@ export const ta: Dictionary = {
     paymentSuccessDescription: "உங்கள் பதிவு பாஸ் மற்றும் QR குறியீட்டிற்கு உங்கள் மின்னஞ்சலைச் சரிபார்க்கவும்.",
     paymentFormLoadError: "பணம் செலுத்தும் படிவத்தை ஏற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
     paymentFormStillLoading: "பணம் செலுத்தும் படிவம் இன்னும் ஏற்றப்படுகிறது — சிறிது நேரம் கழித்து முயற்சிக்கவும்.",
+    payAtCheckinInstead: "நான் செக்-இன் போது செலுத்துகிறேன்",
+    deferringToCheckin: "ஒரு கணம்...",
+    deferredToCheckinTitle: "நீங்கள் பதிவு செய்யப்பட்டீர்கள்!",
+    deferredToCheckinDescription: (amount: number) => `உங்கள் பாஸிற்கு உங்கள் மின்னஞ்சலைச் சரிபார்க்கவும். நீங்கள் செக்-இன் போது ₹${amount} செலுத்தலாம்.`,
   },
   publicGive: {
     notFoundDescription: "இந்த நன்கொடை இணைப்பு தவறானது அல்லது இனி செயலில் இல்லை. புதிய இணைப்பிற்கு தேவாலயத்தைக் கேளுங்கள்.",

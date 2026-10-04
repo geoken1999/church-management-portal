@@ -200,7 +200,7 @@ export async function finalizeEventRegistrationPayment(
     .eq("id", order.registration_id);
 
   const event = order.events as { payment_timing: string | null } | null;
-  if (event?.payment_timing === "before_registration") {
+  if (event?.payment_timing === "before_registration" || event?.payment_timing === "both") {
     await sendPassEmailForRegistration(order.registration_id);
   }
 

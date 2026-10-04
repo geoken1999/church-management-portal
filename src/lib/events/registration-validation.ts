@@ -177,10 +177,11 @@ export const EVENT_PAYMENT_GATEWAY_LABELS: Record<EventPaymentGateway, string> =
   external: "Your own payment link",
 };
 
-export const EVENT_PAYMENT_TIMINGS: EventPaymentTiming[] = ["before_registration", "at_checkin"];
+export const EVENT_PAYMENT_TIMINGS: EventPaymentTiming[] = ["before_registration", "at_checkin", "both"];
 export const EVENT_PAYMENT_TIMING_LABELS: Record<EventPaymentTiming, string> = {
   before_registration: "Before registration is confirmed — the pass is held until payment is confirmed",
   at_checkin: "At check-in — the pass is sent now, payment is collected later",
+  both: "Visitor's choice — they can pay now, or choose to pay at check-in",
 };
 
 export interface PaymentSettingsErrors {

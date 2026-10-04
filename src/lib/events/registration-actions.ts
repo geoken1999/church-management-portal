@@ -5,6 +5,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { checkStorageQuota, getPlanUsage } from "@/lib/plans/dal";
+import { requireFinancePlan } from "@/lib/finance/actions";
+import { sharedServiceNetAmount } from "@/lib/finance/fees";
+import { notifyPlatformAdmins } from "@/lib/platform-admin/notify";
 import {
   validateRegistrationSettings,
   validatePaymentSettings,
@@ -235,15 +238,115 @@ export async function markRegistrationPaid(formData: FormData) {
 
   await admin.from("event_registrations").update({ payment_status: "paid", paid_at: new Date().toISOString() }).eq("id", registrationId);
 
-  // "before_registration" withholds the pass until payment is confirmed —
-  // this is the first moment that becomes true for an external-gateway
-  // registration (or a platform-gateway one being reconciled manually).
-  // "at_checkin" registrations already got their pass at registration
-  // time, so there's nothing to send here.
+  // "before_registration" (and "both", until the visitor resolves their
+  // choice) withholds the pass until payment is confirmed — this is the
+  // first moment that becomes true for an external-gateway registration
+  // (or a platform-gateway one being reconciled manually). "at_checkin"
+  // registrations already got their pass at registration time, so
+  // there's nothing to send here.
   const event = registration.events as { payment_timing: string | null } | null;
-  if (event?.payment_timing === "before_registration") {
+  if (event?.payment_timing === "before_registration" || event?.payment_timing === "both") {
     await sendPassEmailForRegistration(registrationId);
   }
+
+  revalidatePath(EVENTS_PATH);
+}
+
+export interface EventPayoutRequestState {
+  error?: string;
+  success?: boolean;
+}
+
+// Asks the platform to pay out a platform-gateway event's collected
+// balance — mirrors requestFundraiserPayout (src/lib/finance/actions.ts)
+// exactly. Only ever creates a request row; see /platform-admin/payouts
+// for where it's actually fulfilled (still a manual bank transfer,
+// recorded there once done).
+export async function requestEventPayout(
+  _prevState: EventPayoutRequestState,
+  formData: FormData,
+): Promise<EventPayoutRequestState> {
+  const user = await requireUser();
+  const eventId = String(formData.get("eventId") ?? "");
+
+  const organizationId = await organizationIdForEvent(eventId);
+  if (!organizationId) {
+    return { error: "That event could not be found." };
+  }
+  const planError = await requireFinancePlan(organizationId);
+  if (planError) {
+    return { error: planError };
+  }
+  const access = await checkTabAccess(organizationId, "events", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
+
+  const admin = createAdminClient();
+
+  // Computed fresh here rather than trusting a client-submitted amount.
+  // "Collected" is read from event_registration_payment_orders, not
+  // event_registrations.payment_status — see getEventPayoutLedger
+  // (src/lib/events/dal.ts) for why that distinction matters.
+  const [{ data: event }, { data: orders }, { data: payouts }, { data: existingPending }] = await Promise.all([
+    admin.from("events").select("payment_gateway").eq("id", eventId).maybeSingle(),
+    admin.from("event_registration_payment_orders").select("amount").eq("event_id", eventId).eq("status", "paid"),
+    admin.from("event_payouts").select("amount").eq("event_id", eventId),
+    admin.from("event_payout_requests").select("id").eq("event_id", eventId).eq("status", "pending").maybeSingle(),
+  ]);
+
+  if (!event || event.payment_gateway !== "platform") {
+    return { error: "This event isn't using the platform's payment gateway." };
+  }
+  if (existingPending) {
+    return { error: "A payout request is already pending for this event." };
+  }
+
+  const collected = (orders ?? []).reduce((sum, row) => sum + row.amount, 0);
+  const paidOut = (payouts ?? []).reduce((sum, row) => sum + row.amount, 0);
+  const owed = sharedServiceNetAmount(collected) - paidOut;
+
+  if (owed <= 0) {
+    return { error: "There's nothing owed to request a payout for." };
+  }
+
+  const { error } = await admin.from("event_payout_requests").insert({
+    organization_id: organizationId,
+    event_id: eventId,
+    amount: owed,
+    requested_by: user.id,
+  });
+
+  if (error) {
+    return { error: "Couldn't submit that payout request. Please try again." };
+  }
+
+  await notifyPlatformAdmins(
+    "New event payout request",
+    `<p>An organization has requested a payout of <strong>₹${owed.toFixed(2)}</strong> for an event's collected registrations.</p><p>Review and record it from Platform Admin → Payouts.</p>`,
+  );
+
+  revalidatePath(EVENTS_PATH);
+  return { success: true };
+}
+
+export async function cancelEventPayoutRequest(formData: FormData) {
+  await requireUser();
+  const requestId = String(formData.get("requestId") ?? "");
+
+  const admin = createAdminClient();
+  const { data: request } = await admin
+    .from("event_payout_requests")
+    .select("organization_id, status")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (!request || request.status !== "pending") return;
+
+  if (await requireFinancePlan(request.organization_id)) return;
+  const access = await checkTabAccess(request.organization_id, "events", "write");
+  if (!access.ok) return;
+
+  await admin.from("event_payout_requests").update({ status: "cancelled" }).eq("id", requestId);
 
   revalidatePath(EVENTS_PATH);
 }

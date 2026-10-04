@@ -83,6 +83,74 @@ export async function getFundraiserPayoutHistory(fundraiserId: string) {
   return data ?? [];
 }
 
+export interface EventPayoutLedgerEntry {
+  eventId: string;
+  eventTitle: string;
+  organizationId: string;
+  organizationName: string;
+  collected: number;
+  paidOut: number;
+  owed: number;
+  pendingRequest: { id: string; amount: number } | null;
+}
+
+// Mirrors getSharedFundraiserLedger exactly, for platform-gateway paid
+// events instead of shared-mode fundraisers. "Collected" comes from
+// event_registration_payment_orders (status = 'paid') — the only rows
+// that represent money Razorpay actually captured into the platform's
+// account, never from event_registrations.payment_status (which also
+// flips to 'paid' for manually-reconciled cash/bank-transfer/external-link
+// payments that never touched this account).
+export async function getEventPayoutLedgerAdmin(): Promise<EventPayoutLedgerEntry[]> {
+  const admin = createAdminClient();
+
+  const [{ data: events }, { data: orders }, { data: payouts }, { data: pendingRequests }] = await Promise.all([
+    admin
+      .from("events")
+      .select("id, title, organization_id, organizations(name)")
+      .eq("payment_gateway", "platform"),
+    admin.from("event_registration_payment_orders").select("event_id, amount").eq("status", "paid"),
+    admin.from("event_payouts").select("event_id, amount"),
+    admin.from("event_payout_requests").select("id, event_id, amount").eq("status", "pending"),
+  ]);
+
+  const collectedByEvent = new Map<string, number>();
+  for (const order of orders ?? []) {
+    collectedByEvent.set(order.event_id, (collectedByEvent.get(order.event_id) ?? 0) + order.amount);
+  }
+
+  const paidOutByEvent = new Map<string, number>();
+  for (const payout of payouts ?? []) {
+    paidOutByEvent.set(payout.event_id, (paidOutByEvent.get(payout.event_id) ?? 0) + payout.amount);
+  }
+
+  const pendingByEvent = new Map<string, { id: string; amount: number }>();
+  for (const request of pendingRequests ?? []) {
+    pendingByEvent.set(request.event_id, { id: request.id, amount: request.amount });
+  }
+
+  return (events ?? [])
+    .map((event) => {
+      const collected = collectedByEvent.get(event.id) ?? 0;
+      const paidOut = paidOutByEvent.get(event.id) ?? 0;
+      return {
+        eventId: event.id,
+        eventTitle: event.title,
+        organizationId: event.organization_id,
+        organizationName: (event.organizations as { name: string } | null)?.name ?? "Unknown church",
+        collected,
+        paidOut,
+        owed: sharedServiceNetAmount(collected) - paidOut,
+        pendingRequest: pendingByEvent.get(event.id) ?? null,
+      };
+    })
+    .filter((entry) => entry.collected > 0)
+    .sort((a, b) => {
+      if (Boolean(a.pendingRequest) !== Boolean(b.pendingRequest)) return a.pendingRequest ? -1 : 1;
+      return b.owed - a.owed;
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Tenants — every organization on the platform, with its effective plan,
 // subscription status, and owner contact — the Super Admin's "who's on the

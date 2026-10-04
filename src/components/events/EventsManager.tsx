@@ -7,6 +7,7 @@ import { createEvent, updateEvent, deleteEvent, type EventFormState } from "@/li
 import { getOccurrencesInRange, occurrenceLabel } from "@/lib/events/recurrence";
 import { RECURRENCE_FREQUENCIES, EVENT_STATUSES } from "@/lib/events/validation";
 import { EventRegistrationDialog } from "@/components/events/EventRegistrationDialog";
+import { EventPayoutDialog, type PayoutHistoryEntry } from "@/components/events/EventPayoutDialog";
 import { AddToAttendanceButton } from "@/components/events/AddToAttendanceButton";
 import { MEETING_MODE_LABELS } from "@/lib/events/location";
 import type { Branch, Event, EventMeetingMode, EventRecurrenceFrequency, EventStatus, Member } from "@/types/database";
@@ -32,7 +33,14 @@ import {
 
 type MemberBasic = Pick<Member, "id" | "first_name" | "last_name">;
 type BranchBasic = Pick<Branch, "id" | "name">;
-type EventRow = Event & { members: MemberBasic | null; branches: BranchBasic | null };
+type EventRow = Event & {
+  members: MemberBasic | null;
+  branches: BranchBasic | null;
+  collected: number;
+  owed: number;
+  pendingPayoutRequest: { id: string; amount: number } | null;
+  payoutHistory: PayoutHistoryEntry[];
+};
 type KmeetBadge = { id: string; title: string; status: string };
 
 const OPEN_MEETING_LABEL = "Open meeting (not branch-specific)";
@@ -661,6 +669,16 @@ function EventCard({
               {occurrenceLabel(event)}
             </Badge>
             <Badge variant={EVENT_STATUS_BADGE_VARIANTS[event.status ?? "active"]}>{EVENT_STATUS_LABELS[event.status ?? "active"]}</Badge>
+            {event.payment_gateway === "platform" && event.collected > 0 && (
+              <EventPayoutDialog
+                eventId={event.id}
+                eventTitle={event.title}
+                collected={event.collected}
+                owed={event.owed}
+                pendingPayoutRequest={event.pendingPayoutRequest}
+                payoutHistory={event.payoutHistory}
+              />
+            )}
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <MapPin className="size-3.5 shrink-0" />

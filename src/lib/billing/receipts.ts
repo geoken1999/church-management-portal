@@ -65,3 +65,16 @@ export async function sendAddonPurchaseEmail(organizationId: string, packLabel: 
     `<p>Your purchase of <strong>${packLabel}</strong> for ${formatRupees(amountRupees)} was successful and has been added to your account.</p>`,
   );
 }
+
+// The organizer's receipt once a platform-gateway event's payout request
+// has actually been wired and recorded (recordEventPayout, src/lib/
+// platform-admin/actions.ts) — the counterpart to notifyPlatformAdmins
+// (src/lib/platform-admin/notify.ts), which fires when the request is
+// first raised.
+export async function sendEventPayoutProcessedEmail(organizationId: string, eventTitle: string, amountRupees: number): Promise<void> {
+  await sendBillingEmail(
+    organizationId,
+    `Payout sent — ${eventTitle}`,
+    `<p>A payout of <strong>${formatRupees(amountRupees)}</strong> for <strong>${eventTitle}</strong>'s registration payments has been processed and wired to you.</p>`,
+  );
+}

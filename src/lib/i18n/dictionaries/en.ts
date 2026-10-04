@@ -110,6 +110,10 @@ export const en = {
     paymentSuccessDescription: "Check your email for your registration pass and QR code.",
     paymentFormLoadError: "Couldn't load the payment form. Please refresh and try again.",
     paymentFormStillLoading: "The payment form is still loading — try again in a moment.",
+    payAtCheckinInstead: "I'll pay at check-in instead",
+    deferringToCheckin: "One moment...",
+    deferredToCheckinTitle: "You're registered!",
+    deferredToCheckinDescription: (amount: number) => `Check your email for your pass. You can pay ₹${amount} at check-in.`,
   },
   publicGive: {
     notFoundDescription: "This giving link is invalid or is no longer active. Ask the church for a new link.",

@@ -6,6 +6,7 @@ import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
 import { isPlanId } from "@/lib/plans/config";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { notifyOrgOfSupportReply } from "@/lib/support/notify-org";
+import { sendEventPayoutProcessedEmail } from "@/lib/billing/receipts";
 import { TAB_LABELS, type TabKey } from "@/lib/permissions/tabs";
 import type { SupportTicketStatus } from "@/types/database";
 
@@ -64,6 +65,50 @@ export async function recordFundraiserPayout(_prevState: RecordPayoutState, form
     .update({ status: "paid", resolved_payout_id: payout.id })
     .eq("fundraiser_id", fundraiserId)
     .eq("status", "pending");
+
+  revalidatePath(PAYOUTS_PATH);
+  return { success: true };
+}
+
+// Mirrors recordFundraiserPayout exactly, for platform-gateway events.
+export async function recordEventPayout(_prevState: RecordPayoutState, formData: FormData): Promise<RecordPayoutState> {
+  const user = await requirePlatformAdmin();
+
+  const eventId = String(formData.get("eventId") ?? "");
+  const organizationId = String(formData.get("organizationId") ?? "");
+  const amountRaw = String(formData.get("amount") ?? "");
+  const note = String(formData.get("note") ?? "").trim();
+
+  const amount = Number(amountRaw);
+  if (!amountRaw.trim() || Number.isNaN(amount) || amount <= 0) {
+    return { error: "Enter an amount greater than 0." };
+  }
+
+  const admin = createAdminClient();
+  const { data: payout, error } = await admin
+    .from("event_payouts")
+    .insert({
+      organization_id: organizationId,
+      event_id: eventId,
+      amount,
+      note: note || null,
+      paid_by: user.id,
+    })
+    .select("id")
+    .single();
+
+  if (error || !payout) {
+    return { error: "Couldn't record that payout. Please try again." };
+  }
+
+  await admin
+    .from("event_payout_requests")
+    .update({ status: "paid", resolved_payout_id: payout.id })
+    .eq("event_id", eventId)
+    .eq("status", "pending");
+
+  const { data: event } = await admin.from("events").select("title").eq("id", eventId).maybeSingle();
+  await sendEventPayoutProcessedEmail(organizationId, event?.title ?? "your event", amount);
 
   revalidatePath(PAYOUTS_PATH);
   return { success: true };

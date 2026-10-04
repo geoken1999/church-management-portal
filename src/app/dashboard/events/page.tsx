@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getLeaderMembers } from "@/lib/leaders/dal";
 import { getBranches } from "@/lib/branches/dal";
-import { getEvents } from "@/lib/events/dal";
+import { getEvents, getEventPayoutLedger } from "@/lib/events/dal";
 import { getKmeetMeetingsByEvent } from "@/lib/kmeet/dal";
 import { getPlanLimits } from "@/lib/plans/dal";
 import { getSiteUrl } from "@/lib/site-url";
@@ -24,13 +24,19 @@ export default async function EventsPage() {
 
   // Event managers are picked from Leaders, not the full members list —
   // see /dashboard/leaders.
-  const [assignableMembers, branches, events, kmeetByEvent, plan] = await Promise.all([
+  const [assignableMembers, branches, events, kmeetByEvent, plan, payoutLedger] = await Promise.all([
     getLeaderMembers(organizationId),
     getBranches(organizationId),
     getEvents(organizationId),
     getKmeetMeetingsByEvent(organizationId),
     getPlanLimits(organizationId),
+    getEventPayoutLedger(organizationId),
   ]);
+
+  const eventsWithPayouts = events.map((event) => ({
+    ...event,
+    ...(payoutLedger.get(event.id) ?? { collected: 0, owed: 0, pendingPayoutRequest: null, payoutHistory: [] }),
+  }));
 
   return (
     <div className="space-y-8">
@@ -45,7 +51,7 @@ export default async function EventsPage() {
         organizationId={organizationId}
         members={assignableMembers}
         branches={branches}
-        events={events}
+        events={eventsWithPayouts}
         canManage={canManage}
         siteUrl={getSiteUrl()}
         kmeetByEventId={Object.fromEntries(kmeetByEvent)}

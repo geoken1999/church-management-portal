@@ -235,7 +235,15 @@ export async function refreshWhatsAppTemplateStatusAction(templateId: string): P
     const { status, rejectedReason } = await fetchMetaTemplateStatus(template.meta_template_id);
     await admin.from("whatsapp_templates").update({ status, rejected_reason: rejectedReason }).eq("id", templateId);
   } catch (err) {
-    return { error: describeWhatsAppError(err).message };
+    const detail = describeWhatsAppError(err);
+    await logPlatformEvent({
+      level: "error",
+      source: "whatsapp_template",
+      message: `Status refresh failed: ${err instanceof Error ? err.message : "unknown error"}`,
+      organizationId: template.organization_id,
+      metadata: { templateId, code: detail.code, type: detail.type },
+    });
+    return { error: detail.message };
   }
 
   revalidatePath(WHATSAPP_PATH);
@@ -442,7 +450,15 @@ export async function sendWhatsAppReplyAction(conversationId: string, body: stri
     // ever be sent as a reply inside that window. describeWhatsAppError
     // covers the other common cause (an invalid/expired access token)
     // with its own clearer message instead of Meta's raw wording.
-    return { error: describeWhatsAppError(err).message };
+    const detail = describeWhatsAppError(err);
+    await logPlatformEvent({
+      level: "error",
+      source: "whatsapp_send",
+      message: `Reply send failed: ${err instanceof Error ? err.message : "unknown error"}`,
+      organizationId: conversation.organization_id,
+      metadata: { conversationId, code: detail.code, type: detail.type },
+    });
+    return { error: detail.message };
   }
 
   await admin.from("whatsapp_messages").insert({

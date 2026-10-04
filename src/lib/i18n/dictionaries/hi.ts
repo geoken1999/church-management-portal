@@ -58,7 +58,6 @@ export const hi: Dictionary = {
       askAura: "Ask Aura",
       aiRules: "AI नियम",
       automations: "ऑटोमेशन",
-      automateWishes: "सदस्यों के लिए शुभकामनाएं स्वचालित करें",
       forms: "फ़ॉर्म",
       folder: "फ़ोल्डर",
       attendance: "उपस्थिति",

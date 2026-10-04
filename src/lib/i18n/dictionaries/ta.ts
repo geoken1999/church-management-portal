@@ -58,7 +58,6 @@ export const ta: Dictionary = {
       askAura: "Ask Aura",
       aiRules: "AI விதிகள்",
       automations: "ஆட்டோமேஷன்",
-      automateWishes: "உறுப்பினர்களுக்கான வாழ்த்துக்களை தானியக்கமாக்கு",
       forms: "படிவங்கள்",
       folder: "கோப்புறை",
       attendance: "வருகை",

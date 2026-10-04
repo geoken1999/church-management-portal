@@ -49,7 +49,7 @@ export function PricingSection() {
         </Tabs>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {PLAN_ORDER.map((planId) => {
           const plan = PLANS[planId];
           const featured = planId === FEATURED_PLAN_ID;
@@ -88,28 +88,30 @@ export function PricingSection() {
           );
         })}
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Custom</CardTitle>
-              <Sparkles className="size-4 text-primary" />
-            </div>
-            <p className="font-heading text-3xl font-bold">Let&apos;s talk</p>
-            <CardDescription>For churches that need something outside the standard plans.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ul className="space-y-2.5 text-sm">
-              {CUSTOM_PLAN_HIGHLIGHTS.map((highlight) => (
-                <li key={highlight} className="flex items-start gap-2">
-                  <Check className="mt-0.5 size-4 shrink-0 text-primary" />
-                  <span>{highlight}</span>
-                </li>
-              ))}
-            </ul>
-            <CustomPlanRequestDialog triggerLabel="Request a Custom plan" triggerClassName="w-full" />
-          </CardContent>
-        </Card>
       </div>
+
+      <Card className="mt-6 overflow-hidden border-primary/30 bg-gradient-to-r from-primary/5 via-transparent to-transparent">
+        <CardContent className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+              <Sparkles className="size-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-heading text-lg font-bold">Need something custom?</p>
+              <p className="mt-1 text-sm text-muted-foreground">For churches that need something outside the standard plans.</p>
+              <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                {CUSTOM_PLAN_HIGHLIGHTS.map((highlight) => (
+                  <li key={highlight} className="flex items-center gap-1.5">
+                    <Check className="size-3.5 shrink-0 text-primary" />
+                    {highlight}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <CustomPlanRequestDialog triggerLabel="Request a Custom plan" triggerClassName="shrink-0" />
+        </CardContent>
+      </Card>
     </>
   );
 }

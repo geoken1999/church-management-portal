@@ -105,6 +105,24 @@ export async function POST(request: Request) {
 
   const planName = isPlanId(existing.plan_id) ? PLANS[existing.plan_id].name : existing.plan_id;
 
+  // Record what the platform actually collected for this charge. Razorpay
+  // reports amounts in paise. Keyed on the payment id, so a redelivered
+  // webhook doesn't count the same charge twice.
+  if (event === "subscription.charged" && paymentEntity?.id && paymentEntity.amount > 0) {
+    await admin.from("platform_subscription_payments").upsert(
+      {
+        organization_id: existing.organization_id,
+        razorpay_subscription_id: subscriptionEntity.id,
+        razorpay_payment_id: paymentEntity.id,
+        plan_id: existing.plan_id,
+        amount: paymentEntity.amount / 100,
+        currency: paymentEntity.currency ?? "INR",
+        paid_at: toIso(paymentEntity.created_at) ?? new Date().toISOString(),
+      },
+      { onConflict: "razorpay_payment_id", ignoreDuplicates: true },
+    );
+  }
+
   if (event === "subscription.activated" || event === "subscription.charged") {
     await admin.from("organizations").update({ plan: existing.plan_id }).eq("id", existing.organization_id);
 

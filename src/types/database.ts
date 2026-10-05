@@ -962,6 +962,31 @@ export type EventPayout = {
   created_at: string;
 };
 
+export type PlatformSubscriptionPayment = {
+  id: string;
+  organization_id: string | null;
+  razorpay_subscription_id: string;
+  razorpay_payment_id: string;
+  plan_id: string;
+  amount: number;
+  currency: string;
+  paid_at: string;
+  created_at: string;
+};
+
+export type PlatformExpense = {
+  id: string;
+  service: string;
+  description: string;
+  vendor: string | null;
+  amount: number;
+  currency: string;
+  paid_on: string;
+  reference: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
 export type EventPayoutRequestStatus = "pending" | "paid" | "cancelled";
 
 export type EventPayoutRequest = {
@@ -2348,6 +2373,19 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      platform_subscription_payments: {
+        Row: PlatformSubscriptionPayment;
+        Insert: Partial<PlatformSubscriptionPayment> &
+          Pick<PlatformSubscriptionPayment, "razorpay_subscription_id" | "razorpay_payment_id" | "plan_id" | "amount" | "paid_at">;
+        Update: Partial<PlatformSubscriptionPayment>;
+        Relationships: [];
+      };
+      platform_expenses: {
+        Row: PlatformExpense;
+        Insert: Partial<PlatformExpense> & Pick<PlatformExpense, "service" | "description" | "amount" | "paid_on">;
+        Update: Partial<PlatformExpense>;
+        Relationships: [];
       };
       event_payouts: {
         Row: EventPayout;

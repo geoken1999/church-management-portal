@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Building2, LifeBuoy, HeartPulse, ScrollText, HandCoins, BookOpen, Radio, ToggleLeft, Wallet, Receipt } from "lucide-react";
+import { LayoutDashboard, Building2, LifeBuoy, HeartPulse, ScrollText, HandCoins, BookOpen, Radio, ToggleLeft, Wallet, Receipt, BarChart3 } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/platform-admin", label: "Overview", icon: LayoutDashboard, exact: true },
@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: "/platform-admin/support", label: "Support", icon: LifeBuoy, exact: false },
   { href: "/platform-admin/earnings", label: "Earnings", icon: Wallet, exact: false },
   { href: "/platform-admin/expenses", label: "Expenses", icon: Receipt, exact: false },
+  { href: "/platform-admin/usage", label: "Usage", icon: BarChart3, exact: false },
   { href: "/platform-admin/payouts", label: "Payouts", icon: HandCoins, exact: false },
   { href: "/platform-admin/health", label: "Health", icon: HeartPulse, exact: false },
   { href: "/platform-admin/logs", label: "Logs", icon: ScrollText, exact: false },

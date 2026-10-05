@@ -114,9 +114,19 @@ create policy "Org members can view membership payouts"
   on public.membership_payouts for select to authenticated
   using (public.is_org_member(organization_id));
 
-alter table public.membership_payout_requests
-  add constraint membership_payout_requests_resolved_fk
-  foreign key (resolved_payout_id) references public.membership_payouts (id) on delete set null;
+-- Added in a separate step because membership_payouts is created after
+-- membership_payout_requests. Guarded so the file can be run again.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'membership_payout_requests_resolved_fk'
+  ) then
+    alter table public.membership_payout_requests
+      add constraint membership_payout_requests_resolved_fk
+      foreign key (resolved_payout_id) references public.membership_payouts (id) on delete set null;
+  end if;
+end
+$$;
 
 -- Reversal (run manually if needed):
 --   alter table public.membership_payout_requests drop constraint if exists membership_payout_requests_resolved_fk;

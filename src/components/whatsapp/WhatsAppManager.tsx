@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { MessageCircle, Search, Send, Sparkles, TriangleAlert, FileText, RefreshCw, Trash2, User } from "lucide-react";
 import {
@@ -864,6 +864,23 @@ function ChatThread({
   const [aiTyping, setAiTyping] = useState(false);
   const [aiModePending, startAiModeTransition] = useTransition();
 
+  // The list follows new messages to the bottom only while the reader is
+  // already there, so scrolling back through older messages isn't interrupted
+  // by the periodic refresh. Opening a conversation starts at the bottom.
+  const listRef = useRef<HTMLDivElement>(null);
+  const nearBottomRef = useRef(true);
+  useEffect(() => {
+    nearBottomRef.current = true;
+  }, [conversationId]);
+  useEffect(() => {
+    const el = listRef.current;
+    if (el && nearBottomRef.current) el.scrollTop = el.scrollHeight;
+  }, [messages, conversationId]);
+  function trackScroll() {
+    const el = listRef.current;
+    if (el) nearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  }
+
   useEffect(() => {
     getWhatsAppAiMode(organizationId, phoneNumber).then(setAiModeState);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -917,7 +934,7 @@ function ChatThread({
           AI mode {aiMode ? "on" : "off"}
         </Button>
       </div>
-      <div className="flex-1 space-y-2 overflow-y-auto p-3">
+      <div ref={listRef} onScroll={trackScroll} className="flex-1 space-y-2 overflow-y-auto p-3">
         {messages.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">No messages yet.</p>
         ) : (

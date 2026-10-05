@@ -18,6 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
+import { formatInTimezone, partsInTimezone } from "@/lib/organizations/timezone";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTab, TabsIndicator } from "@/components/ui/tabs";
@@ -41,24 +42,22 @@ export type TodoRow = Todo & {
   creator: { first_name: string; last_name: string } | null;
 };
 
-function toDatetimeLocal(iso: string | null): string {
+// The church's local date and time, in the form the datetime-local input
+// expects. Read in the organization's timezone, so a 7 PM to-do still reads 7 PM
+// for someone whose browser is set to a different zone.
+function toDatetimeLocal(iso: string | null, timeZone: string): string {
   if (!iso) return "";
-  const date = new Date(iso);
+  const p = partsInTimezone(new Date(iso), timeZone);
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return `${p.year}-${pad(p.month)}-${pad(p.day)}T${pad(p.hour)}:${pad(p.minute)}`;
 }
 
 function isOverdue(todo: TodoRow): boolean {
   return todo.status === "pending" && !!todo.due_at && new Date(todo.due_at).getTime() < Date.now();
 }
 
-function formatDueDate(iso: string): string {
-  return new Date(iso).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+function formatDueDate(iso: string, timeZone: string): string {
+  return formatInTimezone(iso, timeZone, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }, "en-US");
 }
 
 // ---------------------------------------------------------------------------
@@ -237,13 +236,13 @@ function CreateTodoDialog({ members }: { members: TeamMemberOption[] }) {
 // Edit
 // ---------------------------------------------------------------------------
 
-function EditTodoDialog({ todo, members }: { todo: TodoRow; members: TeamMemberOption[] }) {
+function EditTodoDialog({ todo, members, timezone }: { todo: TodoRow; members: TeamMemberOption[]; timezone: string }) {
   const [state, setState] = useState<TodoFormState>(initialFormState);
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState(todo.title);
   const [description, setDescription] = useState(todo.description ?? "");
-  const [dueAt, setDueAt] = useState(toDatetimeLocal(todo.due_at));
+  const [dueAt, setDueAt] = useState(toDatetimeLocal(todo.due_at, timezone));
   const [assignedTo, setAssignedTo] = useState(todo.assigned_to ?? "");
 
   function handleSubmit(formData: FormData) {
@@ -263,7 +262,7 @@ function EditTodoDialog({ todo, members }: { todo: TodoRow; members: TeamMemberO
           setState(initialFormState);
           setTitle(todo.title);
           setDescription(todo.description ?? "");
-          setDueAt(toDatetimeLocal(todo.due_at));
+          setDueAt(toDatetimeLocal(todo.due_at, timezone));
           setAssignedTo(todo.assigned_to ?? "");
         }
       }}
@@ -346,7 +345,7 @@ function DeleteTodoDialog({ todo }: { todo: TodoRow }) {
 // Row
 // ---------------------------------------------------------------------------
 
-function TodoItemRow({ todo, members }: { todo: TodoRow; members: TeamMemberOption[] }) {
+function TodoItemRow({ todo, members, timezone }: { todo: TodoRow; members: TeamMemberOption[]; timezone: string }) {
   const [pending, startTransition] = useTransition();
   const overdue = isOverdue(todo);
 
@@ -377,7 +376,7 @@ function TodoItemRow({ todo, members }: { todo: TodoRow; members: TeamMemberOpti
           {todo.due_at && (
             <Badge variant={overdue ? "destructive" : "outline"}>
               <CalendarClock className="size-3" />
-              {formatDueDate(todo.due_at)}
+              {formatDueDate(todo.due_at, timezone)}
             </Badge>
           )}
           {todo.assignee && (
@@ -401,7 +400,7 @@ function TodoItemRow({ todo, members }: { todo: TodoRow; members: TeamMemberOpti
             <CalendarPlus className="size-3.5" />
           </Button>
         )}
-        <EditTodoDialog todo={todo} members={members} />
+        <EditTodoDialog todo={todo} members={members} timezone={timezone} />
         <DeleteTodoDialog todo={todo} />
       </div>
     </div>
@@ -412,7 +411,7 @@ function TodoItemRow({ todo, members }: { todo: TodoRow; members: TeamMemberOpti
 // Root
 // ---------------------------------------------------------------------------
 
-export function TodosManager({ todos, members }: { todos: TodoRow[]; members: TeamMemberOption[] }) {
+export function TodosManager({ todos, members, timezone }: { todos: TodoRow[]; members: TeamMemberOption[]; timezone: string }) {
   const [filter, setFilter] = useState<"active" | "completed" | "all">("active");
 
   const filtered = useMemo(() => {
@@ -446,7 +445,7 @@ export function TodosManager({ todos, members }: { todos: TodoRow[]; members: Te
           ) : (
             <div className="divide-y divide-border">
               {filtered.map((todo) => (
-                <TodoItemRow key={todo.id} todo={todo} members={members} />
+                <TodoItemRow key={todo.id} todo={todo} members={members} timezone={timezone} />
               ))}
             </div>
           )}

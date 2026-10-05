@@ -34,7 +34,7 @@ export default async function TodosPage() {
         <p className="mt-1 text-muted-foreground">Track tasks for your team, with optional reminders.</p>
       </div>
 
-      <TodosManager todos={todos} members={memberOptions} />
+      <TodosManager todos={todos} members={memberOptions} timezone={membership.organization.timezone} />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { validateTodo, type TodoFieldErrors } from "@/lib/todos/validation";
 import { sendPushToUsers } from "@/lib/push/client";
+import { DEFAULT_TIMEZONE, zonedTimeToUtc } from "@/lib/organizations/timezone";
 
 const TODOS_PATH = "/dashboard/todos";
 const DASHBOARD_PATH = "/dashboard";
@@ -19,6 +20,18 @@ function readTodoFields(formData: FormData) {
     dueAt: String(formData.get("dueAt") ?? "").trim(),
     assignedTo: String(formData.get("assignedTo") ?? "").trim(),
   };
+}
+
+// The form's date and time have no timezone. They mean the church's local
+// time, so they're read in the organization's timezone, not the server's.
+async function timezoneForOrganization(organizationId: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("organizations").select("timezone").eq("id", organizationId).maybeSingle();
+  return data?.timezone ?? null;
+}
+
+function dueAtFromForm(dueAt: string, timeZone: string): string | null {
+  return dueAt ? zonedTimeToUtc(dueAt, timeZone).toISOString() : null;
 }
 
 export interface TodoFormState {
@@ -58,7 +71,7 @@ export async function createTodo(_prevState: TodoFormState, formData: FormData):
     organization_id: membership.organization.id,
     title: fields.title,
     description: fields.description || null,
-    due_at: fields.dueAt ? new Date(fields.dueAt).toISOString() : null,
+    due_at: dueAtFromForm(fields.dueAt, membership.organization.timezone),
     assigned_to: fields.assignedTo || null,
     created_by: user.id,
   });
@@ -99,6 +112,8 @@ export async function updateTodo(_prevState: TodoFormState, formData: FormData):
     return { fieldErrors };
   }
 
+  const timeZone = (await timezoneForOrganization(organizationId)) ?? DEFAULT_TIMEZONE;
+
   const supabase = await createClient();
 
   // Read the previous assignee first — only a change TO a new assignee
@@ -112,7 +127,7 @@ export async function updateTodo(_prevState: TodoFormState, formData: FormData):
     .update({
       title: fields.title,
       description: fields.description || null,
-      due_at: fields.dueAt ? new Date(fields.dueAt).toISOString() : null,
+      due_at: dueAtFromForm(fields.dueAt, timeZone),
       assigned_to: fields.assignedTo || null,
     })
     .eq("id", id);

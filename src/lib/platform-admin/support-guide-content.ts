@@ -101,12 +101,14 @@ export const SUPPORT_GUIDE_CATEGORIES: DocCategory[] = [
     articles: [
       {
         id: "cron-list",
-        title: "The three cron jobs",
+        title: "The five cron jobs",
         body: [
-          "- /api/cron/event-reminders — 45 2 * * * UTC (about 8:15 AM IST) — sends \"24h before\" and \"morning of\" event registration reminder emails.",
-          "- /api/cron/daily-health-report — 30 4 * * * UTC (about 10:00 AM IST) — emails a platform health summary to HEALTH_REPORT_EMAIL.",
           "- /api/instagram/cron/refresh-tokens — 0 3 * * * UTC (about 8:30 AM IST) — refreshes Instagram long-lived tokens before they expire.",
-          "All three are locked to once a day because Vercel's Hobby plan rejects any cron schedule finer than daily at deploy time — this is a hard platform ceiling, not a choice. The practical effect: an event's \"1 hour before\" reminder option can only fire if that moment happens to land within a few minutes of the one fixed daily run, so it's functionally unreliable today. Upgrading to Vercel Pro removes this ceiling.",
+          "- /api/cron/daily-health-report — 30 4 * * * UTC (about 10:00 AM IST) — emails a platform health summary to HEALTH_REPORT_EMAIL.",
+          "- /api/cron/event-reminders — 45 2 * * * UTC (about 8:15 AM IST) — sends \"24h before\" and \"morning of\" event registration reminder emails.",
+          "- /api/cron/todo-reminders — 15 3 * * * UTC (about 8:45 AM IST) — sends due-soon and assignment reminders for To Do items.",
+          "- /api/cron/automation-run — 0 1 * * * UTC (about 6:30 AM IST) — the one daily pass for automations. It runs birthday and anniversary wishes, the staff digest, member follow-up tasks (on each automation's chosen weekday), and monthly membership fee requests, reminders and receipts (on each church's due day, in its own timezone).",
+          "Vercel's Hobby plan rejects any cron schedule finer than daily at deploy time — this is a hard platform ceiling, not a choice. The practical effect: an event's \"1 hour before\" reminder option can only fire if that moment happens to land within a few minutes of the one fixed daily run, so it's functionally unreliable today. Upgrading to Vercel Pro removes this ceiling.",
         ],
       },
       {
@@ -114,7 +116,7 @@ export const SUPPORT_GUIDE_CATEGORIES: DocCategory[] = [
         title: "Manually triggering a cron job for testing",
         body: [
           "Both routes check a CRON_SECRET bearer token. Vercel automatically sends this as \"Authorization: Bearer $CRON_SECRET\" on its own scheduled calls — no extra wiring needed for the real cron to work.",
-          "To test by hand: curl -H \"Authorization: Bearer <secret>\" https://kingdomflow.in/api/cron/<job>. The secret value lives in Vercel's env vars.",
+          "To test by hand: curl -H \"Authorization: Bearer <secret>\" https://kingdomflow.in/api/cron/<job>. The secret value lives in Vercel's env vars. Note that running automation-run by hand runs every church's automations for that day, so use it with care on a live database.",
           "Read the JSON response directly — each route returns a small summary (for example eventsChecked and remindersSent counts) rather than just a 200 OK.",
         ],
       },
@@ -131,6 +133,17 @@ export const SUPPORT_GUIDE_CATEGORIES: DocCategory[] = [
           "1. Check Platform Admin → Logs for an email_send warning around the expected time. No warning at all is itself informative — see step 3.",
           "2. Confirm RESEND_API_KEY and EMAIL_FROM_ADDRESS are set in Vercel Production (the Health page also surfaces Resend's config status).",
           "3. If it's one of the two cron-sent reports, hit the route directly with the CRON_SECRET bearer token. A missing recipient or config env var makes the route fail before it ever logs anything — exactly what happened with HEALTH_REPORT_EMAIL being present locally but never added to Production: the report silently failed every day since the cron was created, with zero trace in Logs.",
+        ],
+      },
+      {
+        id: "membership-email",
+        title: "Membership fee emails or receipts didn't arrive",
+        body: [
+          "1. Platform Admin → Logs, filtered to membership_fee. A warning with \"not sent\" names the reason, usually the church's email quota or a missing sender. An error with \"couldn't be recorded\" means the email went out but the database write failed, which is why the next run would send it again. Check step 2 before anything else.",
+          "2. Confirm the database has the membership columns: request_via, reminder_via, receipt_sent_at and receipt_via on membership_fee_invoices (migration 0112). Without them, sends go out but aren't recorded, and receipts can't be retried.",
+          "3. Confirm NEXT_PUBLIC_SITE_URL is https://kingdomflow.in in Vercel Production. The links in these emails are built from it, and the Payment page is a public route, not a login.",
+          "4. Receipts that failed when a payment was confirmed are retried by the daily automation run, so they usually arrive on the next day. Reminders go out only after the chosen number of days has passed since the request. A member with no email address on file is never sent anything, which the Membership fees report shows as \"No email on file\".",
+          "5. Quota: membership emails sent from KingdomFlow's sender count against the church's monthly email allowance. Churches using their own SMTP are not counted. When a church is out of allowance, the daily run stops sending for that church until the allowance resets.",
         ],
       },
       {

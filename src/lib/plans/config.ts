@@ -35,7 +35,7 @@ export interface PlanLimits {
   instagramAccountLimit: number;
   youtubeAccountLimit: number;
   storageBytes: number;
-  // How long a single K-meet call can run before it's automatically ended
+  // How long a single K-Meet call can run before it's automatically ended
   // for everyone — null means unlimited. Snapshotted onto the meeting row
   // the moment its call actually starts (see kmeet/actions.ts), not
   // re-read live, so a mid-call plan change never changes an
@@ -208,9 +208,9 @@ export const PLANS: Record<PlanId, PlanLimits> = {
   ),
 };
 
-// K-Audio's limit is always K-meet's limit + 10 minutes (unlimited stays
+// K-Audio's limit is always K-Meet's limit + 10 minutes (unlimited stays
 // unlimited) — a relative rule, not an independent number, so it can
-// never drift out of sync if K-meet's own limits ever change.
+// never drift out of sync if K-Meet's own limits ever change.
 export function kaudioMaxDurationMinutes(plan: PlanLimits): number | null {
   return plan.kmeetMaxDurationMinutes === null ? null : plan.kmeetMaxDurationMinutes + 10;
 }

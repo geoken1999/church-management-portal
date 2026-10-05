@@ -6,7 +6,7 @@ import { KmeetManager } from "@/components/kmeet/KmeetManager";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
 export const metadata: Metadata = {
-  title: "K-meet | KingdomFlow",
+  title: "K-Meet | KingdomFlow",
 };
 
 export default async function KmeetPage() {
@@ -14,7 +14,7 @@ export default async function KmeetPage() {
   const organizationId = membership.organization.id;
 
   if (!membership.tabAccess.kmeet.read) {
-    return <AccessRestricted label="K-meet" />;
+    return <AccessRestricted label="K-Meet" />;
   }
 
   const [meetings, eventOptions] = await Promise.all([getKmeetMeetings(organizationId, "video"), getUpcomingEventOptions(organizationId)]);
@@ -25,7 +25,7 @@ export default async function KmeetPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-heading text-3xl font-bold tracking-tight">K-meet</h1>
+        <h1 className="font-heading text-3xl font-bold tracking-tight">K-Meet</h1>
         <p className="mt-1 text-muted-foreground">Video meetings — start one instantly or schedule one for later.</p>
       </div>
 

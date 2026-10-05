@@ -53,7 +53,7 @@ export const hi: Dictionary = {
       events: "कार्यक्रम",
       todos: "कार्य सूची",
       planner: "योजनाकार",
-      kmeet: "K-meet",
+      kmeet: "K-Meet",
       kaudio: "K-Audio",
       askAura: "Ask Aura",
       aiRules: "AI नियम",

@@ -819,7 +819,7 @@ export type KmeetMeeting = {
   scheduled_at: string | null;
   room_id: string | null;
   status: KmeetMeetingStatus;
-  // "video" is K-meet; "audio" is K-Audio — the same table, scheduling,
+  // "video" is K-Meet; "audio" is K-Audio — the same table, scheduling,
   // moderation, and room infrastructure serve both, distinguished only by
   // this column (see src/lib/kmeet/mode.ts).
   mode: KmeetMode;

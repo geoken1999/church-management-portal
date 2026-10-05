@@ -197,3 +197,23 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none; /* Chrome, Safari, modern Edge */
 }
+/* Active-speaker border on a call tile. Blinks while the participant is
+   speaking; people who have reduced motion turned on get a steady border
+   instead, so the speaker is still shown without flashing. */
+@keyframes speaking-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+.speaking-border {
+  animation: speaking-blink 1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .speaking-border {
+    animation: none;
+  }
+}

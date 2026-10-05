@@ -23,7 +23,7 @@ export function planFeatureRows(plan: PlanLimits): { label: string; included: bo
     { label: plan.memberLimit === null ? "Unlimited members" : `Up to ${plan.memberLimit.toLocaleString()} members`, included: true },
     { label: plan.formsLimit === null ? "Unlimited forms" : `Up to ${plan.formsLimit} forms`, included: true },
     {
-      label: plan.kmeetMaxDurationMinutes === null ? "Unlimited K-meet/K-audio" : `${plan.kmeetMaxDurationMinutes}-min K-meet, ${plan.kmeetMaxDurationMinutes + 10}-min K-audio`,
+      label: plan.kmeetMaxDurationMinutes === null ? "Unlimited K-Meet/K-Audio" : `${plan.kmeetMaxDurationMinutes}-min K-Meet, ${plan.kmeetMaxDurationMinutes + 10}-min K-Audio`,
       included: true,
     },
     {

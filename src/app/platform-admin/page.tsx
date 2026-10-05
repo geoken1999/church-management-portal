@@ -6,6 +6,7 @@ import { getPlatformOverview, getPlatformEvents } from "@/lib/platform-admin/dal
 import { PLANS } from "@/lib/plans/config";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { formatPlatformDateTime } from "@/lib/platform-admin/format";
 
 export const metadata: Metadata = {
   title: "Super Admin | KingdomFlow",
@@ -82,7 +83,7 @@ export default async function PlatformAdminOverviewPage() {
                   <div className="min-w-0">
                     <p className="truncate text-sm">{event.message}</p>
                     <p className="text-xs text-muted-foreground">
-                      {event.source} · {new Date(event.created_at).toLocaleString()}
+                      {event.source} · {formatPlatformDateTime(event.created_at)}
                     </p>
                   </div>
                   <Badge variant={LEVEL_VARIANTS[event.level]}>{event.level}</Badge>

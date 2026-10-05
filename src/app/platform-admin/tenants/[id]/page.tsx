@@ -10,6 +10,7 @@ import { ReportExportButtons } from "@/components/platform-admin/ReportExportBut
 import { CustomPlanDialog } from "@/components/platform-admin/CustomPlanDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { formatPlatformDate } from "@/lib/platform-admin/format";
 
 function formatMoney(amount: number): string {
   return `₹${amount.toLocaleString("en-IN")}`;
@@ -52,9 +53,9 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
             <Badge variant={usage.customPlanLimits ? "default" : "outline"}>{usage.planName}</Badge>
           </div>
           <p className="mt-1 text-muted-foreground">
-            Joined {new Date(usage.createdAt).toLocaleDateString()}
+            Joined {formatPlatformDate(usage.createdAt)}
             {usage.country && ` · ${usage.country}`}
-            {usage.trialEndsAt && stillTrialing && ` · Trial ends ${new Date(usage.trialEndsAt).toLocaleDateString()}`}
+            {usage.trialEndsAt && stillTrialing && ` · Trial ends ${formatPlatformDate(usage.trialEndsAt)}`}
           </p>
           <div className="mt-2">
             <CustomPlanDialog

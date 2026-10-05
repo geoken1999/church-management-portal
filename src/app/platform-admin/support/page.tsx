@@ -7,6 +7,7 @@ import { SupportTicketThread } from "@/components/platform-admin/SupportTicketTh
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { SupportTicketCategory, SupportTicketUrgency, SupportTicketStatus } from "@/types/database";
+import { formatPlatformDateTime } from "@/lib/platform-admin/format";
 
 export const metadata: Metadata = {
   title: "Support | KingdomFlow Super Admin",
@@ -59,7 +60,7 @@ export default async function PlatformAdminSupportPage() {
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {ticket.organizationName} · {ticket.createdByName ?? "Unknown"} {ticket.createdByEmail && `(${ticket.createdByEmail})`} ·{" "}
-                      {new Date(ticket.createdAt).toLocaleString()}
+                      {formatPlatformDateTime(ticket.createdAt)}
                     </p>
                   </div>
                   <SupportTicketActions ticketId={ticket.id} status={ticket.status} />

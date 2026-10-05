@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { PlanId } from "@/lib/plans/config";
+import { formatPlatformDate } from "@/lib/platform-admin/format";
 
 export const metadata: Metadata = {
   title: "Tenants | KingdomFlow Super Admin",
@@ -57,9 +58,9 @@ export default async function PlatformAdminTenantsPage() {
                     <span>
                       {tenant.memberCount} {tenant.memberCount === 1 ? "login" : "logins"}
                     </span>
-                    <span>Joined {new Date(tenant.createdAt).toLocaleDateString()}</span>
+                    <span>Joined {formatPlatformDate(tenant.createdAt)}</span>
                     {tenant.trialEndsAt && new Date(tenant.trialEndsAt) > new Date() && (
-                      <span>Trial ends {new Date(tenant.trialEndsAt).toLocaleDateString()}</span>
+                      <span>Trial ends {formatPlatformDate(tenant.trialEndsAt)}</span>
                     )}
                   </div>
                 </div>

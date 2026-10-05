@@ -650,3 +650,71 @@ export async function getActiveSessions(): Promise<ActiveSession[]> {
     ip: row.ip,
   }));
 }
+
+export interface MembershipLedgerEntry {
+  organizationId: string;
+  organizationName: string;
+  collected: number;
+  paidOut: number;
+  owed: number;
+  pendingRequest: PendingPayoutRequest | null;
+}
+
+// Membership fee balances per church. Same rules as the fundraiser and event
+// ledgers: the platform's fee comes off what was collected, and paid-out
+// amounts are subtracted.
+export async function getMembershipLedgerAdmin(): Promise<MembershipLedgerEntry[]> {
+  const admin = createAdminClient();
+  const [{ data: paid }, { data: payouts }, { data: pendingRequests }, { data: orgs }] = await Promise.all([
+    admin.from("membership_fee_invoices").select("organization_id, amount").eq("status", "paid"),
+    admin.from("membership_payouts").select("organization_id, amount"),
+    admin
+      .from("membership_payout_requests")
+      .select("id, organization_id, amount, payout_method, upi_id, bank_account_holder, bank_account_number, bank_ifsc, bank_name")
+      .eq("status", "pending"),
+    admin.from("organizations").select("id, name"),
+  ]);
+
+  const collectedByOrg = new Map<string, number>();
+  for (const row of paid ?? []) {
+    collectedByOrg.set(row.organization_id, (collectedByOrg.get(row.organization_id) ?? 0) + Number(row.amount));
+  }
+  const paidOutByOrg = new Map<string, number>();
+  for (const row of payouts ?? []) {
+    paidOutByOrg.set(row.organization_id, (paidOutByOrg.get(row.organization_id) ?? 0) + Number(row.amount));
+  }
+  const pendingByOrg = new Map<string, PendingPayoutRequest>();
+  for (const request of pendingRequests ?? []) {
+    pendingByOrg.set(request.organization_id, {
+      id: request.id,
+      amount: Number(request.amount),
+      payoutMethod: request.payout_method,
+      upiId: request.upi_id,
+      bankAccountHolder: request.bank_account_holder,
+      bankAccountNumber: request.bank_account_number,
+      bankIfsc: request.bank_ifsc,
+      bankName: request.bank_name,
+    });
+  }
+  const nameByOrg = new Map((orgs ?? []).map((o) => [o.id, o.name]));
+
+  const orgIds = new Set([...collectedByOrg.keys(), ...pendingByOrg.keys()]);
+  return [...orgIds]
+    .map((organizationId) => {
+      const collected = collectedByOrg.get(organizationId) ?? 0;
+      const paidOut = paidOutByOrg.get(organizationId) ?? 0;
+      return {
+        organizationId,
+        organizationName: nameByOrg.get(organizationId) ?? "Unknown church",
+        collected,
+        paidOut,
+        owed: sharedServiceNetAmount(collected) - paidOut,
+        pendingRequest: pendingByOrg.get(organizationId) ?? null,
+      };
+    })
+    .filter((entry) => entry.collected > 0)
+    .sort((a, b) => {
+      if (Boolean(a.pendingRequest) !== Boolean(b.pendingRequest)) return a.pendingRequest ? -1 : 1;
+      return b.owed - a.owed;
+    });
+}

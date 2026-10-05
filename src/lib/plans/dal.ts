@@ -203,7 +203,25 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
     supabase.from("organization_members").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).eq("role", "member"),
   ]);
 
-  const emailsSentThisMonth = (emailCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0);
+  // Monthly membership-fee emails (payment requests and reminders) are sent
+  // one per member, so they're counted one each, alongside campaign sends.
+  const [{ count: membershipRequestsSent }, { count: membershipRemindersSent }] = await Promise.all([
+    supabase
+      .from("membership_fee_invoices")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("request_via", "shared")
+      .gte("request_sent_at", startOfMonth.toISOString()),
+    supabase
+      .from("membership_fee_invoices")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("reminder_via", "shared")
+      .gte("reminder_sent_at", startOfMonth.toISOString()),
+  ]);
+
+  const emailsSentThisMonth =
+    (emailCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0) + (membershipRequestsSent ?? 0) + (membershipRemindersSent ?? 0);
   const smsSentThisMonth = (smsCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0);
   const whatsappSentThisMonth = (whatsappCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0);
   const aiRepliesSentThisMonth = aiRepliesCount ?? 0;
@@ -490,6 +508,40 @@ function startOfCurrentMonthIso(): string {
   start.setDate(1);
   start.setHours(0, 0, 0, 0);
   return start.toISOString();
+}
+
+// Background-job version of the shared email allowance (the monthly
+// membership-fee run). Cron jobs have no user session, so getPlanUsage can't
+// be used there. Counts the same things as getPlanUsage. Add-on credits are
+// not drawn on from background sends.
+export async function getSharedEmailRemainingForBackground(organizationId: string): Promise<number> {
+  const admin = createAdminClient();
+  const start = startOfCurrentMonthIso();
+  const plan = await resolveEffectivePlanForWebhook(organizationId);
+  const [{ data: campaigns }, { count: requestsSent }, { count: remindersSent }] = await Promise.all([
+    admin.from("email_campaigns").select("sent_count").eq("organization_id", organizationId).eq("provider", "shared").gte("created_at", start),
+    admin
+      .from("membership_fee_invoices")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("request_via", "shared")
+      .gte("request_sent_at", start),
+    admin
+      .from("membership_fee_invoices")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("reminder_via", "shared")
+      .gte("reminder_sent_at", start),
+  ]);
+  const used = (campaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0) + (requestsSent ?? 0) + (remindersSent ?? 0);
+  return Math.max(0, plan.emailsPerMonth - used);
+}
+
+// Background-job check for the finance plan (membership fees are a finance
+// feature). Same plan resolution as the webhook paths.
+export async function financeEnabledForBackground(organizationId: string): Promise<boolean> {
+  const plan = await resolveEffectivePlanForWebhook(organizationId);
+  return plan.financeEnabled;
 }
 
 // Read-only — call before generating a reply, to avoid spending an OpenAI

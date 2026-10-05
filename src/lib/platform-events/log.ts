@@ -19,7 +19,8 @@ export type PlatformEventSource =
   | "platform_admin"
   | "instagram_webhook"
   | "automation_send"
-  | "event_registration_payment";
+  | "event_registration_payment"
+  | "membership_fee";
 
 // Fire-and-forget: a logging failure must never break the real
 // request/action it's describing, so every call site awaits this but

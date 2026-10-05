@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { findEligibleMembersForTrigger } from "@/lib/automations/eligibility";
 import { sendDirectMemberMessage, sendStaffDigest } from "@/lib/automations/send";
 import { runMemberFollowupAutomations } from "@/lib/automations/followup-run";
+import { runMembershipFeeCycle } from "@/lib/membership-fees/run";
 import type { AutomationTrigger } from "@/types/database";
 
 // Vercel Cron hits this once a day (see vercel.json) — no user session
@@ -76,10 +77,17 @@ export async function GET(request: Request) {
   // each run is idempotent per automation per local day (see followup-run.ts).
   const followups = await runMemberFollowupAutomations(admin, now);
 
+  // Monthly membership fee requests and reminders. Same daily run, and
+  // it does nothing for orgs whose due day isn't today (see run.ts).
+  const membershipFees = await runMembershipFeeCycle(admin, now);
+
   return NextResponse.json({
     triggersChecked: triggers?.length ?? 0,
     membersMessaged,
     digestsSent,
     followupAutomationsChecked: followups.automationsChecked,
+    membershipFeeOrgsChecked: membershipFees.orgsChecked,
+    membershipFeeRequestsSent: membershipFees.requestsSent,
+    membershipFeeRemindersSent: membershipFees.remindersSent,
   });
 }

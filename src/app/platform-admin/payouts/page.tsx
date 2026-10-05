@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
-import { getSharedFundraiserLedger, getEventPayoutLedgerAdmin, type PendingPayoutRequest } from "@/lib/platform-admin/dal";
+import { getSharedFundraiserLedger, getEventPayoutLedgerAdmin, getMembershipLedgerAdmin, type PendingPayoutRequest } from "@/lib/platform-admin/dal";
 import { SHARED_SERVICE_FEE_RATE, sharedServiceFee } from "@/lib/finance/fees";
 import { RecordPayoutDialog } from "@/components/platform-admin/RecordPayoutDialog";
 import { RecordEventPayoutDialog } from "@/components/platform-admin/RecordEventPayoutDialog";
+import { RecordMembershipPayoutDialog } from "@/components/platform-admin/RecordMembershipPayoutDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -33,7 +34,11 @@ function formatPayoutDestination(request: PendingPayoutRequest): string | null {
 
 export default async function PlatformAdminPayoutsPage() {
   await requirePlatformAdmin();
-  const [ledger, eventLedger] = await Promise.all([getSharedFundraiserLedger(), getEventPayoutLedgerAdmin()]);
+  const [ledger, eventLedger, membershipLedger] = await Promise.all([
+    getSharedFundraiserLedger(),
+    getEventPayoutLedgerAdmin(),
+    getMembershipLedgerAdmin(),
+  ]);
 
   return (
     <div className="max-w-4xl space-y-10">
@@ -139,6 +144,51 @@ export default async function PlatformAdminPayoutsPage() {
           ))}
         </div>
       )}
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="font-heading text-xl font-bold tracking-tight">Membership fee payouts</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Monthly membership fees collected through the shared account, less the {FEE_PERCENT} fee, minus what&apos;s already been paid out.
+          </p>
+        </div>
+        {membershipLedger.length === 0 ? (
+          <Card>
+            <CardContent className="py-10 text-center text-sm text-muted-foreground">No membership fees have been collected yet.</CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {membershipLedger.map((entry) => (
+              <Card key={entry.organizationId}>
+                <CardContent className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-heading text-base font-bold">{entry.organizationName}</h3>
+                    <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                      <span>₹{formatMoney(entry.collected)} collected</span>
+                      <span>
+                        {FEE_PERCENT} fee (₹{formatMoney(sharedServiceFee(entry.collected))})
+                      </span>
+                      <span>₹{formatMoney(entry.paidOut)} paid out</span>
+                    </div>
+                    {entry.pendingRequest && formatPayoutDestination(entry.pendingRequest) && (
+                      <p className="mt-1 text-xs font-medium text-foreground">Send via {formatPayoutDestination(entry.pendingRequest)}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {entry.pendingRequest && <Badge variant="destructive">Payout requested</Badge>}
+                    <Badge variant={entry.owed > 0 ? "default" : "secondary"}>₹{formatMoney(entry.owed)} owed</Badge>
+                    <RecordMembershipPayoutDialog
+                      organizationId={entry.organizationId}
+                      organizationName={entry.organizationName}
+                      owed={entry.pendingRequest?.amount ?? entry.owed}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

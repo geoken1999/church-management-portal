@@ -994,6 +994,63 @@ export type PlatformExpense = {
   created_at: string;
 };
 
+export type MembershipInvoiceStatus = "due" | "paid" | "cancelled";
+
+export type MembershipFeeSettings = {
+  organization_id: string;
+  enabled: boolean;
+  amount: number | null;
+  due_day: number;
+  reminder_after_days: number;
+  updated_by: string | null;
+  updated_at: string;
+};
+
+export type MembershipFeeInvoice = {
+  id: string;
+  organization_id: string;
+  member_id: string;
+  period: string;
+  amount: number;
+  status: MembershipInvoiceStatus;
+  public_token: string;
+  razorpay_order_id: string | null;
+  razorpay_payment_id: string | null;
+  paid_at: string | null;
+  request_sent_at: string | null;
+  request_via: "shared" | "own" | null;
+  reminder_sent_at: string | null;
+  reminder_via: "shared" | "own" | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MembershipPayoutRequest = {
+  id: string;
+  organization_id: string;
+  amount: number;
+  status: "pending" | "paid" | "cancelled";
+  payout_method: PayoutMethod;
+  upi_id: string | null;
+  bank_account_holder: string | null;
+  bank_account_number: string | null;
+  bank_ifsc: string | null;
+  bank_name: string | null;
+  requested_by: string | null;
+  resolved_payout_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MembershipPayout = {
+  id: string;
+  organization_id: string;
+  amount: number;
+  note: string | null;
+  paid_by: string | null;
+  created_at: string;
+};
+
 export type EventPayoutRequestStatus = "pending" | "paid" | "cancelled";
 
 export type EventPayoutRequest = {
@@ -2431,6 +2488,30 @@ export type Database = {
         Row: PlatformExpense;
         Insert: Partial<PlatformExpense> & Pick<PlatformExpense, "service" | "description" | "amount" | "paid_on">;
         Update: Partial<PlatformExpense>;
+        Relationships: [];
+      };
+      membership_fee_settings: {
+        Row: MembershipFeeSettings;
+        Insert: Partial<MembershipFeeSettings> & Pick<MembershipFeeSettings, "organization_id">;
+        Update: Partial<MembershipFeeSettings>;
+        Relationships: [];
+      };
+      membership_fee_invoices: {
+        Row: MembershipFeeInvoice;
+        Insert: Partial<MembershipFeeInvoice> & Pick<MembershipFeeInvoice, "organization_id" | "member_id" | "period" | "amount">;
+        Update: Partial<MembershipFeeInvoice>;
+        Relationships: [];
+      };
+      membership_payout_requests: {
+        Row: MembershipPayoutRequest;
+        Insert: Partial<MembershipPayoutRequest> & Pick<MembershipPayoutRequest, "organization_id" | "amount" | "payout_method">;
+        Update: Partial<MembershipPayoutRequest>;
+        Relationships: [];
+      };
+      membership_payouts: {
+        Row: MembershipPayout;
+        Insert: Partial<MembershipPayout> & Pick<MembershipPayout, "organization_id" | "amount">;
+        Update: Partial<MembershipPayout>;
         Relationships: [];
       };
       event_payouts: {

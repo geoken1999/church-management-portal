@@ -290,3 +290,31 @@ export async function updateSessionHeadcount(sessionId: string, headcountRaw: st
   revalidatePath(`${ATTENDANCE_PATH}/${sessionId}`);
   return {};
 }
+
+// Explicit "register complete" marker. Only recorded sessions count toward
+// absence in the Member follow-up automation, so a session nobody marked is
+// never read as "everyone was absent".
+export async function setSessionRecorded(sessionId: string, recorded: boolean): Promise<UpdateHeadcountState> {
+  await requireUser();
+
+  const organizationId = await organizationIdForSession(sessionId);
+  if (!organizationId) {
+    return { error: "That session could not be found." };
+  }
+  const access = await checkTabAccess(organizationId, "attendance", "write");
+  if (!access.ok) {
+    return { error: access.message };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("attendance_sessions")
+    .update({ recorded_at: recorded ? new Date().toISOString() : null })
+    .eq("id", sessionId);
+  if (error) {
+    return { error: "Couldn't update the register. Please try again." };
+  }
+
+  revalidatePath(`${ATTENDANCE_PATH}/${sessionId}`);
+  return {};
+}

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Cake, ChevronRight } from "lucide-react";
+import { Cake, ChevronRight, Users } from "lucide-react";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getPlanLimits } from "@/lib/plans/dal";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
@@ -21,6 +21,12 @@ const AUTOMATION_FEATURES = [
     icon: Cake,
     title: "Automate Wishes for Members",
     description: "Send birthday and anniversary wishes to members automatically over WhatsApp.",
+  },
+  {
+    href: "/dashboard/automation/followup",
+    icon: Users,
+    title: "Member Follow-up",
+    description: "Create a To Do task for a leader when a member has missed several Sundays in a row. Nothing is sent to the member.",
   },
 ];
 

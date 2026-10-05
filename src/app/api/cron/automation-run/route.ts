@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { findEligibleMembersForTrigger } from "@/lib/automations/eligibility";
 import { sendDirectMemberMessage, sendStaffDigest } from "@/lib/automations/send";
+import { runMemberFollowupAutomations } from "@/lib/automations/followup-run";
 import type { AutomationTrigger } from "@/types/database";
 
 // Vercel Cron hits this once a day (see vercel.json) — no user session
@@ -71,5 +72,14 @@ export async function GET(request: Request) {
     digestsSent += 1;
   }
 
-  return NextResponse.json({ triggersChecked: triggers?.length ?? 0, membersMessaged, digestsSent });
+  // Member follow-up is a separate pass: it creates tasks, not messages, and
+  // each run is idempotent per automation per local day (see followup-run.ts).
+  const followups = await runMemberFollowupAutomations(admin, now);
+
+  return NextResponse.json({
+    triggersChecked: triggers?.length ?? 0,
+    membersMessaged,
+    digestsSent,
+    followupAutomationsChecked: followups.automationsChecked,
+  });
 }

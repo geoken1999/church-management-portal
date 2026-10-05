@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getAutomation, getAutomationTriggers, getAutomationDestinations, getAutomationTemplates, getEligibleDateFields } from "@/lib/automations/dal";
 import { AutomationWizard } from "@/components/automation/AutomationWizard";
@@ -20,6 +20,7 @@ export default async function EditAutomationPage({ params }: { params: Promise<{
 
   const automation = await getAutomation(organizationId, id);
   if (!automation) notFound();
+  if (automation.type === "member_followup") redirect(`/dashboard/automation/followup/${automation.id}`);
 
   const [triggers, destinations, templates, dateFieldOptions] = await Promise.all([
     getAutomationTriggers(organizationId, id),

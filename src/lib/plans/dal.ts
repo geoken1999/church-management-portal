@@ -402,20 +402,20 @@ export async function checkFormsQuota(organizationId: string): Promise<string | 
   return null;
 }
 
-// Called right before creating a new automation — counts every automation
-// the org has regardless of status (active/paused/draft), same simple
-// total-row-count shape as branches/members/forms above, rather than only
-// counting "active" ones. 0 means the whole module is off (checked
-// separately, before this is ever called, via plan.automationLimit === 0
-// in createAutomationAction) — this function only guards the ceiling once
-// the module is already available.
+// Only active automations count against the plan's "at a time" limit. Drafts
+// and paused automations are free to keep. Enforced at activation, atomically,
+// by the activate_automation_within_limit database function (migration 0110).
 export async function checkAutomationQuota(organizationId: string): Promise<string | null> {
   const { plan } = await getPlanUsage(organizationId);
   if (plan.automationLimit === null) return null;
   const supabase = await createClient();
-  const { count } = await supabase.from("automations").select("id", { count: "exact", head: true }).eq("organization_id", organizationId);
+  const { count } = await supabase
+    .from("automations")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("status", "active");
   if ((count ?? 0) >= plan.automationLimit) {
-    return `Your ${plan.name} plan allows up to ${plan.automationLimit} automations. Remove one or upgrade your plan to add more.`;
+    return `Your ${plan.name} plan allows up to ${plan.automationLimit} active automations at a time (${count ?? 0} active now). Pause one or upgrade your plan to activate more.`;
   }
   return null;
 }

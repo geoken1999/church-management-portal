@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getAutomation, getAutomationExecutions } from "@/lib/automations/dal";
@@ -31,6 +31,7 @@ export default async function AutomationHistoryPage({ params }: { params: Promis
 
   const automation = await getAutomation(organizationId, id);
   if (!automation) notFound();
+  if (automation.type === "member_followup") redirect(`/dashboard/automation/followup/${automation.id}`);
 
   const executions = await getAutomationExecutions(organizationId, id);
 

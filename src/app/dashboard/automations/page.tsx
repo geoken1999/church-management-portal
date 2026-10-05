@@ -34,7 +34,8 @@ export default async function AutomationsPage() {
     return <AccessRestricted label="Automations" />;
   }
 
-  const automations = await getAutomations(organizationId);
+  // Member follow-up automations have their own pages under /dashboard/automation/followup.
+  const automations = (await getAutomations(organizationId)).filter((a) => a.type === "birthday_anniversary");
   const canWrite = membership.tabAccess.automations.write;
 
   return (

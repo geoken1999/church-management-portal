@@ -751,6 +751,8 @@ export type WorshipDocument = {
 
 export type TodoStatus = "pending" | "completed";
 
+export type TodoPriority = "low" | "normal" | "high";
+
 export type Todo = {
   id: string;
   organization_id: string;
@@ -759,6 +761,11 @@ export type Todo = {
   due_at: string | null;
   status: TodoStatus;
   assigned_to: string | null;
+  // Set for automation-created follow-up tasks; null for ordinary to-dos.
+  member_id: string | null;
+  branch_id: string | null;
+  automation_id: string | null;
+  priority: TodoPriority;
   created_by: string | null;
   completed_at: string | null;
   // Set by the daily /api/cron/todo-reminders digest after it notifies an
@@ -1012,6 +1019,9 @@ export type AttendanceSession = {
   organization_id: string;
   branch_id: string | null;
   event_id: string | null;
+  // Set when the register is explicitly marked complete. Null means the
+  // session was never recorded, so absence can't be inferred from it.
+  recorded_at: string | null;
   occurrence_date: string;
   title: string;
   notes: string | null;
@@ -1333,7 +1343,7 @@ export type AutomationTemplate = {
   updated_at: string;
 };
 
-export type AutomationType = "birthday_anniversary";
+export type AutomationType = "birthday_anniversary" | "member_followup";
 export type AutomationStatus = "draft" | "active" | "paused";
 
 export type Automation = {
@@ -1342,10 +1352,46 @@ export type Automation = {
   type: AutomationType;
   name: string;
   status: AutomationStatus;
+  // Per-type settings, shaped by the type's own module (see
+  // src/lib/automations/followup-config.ts for member_followup).
+  config: Record<string, unknown>;
+  last_run_at: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type AutomationRunStatus = "running" | "completed" | "failed";
+
+export type AutomationRun = {
+  id: string;
+  organization_id: string;
+  automation_id: string;
+  run_key: string;
+  status: AutomationRunStatus;
+  started_at: string;
+  completed_at: string | null;
+  members_evaluated: number;
+  members_qualified: number;
+  tasks_created: number;
+  notifications_sent: number;
+  skipped_count: number;
+  error_count: number;
+  error_summary: string | null;
+};
+
+export type AutomationRunItemOutcome = "task_created" | "skipped_existing_task" | "skipped_data_quality" | "error";
+
+export type AutomationRunItem = {
+  id: string;
+  run_id: string;
+  organization_id: string;
+  member_id: string | null;
+  outcome: AutomationRunItemOutcome;
+  todo_id: string | null;
+  error_message: string | null;
+  created_at: string;
 };
 
 export type AutomationDateFieldSource = "built_in" | "custom_field";
@@ -2956,6 +3002,34 @@ export type Database = {
           },
         ];
       };
+      automation_runs: {
+        Row: AutomationRun;
+        Insert: Partial<AutomationRun> & Pick<AutomationRun, "organization_id" | "automation_id" | "run_key">;
+        Update: Partial<AutomationRun>;
+        Relationships: [
+          {
+            foreignKeyName: "automation_runs_automation_id_fkey";
+            columns: ["automation_id"];
+            isOneToOne: false;
+            referencedRelation: "automations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      automation_run_items: {
+        Row: AutomationRunItem;
+        Insert: Partial<AutomationRunItem> & Pick<AutomationRunItem, "run_id" | "organization_id" | "outcome">;
+        Update: Partial<AutomationRunItem>;
+        Relationships: [
+          {
+            foreignKeyName: "automation_run_items_run_id_fkey";
+            columns: ["run_id"];
+            isOneToOne: false;
+            referencedRelation: "automation_runs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       automation_triggers: {
         Row: AutomationTrigger;
         Insert: Partial<AutomationTrigger> & Pick<AutomationTrigger, "automation_id" | "organization_id" | "date_field_source" | "occasion_label">;
@@ -3197,6 +3271,10 @@ export type Database = {
           organization_logo_url: string | null;
           organization_timezone: string;
         }[];
+      };
+      activate_automation_within_limit: {
+        Args: { p_org: string; p_automation: string; p_limit: number | null };
+        Returns: boolean;
       };
       submit_event_registration: {
         Args: { token: string; answers: Record<string, unknown> };

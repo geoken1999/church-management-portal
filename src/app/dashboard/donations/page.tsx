@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getMembers } from "@/lib/members/dal";
 import { getDonations, getFundraiserOptions } from "@/lib/finance/dal";
 import { getPlanUsage } from "@/lib/plans/dal";
 import { DonationsManager } from "@/components/finance/DonationsManager";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
+import { Button } from "@/components/ui/button";
 import { UpgradeRequired } from "@/components/dashboard/UpgradeRequired";
 
 export const metadata: Metadata = {
@@ -38,9 +40,14 @@ export default async function DonationsPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="font-heading text-3xl font-bold tracking-tight">Donation</h1>
-        <p className="mt-1 text-muted-foreground">Gifts from members and outside donors.</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-3xl font-bold tracking-tight">Donation</h1>
+          <p className="mt-1 text-muted-foreground">Gifts from members and outside donors.</p>
+        </div>
+        <Button variant="outline" nativeButton={false} render={<Link href="/dashboard/membership-fees" />}>
+          Membership fees
+        </Button>
       </div>
 
       <DonationsManager

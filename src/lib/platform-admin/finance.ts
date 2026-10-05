@@ -11,13 +11,14 @@ import type { PlatformExpense } from "@/types/database";
 // fundraiser and event payments. The gross collected on shared accounts
 // belongs to churches until it is paid out, so it is reported as a memo.
 
-export type RevenueSource = "subscriptions" | "addon_packs" | "shared_fundraiser_fees" | "shared_event_fees";
+export type RevenueSource = "subscriptions" | "addon_packs" | "shared_fundraiser_fees" | "shared_event_fees" | "shared_membership_fees";
 
 export const REVENUE_SOURCE_LABELS: Record<RevenueSource, string> = {
   subscriptions: "Plan subscriptions",
   addon_packs: "Add-on packs (SMS, email, WhatsApp, storage)",
   shared_fundraiser_fees: "Shared-account fee: fundraisers",
   shared_event_fees: "Shared-account fee: paid events",
+  shared_membership_fees: "Shared-account fee: membership fees",
 };
 
 const REVENUE_SOURCES = Object.keys(REVENUE_SOURCE_LABELS) as RevenueSource[];
@@ -70,11 +71,12 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 export async function getPlatformEarningsReport(now: Date = new Date()): Promise<PlatformEarningsReport> {
   const admin = createAdminClient();
 
-  const [subs, addons, sharedDonations, eventOrders, expenses] = await Promise.all([
+  const [subs, addons, sharedDonations, eventOrders, membershipPayments, expenses] = await Promise.all([
     admin.from("platform_subscription_payments").select("amount, paid_at"),
     admin.from("organization_addon_orders").select("amount, paid_at, created_at").eq("status", "paid"),
     admin.from("donations").select("amount, donated_on").eq("payment_mode", "shared"),
     admin.from("event_registration_payment_orders").select("amount, updated_at").eq("status", "paid"),
+    admin.from("membership_fee_invoices").select("amount, paid_at").eq("status", "paid"),
     admin.from("platform_expenses").select("paid_on, amount"),
   ]);
 
@@ -86,6 +88,11 @@ export async function getPlatformEarningsReport(now: Date = new Date()): Promise
     revenueEvents.push({ source: "addon_packs", amount: Number(row.amount), when: row.paid_at ?? row.created_at });
   }
   let heldForChurches = 0;
+  for (const row of membershipPayments.data ?? []) {
+    const gross = Number(row.amount);
+    heldForChurches += gross;
+    revenueEvents.push({ source: "shared_membership_fees", amount: sharedServiceFee(gross), when: row.paid_at ?? new Date().toISOString() });
+  }
   for (const row of sharedDonations.data ?? []) {
     const gross = Number(row.amount);
     heldForChurches += gross;
@@ -170,7 +177,7 @@ export async function getPlatformEarningsReport(now: Date = new Date()): Promise
 }
 
 function emptyBySource(): Record<RevenueSource, number> {
-  return { subscriptions: 0, addon_packs: 0, shared_fundraiser_fees: 0, shared_event_fees: 0 };
+  return { subscriptions: 0, addon_packs: 0, shared_fundraiser_fees: 0, shared_event_fees: 0, shared_membership_fees: 0 };
 }
 
 export async function getPlatformExpensesReport(now: Date = new Date()): Promise<PlatformExpensesReport> {

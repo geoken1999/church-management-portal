@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { finalizeGivingOrderPayment } from "@/lib/finance/razorpay-giving";
 import { finalizeAddonOrderPayment } from "@/lib/billing/addon-actions";
 import { finalizeEventRegistrationPayment } from "@/lib/events/razorpay-registration";
+import { finalizeMembershipPayment } from "@/lib/membership-fees/finalize";
 import { sendSubscriptionActivatedEmail, sendSubscriptionChargedEmail, sendSubscriptionCancelledEmail } from "@/lib/billing/receipts";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { PLANS, isPlanId, isBillingInterval } from "@/lib/plans/config";
@@ -60,6 +61,13 @@ export async function POST(request: Request) {
   // account, so this webhook covers them too.
   if (event === "payment.captured" && paymentEntity?.notes?.kind === "addon_purchase" && paymentEntity.order_id) {
     await finalizeAddonOrderPayment(paymentEntity.order_id, paymentEntity.id);
+    return NextResponse.json({ ok: true });
+  }
+
+  // Backup confirmation path for monthly membership fees, same reasoning as
+  // add-on purchases: the platform's own account, so this webhook sees them.
+  if (event === "payment.captured" && paymentEntity?.notes?.kind === "membership_fee" && paymentEntity.order_id) {
+    await finalizeMembershipPayment(paymentEntity.order_id, paymentEntity.id);
     return NextResponse.json({ ok: true });
   }
 

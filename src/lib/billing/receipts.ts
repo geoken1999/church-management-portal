@@ -78,3 +78,11 @@ export async function sendEventPayoutProcessedEmail(organizationId: string, even
     `<p>A payout of <strong>${formatRupees(amountRupees)}</strong> for <strong>${eventTitle}</strong>'s registration payments has been processed and wired to you.</p>`,
   );
 }
+
+export async function sendMembershipPayoutProcessedEmail(organizationId: string, amountRupees: number): Promise<void> {
+  await sendBillingEmail(
+    organizationId,
+    "Membership fee payout sent",
+    `<p>A payout of <strong>${formatRupees(amountRupees)}</strong> from membership fee collections has been processed and wired to you.</p>`,
+  );
+}

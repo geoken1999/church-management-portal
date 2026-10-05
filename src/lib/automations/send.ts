@@ -111,8 +111,7 @@ export async function sendStaffDigest(
   const result = await sendBulkTemplateMessage({
     templateName: template.meta_template_name,
     languageCode: template.language,
-    bodyParams,
-    recipients: destination.recipient_phones,
+    recipients: destination.recipient_phones.map((phone) => ({ phone, bodyParams })),
   });
 
   const allFailed = result.failed.length === destination.recipient_phones.length;

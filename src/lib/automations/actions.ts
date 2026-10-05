@@ -26,9 +26,8 @@ export async function createAutomationAction(name: string): Promise<AutomationAc
   const plan = await getPlanLimits(organizationId);
   if (plan.automationLimit === 0) return { error: `Automation isn't included on the ${plan.name} plan.` };
 
-  const quotaError = await checkAutomationQuota(organizationId);
-  if (quotaError) return { error: quotaError };
-
+  // New automations start as drafts, which don't count against the active
+  // limit. The limit is enforced when one is activated (updateAutomationAction).
   if (!name.trim()) return { error: "Give this automation a name." };
 
   const admin = createAdminClient();
@@ -56,12 +55,30 @@ export async function updateAutomationAction(params: { id: string; name?: string
   if (plan.automationLimit === 0) return { error: `Automation isn't included on the ${plan.name} plan.` };
 
   const admin = createAdminClient();
+
+  if (params.status === "active") {
+    // Activation runs under the database's per-org lock (migration 0110), so
+    // concurrent activations can't push the org past its active limit.
+    const { data: activated, error: activateError } = await admin.rpc("activate_automation_within_limit", {
+      p_org: organizationId,
+      p_automation: params.id,
+      p_limit: plan.automationLimit,
+    });
+    if (activateError) return { error: "Couldn't activate that automation." };
+    if (!activated) {
+      const quotaError = await checkAutomationQuota(organizationId);
+      return { error: quotaError ?? `Your ${plan.name} plan's active automation limit has been reached.` };
+    }
+  }
+
   const update: { name?: string; status?: AutomationStatus; updated_by: string } = { updated_by: user.id };
   if (params.name !== undefined) update.name = params.name.trim();
-  if (params.status !== undefined) update.status = params.status;
+  if (params.status !== undefined && params.status !== "active") update.status = params.status;
 
-  const { error } = await admin.from("automations").update(update).eq("id", params.id).eq("organization_id", organizationId);
-  if (error) return { error: "Couldn't update that automation." };
+  if (update.name !== undefined || update.status !== undefined) {
+    const { error } = await admin.from("automations").update(update).eq("id", params.id).eq("organization_id", organizationId);
+    if (error) return { error: "Couldn't update that automation." };
+  }
 
   revalidatePath(AUTOMATIONS_PATH);
   return { id: params.id };

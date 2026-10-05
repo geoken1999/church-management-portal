@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { Search, MapPin, CalendarDays, Users, UserPlus, Ticket, IndianRupee } from "lucide-react";
-import { toggleAttendanceRecord, updateSessionHeadcount, toggleEventRegistrationCheckIn } from "@/lib/attendance/actions";
+import { toggleAttendanceRecord, updateSessionHeadcount, toggleEventRegistrationCheckIn, setSessionRecorded } from "@/lib/attendance/actions";
 import { markRegistrationPaid } from "@/lib/events/registration-actions";
 import { validateHeadcount } from "@/lib/attendance/validation";
 import type { EventRegistration } from "@/types/database";
@@ -26,6 +26,7 @@ interface SessionInfo {
   occurrence_date: string;
   notes: string | null;
   headcount: number | null;
+  recorded_at: string | null;
   branches: { id: string; name: string } | null;
   events: { id: string; title: string; registration_enabled: boolean; payment_required: boolean } | null;
 }
@@ -105,6 +106,32 @@ function RegistrantRow({
 
 function formatDate(iso: string): string {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" });
+}
+
+function RegisterCompleteToggle({ sessionId, recordedAt, canWrite }: { sessionId: string; recordedAt: string | null; canWrite: boolean }) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const recorded = recordedAt !== null;
+
+  function handleToggle() {
+    setError(null);
+    startTransition(async () => {
+      const result = await setSessionRecorded(sessionId, !recorded);
+      if (result.error) setError(result.error);
+    });
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Badge variant={recorded ? "secondary" : "outline"}>{recorded ? "Register complete" : "Register not marked complete"}</Badge>
+      {canWrite && (
+        <Button type="button" size="sm" variant="outline" disabled={pending} onClick={handleToggle}>
+          {recorded ? "Reopen register" : "Mark register complete"}
+        </Button>
+      )}
+      {error && <span className="text-xs text-destructive">{error}</span>}
+    </div>
+  );
 }
 
 function HeadcountEditor({ sessionId, initialHeadcount, canWrite }: { sessionId: string; initialHeadcount: number | null; canWrite: boolean }) {
@@ -355,6 +382,7 @@ export function AttendanceSessionDetail({
           </div>
           {session.notes && <p className="text-sm text-muted-foreground">{session.notes}</p>}
           <HeadcountEditor sessionId={session.id} initialHeadcount={session.headcount} canWrite={canWrite} />
+          <RegisterCompleteToggle sessionId={session.id} recordedAt={session.recorded_at} canWrite={canWrite} />
         </CardContent>
       </Card>
 

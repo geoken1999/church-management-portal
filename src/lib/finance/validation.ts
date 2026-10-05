@@ -56,7 +56,10 @@ export interface OfferingFieldErrors {
   collectedOn?: string;
 }
 
-export function validateOffering(input: { category: string; amount: string; collectedOn: string }): OfferingFieldErrors {
+export function validateOffering(
+  input: { category: string; amount: string; collectedOn: string },
+  todayKey: string = today(),
+): OfferingFieldErrors {
   const errors: OfferingFieldErrors = {};
 
   if (!input.category.trim()) {
@@ -70,7 +73,7 @@ export function validateOffering(input: { category: string; amount: string; coll
 
   if (!input.collectedOn) {
     errors.collectedOn = "Date is required.";
-  } else if (input.collectedOn > today()) {
+  } else if (input.collectedOn > todayKey) {
     errors.collectedOn = "Date can't be in the future.";
   }
 
@@ -83,12 +86,15 @@ export interface DonationFieldErrors {
   donatedOn?: string;
 }
 
-export function validateDonation(input: {
-  memberId: string;
-  donorName: string;
-  amount: string;
-  donatedOn: string;
-}): DonationFieldErrors {
+export function validateDonation(
+  input: {
+    memberId: string;
+    donorName: string;
+    amount: string;
+    donatedOn: string;
+  },
+  todayKey: string = today(),
+): DonationFieldErrors {
   const errors: DonationFieldErrors = {};
 
   if (!input.memberId && !input.donorName.trim()) {
@@ -100,7 +106,7 @@ export function validateDonation(input: {
 
   if (!input.donatedOn) {
     errors.donatedOn = "Date is required.";
-  } else if (input.donatedOn > today()) {
+  } else if (input.donatedOn > todayKey) {
     errors.donatedOn = "Date can't be in the future.";
   }
 

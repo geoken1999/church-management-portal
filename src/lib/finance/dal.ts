@@ -1,4 +1,6 @@
 import "server-only";
+import { dateKeyInTimezone } from "@/lib/organizations/timezone";
+import { getOrganizationTimezone } from "@/lib/organizations/org-timezone";
 
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
@@ -131,10 +133,8 @@ export interface FinanceOverviewStats {
 export const getFinanceOverviewStats = cache(async (organizationId: string): Promise<FinanceOverviewStats> => {
   const supabase = await createClient();
 
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
-  const startOfMonthIso = startOfMonth.toISOString().slice(0, 10);
+  // The first day of the church's current month, not the server's (UTC) one.
+  const startOfMonthIso = `${dateKeyInTimezone(new Date(), await getOrganizationTimezone(organizationId)).slice(0, 7)}-01`;
 
   const [{ data: offerings }, { data: donations }, { data: activeFundraisers }, { data: fundraiserDonations }] =
     await Promise.all([

@@ -17,7 +17,7 @@ export interface ExpenseFieldErrors {
   expenseDate?: string;
 }
 
-export function validateExpense(input: { amount: string; expenseDate: string }): ExpenseFieldErrors {
+export function validateExpense(input: { amount: string; expenseDate: string }, todayKey: string = today()): ExpenseFieldErrors {
   const errors: ExpenseFieldErrors = {};
 
   if (!input.amount.trim()) {
@@ -29,7 +29,7 @@ export function validateExpense(input: { amount: string; expenseDate: string }):
 
   if (!input.expenseDate) {
     errors.expenseDate = "Date is required.";
-  } else if (input.expenseDate > today()) {
+  } else if (input.expenseDate > todayKey) {
     errors.expenseDate = "Date can't be in the future.";
   }
 

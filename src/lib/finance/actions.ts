@@ -1,5 +1,7 @@
 "use server";
 
+import { dateKeyInTimezone } from "@/lib/organizations/timezone";
+import { getOrganizationTimezone } from "@/lib/organizations/org-timezone";
 import { revalidatePath } from "next/cache";
 import { checkFeatureCap } from "@/lib/plans/dal";
 import { createClient } from "@/lib/supabase/server";
@@ -258,7 +260,7 @@ export async function createOffering(
   }
 
   const fields = readOfferingFields(formData);
-  const fieldErrors = validateOffering(fields);
+  const fieldErrors = validateOffering(fields, dateKeyInTimezone(new Date(), await getOrganizationTimezone(organizationId)));
   if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
   }
@@ -303,7 +305,7 @@ export async function updateOffering(
   }
 
   const fields = readOfferingFields(formData);
-  const fieldErrors = validateOffering(fields);
+  const fieldErrors = validateOffering(fields, dateKeyInTimezone(new Date(), await getOrganizationTimezone(organizationId)));
   if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
   }
@@ -384,7 +386,7 @@ export async function createDonation(
   }
 
   const fields = readDonationFields(formData);
-  const fieldErrors = validateDonation(fields);
+  const fieldErrors = validateDonation(fields, dateKeyInTimezone(new Date(), await getOrganizationTimezone(organizationId)));
   if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
   }
@@ -434,7 +436,7 @@ export async function updateDonation(
   }
 
   const fields = readDonationFields(formData);
-  const fieldErrors = validateDonation(fields);
+  const fieldErrors = validateDonation(fields, dateKeyInTimezone(new Date(), await getOrganizationTimezone(organizationId)));
   if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
   }

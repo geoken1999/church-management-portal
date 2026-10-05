@@ -6,6 +6,7 @@ import { getRazorpayEnv } from "@/lib/billing/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendGivingReceiptEmail } from "@/lib/finance/giving-receipt";
 import type { FundraiserPaymentMode } from "@/types/database";
+import { DEFAULT_TIMEZONE, dateKeyInTimezone } from "@/lib/organizations/timezone";
 
 export interface GivingCredentials {
   keyId: string;
@@ -107,7 +108,10 @@ export async function finalizeGivingOrderPayment(razorpayOrderId: string, razorp
     return { success: true };
   }
 
-  const donatedOn = new Date().toISOString().slice(0, 10);
+  // The church's calendar day, not the UTC day, so a gift made just after
+  // midnight in India is dated the right day.
+  const { data: org } = await admin.from("organizations").select("timezone").eq("id", order.organization_id).maybeSingle();
+  const donatedOn = dateKeyInTimezone(new Date(), org?.timezone ?? DEFAULT_TIMEZONE);
   const { data: donation, error: donationError } = await admin
     .from("donations")
     .insert({

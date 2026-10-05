@@ -36,6 +36,7 @@ export default async function KmeetPage() {
         events={eventOptions}
         upcoming={upcoming}
         past={past}
+        timezone={membership.organization.timezone}
       />
     </div>
   );

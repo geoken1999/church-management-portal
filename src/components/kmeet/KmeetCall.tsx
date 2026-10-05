@@ -451,6 +451,10 @@ function CallView({
   const [joined, setJoined] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [deniedEntry, setDeniedEntry] = useState(false);
+  // Set when the host ends the call. Everyone still in it gets onMeetingLeft,
+  // so the screen can say so, rather than sitting on "Connecting" until a
+  // refresh.
+  const [meetingEnded, setMeetingEnded] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<EntryRequest[]>([]);
   const [requireAdmission, setRequireAdmission] = useState(initialRequireAdmission);
   const [chatOpen, setChatOpen] = useState(false);
@@ -459,6 +463,7 @@ function CallView({
 
   const { join, leave, end, participants, changeWebcam, changeMic } = useMeeting({
     onMeetingJoined: () => setJoined(true),
+    onMeetingLeft: () => setMeetingEnded(true),
     onError: (data: { code: string; message: string }) => {
       // code 4002 (INVALID_TOKEN) right at the start is almost always this
       // SDK's own config effect (a parent effect) not having run yet when
@@ -523,6 +528,19 @@ function CallView({
       <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
         <Alert variant="destructive" className="max-w-md">
           <AlertDescription>The host didn&apos;t admit you to this meeting.</AlertDescription>
+        </Alert>
+        <Button type="button" variant="outline" onClick={onLeft}>
+          Back
+        </Button>
+      </div>
+    );
+  }
+
+  if (meetingEnded) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+        <Alert className="max-w-md">
+          <AlertDescription>The host has ended this {audioOnly ? "call" : "meeting"}.</AlertDescription>
         </Alert>
         <Button type="button" variant="outline" onClick={onLeft}>
           Back

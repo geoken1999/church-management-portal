@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
+import { DEFAULT_TIMEZONE, dateKeyInTimezone } from "@/lib/organizations/timezone";
 import { validateSessionTitle, validateOccurrenceDate, validateHeadcount } from "@/lib/attendance/validation";
 
 const ATTENDANCE_PATH = "/dashboard/attendance";
@@ -55,7 +56,13 @@ export async function addEventToAttendance(eventId: string): Promise<CreateSessi
   // occurrence," same reasoning the Attendance session's own
   // occurrence_date field already relies on. A one-off event just uses
   // its own start date.
-  const occurrenceDate = event.is_recurring ? new Date().toISOString().slice(0, 10) : new Date(event.start_at).toISOString().slice(0, 10);
+  // Dates are the church's calendar day. Reading the UTC date would give
+  // yesterday for a service before 5:30 AM India time.
+  const { data: org } = await admin.from("organizations").select("timezone").eq("id", event.organization_id).maybeSingle();
+  const timeZone = org?.timezone ?? DEFAULT_TIMEZONE;
+  const occurrenceDate = event.is_recurring
+    ? dateKeyInTimezone(new Date(), timeZone)
+    : dateKeyInTimezone(new Date(event.start_at), timeZone);
 
   const { data: existing } = await admin
     .from("attendance_sessions")

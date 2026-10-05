@@ -16,6 +16,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { formatInTimezone } from "@/lib/organizations/timezone";
 
 export interface KmeetEventOption {
   id: string;
@@ -203,7 +204,17 @@ function statusBadge(status: KmeetMeetingStatus) {
   return <Badge variant="outline">Scheduled</Badge>;
 }
 
-function MeetingCard({ mode, meeting, canManage }: { mode: KmeetMode; meeting: KmeetMeetingRow; canManage: boolean }) {
+function MeetingCard({
+  mode,
+  meeting,
+  canManage,
+  timezone,
+}: {
+  mode: KmeetMode;
+  meeting: KmeetMeetingRow;
+  canManage: boolean;
+  timezone: string;
+}) {
   const [pending, startTransition] = useTransition();
   const [copied, setCopied] = useState(false);
 
@@ -236,7 +247,7 @@ function MeetingCard({ mode, meeting, canManage }: { mode: KmeetMode; meeting: K
         {meeting.description && <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{meeting.description}</p>}
         <p className="mt-0.5 text-xs text-muted-foreground">
           {meeting.scheduled_at
-            ? new Date(meeting.scheduled_at).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+            ? formatInTimezone(meeting.scheduled_at, timezone, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }, "en-US")
             : "Instant meeting"}
           {meeting.events ? ` · ${meeting.events.title}` : ""}
         </p>
@@ -269,6 +280,7 @@ export function KmeetManager({
   events,
   upcoming,
   past,
+  timezone,
 }: {
   mode: KmeetMode;
   canWrite: boolean;
@@ -276,6 +288,7 @@ export function KmeetManager({
   events: KmeetEventOption[];
   upcoming: KmeetMeetingRow[];
   past: KmeetMeetingRow[];
+  timezone: string;
 }) {
   return (
     <div className="space-y-6">
@@ -307,7 +320,7 @@ export function KmeetManager({
           ) : (
             <div className="divide-y divide-border">
               {upcoming.map((meeting) => (
-                <MeetingCard key={meeting.id} mode={mode} meeting={meeting} canManage={canWrite} />
+                <MeetingCard key={meeting.id} mode={mode} meeting={meeting} canManage={canWrite} timezone={timezone} />
               ))}
             </div>
           )}
@@ -322,7 +335,7 @@ export function KmeetManager({
           <CardContent>
             <div className="divide-y divide-border">
               {past.map((meeting) => (
-                <MeetingCard key={meeting.id} mode={mode} meeting={meeting} canManage={canWrite} />
+                <MeetingCard key={meeting.id} mode={mode} meeting={meeting} canManage={canWrite} timezone={timezone} />
               ))}
             </div>
           </CardContent>

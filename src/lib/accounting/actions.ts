@@ -1,5 +1,7 @@
 "use server";
 
+import { dateKeyInTimezone } from "@/lib/organizations/timezone";
+import { getOrganizationTimezone } from "@/lib/organizations/org-timezone";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
@@ -57,7 +59,7 @@ export async function createExpense(_prevState: ExpenseFormState, formData: Form
   if (!access.ok) return { error: access.message };
 
   const fields = readExpenseFields(formData);
-  const fieldErrors = validateExpense(fields);
+  const fieldErrors = validateExpense(fields, dateKeyInTimezone(new Date(), await getOrganizationTimezone(organizationId)));
   if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
   }
@@ -99,7 +101,7 @@ export async function updateExpense(_prevState: ExpenseFormState, formData: Form
   if (!access.ok) return { error: access.message };
 
   const fields = readExpenseFields(formData);
-  const fieldErrors = validateExpense(fields);
+  const fieldErrors = validateExpense(fields, dateKeyInTimezone(new Date(), await getOrganizationTimezone(organizationId)));
   if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
   }

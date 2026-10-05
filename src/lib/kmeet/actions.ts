@@ -13,6 +13,7 @@ import { tabKeyForMode, dashboardBasePathForMode } from "@/lib/kmeet/mode";
 import { getPlanLimits } from "@/lib/plans/dal";
 import { kaudioMaxDurationMinutes, type PlanLimits } from "@/lib/plans/config";
 import { getSiteUrl } from "@/lib/site-url";
+import { zonedTimeToUtc } from "@/lib/organizations/timezone";
 import type { KmeetMode } from "@/types/database";
 
 function maxDurationMinutesForMode(mode: KmeetMode, plan: PlanLimits): number | null {
@@ -56,8 +57,10 @@ export async function scheduleMeetingAction(_prevState: KmeetFormState, formData
 
   if (!title) return { error: "Give the meeting a title." };
 
-  const scheduledAt = new Date(scheduledAtRaw);
-  if (!scheduledAtRaw || Number.isNaN(scheduledAt.getTime())) return { error: "Choose a valid date and time." };
+  // The form has no timezone: the time is the church's local time.
+  const validLocal = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(scheduledAtRaw);
+  const scheduledAt = validLocal ? zonedTimeToUtc(scheduledAtRaw, membership.organization.timezone) : new Date(Number.NaN);
+  if (!validLocal || Number.isNaN(scheduledAt.getTime())) return { error: "Choose a valid date and time." };
   if (scheduledAt.getTime() < Date.now() - 60_000) return { error: "Choose a time in the future." };
 
   const supabase = await createClient();

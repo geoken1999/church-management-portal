@@ -3,11 +3,21 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
-import { isPlanId, type CustomPlanOverrides } from "@/lib/plans/config";
+import {
+  isPlanId,
+  PLANS,
+  CAPPABLE_TABS,
+  FINANCE_TABS,
+  SOCIAL_TABS,
+  effectiveTabs,
+  type CustomPlanOverrides,
+  type CappableTab,
+} from "@/lib/plans/config";
+import { TAB_KEYS, type TabKey } from "@/lib/permissions/tabs";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { notifyOrgOfSupportReply } from "@/lib/support/notify-org";
 import { sendEventPayoutProcessedEmail } from "@/lib/billing/receipts";
-import { TAB_LABELS, type TabKey } from "@/lib/permissions/tabs";
+import { TAB_LABELS } from "@/lib/permissions/tabs";
 import type { SupportTicketStatus } from "@/types/database";
 
 const PAYOUTS_PATH = "/platform-admin/payouts";
@@ -216,8 +226,46 @@ export async function setTenantCustomPlanLimits(
     supportSlaDays: readInt(formData, "supportSlaDays", 5),
   };
 
+  // Tab switches: "default" leaves the key out (plan default flows through),
+  // "on"/"off" are stored as overrides. Finance and Social are one switch
+  // each, applied to every tab in their group.
+  const tabOverrides: Partial<Record<TabKey, boolean>> = {};
+  const parseSwitch = (value: string | null): boolean | undefined =>
+    value === "on" ? true : value === "off" ? false : undefined;
+  const financeSwitch = parseSwitch(formData.get("group_finance") as string | null);
+  const socialSwitch = parseSwitch(formData.get("group_social") as string | null);
+  for (const tab of FINANCE_TABS) if (financeSwitch !== undefined) tabOverrides[tab] = financeSwitch;
+  for (const tab of SOCIAL_TABS) if (socialSwitch !== undefined) tabOverrides[tab] = socialSwitch;
+  for (const tab of TAB_KEYS) {
+    if (FINANCE_TABS.includes(tab) || SOCIAL_TABS.includes(tab)) continue;
+    const value = parseSwitch(formData.get(`tab_${tab}`) as string | null);
+    if (value !== undefined) tabOverrides[tab] = value;
+  }
+
+  const featureCaps: Partial<Record<CappableTab, number | null>> = {};
+  for (const tab of CAPPABLE_TABS) {
+    featureCaps[tab] = readNullableInt(formData, `cap_${tab}`);
+  }
+
   const admin = createAdminClient();
-  const { error } = await admin.from("organizations").update({ custom_plan_limits: overrides }).eq("id", organizationId);
+  const { data: org } = await admin.from("organizations").select("plan").eq("id", organizationId).maybeSingle();
+  const basePlanId = org?.plan && isPlanId(org.plan) ? org.plan : "basic";
+
+  // Module flags are derived from the tab switches, so the stored flags can
+  // never disagree with what the nav and page checks see.
+  const tabs = effectiveTabs(PLANS[basePlanId], tabOverrides);
+  const finalOverrides: CustomPlanOverrides = {
+    ...overrides,
+    financeEnabled: tabs.fundraisers,
+    socialMediaEnabled: tabs.instagram,
+    tabOverrides,
+    featureCaps,
+  };
+
+  const { error } = await admin
+    .from("organizations")
+    .update({ custom_plan_limits: finalOverrides as unknown as Record<string, unknown> })
+    .eq("id", organizationId);
 
   if (error) {
     return { error: "Couldn't save those custom rules. Please try again." };
@@ -228,7 +276,7 @@ export async function setTenantCustomPlanLimits(
     source: "platform_admin",
     message: `Platform admin (${platformAdmin.email ?? "unknown"}) set custom plan rules`,
     organizationId,
-    metadata: { overrides },
+    metadata: { overrides: finalOverrides },
   });
 
   revalidatePath(TENANTS_PATH);

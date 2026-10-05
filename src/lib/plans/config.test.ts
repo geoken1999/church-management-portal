@@ -1,5 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { ADDON_PACKS, getAddonPack, addonPacksFor, kaudioMaxDurationMinutes, resolvePlanLimits, PLANS } from "./config";
+import {
+  ADDON_PACKS,
+  getAddonPack,
+  addonPacksFor,
+  kaudioMaxDurationMinutes,
+  resolvePlanLimits,
+  resolveTabStates,
+  featureCapFor,
+  PLANS,
+} from "./config";
 
 describe("kaudioMaxDurationMinutes", () => {
   it("adds 10 minutes to a finite K-meet limit", () => {
@@ -21,6 +30,7 @@ describe("resolvePlanLimits", () => {
     const merged = resolvePlanLimits("basic", {
       ...PLANS.basic,
       branchLimit: 999,
+      tabOverrides: { automations: true },
       automationLimit: 3,
     });
     expect(merged.name).toBe("Custom");
@@ -29,6 +39,44 @@ describe("resolvePlanLimits", () => {
     // Unrelated fields still come from the base plan.
     expect(merged.id).toBe("basic");
     expect(merged.priceInRupees).toBe(PLANS.basic.priceInRupees);
+  });
+
+  it("keeps Automation off when the tab is off, whatever the rule value says", () => {
+    const merged = resolvePlanLimits("premium", { ...PLANS.premium, automationLimit: 5, tabOverrides: { automations: false } });
+    expect(merged.automationLimit).toBe(0);
+  });
+
+  it("derives Finance and Social Media flags from the tab switches", () => {
+    const starter = resolvePlanLimits("basic", { ...PLANS.basic, tabOverrides: { instagram: true, youtube: true, facebook: true } });
+    expect(starter.socialMediaEnabled).toBe(true);
+    const growth = resolvePlanLimits("premium", { ...PLANS.premium, tabOverrides: { fundraisers: false } });
+    expect(growth.financeEnabled).toBe(false);
+  });
+});
+
+describe("resolveTabStates", () => {
+  it("follows the plan default when no override is set", () => {
+    const tabs = resolveTabStates("basic", null);
+    expect(tabs.fundraisers).toBe(true);
+    expect(tabs.instagram).toBe(true);
+    expect(tabs.automations).toBe(false);
+  });
+
+  it("applies overrides on top of the plan default in both directions", () => {
+    const tabs = resolveTabStates("basic", { ...PLANS.basic, tabOverrides: { events: false, automations: true } });
+    expect(tabs.events).toBe(false);
+    expect(tabs.automations).toBe(true);
+  });
+});
+
+describe("featureCapFor", () => {
+  it("returns null (unlimited) when no cap is set", () => {
+    expect(featureCapFor(null, "events")).toBeNull();
+    expect(featureCapFor({ ...PLANS.basic, featureCaps: {} }, "events")).toBeNull();
+  });
+
+  it("returns the configured cap", () => {
+    expect(featureCapFor({ ...PLANS.basic, featureCaps: { events: 25 } }, "events")).toBe(25);
   });
 });
 

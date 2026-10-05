@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { checkFeatureCap } from "@/lib/plans/dal";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
@@ -42,6 +43,9 @@ export async function createTodo(_prevState: TodoFormState, formData: FormData):
   if (!membership.tabAccess.todos.write) {
     return { error: "You don't have permission to create to-dos." };
   }
+
+  const capError = await checkFeatureCap(membership.organization.id, "todos", "todos");
+  if (capError) return { error: capError };
 
   const fields = readTodoFields(formData);
   const fieldErrors = validateTodo(fields);

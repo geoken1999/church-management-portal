@@ -57,7 +57,12 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
             {usage.trialEndsAt && stillTrialing && ` · Trial ends ${new Date(usage.trialEndsAt).toLocaleDateString()}`}
           </p>
           <div className="mt-2">
-            <CustomPlanDialog organizationId={usage.id} effectiveLimits={usage.planLimits} hasCustomPlan={usage.customPlanLimits !== null} />
+            <CustomPlanDialog
+              organizationId={usage.id}
+              effectiveLimits={usage.planLimits}
+              customPlanLimits={usage.customPlanLimits}
+              hasCustomPlan={usage.customPlanLimits !== null}
+            />
           </div>
         </div>
         <ReportExportButtons onExport={exportTenantReport.bind(null, usage.id)} />

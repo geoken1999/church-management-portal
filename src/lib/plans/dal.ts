@@ -3,7 +3,15 @@ import "server-only";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isPlanId, resolvePlanLimits, type PlanLimits, type CustomPlanOverrides } from "@/lib/plans/config";
+import {
+  isPlanId,
+  resolvePlanLimits,
+  resolveTabStates,
+  type PlanLimits,
+  type CustomPlanOverrides,
+  type CappableTab,
+} from "@/lib/plans/config";
+import type { TabKey } from "@/lib/permissions/tabs";
 import { formatBytes } from "@/lib/plans/format";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 
@@ -543,4 +551,36 @@ export async function recordAiReplyUsageForWebhook(
   }
 
   await admin.from("ai_reply_usage").insert({ organization_id: organizationId, participant_id: participantId, source });
+}
+
+// Per-tab on/off state and feature caps for one org — read by checkTabAccess
+// (every server action) and the nav. Cached per request like getPlanAccess.
+export const getOrgFeatureState = cache(
+  async (organizationId: string): Promise<{ tabs: Record<TabKey, boolean>; featureCaps: Partial<Record<CappableTab, number | null>> }> => {
+    const supabase = await createClient();
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("plan, custom_plan_limits")
+      .eq("id", organizationId)
+      .maybeSingle();
+    const planId = org?.plan && isPlanId(org.plan) ? org.plan : "basic";
+    const custom = (org?.custom_plan_limits ?? null) as CustomPlanOverrides | null;
+    return {
+      tabs: resolveTabStates(planId, custom),
+      featureCaps: custom?.featureCaps ?? {},
+    };
+  },
+);
+
+// Blocks a create action once a tenant's cap for that feature is reached.
+export async function checkFeatureCap(organizationId: string, tab: CappableTab, table: string): Promise<string | null> {
+  const { featureCaps } = await getOrgFeatureState(organizationId);
+  const cap = featureCaps[tab] ?? null;
+  if (cap === null) return null;
+  const supabase = await createClient();
+  const { count } = await supabase.from(table).select("id", { count: "exact", head: true }).eq("organization_id", organizationId);
+  if ((count ?? 0) >= cap) {
+    return `This church's plan allows up to ${cap} ${tab} entries. Remove one or contact us to raise the limit.`;
+  }
+  return null;
 }

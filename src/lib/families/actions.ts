@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { checkFeatureCap } from "@/lib/plans/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
@@ -39,6 +40,9 @@ export async function createFamily(_prevState: FamilyFormState, formData: FormDa
   if (!access.ok) {
     return { error: access.message };
   }
+
+  const capError = await checkFeatureCap(organizationId, "families", "families");
+  if (capError) return { error: capError };
 
   const name = String(formData.get("name") ?? "");
   const notes = String(formData.get("notes") ?? "").trim();

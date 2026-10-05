@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/dal";
 import { normalizeTabPermissions, fullTabAccess, type TabKey } from "@/lib/permissions/tabs";
 import { getDisabledFeatures } from "@/lib/platform-admin/feature-flags";
+import { getOrgFeatureState } from "@/lib/plans/dal";
 import type { TabAccess } from "@/types/database";
 
 export type TabAccessLevel = keyof TabAccess;
@@ -31,6 +32,13 @@ export async function checkTabAccess(
   const disabledFeatures = await getDisabledFeatures();
   if (disabledFeatures.has(tab)) {
     return { ok: false, message: "This feature has been turned off platform-wide." };
+  }
+
+  // A tab the org's plan (or a platform-admin custom rule) excludes is off
+  // for everyone in the org, owners included — same as the kill switch above.
+  const orgState = await getOrgFeatureState(organizationId);
+  if (!orgState.tabs[tab]) {
+    return { ok: false, message: "This feature isn't included in your plan." };
   }
 
   const user = await requireUser();

@@ -8,7 +8,14 @@ import {
   clearTenantCustomPlanLimits,
   type SetTenantCustomPlanLimitsState,
 } from "@/lib/platform-admin/actions";
-import type { PlanLimits, CustomPlanOverrides } from "@/lib/plans/config";
+import {
+  CAPPABLE_TABS,
+  FINANCE_TABS,
+  SOCIAL_TABS,
+  type PlanLimits,
+  type CustomPlanOverrides,
+} from "@/lib/plans/config";
+import { TAB_KEYS, TAB_LABELS, type TabKey } from "@/lib/permissions/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,15 +39,38 @@ function nullableIntDefault(value: number | null): string {
   return value === null ? "" : String(value);
 }
 
+type SwitchValue = "default" | "on" | "off";
+
+function switchValue(value: boolean | undefined): SwitchValue {
+  return value === undefined ? "default" : value ? "on" : "off";
+}
+
+// Tabs shown as one row each, after the two group switches cover the rest.
+const INDIVIDUAL_TABS = TAB_KEYS.filter((tab) => !FINANCE_TABS.includes(tab) && !SOCIAL_TABS.includes(tab));
+
+function SwitchSelect({ name, defaultValue }: { name: string; defaultValue: SwitchValue }) {
+  return (
+    <select id={name} name={name} defaultValue={defaultValue} className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm">
+      <option value="default">Plan default</option>
+      <option value="on">On</option>
+      <option value="off">Off</option>
+    </select>
+  );
+}
+
 export function CustomPlanDialog({
   organizationId,
   effectiveLimits,
+  customPlanLimits,
   hasCustomPlan,
 }: {
   organizationId: string;
   effectiveLimits: PlanLimits;
+  customPlanLimits: CustomPlanOverrides | null;
   hasCustomPlan: boolean;
 }) {
+  const tabOverrides = customPlanLimits?.tabOverrides ?? {};
+  const featureCaps = customPlanLimits?.featureCaps ?? {};
   const router = useRouter();
   const [state, setState] = useState<SetTenantCustomPlanLimitsState>(initialState);
   const [pending, startTransition] = useTransition();
@@ -175,23 +205,58 @@ export function CustomPlanDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox name="financeEnabled" defaultChecked={overrides.financeEnabled} />
-              Finance
-            </label>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <label className="flex items-center gap-2 text-sm">
               <Checkbox name="ownPaymentGatewayEnabled" defaultChecked={overrides.ownPaymentGatewayEnabled} />
-              Own gateway
+              Own payment gateway
             </label>
             <label className="flex items-center gap-2 text-sm">
               <Checkbox name="customSmtpEnabled" defaultChecked={overrides.customSmtpEnabled} />
               Own SMTP
             </label>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox name="socialMediaEnabled" defaultChecked={overrides.socialMediaEnabled} />
-              Social Media
-            </label>
+          </div>
+
+          <div className="space-y-3 rounded-md border border-border p-3">
+            <div>
+              <p className="text-sm font-medium">Features</p>
+              <p className="text-xs text-muted-foreground">
+                Force each module on or off for this church, regardless of plan. &quot;Plan default&quot; follows the
+                plan. The platform-wide switch on Feature Flags still overrides everything.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor="group_finance">Finance (Fund Raiser, Offering, Donation, Accounting)</Label>
+                <SwitchSelect name="group_finance" defaultValue={switchValue(tabOverrides.fundraisers)} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="group_social">Social Media (Instagram, YouTube, Facebook)</Label>
+                <SwitchSelect name="group_social" defaultValue={switchValue(tabOverrides.instagram)} />
+              </div>
+              {INDIVIDUAL_TABS.map((tab: TabKey) => (
+                <div key={tab} className="space-y-1">
+                  <Label htmlFor={`tab_${tab}`}>{TAB_LABELS[tab]}</Label>
+                  <SwitchSelect name={`tab_${tab}`} defaultValue={switchValue(tabOverrides[tab])} />
+                </div>
+              ))}
+            </div>
+            <div className="space-y-2 pt-2">
+              <p className="text-sm font-medium">Caps (max entries, blank = unlimited)</p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {CAPPABLE_TABS.map((tab) => (
+                  <div key={tab} className="space-y-1">
+                    <Label htmlFor={`cap_${tab}`}>{TAB_LABELS[tab]}</Label>
+                    <Input
+                      id={`cap_${tab}`}
+                      name={`cap_${tab}`}
+                      type="number"
+                      min={0}
+                      defaultValue={nullableIntDefault(featureCaps[tab] ?? null)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           <DialogFooter className="flex items-center justify-between sm:justify-between">

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { checkFeatureCap } from "@/lib/plans/dal";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
@@ -118,6 +119,9 @@ export async function createFundraiser(
   if (!access.ok) {
     return { error: access.message };
   }
+
+  const capError = await checkFeatureCap(organizationId, "fundraisers", "fundraisers");
+  if (capError) return { error: capError };
 
   const fields = readFundraiserFields(formData);
   const fieldErrors = validateFundraiser(fields);

@@ -4,7 +4,8 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthUser, getProfile } from "@/lib/auth/dal";
-import { normalizeTabPermissions, allFullTabAccess, noTabAccess, type TabKey } from "@/lib/permissions/tabs";
+import { normalizeTabPermissions, allFullTabAccess, noTabAccess, TAB_KEYS, type TabKey } from "@/lib/permissions/tabs";
+import { isPlanId, resolveTabStates, type CustomPlanOverrides } from "@/lib/plans/config";
 import { getDisabledFeatures } from "@/lib/platform-admin/feature-flags";
 import type { Organization, OrganizationRole, TabAccess } from "@/types/database";
 
@@ -42,13 +43,26 @@ export const getUserOrganizations = cache(async (): Promise<OrganizationMembersh
     return result;
   }
 
+  // A tab the org's plan or a custom rule excludes is hidden for everyone
+  // in that org, owners included — same layering as the kill switch above.
+  function withOrgFlags(access: Record<TabKey, TabAccess>, org: Organization): Record<TabKey, TabAccess> {
+    const planId = org.plan && isPlanId(org.plan) ? org.plan : "basic";
+    const tabStates = resolveTabStates(planId, (org.custom_plan_limits ?? null) as CustomPlanOverrides | null);
+    const result = { ...access };
+    for (const tab of TAB_KEYS) {
+      if (!tabStates[tab]) result[tab] = noTabAccess();
+    }
+    return result;
+  }
+
   return data
     .filter((row): row is typeof row & { organizations: Organization } => Boolean(row.organizations))
     .map((row) => ({
       organization: row.organizations,
       role: row.role,
-      tabAccess: withGlobalFlags(
-        row.role === "owner" || row.role === "admin" ? allFullTabAccess() : normalizeTabPermissions(row.tab_permissions),
+      tabAccess: withOrgFlags(
+        withGlobalFlags(row.role === "owner" || row.role === "admin" ? allFullTabAccess() : normalizeTabPermissions(row.tab_permissions)),
+        row.organizations,
       ),
     }));
 });

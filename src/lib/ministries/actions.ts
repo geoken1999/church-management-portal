@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { checkFeatureCap } from "@/lib/plans/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
@@ -50,6 +51,9 @@ export async function createMinistry(
   if (!access.ok) {
     return { error: access.message };
   }
+
+  const capError = await checkFeatureCap(organizationId, "ministries", "ministries");
+  if (capError) return { error: capError };
 
   const { title, type, managedBy, vision, mission, startedOn, futurePlans } = readMinistryFields(formData);
 

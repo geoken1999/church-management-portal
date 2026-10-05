@@ -221,19 +221,95 @@ export function kaudioMaxDurationMinutes(plan: PlanLimits): number | null {
 // deliberately excluding identity/pricing fields: a Custom org's price
 // stays whatever was comped manually (via setTenantPlan), only the
 // *rules* vary here. Stored as-is in organizations.custom_plan_limits.
+import { TAB_KEYS, type TabKey } from "@/lib/permissions/tabs";
+
+// Tabs whose per-tenant cap counts rows in their own table. Other tabs get
+// on/off only; the four plan-level quotas (branches, members, forms,
+// automations) keep their existing fields instead.
+export const CAPPABLE_TABS = [
+  "events",
+  "todos",
+  "fundraisers",
+  "ministries",
+  "families",
+  "leaders",
+  "youth",
+  "committee",
+] as const;
+export type CappableTab = (typeof CAPPABLE_TABS)[number];
+
+// Module-level switches. Each group is one switch in the Custom rules
+// dialog, so every tab in a group always resolves the same way.
+export const FINANCE_TABS: TabKey[] = ["fundraisers", "offerings", "donations", "accounting"];
+export const SOCIAL_TABS: TabKey[] = ["instagram", "youtube", "facebook"];
+
+export interface TenantFeatureSettings {
+  // Missing key = plan default. true forces on, false forces off.
+  tabOverrides?: Partial<Record<TabKey, boolean>>;
+  // Missing or null = unlimited.
+  featureCaps?: Partial<Record<CappableTab, number | null>>;
+}
+
+// The rule fields a platform admin can set for a negotiated deal, plus
+// per-tenant feature switches and caps. Pricing and identity stay with the
+// underlying plan.
 export type CustomPlanOverrides = Omit<
   PlanLimits,
   "id" | "name" | "priceInRupees" | "priceLabel" | "priceInRupeesAnnual" | "priceLabelAnnual"
->;
+> &
+  TenantFeatureSettings;
+
+// What the plan includes by default for one tab, before any tenant override.
+function planTabDefault(base: PlanLimits, tab: TabKey): boolean {
+  if (FINANCE_TABS.includes(tab)) return base.financeEnabled;
+  if (SOCIAL_TABS.includes(tab)) return base.socialMediaEnabled;
+  if (tab === "automations") return base.automationLimit !== 0;
+  return true;
+}
+
+// Every tab's effective on/off state for an org: the plan default, with
+// any tenant override applied on top.
+export function effectiveTabs(base: PlanLimits, tabOverrides: TenantFeatureSettings["tabOverrides"]): Record<TabKey, boolean> {
+  const result = {} as Record<TabKey, boolean>;
+  for (const tab of TAB_KEYS) {
+    result[tab] = tabOverrides?.[tab] ?? planTabDefault(base, tab);
+  }
+  return result;
+}
+
+export function resolveTabStates(planId: PlanId, customOverrides: CustomPlanOverrides | null): Record<TabKey, boolean> {
+  return effectiveTabs(PLANS[planId], customOverrides?.tabOverrides);
+}
 
 // The single place "what limits does this org actually have" is
-// computed — used by both getPlanAccess (src/lib/plans/dal.ts) and
-// getTenantUsage (src/lib/platform-admin/dal.ts), which used to each do
-// their own plain PLANS[planId] lookup with no override concept.
+// computed. Module flags and automation limit are derived from the tab
+// switches, so a tab turned on or off for one tenant also changes the
+// page-level checks that read those flags.
 export function resolvePlanLimits(planId: PlanId, customOverrides: CustomPlanOverrides | null): PlanLimits {
   const basePlan = PLANS[planId];
   if (!customOverrides) return basePlan;
-  return { ...basePlan, ...customOverrides, name: "Custom" };
+
+  const rules: Partial<CustomPlanOverrides> = { ...customOverrides };
+  delete rules.tabOverrides;
+  delete rules.featureCaps;
+  const tabs = effectiveTabs(basePlan, customOverrides.tabOverrides);
+
+  let automationLimit = rules.automationLimit ?? basePlan.automationLimit;
+  if (!tabs.automations) automationLimit = 0;
+  else if (automationLimit === 0) automationLimit = null;
+
+  return {
+    ...basePlan,
+    ...rules,
+    financeEnabled: tabs.fundraisers,
+    socialMediaEnabled: tabs.instagram,
+    automationLimit,
+    name: "Custom",
+  };
+}
+
+export function featureCapFor(customOverrides: CustomPlanOverrides | null, tab: CappableTab): number | null {
+  return customOverrides?.featureCaps?.[tab] ?? null;
 }
 
 export function isPlanId(value: string): value is PlanId {

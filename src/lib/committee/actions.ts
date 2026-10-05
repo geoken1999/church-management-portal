@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { checkFeatureCap } from "@/lib/plans/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
@@ -44,6 +45,9 @@ export async function createCommitteeMember(
   if (!access.ok) {
     return { error: access.message };
   }
+
+  const capError = await checkFeatureCap(organizationId, "committee", "committee_members");
+  if (capError) return { error: capError };
 
   const { memberId, committeeName, role, notes } = readCommitteeFields(formData);
 

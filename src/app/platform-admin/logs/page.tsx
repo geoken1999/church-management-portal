@@ -5,6 +5,7 @@ import { getPlatformEvents } from "@/lib/platform-admin/dal";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { PlatformEventLevel } from "@/types/database";
+import { formatPlatformDateTime } from "@/lib/platform-admin/format";
 
 export const metadata: Metadata = {
   title: "Logs | KingdomFlow Super Admin",
@@ -68,7 +69,7 @@ export default async function PlatformAdminLogsPage({ searchParams }: { searchPa
                     <Badge variant={LEVEL_VARIANTS[event.level]}>{event.level}</Badge>
                     <span className="text-xs font-medium text-muted-foreground">{event.source}</span>
                   </div>
-                  <span className="text-xs text-muted-foreground">{new Date(event.created_at).toLocaleString()}</span>
+                  <span className="text-xs text-muted-foreground">{formatPlatformDateTime(event.created_at)}</span>
                 </div>
                 <p className="text-sm">{event.message}</p>
                 {Object.keys(event.metadata).length > 0 && (

@@ -8,11 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { SupportTicketMessageRow } from "@/lib/platform-admin/dal";
+import { formatPlatformDateTime } from "@/lib/platform-admin/format";
 
 const initialState: AddPlatformSupportReplyState = {};
 
 function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString();
+  return formatPlatformDateTime(iso);
 }
 
 export function SupportTicketThread({ ticketId, messages }: { ticketId: string; messages: SupportTicketMessageRow[] }) {

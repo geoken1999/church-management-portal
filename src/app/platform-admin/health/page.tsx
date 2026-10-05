@@ -10,6 +10,7 @@ import { formatBytes } from "@/lib/plans/format";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { formatPlatformDateTime } from "@/lib/platform-admin/format";
 
 export const metadata: Metadata = {
   title: "Health | KingdomFlow Super Admin",
@@ -120,7 +121,7 @@ export default async function PlatformAdminHealthPage() {
                 <Badge variant={DEPLOYMENT_STATE_VARIANTS[deployment.state] ?? "secondary"}>{deployment.state}</Badge>
                 {deployment.readyAt && (
                   <p className="text-xs text-muted-foreground">
-                    Went live {new Date(deployment.readyAt).toLocaleString()}
+                    Went live {formatPlatformDateTime(deployment.readyAt)}
                     {deployment.buildDurationMs !== null && ` · built in ${Math.round(deployment.buildDurationMs / 1000)}s`}
                   </p>
                 )}
@@ -281,7 +282,7 @@ export default async function PlatformAdminHealthPage() {
                   <div className="min-w-0">
                     <p className="text-sm">{event.message}</p>
                     <p className="text-xs text-muted-foreground">
-                      {event.source} · {new Date(event.created_at).toLocaleString()}
+                      {event.source} · {formatPlatformDateTime(event.created_at)}
                     </p>
                   </div>
                   <Badge variant="destructive">error</Badge>

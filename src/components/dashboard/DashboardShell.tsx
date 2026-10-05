@@ -45,6 +45,7 @@ import {
   Smartphone,
   ClipboardList,
   Workflow,
+  Wallet,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { YouTubeIcon } from "@/components/icons/YouTubeIcon";
@@ -134,6 +135,7 @@ const NAV_GROUPS = [
       { href: "/dashboard/fundraisers", itemKey: "fundraisers" as const, icon: Target, tab: "fundraisers" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },
       { href: "/dashboard/offerings", itemKey: "offerings" as const, icon: HandCoins, tab: "offerings" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },
       { href: "/dashboard/donations", itemKey: "donations" as const, icon: Gift, tab: "donations" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },
+      { href: "/dashboard/payouts", itemKey: "payouts" as const, icon: Wallet, tab: "donations" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },
     ],
   },
   {

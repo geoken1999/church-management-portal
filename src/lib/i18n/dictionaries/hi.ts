@@ -67,6 +67,7 @@ export const hi: Dictionary = {
       fundraisers: "निधि संग्रह",
       offerings: "भेंट",
       donations: "दान",
+      payouts: "भुगतान",
       email: "ईमेल",
       sms: "एसएमएस",
       whatsapp: "व्हाट्सएप",

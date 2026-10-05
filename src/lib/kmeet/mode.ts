@@ -14,5 +14,5 @@ export function publicBasePathForMode(mode: KmeetMode): string {
 }
 
 export function labelForMode(mode: KmeetMode): string {
-  return mode === "audio" ? "K-Audio" : "K-meet";
+  return mode === "audio" ? "K-Audio" : "K-Meet";
 }

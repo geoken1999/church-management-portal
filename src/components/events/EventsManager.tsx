@@ -729,7 +729,7 @@ function EventCard({
                   href={`/dashboard/kmeet/${meeting.id}`}
                   className="font-medium text-primary underline-offset-4 hover:underline"
                 >
-                  K-meet: {meeting.title}
+                  K-Meet: {meeting.title}
                   {meeting.status === "live" ? " (live)" : meeting.status === "ended" ? " (ended)" : ""}
                 </a>
               ))}

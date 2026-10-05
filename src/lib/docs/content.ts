@@ -23,7 +23,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
         title: "Setting up your church",
         body: [
           "When you first sign up, you'll create an organization for your church — its name, congregation size, number of branches, and country. Country matters: it sets the default phone country code used across Members, Branches, and SMS.",
-          "Every organization gets a free 14-day trial with full Basic-plan access, no card required. After that, an owner or admin needs to subscribe from the Billing page to keep using the app.",
+          "Every organization gets a free 14-day trial with full Starter-plan access, no card required. After that, an owner or admin needs to subscribe from the Billing page to keep using the app.",
           "You'll get a welcome email as soon as your church's account is created, with a few suggested first steps and a link straight back to your dashboard.",
           "A short welcome tour pops up automatically the first time your dashboard loads, pointing out where each area of the app lives. Skip it or click through it — either way it won't show again on its own, but you can replay it anytime from \"Take the tour\" at the bottom of the sidebar's Help section.",
         ],
@@ -107,7 +107,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
         body: [
           "Team → \"Create login\" issues a ready-to-use email and password directly — the person doesn't need to sign up themselves. The password is shown once; copy it and share it with them yourself.",
           "When creating a login, you set their role (Member or Admin) and, for Members, a permission matrix — see \"Team permissions\" below.",
-          "Each plan has a limit on how many logins you can add beyond the owner's own seat: 3 on Basic, 10 on Premium, 50 on Pro.",
+          "Each plan has a limit on how many logins you can add beyond the owner's own seat: 1 extra admin and 2 extra staff on Starter, 3 admins and 5 staff on Growth, and 10 admins and 20 staff on Pro.",
         ],
       },
       {
@@ -155,6 +155,46 @@ export const DOC_CATEGORIES: DocCategory[] = [
         title: "To Do (team tasks)",
         body: [
           "A shared task list for your team — assign a to-do to any team member, set a due date, and export it to your calendar.",
+        ],
+      },
+      {
+        id: "kmeet-kaudio",
+        title: "K-Meet and K-Audio calls",
+        body: [
+          "K-Meet is a video call and K-Audio is an audio-only call. Both are started from their own pages in the dashboard, and you can invite people with a link, including people who aren't members.",
+          "When someone is speaking, their call tile gets a border that blinks, so you can see who is talking at a glance. If your device has reduced motion turned on, the border stays steady instead of blinking.",
+          "Call length depends on your plan. On Starter, K-Meet calls end after 20 minutes and K-Audio calls after 30. On Growth, they end after 40 and 50 minutes. On Pro, calls have no time limit.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "automation",
+    title: "Automation",
+    articles: [
+      {
+        id: "automation-overview",
+        title: "What automation does and what it costs",
+        body: [
+          "Automation runs recurring tasks without anyone having to remember them. Find it under Automation in the sidebar, then pick the feature you want to set up.",
+          "Starter doesn't include automation. Growth allows 5 active automations at a time, and Pro allows 10. Drafts and paused automations don't count toward the limit — only active ones do.",
+        ],
+      },
+      {
+        id: "automation-birthdays",
+        title: "Birthday and anniversary wishes",
+        body: [
+          "Automate Wishes for Members sends birthday and anniversary wishes over WhatsApp, on the day, to each member it applies to. Choose which occasions to send for, the message template, and whether your staff also get a daily digest of who was celebrated.",
+        ],
+      },
+      {
+        id: "automation-member-followup",
+        title: "Member follow-up: tasks for members who have stopped coming",
+        body: [
+          "Member follow-up creates a To Do task for a leader when a member has been absent for a set number of Sundays in a row (2 to 12, default 3). Nothing is sent to the member. The task is assigned to the person you choose, and it's due in the number of working days you set.",
+          "A Sunday only counts if its register was marked complete. On the attendance session, use Mark register complete once the register is final. Sundays that aren't marked complete are skipped, not counted as absences.",
+          "Each member has at most one open task per automation. When that task is completed, the next missed run can create a new one. The assignee is notified without the member's name.",
+          "You choose the branches and the weekday the check runs on. Activate it from the automation page, and pause it there at any time.",
         ],
       },
     ],
@@ -231,7 +271,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
         body: [
           "Accounting tracks income and expenses by category (e.g. \"Tithes\", \"Utilities\"), with a chart comparing income vs. expense bucketed by day, week, or month depending on the date range you pick, and everything filterable by branch.",
           "Ledger gives you a running, printable record of transactions for a period. Invoices let you create a line-itemed invoice for a person or organization and print it directly from the browser — both are meant to be handed to someone, not just viewed on screen.",
-          "Accounting is included on the Premium and Pro plans, not Basic — same gate as the rest of Finance.",
+          "Accounting is included on every plan — same gate as the rest of Finance.",
         ],
       },
     ],
@@ -247,7 +287,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
           "Fund Raiser tracks campaigns toward a goal amount. The \"raised\" total is calculated automatically from Donations linked to that campaign — there's no separate field to manually type a raised amount.",
           "Offering logs amounts collected during services or events — a simple record: category, amount, date, and optional branch.",
           "Donation logs a gift from a member (picked from your roster) or a free-text donor name for guests. Donations can optionally be linked to a Fund Raiser to count toward its goal.",
-          "The Finance module is included on the Premium and Pro plans, not Basic.",
+          "The Finance module is included on every plan.",
         ],
       },
       {
@@ -257,6 +297,18 @@ export const DOC_CATEGORIES: DocCategory[] = [
           "Any Fund Raiser can turn on an online payment link, letting a donor enter their own amount and pay by card/UPI/etc. through Razorpay — no need to record every gift by hand. If the donor entered an email address, they're automatically emailed a receipt once the payment goes through.",
           "Choose either your own Razorpay account (connected from the Fund Raiser page) or our shared service, which needs no setup on your end. A shared-service donation is charged a 2.5% transaction fee, shown up front on both the giving page and your Fund Raiser dashboard, before it's paid out to you — your own account has no such fee since the money goes straight to you.",
           "For shared-service fundraisers, the wallet balance shown at the top right of the Fund Raiser page is what you've collected (after the fee) and haven't been paid out yet — it drops automatically once we record a payout on our end. Click it to open a payout request, which we process manually — it isn't instant. Each campaign's row also has a \"Show payout history\" link listing every payout you've received for it, with date, amount, and our note.",
+        ],
+      },
+      {
+        id: "membership-fees",
+        title: "Monthly membership fees",
+        body: [
+          "Membership fees ask each active member for a fixed monthly amount, by email, with a payment link. Set it up from Donation, then Membership fees: turn it on, enter the monthly amount, and choose the day of the month the requests go out (1 to 28) and how many days later a reminder is sent to anyone still unpaid.",
+          "On that day, every active member with an email address on file gets their own payment link. Members pay through Razorpay's secure checkout, and get a receipt by email as soon as the payment goes through. Members without an email address can't be sent a link, and are listed as \"No email on file\" in the report.",
+          "Payments go through KingdomFlow's shared Razorpay account, so a 2.5% transaction fee applies, the same as for shared-service Fund Raisers. Members who join after the request day are billed from the following month.",
+          "The monthly report shows what was expected, collected and is still outstanding, with each member's status and when their request was sent. Export it to CSV from the same page.",
+          "The collected amount, less the fee, is paid out to you on request. Save your UPI or bank details in your organization settings first, then use Request payout on the Membership fees page. Payouts are processed manually on our end, so they aren't instant.",
+          "- Payments can only be taken through KingdomFlow's shared account. Payments you collect yourself, such as cash or your own payment link, aren't recorded here.",
         ],
       },
     ],
@@ -270,7 +322,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
         title: "Email and SMS campaigns",
         body: [
           "Send bulk email newsletters or SMS announcements to your congregation from the Email and SMS tabs. Both use a shared sending account by default, metered by your plan's monthly quota.",
-          "Premium and Pro plans can connect their own SMTP server for unmetered email sending — SMS has no equivalent \"bring your own\" option.",
+          "Growth and Pro plans can connect their own SMTP server for unmetered email sending — SMS has no equivalent \"bring your own\" option.",
           "SMS recipients' country codes are resolved from their branch (or the church's country as a fallback) — this only works correctly if that's set.",
         ],
       },
@@ -288,7 +340,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
         body: [
           "Connect your church's Instagram, YouTube, and Facebook accounts to manage posts, comments, and messages without leaving the dashboard.",
           "YouTube supports connecting more than one channel — use the channel switcher above the YouTube dashboard to add another channel or switch which one is active. Videos, comments, analytics, and live streaming controls all apply to whichever channel is currently active.",
-          "Social Media is included on the Pro plan only. Connecting an account also requires an owner or admin.",
+          "Social Media is included on every plan. Connecting an account also requires an owner or admin.",
         ],
       },
     ],
@@ -299,10 +351,11 @@ export const DOC_CATEGORIES: DocCategory[] = [
     articles: [
       {
         id: "plans",
-        title: "Basic, Premium, and Pro",
+        title: "Starter, Growth, Pro, and Custom",
         body: [
-          "The three plans differ in email/SMS quotas, storage, added team logins, and whether Finance, Social Media, and your own SMTP are included — see the Billing page for the full comparison.",
-          "Every plan is available billed Monthly, or Annually at 10% off (toggle on the Billing page or the pricing page).",
+          "The plans differ in email/SMS quotas, storage, added team logins, automation, and whether your own SMTP server can be connected. Finance and Social Media are included on every plan — see the Billing page for the full comparison.",
+          "Custom is set up for a specific church by KingdomFlow, with limits agreed with you, and is shown on the pricing page as a request-a-quote option.",
+          "Every plan is available billed Monthly, or Annually at 17% off (toggle on the Billing page or the pricing page).",
           "Your organization's owner and admins get an email whenever a subscription is activated, renewed, or cancelled, and whenever an add-on pack is purchased — sent to every owner/admin, not just whoever made the change.",
         ],
       },
@@ -310,7 +363,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
         id: "trial",
         title: "The 14-day trial",
         body: [
-          "New organizations get 14 days of full Basic-plan access with no subscription required — you'll see a countdown banner across the dashboard during this period.",
+          "New organizations get 14 days of full Starter-plan access with no subscription required — you'll see a countdown banner across the dashboard during this period.",
           "Once the trial ends, the app is locked to a \"subscribe now\" screen until an owner or admin picks a plan. Other team members will see a message asking them to contact an owner/admin.",
         ],
       },
@@ -368,6 +421,8 @@ export const DOC_CATEGORIES: DocCategory[] = [
           "- Fund Raiser payout requests (shared-service giving) are processed manually on our end, not instantly.",
           "- Ledger and Invoices are print-only right now — there's no built-in emailing or PDF download, just \"print to PDF\" from the browser's print dialog.",
           "- Trial length is fixed at 14 days and isn't extendable from within the app.",
+          "- Membership fee payments count only when made through KingdomFlow's shared account. Cash and your own payment links aren't recorded.",
+          "- Member follow-up depends on each Sunday's register being marked complete. Unmarked Sundays are skipped, not treated as absences.",
         ],
       },
     ],

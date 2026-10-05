@@ -166,9 +166,9 @@ export function CustomPlanDialog({
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
-              <Label htmlFor="kmeetMaxDurationMinutes">K-meet max (min, blank = unlimited)</Label>
+              <Label htmlFor="kmeetMaxDurationMinutes">K-Meet max (min, blank = unlimited)</Label>
               <Input id="kmeetMaxDurationMinutes" name="kmeetMaxDurationMinutes" type="number" min={0} defaultValue={nullableIntDefault(overrides.kmeetMaxDurationMinutes)} />
-              <p className="text-xs text-muted-foreground">K-audio is always this + 10 min.</p>
+              <p className="text-xs text-muted-foreground">K-Audio is always this + 10 min.</p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="branchLimit">Branches (blank = unlimited)</Label>

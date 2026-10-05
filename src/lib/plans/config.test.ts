@@ -11,12 +11,12 @@ import {
 } from "./config";
 
 describe("kaudioMaxDurationMinutes", () => {
-  it("adds 10 minutes to a finite K-meet limit", () => {
+  it("adds 10 minutes to a finite K-Meet limit", () => {
     expect(kaudioMaxDurationMinutes(PLANS.basic)).toBe(30); // basic: 20 -> 30
     expect(kaudioMaxDurationMinutes(PLANS.premium)).toBe(50); // premium: 40 -> 50
   });
 
-  it("stays unlimited when K-meet's limit is unlimited", () => {
+  it("stays unlimited when K-Meet's limit is unlimited", () => {
     expect(kaudioMaxDurationMinutes(PLANS.pro)).toBeNull(); // pro: null -> null
   });
 });
@@ -141,7 +141,7 @@ describe("PLANS.pro", () => {
     expect(PLANS.pro.automationLimit).toBe(10);
   });
 
-  it("leaves K-meet/K-audio and forms unlimited, but caps branches/members", () => {
+  it("leaves K-Meet/K-Audio and forms unlimited, but caps branches/members", () => {
     expect(PLANS.pro.kmeetMaxDurationMinutes).toBeNull();
     expect(PLANS.pro.formsLimit).toBeNull();
     expect(PLANS.pro.branchLimit).toBe(20);

@@ -6,7 +6,7 @@ import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 import { KmeetCall } from "@/components/kmeet/KmeetCallLoader";
 
 export const metadata: Metadata = {
-  title: "K-meet | KingdomFlow",
+  title: "K-Meet | KingdomFlow",
 };
 
 export default async function KmeetCallPage({ params }: { params: Promise<{ meetingId: string }> }) {
@@ -15,7 +15,7 @@ export default async function KmeetCallPage({ params }: { params: Promise<{ meet
   const organizationId = membership.organization.id;
 
   if (!membership.tabAccess.kmeet.read) {
-    return <AccessRestricted label="K-meet" />;
+    return <AccessRestricted label="K-Meet" />;
   }
 
   const meeting = await getKmeetMeeting(organizationId, meetingId, "video");

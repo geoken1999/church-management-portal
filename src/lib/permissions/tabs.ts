@@ -54,7 +54,7 @@ export const TAB_LABELS: Record<TabKey, string> = {
   events: "Events",
   todos: "To Do",
   planner: "Planner",
-  kmeet: "K-meet",
+  kmeet: "K-Meet",
   kaudio: "K-Audio",
   forms: "Forms",
   folder: "Folder",

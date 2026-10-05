@@ -71,8 +71,20 @@ function useVideoOrientation(videoRef: React.RefObject<HTMLVideoElement | null>,
 // reference implementation does (construct a fresh MediaStream from the
 // track, since the SDK doesn't auto-play audio for you).
 function ParticipantTile({ participantId, isModerator }: { participantId: string; isModerator: boolean }) {
-  const { displayName, webcamOn, webcamStream, micOn, micStream, isLocal, screenShareOn, screenShareStream, disableMic, disableWebcam, remove } =
-    useParticipant(participantId);
+  const {
+    displayName,
+    webcamOn,
+    webcamStream,
+    micOn,
+    micStream,
+    isLocal,
+    isActiveSpeaker,
+    screenShareOn,
+    screenShareStream,
+    disableMic,
+    disableWebcam,
+    remove,
+  } = useParticipant(participantId);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const screenRef = useRef<HTMLVideoElement>(null);
@@ -134,6 +146,12 @@ function ParticipantTile({ participantId, isModerator }: { participantId: string
         </div>
       )}
       <audio ref={audioRef} autoPlay />
+      {isActiveSpeaker && (
+        <>
+          <div aria-hidden="true" className="speaking-border pointer-events-none absolute inset-0 rounded-lg border-2 border-primary" />
+          <span className="sr-only">Speaking</span>
+        </>
+      )}
       <div className="absolute bottom-1.5 left-1.5 rounded bg-black/60 px-1.5 py-0.5 text-xs text-white">
         {displayName || "Guest"}
         {isLocal ? " (you)" : ""}
@@ -538,7 +556,7 @@ function CallView({
           <AlertDescription>Couldn&apos;t connect to the call: {connectionError}</AlertDescription>
         </Alert>
         <Button type="button" variant="outline" onClick={onLeft}>
-          Back to {audioOnly ? "K-Audio" : "K-meet"}
+          Back to {audioOnly ? "K-Audio" : "K-Meet"}
         </Button>
       </div>
     );
@@ -849,7 +867,7 @@ function PreJoinLobby({
 
 export interface KmeetCallProps {
   meetingId: string;
-  // Defaults to "video" so the existing K-meet call sites (and any stale
+  // Defaults to "video" so the existing K-Meet call sites (and any stale
   // client bundle during a deploy) keep behaving exactly as before.
   mode?: KmeetMode;
   title: string;

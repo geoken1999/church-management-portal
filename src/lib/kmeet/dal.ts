@@ -20,7 +20,7 @@ export const getKmeetMeetings = cache(async (organizationId: string, mode: Kmeet
 });
 
 // Candidates for the "link to an event" picker when scheduling a meeting
-// — upcoming, non-cancelled events only. Shared by both K-meet and
+// — upcoming, non-cancelled events only. Shared by both K-Meet and
 // K-Audio — which event a call is attached to isn't mode-specific.
 export const getUpcomingEventOptions = cache(async (organizationId: string) => {
   const events = await getEvents(organizationId);
@@ -28,7 +28,7 @@ export const getUpcomingEventOptions = cache(async (organizationId: string) => {
   return events.filter((event) => event.status !== "cancelled" && new Date(event.start_at).getTime() >= now).map((event) => ({ id: event.id, title: event.title }));
 });
 
-// Powers the Events page's "linked K-meet meeting" badge — every meeting
+// Powers the Events page's "linked K-Meet meeting" badge — every meeting
 // in this org that's tagged to an event, grouped by event_id so the
 // Events list can look up its own without a query per event. Left
 // unfiltered by mode — the badge shows either kind of call.
@@ -67,7 +67,7 @@ export const getKmeetMeeting = cache(async (organizationId: string, meetingId: s
 // [meetingId] guest-join pages. Only title/status are selected (nothing
 // from any other org-scoped table), same minimal-exposure shape as this
 // app's other invite-link pages. Filtered by mode as defense-in-depth —
-// a K-Audio link can't resolve a K-meet row, and vice versa.
+// a K-Audio link can't resolve a K-Meet row, and vice versa.
 export const getPublicKmeetMeeting = cache(async (meetingId: string, mode: KmeetMode) => {
   const admin = createAdminClient();
   const { data } = await admin.from("kmeet_meetings").select("id, title, status").eq("id", meetingId).eq("mode", mode).maybeSingle();

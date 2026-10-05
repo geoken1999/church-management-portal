@@ -5,7 +5,7 @@ export function getVideoSdkEnv() {
   const secret = process.env.VIDEOSDK_SECRET;
 
   if (!apiKey || !secret) {
-    throw new Error("VIDEOSDK_API_KEY and VIDEOSDK_SECRET must be set to use K-meet.");
+    throw new Error("VIDEOSDK_API_KEY and VIDEOSDK_SECRET must be set to use K-Meet.");
   }
 
   return { apiKey, secret };

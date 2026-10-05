@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isSameNumber, nationalTail } from "@/lib/whatsapp/phone-match";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 
@@ -40,8 +41,16 @@ export async function resolveOrganizationForPhoneNumber(phoneNumber: string): Pr
     return null;
   }
 
-  const { data: matchingMembers } = await admin.from("members").select("organization_id").eq("phone", phoneNumber);
-  const memberOrgIds = new Set((matchingMembers ?? []).map((m) => m.organization_id));
+  // Meta sends the sender in full international form (+91…), while members
+  // are usually saved without the country code, sometimes with a leading 0.
+  // Compare on the last 10 digits, the national number for India and most
+  // of the churches' numbers. Ambiguity across orgs is still refused below.
+  const tail = nationalTail(phoneNumber);
+  const { data: candidates } = tail.length === 10
+    ? await admin.from("members").select("organization_id, phone").like("phone", `%${tail}`)
+    : { data: [] as { organization_id: string; phone: string | null }[] };
+  const matchingMembers = (candidates ?? []).filter((m) => m.phone && isSameNumber(m.phone, phoneNumber));
+  const memberOrgIds = new Set(matchingMembers.map((m) => m.organization_id));
 
   if (memberOrgIds.size === 1) return [...memberOrgIds][0];
   if (memberOrgIds.size > 1) {

@@ -45,9 +45,14 @@ export default async function DonationsPage() {
           <h1 className="font-heading text-3xl font-bold tracking-tight">Donation</h1>
           <p className="mt-1 text-muted-foreground">Gifts from members and outside donors.</p>
         </div>
-        <Button variant="outline" nativeButton={false} render={<Link href="/dashboard/membership-fees" />}>
-          Membership fees
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" nativeButton={false} render={<Link href="/dashboard/payouts" />}>
+            Payouts
+          </Button>
+          <Button variant="outline" nativeButton={false} render={<Link href="/dashboard/membership-fees" />}>
+            Membership fees
+          </Button>
+        </div>
       </div>
 
       <DonationsManager

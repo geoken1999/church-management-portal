@@ -17,6 +17,7 @@ import {
   type TemplateFormState,
 } from "@/lib/whatsapp/actions";
 import { normalizePhoneNumber, countTemplateVariables, validateWhatsAppTemplatePlaceholders } from "@/lib/whatsapp/validation";
+import { MEMBER_FIELDS, validatePlaceholderSpec, type MemberField, type PlaceholderSpec } from "@/lib/whatsapp/placeholders";
 import type { WhatsAppTemplateCategory, WhatsAppTemplateStatus } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,28 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTab, TabsIndicator, TabsPanel } from "@/components/ui/tabs";
+
+// One placeholder as the composer edits it: a typed value for everyone, or a
+// member field with a fallback for numbers that aren't members.
+interface PlaceholderDraft {
+  mode: "fixed" | "member";
+  value: string;
+  field: MemberField;
+  fallback: string;
+}
+
+function emptyPlaceholder(): PlaceholderDraft {
+  return { mode: "fixed", value: "", field: "first_name", fallback: "Friend" };
+}
+
+function toPlaceholderSpec(draft: PlaceholderDraft): PlaceholderSpec {
+  return draft.mode === "fixed" ? { kind: "fixed", value: draft.value } : { kind: "member", field: draft.field, fallback: draft.fallback };
+}
+
+function placeholderChoiceLabel(choice: string): string {
+  if (choice === "fixed") return "One value for everyone";
+  return MEMBER_FIELDS.find((f) => f.key === choice)?.label ?? choice;
+}
 
 export interface WhatsAppRecipientOption {
   id: string;
@@ -561,7 +584,7 @@ function Composer({
   orgCountryCode: string | null;
 }) {
   const [templateId, setTemplateId] = useState<string>(templates[0]?.id ?? "");
-  const [variableValues, setVariableValues] = useState<string[]>([]);
+  const [placeholders, setPlaceholders] = useState<PlaceholderDraft[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [extraNumbers, setExtraNumbers] = useState("");
   const [result, setResult] = useState<{ error?: string; success?: string } | null>(null);
@@ -580,7 +603,11 @@ function Composer({
   function handleSelectTemplate(id: string) {
     setTemplateId(id);
     const next = templates.find((t) => t.id === id);
-    setVariableValues(Array.from({ length: next?.variable_count ?? 0 }, () => ""));
+    setPlaceholders(Array.from({ length: next?.variable_count ?? 0 }, () => emptyPlaceholder()));
+  }
+
+  function updatePlaceholder(index: number, patch: Partial<PlaceholderDraft>) {
+    setPlaceholders((prev) => prev.map((draft, i) => (i === index ? { ...draft, ...patch } : draft)));
   }
 
   function toggle(id: string) {
@@ -611,18 +638,20 @@ function Composer({
       return;
     }
 
+    // Members carry their id so their own name and branch can fill the
+    // placeholders. Typed-in numbers don't, and get each placeholder's fallback.
     const recipients = [
       ...Array.from(selectedIds)
         .map((id) => membersById.get(id))
         .filter((m): m is WhatsAppRecipientOption => Boolean(m))
-        .map((m) => ({ phone: m.phone, countryCode: m.countryCode })),
-      ...parseExtraNumbers(extraNumbers, orgCountryCode).map((phone) => ({ phone, countryCode: orgCountryCode })),
+        .map((m) => ({ phone: m.phone, countryCode: m.countryCode, memberId: m.id })),
+      ...parseExtraNumbers(extraNumbers, orgCountryCode).map((phone) => ({ phone, countryCode: orgCountryCode, memberId: null })),
     ];
 
     const formData = new FormData();
     formData.set("organizationId", organizationId);
     formData.set("templateId", templateId);
-    formData.set("variableValues", JSON.stringify(variableValues));
+    formData.set("placeholderSpecs", JSON.stringify(placeholders.map(toPlaceholderSpec)));
     formData.set("recipients", JSON.stringify(recipients));
 
     startTransition(async () => {
@@ -637,7 +666,8 @@ function Composer({
     });
   }
 
-  const canSend = !disabled && Boolean(template) && variableValues.every((v) => v.trim().length > 0) && totalRecipients > 0 && selectedWithoutCountry.length === 0;
+  const placeholdersReady = placeholders.every((draft) => !validatePlaceholderSpec(toPlaceholderSpec(draft)));
+  const canSend = !disabled && Boolean(template) && placeholdersReady && totalRecipients > 0 && selectedWithoutCountry.length === 0;
 
   return (
     <Card>
@@ -698,21 +728,52 @@ function Composer({
         {template && template.variable_count > 0 && (
           <div className="space-y-2">
             <Label className="text-xs">Fill in the template</Label>
-            {Array.from({ length: template.variable_count }, (_, i) => (
-              <Input
-                key={i}
-                value={variableValues[i] ?? ""}
-                onChange={(e) =>
-                  setVariableValues((prev) => {
-                    const next = [...prev];
-                    next[i] = e.target.value;
-                    return next;
-                  })
-                }
-                placeholder={`Value for {{${i + 1}}}`}
-                disabled={disabled}
-              />
-            ))}
+            {placeholders.map((draft, i) => {
+              const choice = draft.mode === "member" ? draft.field : "fixed";
+              return (
+                <div key={i} className="space-y-2 rounded-lg border border-border p-3">
+                  <p className="text-xs font-medium text-muted-foreground">Placeholder {`{{${i + 1}}}`}</p>
+                  <Select
+                    value={choice}
+                    onValueChange={(v) => {
+                      if (v === "fixed") updatePlaceholder(i, { mode: "fixed" });
+                      else updatePlaceholder(i, { mode: "member", field: v as MemberField });
+                    }}
+                    disabled={disabled}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue>{() => placeholderChoiceLabel(choice)}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fixed">One value for everyone</SelectItem>
+                      {MEMBER_FIELDS.map((f) => (
+                        <SelectItem key={f.key} value={f.key}>
+                          {f.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {draft.mode === "fixed" ? (
+                    <Input
+                      value={draft.value}
+                      onChange={(e) => updatePlaceholder(i, { value: e.target.value })}
+                      placeholder="The text sent to every recipient"
+                      disabled={disabled}
+                    />
+                  ) : (
+                    <Input
+                      value={draft.fallback}
+                      onChange={(e) => updatePlaceholder(i, { fallback: e.target.value })}
+                      placeholder="Used for numbers that aren't members, e.g. Friend"
+                      disabled={disabled}
+                    />
+                  )}
+                </div>
+              );
+            })}
+            {placeholders.some((d) => d.mode === "member") && (
+              <p className="text-xs text-muted-foreground">Each member gets their own name or branch. Numbers typed in get the fallback text.</p>
+            )}
           </div>
         )}
 

@@ -82,18 +82,19 @@ export interface SendBulkTemplateResult {
 
 // Sequential, one Graph API call per recipient — same shape as the old
 // Twilio sendBulkWhatsApp, to avoid bursting Meta's rate limits.
+// Each recipient carries its own placeholder values, so a template can greet
+// every member by name.
 export async function sendBulkTemplateMessage(params: {
   templateName: string;
   languageCode: string;
-  bodyParams: string[];
-  recipients: string[];
+  recipients: { phone: string; bodyParams: string[] }[];
 }): Promise<SendBulkTemplateResult> {
   let sentCount = 0;
   const failed: { phone: string; error: string }[] = [];
 
-  for (const [index, phone] of params.recipients.entries()) {
+  for (const [index, { phone, bodyParams }] of params.recipients.entries()) {
     try {
-      await sendTemplateMessage({ to: phone, templateName: params.templateName, languageCode: params.languageCode, bodyParams: params.bodyParams });
+      await sendTemplateMessage({ to: phone, templateName: params.templateName, languageCode: params.languageCode, bodyParams });
       sentCount += 1;
     } catch (err) {
       failed.push({ phone, error: describeWhatsAppError(err).message });
@@ -103,7 +104,7 @@ export async function sendBulkTemplateMessage(params: {
       // list, and mark the rest failed with the same reason.
       if (err instanceof GraphApiError && err.isAuthError) {
         const remaining = params.recipients.slice(index + 1);
-        failed.push(...remaining.map((p) => ({ phone: p, error: describeWhatsAppError(err).message })));
+        failed.push(...remaining.map((r) => ({ phone: r.phone, error: describeWhatsAppError(err).message })));
         break;
       }
     }

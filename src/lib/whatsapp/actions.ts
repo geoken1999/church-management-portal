@@ -21,6 +21,7 @@ import {
 import { generateReply } from "@/lib/ai/openai";
 import { describeWhatsAppError } from "@/lib/whatsapp/graph-error";
 import type { WhatsAppCampaignStatus, WhatsAppTemplateCategory } from "@/types/database";
+import { parsePlaceholderSpecs, placeholderLabel, resolvePlaceholder, validatePlaceholderSpec, type MemberContext } from "@/lib/whatsapp/placeholders";
 
 const WHATSAPP_PATH = "/dashboard/whatsapp";
 
@@ -311,11 +312,12 @@ export async function sendBulkWhatsAppAction(formData: FormData): Promise<SendWh
   const templateId = String(formData.get("templateId") ?? "");
   if (!templateId) return { error: "Select a message template." };
 
-  const variableValuesRaw = String(formData.get("variableValues") ?? "[]");
-  let variableValues: string[] = [];
+  // Each placeholder is either a typed value or a member field. Read after the
+  // template is loaded, since the number of placeholders comes from it.
+  const specsRaw = String(formData.get("placeholderSpecs") ?? "[]");
+  let specsInput: unknown;
   try {
-    const parsed = JSON.parse(variableValuesRaw);
-    if (Array.isArray(parsed)) variableValues = parsed.map((v) => String(v));
+    specsInput = JSON.parse(specsRaw);
   } catch {
     return { error: "Couldn't read the template's fill-in values." };
   }
@@ -331,18 +333,19 @@ export async function sendBulkWhatsAppAction(formData: FormData): Promise<SendWh
     return { error: "Select at least one recipient." };
   }
 
-  const recipients = Array.from(
-    new Set(
-      rawRecipients
-        .map((entry) => {
-          if (!entry || typeof entry !== "object") return null;
-          const { phone, countryCode } = entry as { phone?: unknown; countryCode?: unknown };
-          if (typeof phone !== "string") return null;
-          return normalizePhoneNumber(phone, typeof countryCode === "string" ? countryCode : null);
-        })
-        .filter((phone): phone is string => Boolean(phone)),
-    ),
-  );
+  // One entry per phone number. A memberId links it to a member record, whose
+  // details fill any member-field placeholders. Typed-in numbers have none.
+  const seenPhones = new Set<string>();
+  const recipients: { phone: string; memberId: string | null }[] = [];
+  for (const entry of rawRecipients) {
+    if (!entry || typeof entry !== "object") continue;
+    const { phone, countryCode, memberId } = entry as { phone?: unknown; countryCode?: unknown; memberId?: unknown };
+    if (typeof phone !== "string") continue;
+    const normalized = normalizePhoneNumber(phone, typeof countryCode === "string" ? countryCode : null);
+    if (!normalized || seenPhones.has(normalized)) continue;
+    seenPhones.add(normalized);
+    recipients.push({ phone: normalized, memberId: typeof memberId === "string" ? memberId : null });
+  }
 
   if (recipients.length === 0) {
     return { error: "Select at least one valid recipient." };
@@ -361,17 +364,47 @@ export async function sendBulkWhatsAppAction(formData: FormData): Promise<SendWh
 
   if (!template) return { error: "That template could not be found." };
   if (template.status !== "approved") return { error: "This template hasn't been approved by WhatsApp yet." };
-  if (variableValues.length < template.variable_count) {
+  const specs = parsePlaceholderSpecs(specsInput, template.variable_count);
+  if (!specs) {
     return { error: `Fill in all ${template.variable_count} placeholder${template.variable_count === 1 ? "" : "s"} before sending.` };
   }
+  const specProblem = specs.map(validatePlaceholderSpec).find(Boolean);
+  if (specProblem) return { error: specProblem };
 
-  // What actually gets stored/shown in history — the template body with
-  // its {{n}} placeholders filled in, not the raw template source.
-  const renderedBody = template.body_text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_match, index: string) => variableValues[Number(index) - 1] ?? `{{${index}}}`);
+  // Member details for the recipients that are members. Read from the database
+  // here, not taken from the browser, so a name can't be changed in transit.
+  const memberIds = [...new Set(recipients.map((r) => r.memberId).filter((id): id is string => Boolean(id)))];
+  const memberContexts = new Map<string, MemberContext>();
+  if (memberIds.length > 0 && specs.some((spec) => spec.kind === "member")) {
+    const [{ data: members }, { data: branches }] = await Promise.all([
+      admin.from("members").select("id, first_name, last_name, branch_id").eq("organization_id", organizationId).in("id", memberIds),
+      admin.from("branches").select("id, name").eq("organization_id", organizationId),
+    ]);
+    const branchNames = new Map((branches ?? []).map((b) => [b.id, b.name]));
+    for (const m of members ?? []) {
+      memberContexts.set(m.id, {
+        firstName: m.first_name,
+        fullName: `${m.first_name} ${m.last_name}`.trim(),
+        branchName: m.branch_id ? branchNames.get(m.branch_id) ?? null : null,
+      });
+    }
+  }
+
+  const sendList = recipients.map((recipient) => {
+    const member = recipient.memberId ? memberContexts.get(recipient.memberId) ?? null : null;
+    return { phone: recipient.phone, bodyParams: specs.map((spec) => resolvePlaceholder(spec, member)) };
+  });
+
+  // What actually gets stored/shown in history: the template body with each
+  // placeholder shown as its typed value, or as a marker for a member field.
+  const renderedBody = template.body_text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_match, index: string) => {
+    const spec = specs[Number(index) - 1];
+    return spec ? placeholderLabel(spec) : `{{${index}}}`;
+  });
 
   let result;
   try {
-    result = await sendBulkTemplateMessage({ templateName: template.name, languageCode: template.language, bodyParams: variableValues.slice(0, template.variable_count), recipients });
+    result = await sendBulkTemplateMessage({ templateName: template.name, languageCode: template.language, recipients: sendList });
   } catch (err) {
     const detail = describeWhatsAppError(err);
     await logPlatformEvent({
@@ -391,7 +424,7 @@ export async function sendBulkWhatsAppAction(formData: FormData): Promise<SendWh
     organization_id: organizationId,
     body: renderedBody,
     template_id: template.id,
-    template_variables: variableValues.slice(0, template.variable_count),
+    template_variables: specs.map(placeholderLabel),
     recipient_count: recipients.length,
     sent_count: result.sentCount,
     failed_count: result.failed.length,

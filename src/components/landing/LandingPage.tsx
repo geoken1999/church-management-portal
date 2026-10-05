@@ -33,6 +33,7 @@ import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { DashboardPreview } from "@/components/landing/DashboardPreview";
+import { AiAutomationSection } from "@/components/landing/AiAutomationSection";
 
 const STATS = [
   { value: "25+", label: "built-in modules" },
@@ -466,6 +467,8 @@ export function LandingPage() {
             </div>
           </div>
         </section>
+
+        <AiAutomationSection />
 
         <section id="pricing" className="bg-muted/40 px-4 py-20 sm:px-6">
           <div className="mx-auto max-w-6xl">

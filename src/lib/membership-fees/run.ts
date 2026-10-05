@@ -1,9 +1,11 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getSiteUrl } from "@/lib/site-url";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { financeEnabledForBackground, getSharedEmailRemainingForBackground } from "@/lib/plans/dal";
 import { sendMembershipEmail } from "@/lib/membership-fees/email";
+import { sendMembershipReceipt } from "@/lib/membership-fees/receipt";
 import { isMembershipDueDay, membershipPaymentPath, membershipPeriodFor, membershipPeriodLabel } from "@/lib/membership-fees/config";
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -32,13 +34,27 @@ interface PendingRow {
 // organizations that have the fee switched on and whose due day is today (in
 // their own timezone), and it can safely run again: invoices are unique per
 // member per month, and a sent email is recorded so it isn't sent twice.
-export async function runMembershipFeeCycle(admin: Admin, now: Date): Promise<MembershipFeeCycleResult> {
+export interface MembershipRunOptions {
+  // Limit the run to one organization. Used for a manual test run.
+  organizationId?: string;
+  // Treat today as the due day. Used for a manual test run only; the daily
+  // cron never sets this.
+  ignoreDueDay?: boolean;
+}
+
+export async function runMembershipFeeCycle(
+  admin: Admin,
+  now: Date,
+  options: MembershipRunOptions = {},
+): Promise<MembershipFeeCycleResult> {
   const result: MembershipFeeCycleResult = { orgsChecked: 0, membersBilled: 0, requestsSent: 0, remindersSent: 0, failed: 0 };
 
-  const { data: settingsRows } = await admin
+  let settingsQuery = admin
     .from("membership_fee_settings")
     .select("organization_id, amount, due_day, reminder_after_days")
     .eq("enabled", true);
+  if (options.organizationId) settingsQuery = settingsQuery.eq("organization_id", options.organizationId);
+  const { data: settingsRows } = await settingsQuery;
 
   for (const settings of settingsRows ?? []) {
     if (settings.amount === null) continue;
@@ -49,7 +65,7 @@ export async function runMembershipFeeCycle(admin: Admin, now: Date): Promise<Me
       result.orgsChecked++;
 
       const period = membershipPeriodFor(now, org.timezone);
-      if (isMembershipDueDay(now, org.timezone, settings.due_day)) {
+      if (options.ignoreDueDay || isMembershipDueDay(now, org.timezone, settings.due_day)) {
         result.membersBilled += await createInvoicesForPeriod(admin, org.id, period, Number(settings.amount));
       }
 
@@ -59,6 +75,7 @@ export async function runMembershipFeeCycle(admin: Admin, now: Date): Promise<Me
       const sent = await sendRequests(admin, org, period, budget, result);
       result.requestsSent += sent;
       result.remindersSent += await sendReminders(admin, org, period, Number(settings.reminder_after_days), now, budget, result);
+      await retryReceipts(admin, org.id, result);
     } catch (err) {
       result.failed++;
       await logPlatformEvent({
@@ -183,18 +200,9 @@ async function deliver(
   org: { id: string; name: string },
   item: { invoiceId: string; to: string; firstName: string; amount: number; period: string; token: string; kind: "request" | "reminder" },
 ): Promise<boolean> {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-  if (!siteUrl) {
-    await logPlatformEvent({
-      level: "error",
-      source: "membership_fee",
-      message: "NEXT_PUBLIC_SITE_URL isn't set, so membership payment links can't be built",
-      organizationId: org.id,
-    });
-    return false;
-  }
-
-  const link = `${siteUrl}${membershipPaymentPath(item.token)}`;
+  // Same public address the rest of the app uses for links (auth emails,
+  // join links), so these resolve on the live domain in production.
+  const link = `${getSiteUrl()}${membershipPaymentPath(item.token)}`;
   const periodLabel = membershipPeriodLabel(item.period);
   const amountText = `₹${item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const subject =
@@ -216,15 +224,42 @@ async function deliver(
     return false;
   }
 
+  // The email has gone out, so a failure to record it is logged loudly. If it
+  // were silent, the next daily run would send the same email again.
   const now = new Date().toISOString();
-  if (item.kind === "request") {
-    await admin.from("membership_fee_invoices").update({ request_sent_at: now, request_via: sent.via }).eq("id", item.invoiceId);
-  } else {
-    await admin.from("membership_fee_invoices").update({ reminder_sent_at: now, reminder_via: sent.via }).eq("id", item.invoiceId);
+  const update =
+    item.kind === "request"
+      ? { request_sent_at: now, request_via: sent.via }
+      : { reminder_sent_at: now, reminder_via: sent.via };
+  const { error } = await admin.from("membership_fee_invoices").update(update).eq("id", item.invoiceId);
+  if (error) {
+    await logPlatformEvent({
+      level: "error",
+      source: "membership_fee",
+      message: `Membership fee ${item.kind} was sent but couldn't be recorded: ${error.message}`,
+      organizationId: org.id,
+      metadata: { invoiceId: item.invoiceId },
+    });
   }
   return true;
 }
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
+}
+
+// Receipts that didn't go out when the payment was confirmed get retried here.
+async function retryReceipts(admin: Admin, organizationId: string, result: MembershipFeeCycleResult): Promise<void> {
+  const { data } = await admin
+    .from("membership_fee_invoices")
+    .select("id, members!inner(email)")
+    .eq("organization_id", organizationId)
+    .eq("status", "paid")
+    .is("receipt_sent_at", null)
+    .not("members.email", "is", null)
+    .limit(SEND_LIMIT_PER_ORG_PER_RUN);
+  for (const row of (data ?? []) as { id: string }[]) {
+    const ok = await sendMembershipReceipt(admin, row.id);
+    if (!ok) result.failed++;
+  }
 }

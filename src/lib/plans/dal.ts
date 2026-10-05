@@ -205,7 +205,7 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
 
   // Monthly membership-fee emails (payment requests and reminders) are sent
   // one per member, so they're counted one each, alongside campaign sends.
-  const [{ count: membershipRequestsSent }, { count: membershipRemindersSent }] = await Promise.all([
+  const [{ count: membershipRequestsSent }, { count: membershipRemindersSent }, { count: membershipReceiptsSent }] = await Promise.all([
     supabase
       .from("membership_fee_invoices")
       .select("id", { count: "exact", head: true })
@@ -218,10 +218,19 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
       .eq("organization_id", organizationId)
       .eq("reminder_via", "shared")
       .gte("reminder_sent_at", startOfMonth.toISOString()),
+    supabase
+      .from("membership_fee_invoices")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("receipt_via", "shared")
+      .gte("receipt_sent_at", startOfMonth.toISOString()),
   ]);
 
   const emailsSentThisMonth =
-    (emailCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0) + (membershipRequestsSent ?? 0) + (membershipRemindersSent ?? 0);
+    (emailCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0) +
+    (membershipRequestsSent ?? 0) +
+    (membershipRemindersSent ?? 0) +
+    (membershipReceiptsSent ?? 0);
   const smsSentThisMonth = (smsCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0);
   const whatsappSentThisMonth = (whatsappCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0);
   const aiRepliesSentThisMonth = aiRepliesCount ?? 0;
@@ -518,7 +527,7 @@ export async function getSharedEmailRemainingForBackground(organizationId: strin
   const admin = createAdminClient();
   const start = startOfCurrentMonthIso();
   const plan = await resolveEffectivePlanForWebhook(organizationId);
-  const [{ data: campaigns }, { count: requestsSent }, { count: remindersSent }] = await Promise.all([
+  const [{ data: campaigns }, { count: requestsSent }, { count: remindersSent }, { count: receiptsSent }] = await Promise.all([
     admin.from("email_campaigns").select("sent_count").eq("organization_id", organizationId).eq("provider", "shared").gte("created_at", start),
     admin
       .from("membership_fee_invoices")
@@ -532,8 +541,15 @@ export async function getSharedEmailRemainingForBackground(organizationId: strin
       .eq("organization_id", organizationId)
       .eq("reminder_via", "shared")
       .gte("reminder_sent_at", start),
+    admin
+      .from("membership_fee_invoices")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("receipt_via", "shared")
+      .gte("receipt_sent_at", start),
   ]);
-  const used = (campaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0) + (requestsSent ?? 0) + (remindersSent ?? 0);
+  const used =
+    (campaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0) + (requestsSent ?? 0) + (remindersSent ?? 0) + (receiptsSent ?? 0);
   return Math.max(0, plan.emailsPerMonth - used);
 }
 

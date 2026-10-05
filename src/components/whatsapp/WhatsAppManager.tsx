@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { MessageCircle, Search, Send, Sparkles, TriangleAlert, FileText, RefreshCw, Trash2, User } from "lucide-react";
 import {
   sendBulkWhatsAppAction,
@@ -51,6 +52,9 @@ function placeholderChoiceLabel(choice: string): string {
   if (choice === "fixed") return "One value for everyone";
   return MEMBER_FIELDS.find((f) => f.key === choice)?.label ?? choice;
 }
+
+// How often the WhatsApp inbox re-fetches while the tab is open.
+const WHATSAPP_INBOX_REFRESH_MS = 5000;
 
 export interface WhatsAppRecipientOption {
   id: string;
@@ -1071,6 +1075,23 @@ export function WhatsAppManager({
   orgCountryCode: string | null;
 }) {
   const approvedTemplates = templates.filter((t) => t.status === "approved");
+
+  // Conversations and their messages come from the server when the page loads.
+  // Re-fetch them on an interval, and as soon as the tab is back in view, so
+  // inbound messages show up without a manual refresh. Only while the tab is
+  // visible, so a background tab doesn't keep querying.
+  const router = useRouter();
+  useEffect(() => {
+    function refreshIfVisible() {
+      if (document.visibilityState === "visible") router.refresh();
+    }
+    const interval = setInterval(refreshIfVisible, WHATSAPP_INBOX_REFRESH_MS);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+    };
+  }, [router]);
 
   return (
     <div className="space-y-6">

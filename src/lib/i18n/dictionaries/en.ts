@@ -69,6 +69,7 @@ export const en = {
       fundraisers: "Fund Raiser",
       offerings: "Offering",
       donations: "Donation",
+      payouts: "Payouts",
       email: "Email",
       sms: "SMS",
       whatsapp: "WhatsApp",

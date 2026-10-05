@@ -67,6 +67,7 @@ export const ta: Dictionary = {
       fundraisers: "நிதி திரட்டல்",
       offerings: "காணிக்கை",
       donations: "நன்கொடை",
+      payouts: "பணம் செலுத்தல்",
       email: "மின்னஞ்சல்",
       sms: "எஸ்எம்எஸ்",
       whatsapp: "வாட்ஸ்அப்",

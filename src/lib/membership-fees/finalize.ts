@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendMembershipReceipt } from "@/lib/membership-fees/receipt";
 
 // Shared by the Checkout callback (which verifies the HMAC first) and the
 // Razorpay webhook (verified by its own signature). Whichever arrives first
@@ -19,11 +20,19 @@ export async function finalizeMembershipPayment(
   if (!invoice) return { error: "That payment could not be found." };
   if (invoice.status === "paid") return { success: true };
 
-  await admin
+  const { data: claimed } = await admin
     .from("membership_fee_invoices")
     .update({ status: "paid", razorpay_payment_id: razorpayPaymentId, paid_at: new Date().toISOString() })
     .eq("id", invoice.id)
-    .eq("status", "due");
+    .eq("status", "due")
+    .select("id")
+    .maybeSingle();
+
+  // Only the caller that won the claim sends the receipt, so the webhook and
+  // the Checkout callback can't both send one.
+  if (claimed) {
+    await sendMembershipReceipt(admin, invoice.id);
+  }
 
   return { success: true };
 }

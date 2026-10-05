@@ -5,6 +5,7 @@ import { getSiteUrl } from "@/lib/site-url";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { financeEnabledForBackground, getSharedEmailRemainingForBackground } from "@/lib/plans/dal";
 import { sendMembershipEmail } from "@/lib/membership-fees/email";
+import { sendMembershipReceipt } from "@/lib/membership-fees/receipt";
 import { isMembershipDueDay, membershipPaymentPath, membershipPeriodFor, membershipPeriodLabel } from "@/lib/membership-fees/config";
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -74,6 +75,7 @@ export async function runMembershipFeeCycle(
       const sent = await sendRequests(admin, org, period, budget, result);
       result.requestsSent += sent;
       result.remindersSent += await sendReminders(admin, org, period, Number(settings.reminder_after_days), now, budget, result);
+      await retryReceipts(admin, org.id, result);
     } catch (err) {
       result.failed++;
       await logPlatformEvent({
@@ -244,4 +246,20 @@ async function deliver(
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
+}
+
+// Receipts that didn't go out when the payment was confirmed get retried here.
+async function retryReceipts(admin: Admin, organizationId: string, result: MembershipFeeCycleResult): Promise<void> {
+  const { data } = await admin
+    .from("membership_fee_invoices")
+    .select("id, members!inner(email)")
+    .eq("organization_id", organizationId)
+    .eq("status", "paid")
+    .is("receipt_sent_at", null)
+    .not("members.email", "is", null)
+    .limit(SEND_LIMIT_PER_ORG_PER_RUN);
+  for (const row of (data ?? []) as { id: string }[]) {
+    const ok = await sendMembershipReceipt(admin, row.id);
+    if (!ok) result.failed++;
+  }
 }

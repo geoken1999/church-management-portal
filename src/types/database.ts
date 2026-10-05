@@ -1021,6 +1021,8 @@ export type MembershipFeeInvoice = {
   request_via: "shared" | "own" | null;
   reminder_sent_at: string | null;
   reminder_via: "shared" | "own" | null;
+  receipt_sent_at: string | null;
+  receipt_via: "shared" | "own" | null;
   created_at: string;
   updated_at: string;
 };

@@ -47,6 +47,8 @@ create table if not exists public.membership_fee_invoices (
   request_via text null check (request_via is null or request_via in ('shared', 'own')),
   reminder_sent_at timestamptz null,
   reminder_via text null check (reminder_via is null or reminder_via in ('shared', 'own')),
+  receipt_sent_at timestamptz null,
+  receipt_via text null check (receipt_via is null or receipt_via in ('shared', 'own')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   -- One fee per member per month. This is what makes the monthly run safe to repeat.

@@ -564,7 +564,12 @@ export function LandingPage() {
               Contact Us
             </Link>
           </nav>
-          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} KingdomFlow, operated by PHILOMINA VINCENT KOUNDER. All rights reserved.</p>
+          <div className="space-y-0.5 text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">KingdomFlow</p>
+            <p>Operated by PHILOMINA VINCENT KOUNDER</p>
+            <p>Mother Theresa Society, Anthony Church Road, Tembipada, Bhandup West, Mumbai 400078</p>
+            <p>© {new Date().getFullYear()} All rights reserved.</p>
+          </div>
         </div>
       </footer>
     </div>

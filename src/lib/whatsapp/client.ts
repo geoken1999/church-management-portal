@@ -60,16 +60,19 @@ export async function sendTemplateMessage(params: {
   templateName: string;
   languageCode: string;
   bodyParams: string[];
+  headerImageUrl?: string | null;
 }): Promise<SendResult> {
+  const components = [
+    ...(params.headerImageUrl ? [{ type: "header", parameters: [{ type: "image", image: { link: params.headerImageUrl } }] }] : []),
+    ...(params.bodyParams.length > 0 ? [{ type: "body", parameters: params.bodyParams.map((text) => ({ type: "text", text })) }] : []),
+  ];
   const id = await postToGraphMessages({
     to: toMetaRecipient(params.to),
     type: "template",
     template: {
       name: params.templateName,
       language: { code: params.languageCode },
-      ...(params.bodyParams.length > 0
-        ? { components: [{ type: "body", parameters: params.bodyParams.map((text) => ({ type: "text", text })) }] }
-        : {}),
+      ...(components.length > 0 ? { components } : {}),
     },
   });
   return { id };
@@ -88,13 +91,20 @@ export async function sendBulkTemplateMessage(params: {
   templateName: string;
   languageCode: string;
   recipients: { phone: string; bodyParams: string[] }[];
+  headerImageUrl?: string | null;
 }): Promise<SendBulkTemplateResult> {
   let sentCount = 0;
   const failed: { phone: string; error: string }[] = [];
 
   for (const [index, { phone, bodyParams }] of params.recipients.entries()) {
     try {
-      await sendTemplateMessage({ to: phone, templateName: params.templateName, languageCode: params.languageCode, bodyParams });
+      await sendTemplateMessage({
+        to: phone,
+        templateName: params.templateName,
+        languageCode: params.languageCode,
+        bodyParams,
+        headerImageUrl: params.headerImageUrl,
+      });
       sentCount += 1;
     } catch (err) {
       failed.push({ phone, error: describeWhatsAppError(err).message });

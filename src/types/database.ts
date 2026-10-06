@@ -3359,6 +3359,10 @@ export type Database = {
         Args: { p_org: string; p_automation: string; p_limit: number | null };
         Returns: boolean;
       };
+      organization_social_accounts: {
+        Args: { p_organization_id: string };
+        Returns: { platform: string; account_name: string; picture_url: string | null; is_active: boolean }[];
+      };
       submit_event_registration: {
         Args: { token: string; answers: Record<string, unknown> };
         Returns: { registration_id: string; confirmation_code: string }[];

@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { getLinkedSocialAccounts } from "@/lib/organizations/social-accounts";
+import { LinkedAccountCard } from "@/components/social/LinkedAccountCard";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getYouTubeDashboardData, getYouTubeConnections } from "@/lib/youtube/dal";
 import { YouTubeManagerClient } from "@/components/youtube/YouTubeManagerClient";
@@ -51,6 +53,11 @@ export default async function YouTubePage({
         ? STATUS_MESSAGES[status]
         : undefined;
 
+  // A member who can't manage the connection still sees that the church has one.
+  const linkedAccount = !canManage && !data.connected
+    ? (await getLinkedSocialAccounts(organizationId)).find((a) => a.platform === "youtube" && a.isActive) ?? null
+    : null;
+
   return (
     <div className="space-y-8">
       <div>
@@ -66,7 +73,11 @@ export default async function YouTubePage({
         </Alert>
       )}
 
-      <YouTubeManagerClient organizationId={organizationId} canManage={canManage} data={data} channels={channels} />
+      {linkedAccount ? (
+        <LinkedAccountCard platformLabel="YouTube" accountName={linkedAccount.accountName} pictureUrl={linkedAccount.pictureUrl} />
+      ) : (
+        <YouTubeManagerClient organizationId={organizationId} canManage={canManage} data={data} channels={channels} />
+      )}
     </div>
   );
 }

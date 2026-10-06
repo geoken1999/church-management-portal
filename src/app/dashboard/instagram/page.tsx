@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { getLinkedSocialAccounts } from "@/lib/organizations/social-accounts";
+import { LinkedAccountCard } from "@/components/social/LinkedAccountCard";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getInstagramDashboardData, getInstagramConnections } from "@/lib/instagram/dal";
 import { InstagramManagerClient } from "@/components/instagram/InstagramManagerClient";
@@ -54,6 +56,11 @@ export default async function InstagramPage({
         ? STATUS_MESSAGES[status]
         : undefined;
 
+  // A member who can't manage the connection still sees that the church has one.
+  const linkedAccount = !canManage && !data.connected
+    ? (await getLinkedSocialAccounts(organizationId)).find((a) => a.platform === "instagram" && a.isActive) ?? null
+    : null;
+
   return (
     <div className="space-y-8">
       <div>
@@ -69,7 +76,11 @@ export default async function InstagramPage({
         </Alert>
       )}
 
-      <InstagramManagerClient organizationId={organizationId} canManage={canManage} data={data} accounts={accounts} />
+      {linkedAccount ? (
+        <LinkedAccountCard platformLabel="Instagram" accountName={linkedAccount.accountName} pictureUrl={linkedAccount.pictureUrl} />
+      ) : (
+        <InstagramManagerClient organizationId={organizationId} canManage={canManage} data={data} accounts={accounts} />
+      )}
     </div>
   );
 }

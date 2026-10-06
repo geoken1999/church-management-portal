@@ -39,7 +39,7 @@ export function LegalPageLayout({
 
       <footer className="border-t border-border px-4 py-8 sm:px-6">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} KingdomFlow. All rights reserved.</p>
+          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} KingdomFlow, operated by PHILOMINA VINCENT KOUNDER. All rights reserved.</p>
           <nav className="flex flex-wrap gap-6">
             <Link href="/about" className="text-sm text-muted-foreground hover:text-foreground">
               About Us

@@ -564,7 +564,7 @@ export function LandingPage() {
               Contact Us
             </Link>
           </nav>
-          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} KingdomFlow. All rights reserved.</p>
+          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} KingdomFlow, operated by PHILOMINA VINCENT KOUNDER. All rights reserved.</p>
         </div>
       </footer>
     </div>

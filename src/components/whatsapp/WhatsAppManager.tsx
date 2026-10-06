@@ -19,6 +19,7 @@ import {
 } from "@/lib/whatsapp/actions";
 import { normalizePhoneNumber, countTemplateVariables, validateWhatsAppTemplatePlaceholders } from "@/lib/whatsapp/validation";
 import { MEMBER_FIELDS, validatePlaceholderSpec, type MemberField, type PlaceholderSpec } from "@/lib/whatsapp/placeholders";
+import { HEADER_IMAGE_TYPES, MAX_TEMPLATE_BUTTONS, validateTemplateButtons } from "@/lib/whatsapp/template-parts";
 import type { WhatsAppTemplateCategory, WhatsAppTemplateStatus } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,30 @@ interface PlaceholderDraft {
   value: string;
   field: MemberField;
   fallback: string;
+}
+
+// A button as the form edits it. `value` is the link or phone number, and is
+// unused for quick replies.
+interface ButtonDraft {
+  type: "url" | "phone" | "quick_reply";
+  text: string;
+  value: string;
+}
+
+const BUTTON_TYPE_LABEL: Record<ButtonDraft["type"], string> = {
+  url: "Open a link",
+  phone: "Call a number",
+  quick_reply: "Quick reply",
+};
+
+function emptyButton(): ButtonDraft {
+  return { type: "url", text: "", value: "" };
+}
+
+function toTemplateButton(draft: ButtonDraft) {
+  if (draft.type === "url") return { type: "url" as const, text: draft.text, url: draft.value };
+  if (draft.type === "phone") return { type: "phone" as const, text: draft.text, phone: draft.value };
+  return { type: "quick_reply" as const, text: draft.text };
 }
 
 function emptyPlaceholder(): PlaceholderDraft {
@@ -230,9 +255,12 @@ function NewTemplateForm({ organizationId }: { organizationId: string }) {
   const [category, setCategory] = useState<WhatsAppTemplateCategory>("utility");
   const [bodyText, setBodyText] = useState("");
   const [exampleValues, setExampleValues] = useState<string[]>([]);
+  const [headerFile, setHeaderFile] = useState<File | null>(null);
+  const [buttonDrafts, setButtonDrafts] = useState<ButtonDraft[]>([]);
 
   const variableCount = countTemplateVariables(bodyText);
   const placeholderError = bodyText.trim() ? validateWhatsAppTemplatePlaceholders(bodyText) : undefined;
+  const buttonProblem = buttonDrafts.length > 0 ? validateTemplateButtons(buttonDrafts.map(toTemplateButton)) : undefined;
 
   function handleBodyChange(value: string) {
     setBodyText(value);
@@ -259,6 +287,8 @@ function NewTemplateForm({ organizationId }: { organizationId: string }) {
     formData.set("category", category);
     formData.set("bodyText", bodyText);
     formData.set("exampleValues", JSON.stringify(exampleValues));
+    formData.set("buttons", JSON.stringify(buttonDrafts.map(toTemplateButton)));
+    if (headerFile) formData.set("headerImage", headerFile);
 
     startTransition(async () => {
       const result = await createWhatsAppTemplateAction(state, formData);
@@ -367,8 +397,62 @@ function NewTemplateForm({ organizationId }: { organizationId: string }) {
             ))}
           </div>
         )}
+        <div className="space-y-1.5">
+          <Label className="text-xs">Header image (optional)</Label>
+          <Input
+            type="file"
+            accept={HEADER_IMAGE_TYPES.join(",")}
+            onChange={(e) => setHeaderFile(e.target.files?.[0] ?? null)}
+          />
+          <p className="text-xs text-muted-foreground">A JPEG or PNG up to 5 MB. It&apos;s sent above the message with every recipient.</p>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs">Buttons (optional, up to {MAX_TEMPLATE_BUTTONS})</Label>
+            {buttonDrafts.length < MAX_TEMPLATE_BUTTONS && (
+              <Button type="button" size="sm" variant="ghost" onClick={() => setButtonDrafts((prev) => [...prev, emptyButton()])}>
+                Add button
+              </Button>
+            )}
+          </div>
+          {buttonDrafts.map((draft, i) => (
+            <div key={i} className="grid gap-2 rounded-lg border border-border p-2 sm:grid-cols-[9rem_1fr_1fr_auto]">
+              <Select
+                value={draft.type}
+                onValueChange={(v) => setButtonDrafts((prev) => prev.map((d, j) => (j === i ? { ...d, type: v as ButtonDraft["type"] } : d)))}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue>{() => BUTTON_TYPE_LABEL[draft.type]}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="url">Open a link</SelectItem>
+                  <SelectItem value="phone">Call a number</SelectItem>
+                  <SelectItem value="quick_reply">Quick reply</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                value={draft.text}
+                onChange={(e) => setButtonDrafts((prev) => prev.map((d, j) => (j === i ? { ...d, text: e.target.value } : d)))}
+                placeholder="Button text"
+              />
+              {draft.type !== "quick_reply" ? (
+                <Input
+                  value={draft.value}
+                  onChange={(e) => setButtonDrafts((prev) => prev.map((d, j) => (j === i ? { ...d, value: e.target.value } : d)))}
+                  placeholder={draft.type === "url" ? "https://…" : "+919876543210"}
+                />
+              ) : (
+                <div />
+              )}
+              <Button type="button" size="sm" variant="ghost" onClick={() => setButtonDrafts((prev) => prev.filter((_, j) => j !== i))}>
+                Remove
+              </Button>
+            </div>
+          ))}
+        </div>
         <div className="flex gap-2">
-          <Button type="button" size="sm" onClick={handleSubmit} disabled={pending || !name.trim() || !bodyText.trim() || !!placeholderError}>
+          <Button type="button" size="sm" onClick={handleSubmit} disabled={pending || !name.trim() || !bodyText.trim() || !!placeholderError || !!buttonProblem}>
             {pending ? "Submitting..." : "Submit for review"}
           </Button>
           <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>

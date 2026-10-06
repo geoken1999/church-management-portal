@@ -2,7 +2,8 @@ import "server-only";
 
 import { getMetaWhatsAppEnv } from "@/lib/whatsapp/env";
 import { parseGraphError } from "@/lib/whatsapp/graph-error";
-import type { WhatsAppTemplateCategory, WhatsAppTemplateStatus } from "@/types/database";
+import type { WhatsAppTemplateButton, WhatsAppTemplateCategory, WhatsAppTemplateStatus } from "@/types/database";
+import { metaButtonsComponent, metaHeaderComponent } from "@/lib/whatsapp/template-parts";
 
 function metaStatusToLocal(status: string): WhatsAppTemplateStatus {
   const lowered = status.toLowerCase();
@@ -37,19 +38,54 @@ export interface CreateTemplateResult {
 // Submits a new template for Meta's review. `bodyText` uses {{1}}, {{2}},
 // ... placeholders; `exampleValues` gives one sample value per placeholder
 // (Meta requires an example to review the template against).
+// Meta needs an example image to review an image header. It's uploaded once
+// through the app's upload session, and the handle Meta returns goes on the
+// template. The app ID is the Meta app that owns the WhatsApp account.
+export async function uploadTemplateHeaderSample(params: { bytes: Uint8Array; mime: string; fileName: string }): Promise<string> {
+  const appId = process.env.META_WHATSAPP_APP_ID;
+  if (!appId) throw new Error("META_WHATSAPP_APP_ID must be set to add an image header to a template.");
+  const { accessToken, apiVersion } = getMetaWhatsAppEnv();
+
+  const session = await fetch(
+    `https://graph.facebook.com/${apiVersion}/${appId}/uploads?file_name=${encodeURIComponent(params.fileName)}&file_length=${params.bytes.length}&file_type=${encodeURIComponent(params.mime)}`,
+    { method: "POST", headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (!session.ok) throw await parseGraphError(session);
+  const { id: sessionId } = (await session.json()) as { id?: string };
+  if (!sessionId) throw new Error("Meta did not start an upload session.");
+
+  const upload = await fetch(`https://graph.facebook.com/${apiVersion}/${sessionId}`, {
+    method: "POST",
+    headers: { Authorization: `OAuth ${accessToken}`, file_offset: "0" },
+    body: params.bytes as unknown as BodyInit,
+  });
+  if (!upload.ok) throw await parseGraphError(upload);
+  const { h } = (await upload.json()) as { h?: string };
+  if (!h) throw new Error("Meta did not return a header handle.");
+  return h;
+}
+
 export async function createMetaTemplate(params: {
   name: string;
   language: string;
   category: WhatsAppTemplateCategory;
   bodyText: string;
   exampleValues: string[];
+  headerHandle?: string | null;
+  buttons?: WhatsAppTemplateButton[];
 }): Promise<CreateTemplateResult> {
   const { businessAccountId } = getMetaWhatsAppEnv();
 
-  const components =
+  const body =
     params.exampleValues.length > 0
-      ? [{ type: "body", text: params.bodyText, example: { body_text: [params.exampleValues] } }]
-      : [{ type: "body", text: params.bodyText }];
+      ? { type: "body", text: params.bodyText, example: { body_text: [params.exampleValues] } }
+      : { type: "body", text: params.bodyText };
+  const buttons = metaButtonsComponent(params.buttons ?? []);
+  const components = [
+    ...(params.headerHandle ? [metaHeaderComponent(params.headerHandle)] : []),
+    body,
+    ...(buttons ? [buttons] : []),
+  ];
 
   const res = await graphFetch(`${businessAccountId}/message_templates`, {
     method: "POST",

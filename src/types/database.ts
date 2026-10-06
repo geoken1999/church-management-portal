@@ -603,6 +603,12 @@ export type OrganizationWhatsAppAccount = {
 export type WhatsAppTemplateCategory = "marketing" | "utility" | "authentication";
 export type WhatsAppTemplateStatus = "draft" | "pending_review" | "approved" | "rejected" | "paused" | "disabled";
 
+// A button on a WhatsApp template. Quick replies need no value at send time.
+export type WhatsAppTemplateButton =
+  | { type: "url"; text: string; url: string }
+  | { type: "phone"; text: string; phone: string }
+  | { type: "quick_reply"; text: string };
+
 export type WhatsAppTemplate = {
   id: string;
   organization_id: string;
@@ -611,6 +617,10 @@ export type WhatsAppTemplate = {
   category: WhatsAppTemplateCategory;
   body_text: string;
   variable_count: number;
+  // 'image' sends a header picture with every message from this template.
+  header_type: "none" | "image";
+  header_image_path: string | null;
+  buttons: WhatsAppTemplateButton[];
   meta_template_id: string | null;
   status: WhatsAppTemplateStatus;
   rejected_reason: string | null;

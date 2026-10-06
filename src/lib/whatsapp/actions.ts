@@ -22,6 +22,8 @@ import { generateReply } from "@/lib/ai/openai";
 import { describeWhatsAppError } from "@/lib/whatsapp/graph-error";
 import type { WhatsAppCampaignStatus, WhatsAppTemplateCategory } from "@/types/database";
 import { parsePlaceholderSpecs, placeholderLabel, resolvePlaceholder, validatePlaceholderSpec, type MemberContext } from "@/lib/whatsapp/placeholders";
+import { HEADER_IMAGE_BUCKET, parseTemplateButtons, validateHeaderImage, validateTemplateButtons } from "@/lib/whatsapp/template-parts";
+import { uploadTemplateHeaderSample } from "@/lib/whatsapp/templates-client";
 
 const WHATSAPP_PATH = "/dashboard/whatsapp";
 
@@ -83,11 +85,48 @@ export async function createWhatsAppTemplateAction(_prevState: TemplateFormState
     return { error: `Provide an example value for each of the ${variableCount} placeholder${variableCount === 1 ? "" : "s"} in your message.` };
   }
 
+  const buttonsRaw = String(formData.get("buttons") ?? "[]");
+  let buttonsInput: unknown;
+  try {
+    buttonsInput = JSON.parse(buttonsRaw);
+  } catch {
+    return { error: "Couldn't read the template's buttons." };
+  }
+  const buttons = parseTemplateButtons(buttonsInput);
+  if (!buttons) return { error: "Couldn't read the template's buttons." };
+  const buttonProblem = validateTemplateButtons(buttons);
+  if (buttonProblem) return { error: buttonProblem };
+
+  const headerEntry = formData.get("headerImage");
+  const headerFile = headerEntry instanceof File && headerEntry.size > 0 ? headerEntry : null;
+  let headerBytes: Uint8Array | null = null;
+  if (headerFile) {
+    const headerProblem = validateHeaderImage(headerFile.type, headerFile.size);
+    if (headerProblem) return { error: headerProblem };
+    headerBytes = new Uint8Array(await headerFile.arrayBuffer());
+  }
+
   const admin = createAdminClient();
+
+  // The image is stored before the template is created, so the send path can
+  // link to it. Meta also keeps a sample of it for review.
+  let headerPath: string | null = null;
+  let headerHandle: string | null = null;
+  if (headerFile && headerBytes) {
+    headerPath = `${organizationId}/${crypto.randomUUID()}.${headerFile.type === "image/png" ? "png" : "jpg"}`;
+    const { error: storageError } = await admin.storage.from(HEADER_IMAGE_BUCKET).upload(headerPath, headerBytes, { contentType: headerFile.type, upsert: false });
+    if (storageError) return { error: "Couldn't save the header image. Please try again." };
+    try {
+      headerHandle = await uploadTemplateHeaderSample({ bytes: headerBytes, mime: headerFile.type, fileName: headerFile.name || "header" });
+    } catch (err) {
+      await admin.storage.from(HEADER_IMAGE_BUCKET).remove([headerPath]);
+      return { error: err instanceof Error ? err.message : "Couldn't upload the header image to WhatsApp." };
+    }
+  }
 
   let metaResult;
   try {
-    metaResult = await createMetaTemplate({ name, language: "en_US", category, bodyText, exampleValues: exampleValues.slice(0, variableCount) });
+    metaResult = await createMetaTemplate({ name, language: "en_US", category, bodyText, exampleValues: exampleValues.slice(0, variableCount), headerHandle, buttons });
   } catch (err) {
     const detail = describeWhatsAppError(err);
     await logPlatformEvent({
@@ -97,6 +136,7 @@ export async function createWhatsAppTemplateAction(_prevState: TemplateFormState
       organizationId,
       metadata: { name, code: detail.code, type: detail.type },
     });
+    if (headerPath) await admin.storage.from(HEADER_IMAGE_BUCKET).remove([headerPath]);
     return { error: detail.message };
   }
 
@@ -127,6 +167,9 @@ export async function createWhatsAppTemplateAction(_prevState: TemplateFormState
     category,
     body_text: bodyText,
     variable_count: variableCount,
+    header_type: headerPath ? "image" : "none",
+    header_image_path: headerPath,
+    buttons,
     meta_template_id: metaResult.metaTemplateId,
     status: metaResult.status,
     rejected_reason: rejectedReason,
@@ -357,7 +400,7 @@ export async function sendBulkWhatsAppAction(formData: FormData): Promise<SendWh
   const admin = createAdminClient();
   const { data: template } = await admin
     .from("whatsapp_templates")
-    .select("id, name, language, body_text, variable_count, status")
+    .select("id, name, language, body_text, variable_count, status, header_type, header_image_path")
     .eq("id", templateId)
     .eq("organization_id", organizationId)
     .maybeSingle();
@@ -404,7 +447,11 @@ export async function sendBulkWhatsAppAction(formData: FormData): Promise<SendWh
 
   let result;
   try {
-    result = await sendBulkTemplateMessage({ templateName: template.name, languageCode: template.language, recipients: sendList });
+    const headerImageUrl =
+      template.header_type === "image" && template.header_image_path
+        ? admin.storage.from(HEADER_IMAGE_BUCKET).getPublicUrl(template.header_image_path).data.publicUrl
+        : null;
+    result = await sendBulkTemplateMessage({ templateName: template.name, languageCode: template.language, recipients: sendList, headerImageUrl });
   } catch (err) {
     const detail = describeWhatsAppError(err);
     await logPlatformEvent({

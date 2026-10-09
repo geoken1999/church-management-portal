@@ -237,6 +237,32 @@ export type Member = {
   updated_at: string;
 };
 
+export type MemberProfileUpdateRequestStatus = "pending" | "approved" | "rejected";
+
+// Only the fields a member is actually allowed to propose — see
+// PROFILE_UPDATE_FIELDS in src/lib/members/profile-update-requests.ts,
+// the single source of truth this type intentionally mirrors.
+export type MemberProposedChanges = Partial<{
+  first_name: string;
+  last_name: string;
+  date_of_birth: string | null;
+  marital_status: MaritalStatus | null;
+  wedding_date: string | null;
+}>;
+
+export type MemberProfileUpdateRequest = {
+  id: string;
+  organization_id: string;
+  member_id: string;
+  proposed_changes: MemberProposedChanges;
+  status: MemberProfileUpdateRequestStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type MediaTeamMember = {
   id: string;
   organization_id: string;
@@ -1715,6 +1741,28 @@ export type Database = {
             columns: ["branch_id"];
             isOneToOne: false;
             referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      member_profile_update_requests: {
+        Row: MemberProfileUpdateRequest;
+        Insert: Partial<MemberProfileUpdateRequest> &
+          Pick<MemberProfileUpdateRequest, "organization_id" | "member_id" | "proposed_changes">;
+        Update: Partial<MemberProfileUpdateRequest>;
+        Relationships: [
+          {
+            foreignKeyName: "member_profile_update_requests_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "member_profile_update_requests_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
             referencedColumns: ["id"];
           },
         ];

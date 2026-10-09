@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
-import { getMembers, getMemberFieldDefinitions } from "@/lib/members/dal";
+import { getMembers, getMemberFieldDefinitions, getPendingProfileUpdateRequests } from "@/lib/members/dal";
 import { getBranches } from "@/lib/branches/dal";
 import { getSiteUrl } from "@/lib/site-url";
 import { MembersManager } from "@/components/members/MembersManager";
@@ -18,10 +18,11 @@ export default async function MembersPage() {
     return <AccessRestricted label="Members" />;
   }
 
-  const [members, definitions, branches] = await Promise.all([
+  const [members, definitions, branches, profileUpdateRequests] = await Promise.all([
     getMembers(membership.organization.id),
     getMemberFieldDefinitions(membership.organization.id),
     getBranches(membership.organization.id),
+    getPendingProfileUpdateRequests(membership.organization.id),
   ]);
 
   // Resolved server-side (not via window.location) so the rendered link is
@@ -45,6 +46,7 @@ export default async function MembersPage() {
         members={members}
         definitions={definitions}
         branches={branches}
+        profileUpdateRequests={profileUpdateRequests}
         canManage={canManage}
       />
     </div>

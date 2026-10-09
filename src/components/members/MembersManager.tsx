@@ -11,9 +11,10 @@ import {
   bulkDeleteMembers,
   type MemberFormState,
 } from "@/lib/members/actions";
+import { approveMemberProfileUpdateRequest, rejectMemberProfileUpdateRequest } from "@/lib/members/profile-update-actions";
 import { downloadMemberTemplate, bulkImportMembers } from "@/lib/members/bulk-actions";
 import { PublicJoinLinkCard } from "@/components/members/PublicJoinLinkCard";
-import type { Branch, Member, MemberFieldDefinition, MemberStatus } from "@/types/database";
+import type { Branch, Member, MemberFieldDefinition, MemberProfileUpdateRequest, MemberStatus } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +36,10 @@ import {
 import { FieldDefinitionsManager } from "@/components/members/FieldDefinitionsManager";
 
 type MemberWithBranch = Member & { branches: Pick<Branch, "id" | "name"> | null };
+
+type ProfileUpdateRequestWithMember = MemberProfileUpdateRequest & {
+  members: Pick<Member, "first_name" | "last_name" | "date_of_birth" | "marital_status" | "wedding_date"> | null;
+};
 
 const initialState: MemberFormState = {};
 const STATUS_OPTIONS: { value: MemberStatus; label: string }[] = [
@@ -560,6 +565,69 @@ function PendingRequestCard({ member }: { member: MemberWithBranch }) {
   );
 }
 
+const PROFILE_UPDATE_FIELD_LABELS: Record<string, string> = {
+  first_name: "First name",
+  last_name: "Last name",
+  date_of_birth: "Date of birth",
+  marital_status: "Marital status",
+  wedding_date: "Wedding date",
+};
+
+function formatProfileUpdateValue(key: string, value: unknown): string {
+  if (value === null || value === undefined || value === "") return "—";
+  if (key === "marital_status") return value === "married" ? "Married" : "Unmarried";
+  return String(value);
+}
+
+// A member proposed a change to their own details from the mobile app
+// (My Details) — never applied directly, see migration 0123's comments.
+// Approve writes proposed_changes onto the members row; Reject just
+// closes the request. Both re-use the same plain-form, no-feedback
+// convention as PendingRequestCard just above.
+function ProfileUpdateRequestCard({ request }: { request: ProfileUpdateRequestWithMember }) {
+  const member = request.members;
+  const changes = request.proposed_changes as Record<string, unknown>;
+  const fieldKeys = Object.keys(changes);
+
+  return (
+    <Card>
+      <CardContent className="space-y-3">
+        <p className="font-medium">{member ? `${member.first_name} ${member.last_name}` : "A member"} requested a change</p>
+        <div className="space-y-1.5 text-sm">
+          {fieldKeys.map((key) => {
+            const label = PROFILE_UPDATE_FIELD_LABELS[key] ?? key;
+            const currentValue = member ? (member as unknown as Record<string, unknown>)[key] : undefined;
+            return (
+              <div key={key} className="flex flex-wrap items-center gap-2">
+                <span className="font-medium text-muted-foreground">{label}:</span>
+                <span className="text-muted-foreground line-through">{formatProfileUpdateValue(key, currentValue)}</span>
+                <span>→</span>
+                <span className="font-medium">{formatProfileUpdateValue(key, changes[key])}</span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex items-center gap-2">
+          <form action={approveMemberProfileUpdateRequest}>
+            <input type="hidden" name="requestId" value={request.id} />
+            <Button type="submit" size="sm">
+              <Check className="size-3.5" />
+              Approve
+            </Button>
+          </form>
+          <form action={rejectMemberProfileUpdateRequest}>
+            <input type="hidden" name="requestId" value={request.id} />
+            <Button type="submit" variant="ghost" size="sm">
+              <X className="size-3.5" />
+              Reject
+            </Button>
+          </form>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function ConfirmDeleteDialog({
   count,
   memberIds,
@@ -803,6 +871,7 @@ export function MembersManager({
   members,
   definitions,
   branches,
+  profileUpdateRequests,
   canManage,
 }: {
   organizationId: string;
@@ -812,6 +881,7 @@ export function MembersManager({
   members: MemberWithBranch[];
   definitions: MemberFieldDefinition[];
   branches: Branch[];
+  profileUpdateRequests: ProfileUpdateRequestWithMember[];
   canManage: boolean;
 }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -857,6 +927,22 @@ export function MembersManager({
           <div className="space-y-3">
             {pendingMembers.map((member) => (
               <PendingRequestCard key={member.id} member={member} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {canManage && profileUpdateRequests.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Pencil className="size-4 text-primary" />
+            <h2 className="font-heading text-lg font-bold">
+              Profile change requests ({profileUpdateRequests.length})
+            </h2>
+          </div>
+          <div className="space-y-3">
+            {profileUpdateRequests.map((request) => (
+              <ProfileUpdateRequestCard key={request.id} request={request} />
             ))}
           </div>
         </div>

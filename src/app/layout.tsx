@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { DM_Sans, Geist_Mono } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ConnectionStatus } from "@/components/ConnectionStatus";
 import "./globals.css";
 
 // DM Sans: matches the KingdomFlow reference design (launchpados.in) — one
@@ -59,6 +60,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               loading.tsx skeletons would mean writing one per route, so this
               covers "any page is loading" uniformly from one place. */}
           <NextTopLoader color="var(--primary)" showSpinner={false} />
+          <ConnectionStatus />
           {children}
         </ThemeProvider>
       </body>

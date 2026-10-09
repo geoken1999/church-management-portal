@@ -31,18 +31,18 @@ describe("buildDigestIdempotencyKey", () => {
 });
 
 describe("buildCelebrantList", () => {
-  it("joins name — occasion lines", () => {
+  it("joins name — occasion entries inline (no newlines, which Meta rejects)", () => {
     const list = buildCelebrantList([
       { name: "Priya Nair", occasionLabel: "Birthday" },
       { name: "Thomas & Anjali", occasionLabel: "Wedding Anniversary" },
     ]);
-    expect(list).toBe("Priya Nair — Birthday\nThomas & Anjali — Wedding Anniversary");
+    expect(list).toBe("Priya Nair — Birthday; Thomas & Anjali — Wedding Anniversary");
   });
 
   it("truncates and notes the remainder past 30 celebrants", () => {
     const celebrants = Array.from({ length: 35 }, (_, i) => ({ name: `Member ${i}`, occasionLabel: "Birthday" }));
     const list = buildCelebrantList(celebrants);
-    expect(list.split("\n")).toHaveLength(31);
+    expect(list.split("; ")).toHaveLength(31);
     expect(list).toContain("...and 5 more");
   });
 });

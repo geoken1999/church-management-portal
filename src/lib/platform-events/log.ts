@@ -8,6 +8,7 @@ import type { PlatformEventLevel } from "@/types/database";
 // string a call site happened to type.
 export type PlatformEventSource =
   | "razorpay_webhook"
+  | "payu_webhook"
   | "whatsapp_webhook"
   | "sms_send"
   | "email_send"

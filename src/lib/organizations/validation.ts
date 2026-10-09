@@ -56,4 +56,14 @@ export function validateBranchCount(value: string): string | undefined {
 }
 
 export const MAX_LOGO_BYTES = 10 * 1024 * 1024;
-export const ALLOWED_LOGO_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
+// SVG deliberately excluded: it's rendered directly as an <img> on every
+// public-facing page (PublicBrandHeader) with no sanitization, and a
+// pathologically complex SVG (deeply nested <use>/<pattern> references, an
+// enormous viewBox) can make the browser hang or crash while trying to
+// rasterize it — a decompression-bomb-style failure mode raster formats
+// don't have. Raster logos cover the real need here.
+export const ALLOWED_LOGO_TYPES = ["image/png", "image/jpeg", "image/webp"];
+// Defensive cap on decoded pixel dimensions (checked client-side, see
+// ChurchLogoUpload) — an oversized raw photo (e.g. a 100MP panorama) can
+// still be under MAX_LOGO_BYTES while being expensive to decode/resize.
+export const MAX_LOGO_DIMENSION_PX = 6000;

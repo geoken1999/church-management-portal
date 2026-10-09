@@ -265,7 +265,7 @@ export async function updateOrganizationLogo(
     return { error: "Choose an image to upload." };
   }
   if (!ALLOWED_LOGO_TYPES.includes(file.type)) {
-    return { error: "Logo must be a PNG, JPEG, WebP, or SVG image." };
+    return { error: "Logo must be a PNG, JPEG, or WebP image." };
   }
   if (file.size > MAX_LOGO_BYTES) {
     return { error: "Logo must be smaller than 10MB." };

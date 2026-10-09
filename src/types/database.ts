@@ -229,6 +229,10 @@ export type Member = {
   wedding_date: string | null;
   custom_fields: Record<string, CustomFieldValue>;
   created_by: string | null;
+  // Set once a member completes phone-OTP login in the mobile app — see
+  // /api/mobile/member-auth/complete. Unrelated to organization_members
+  // (team/staff logins).
+  auth_user_id: string | null;
   created_at: string;
   updated_at: string;
 };

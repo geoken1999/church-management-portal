@@ -78,8 +78,12 @@ export type OrganizationAddonOrder = {
   pack_id: string;
   credits: number;
   amount: number;
-  razorpay_order_id: string;
+  // Legacy — no live Razorpay orders were ever created. New orders use
+  // payu_txnid/payu_mihpayid instead.
+  razorpay_order_id: string | null;
   razorpay_payment_id: string | null;
+  payu_txnid: string | null;
+  payu_mihpayid: string | null;
   status: AddonOrderStatus;
   created_at: string;
   paid_at: string | null;
@@ -1590,7 +1594,7 @@ export type Database = {
       organization_addon_orders: {
         Row: OrganizationAddonOrder;
         Insert: Partial<OrganizationAddonOrder> &
-          Pick<OrganizationAddonOrder, "organization_id" | "addon_type" | "pack_id" | "credits" | "amount" | "razorpay_order_id">;
+          Pick<OrganizationAddonOrder, "organization_id" | "addon_type" | "pack_id" | "credits" | "amount" | "payu_txnid">;
         Update: Partial<OrganizationAddonOrder>;
         Relationships: [
           {

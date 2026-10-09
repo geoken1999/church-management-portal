@@ -3,7 +3,6 @@ import { Razorpay } from "@/lib/billing/razorpay";
 import { getRazorpayWebhookSecret } from "@/lib/billing/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { finalizeGivingOrderPayment } from "@/lib/finance/razorpay-giving";
-import { finalizeAddonOrderPayment } from "@/lib/billing/addon-actions";
 import { finalizeEventRegistrationPayment } from "@/lib/events/razorpay-registration";
 import { finalizeMembershipPayment } from "@/lib/membership-fees/finalize";
 import { sendSubscriptionActivatedEmail, sendSubscriptionChargedEmail, sendSubscriptionCancelledEmail } from "@/lib/billing/receipts";
@@ -56,13 +55,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  // Backup confirmation path for add-on pack purchases, same reasoning as
-  // fundraiser_giving above — these are always on the platform's own
-  // account, so this webhook covers them too.
-  if (event === "payment.captured" && paymentEntity?.notes?.kind === "addon_purchase" && paymentEntity.order_id) {
-    await finalizeAddonOrderPayment(paymentEntity.order_id, paymentEntity.id);
-    return NextResponse.json({ ok: true });
-  }
+  // Add-on pack purchases moved to PayU — see /api/payu/addon/return. PayU
+  // has no equivalent of this Razorpay webhook event, so there's no branch
+  // for it here anymore.
 
   // Backup confirmation path for monthly membership fees, same reasoning as
   // add-on purchases: the platform's own account, so this webhook sees them.

@@ -1,32 +1,34 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth/dal";
+import { requireUser, getProfile } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createRazorpayClient } from "@/lib/billing/razorpay";
-import { getRazorpayEnv } from "@/lib/billing/env";
+import { buildPaymentRequestFields, type PayUFormFields } from "@/lib/payu/client";
 import { getAddonPack } from "@/lib/plans/config";
-import { verifyGivingPaymentSignature } from "@/lib/finance/razorpay-giving";
+import { getSiteUrl } from "@/lib/site-url";
 import { sendAddonPurchaseEmail } from "@/lib/billing/receipts";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import type { AddonType } from "@/lib/plans/config";
 
-const BILLING_PATH = "/dashboard/billing";
-
 export interface CreateAddonOrderState {
   error?: string;
-  orderId?: string;
-  keyId?: string;
+  payuFields?: PayUFormFields;
+  payuActionUrl?: string;
   amount?: number;
   packLabel?: string;
 }
 
 // Add-on packs are always sold by the platform (unlike Fund Raiser giving,
-// there's no "own Razorpay account" mode here) — so this always uses the
-// platform's own account, the same one subscription billing uses.
+// there's no "own payment gateway account" mode here) — so this always uses
+// the platform's own PayU account, the same one subscription billing uses.
+//
+// Unlike Razorpay, PayU has no server-side "create order" call — there's
+// nothing to ask PayU for yet. This builds the hashed form fields the
+// browser will POST straight to PayU's hosted checkout (a full-page
+// redirect, not a popup), and records the attempt under this app's own
+// transaction id so the return handler can find it again.
 export async function createAddonOrder(packId: string): Promise<CreateAddonOrderState> {
-  await requireUser();
+  const user = await requireUser();
   const membership = await requireOrganization();
 
   if (membership.role !== "owner" && membership.role !== "admin") {
@@ -38,40 +40,17 @@ export async function createAddonOrder(packId: string): Promise<CreateAddonOrder
     return { error: "Select a valid add-on pack." };
   }
 
-  const razorpay = createRazorpayClient();
-  let order;
-  try {
-    order = await razorpay.orders.create({
-      amount: Math.round(pack.priceInRupees * 100),
-      currency: "INR",
-      receipt: `addon_${membership.organization.id}_${Date.now()}`,
-      notes: {
-        kind: "addon_purchase",
-        organization_id: membership.organization.id,
-        pack_id: pack.id,
-        addon_type: pack.addonType,
-      },
-    });
-  } catch (err) {
-    console.error("addon order creation failed:", err);
-    await logPlatformEvent({
-      level: "error",
-      source: "addon_purchase",
-      message: "Razorpay addon order creation failed",
-      organizationId: membership.organization.id,
-      metadata: { packId: pack.id },
-    });
-    return { error: "Couldn't start the payment. Please try again." };
-  }
+  const organizationId = membership.organization.id;
+  const txnid = `addon${Date.now()}${organizationId.replace(/-/g, "").slice(0, 8)}`;
 
   const admin = createAdminClient();
   const { error: insertError } = await admin.from("organization_addon_orders").insert({
-    organization_id: membership.organization.id,
+    organization_id: organizationId,
     addon_type: pack.addonType,
     pack_id: pack.id,
     credits: pack.credits,
     amount: pack.priceInRupees,
-    razorpay_order_id: order.id,
+    payu_txnid: txnid,
   });
 
   if (insertError) {
@@ -80,35 +59,39 @@ export async function createAddonOrder(packId: string): Promise<CreateAddonOrder
       level: "error",
       source: "addon_purchase",
       message: `organization_addon_orders insert failed: ${insertError.message}`,
-      organizationId: membership.organization.id,
-      metadata: { packId: pack.id, razorpayOrderId: order.id },
+      organizationId,
+      metadata: { packId: pack.id, txnid },
     });
     return { error: "Couldn't start the payment. Please try again." };
   }
 
-  return { orderId: order.id, keyId: getRazorpayEnv().keyId, amount: pack.priceInRupees, packLabel: pack.label };
-}
-
-export interface ConfirmAddonPaymentState {
-  error?: string;
-  success?: boolean;
-}
-
-export async function confirmAddonPayment(orderId: string, paymentId: string, signature: string): Promise<ConfirmAddonPaymentState> {
-  await requireUser();
-
-  const { keySecret } = getRazorpayEnv();
-  if (!verifyGivingPaymentSignature(orderId, paymentId, signature, keySecret)) {
-    return { error: "Couldn't verify this payment." };
+  const profile = await getProfile();
+  const siteUrl = getSiteUrl();
+  let built;
+  try {
+    built = buildPaymentRequestFields({
+      txnid,
+      amountRupees: pack.priceInRupees,
+      productinfo: `Add-on pack: ${pack.label}`,
+      firstname: profile?.first_name || "Admin",
+      email: user.email ?? "billing@kingdomflow.in",
+      phone: profile?.phone || "9999999999",
+      surl: `${siteUrl}/api/payu/addon/return`,
+      furl: `${siteUrl}/api/payu/addon/return`,
+      udf1: `addon:${txnid}`,
+    });
+  } catch (err) {
+    await logPlatformEvent({
+      level: "error",
+      source: "addon_purchase",
+      message: `PayU field build failed: ${err instanceof Error ? err.message : "unknown error"}`,
+      organizationId,
+      metadata: { packId: pack.id, txnid },
+    });
+    return { error: "Payments aren't configured yet. Please try again later." };
   }
 
-  const result = await finalizeAddonOrderPayment(orderId, paymentId);
-  if (result.error) {
-    return { error: result.error };
-  }
-
-  revalidatePath(BILLING_PATH);
-  return { success: true };
+  return { payuFields: built.fields, payuActionUrl: built.actionUrl, amount: pack.priceInRupees, packLabel: pack.label };
 }
 
 export interface FinalizeAddonOrderResult {
@@ -116,17 +99,18 @@ export interface FinalizeAddonOrderResult {
   success?: boolean;
 }
 
-// Shared by both confirmation paths (the Checkout success callback above,
-// and the Razorpay webhook) — same atomic-claim idempotency pattern as
-// finalizeGivingOrderPayment: whichever fires first wins, the status
-// 'created' -> 'paid' UPDATE only matches once, so the balance can never
-// be credited twice for the same order.
-export async function finalizeAddonOrderPayment(razorpayOrderId: string, razorpayPaymentId: string): Promise<FinalizeAddonOrderResult> {
+// Called only from the PayU return route (/api/payu/addon/return), after
+// that route has verified PayU's hash — this function itself does no
+// verification, it trusts its caller. Same atomic-claim idempotency
+// pattern as before: the status 'created' -> 'paid' UPDATE only matches
+// once, so a redelivered or duplicate callback can't credit the balance
+// twice for the same order.
+export async function finalizeAddonOrderPayment(txnid: string, mihpayid: string): Promise<FinalizeAddonOrderResult> {
   const admin = createAdminClient();
   const { data: order } = await admin
     .from("organization_addon_orders")
     .select("id, organization_id, addon_type, pack_id, credits, amount, status")
-    .eq("razorpay_order_id", razorpayOrderId)
+    .eq("payu_txnid", txnid)
     .maybeSingle();
 
   if (!order) {
@@ -139,7 +123,7 @@ export async function finalizeAddonOrderPayment(razorpayOrderId: string, razorpa
 
   const { data: claimed } = await admin
     .from("organization_addon_orders")
-    .update({ status: "paid", razorpay_payment_id: razorpayPaymentId, paid_at: new Date().toISOString() })
+    .update({ status: "paid", payu_mihpayid: mihpayid, paid_at: new Date().toISOString() })
     .eq("id", order.id)
     .eq("status", "created")
     .select("id")

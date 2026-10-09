@@ -5,6 +5,7 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { getPlanUsage } from "@/lib/plans/dal";
 import { getOrganizationSubscription } from "@/lib/billing/dal";
 import { isRazorpayConfigured } from "@/lib/billing/env";
+import { isPayUConfigured } from "@/lib/payu/env";
 import { getOrganizationPayoutDetails } from "@/lib/organizations/payout-details-dal";
 import { BillingManager } from "@/components/billing/BillingManager";
 import { AddonsManager } from "@/components/billing/AddonsManager";
@@ -15,7 +16,12 @@ export const metadata: Metadata = {
   title: "Billing | KingdomFlow",
 };
 
-export default async function BillingPage() {
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ addon?: string; reason?: string }>;
+}) {
+  const { addon: addonStatus, reason: addonFailureReason } = await searchParams;
   const user = await requireUser();
   const [profile, membership] = await Promise.all([getProfile(), requireOrganization()]);
 
@@ -35,6 +41,23 @@ export default async function BillingPage() {
         <h1 className="font-heading text-3xl font-bold tracking-tight">Billing</h1>
         <p className="mt-1 text-muted-foreground">Manage {membership.organization.name}&apos;s subscription.</p>
       </div>
+
+      {addonStatus === "success" && (
+        <Alert>
+          <AlertDescription>Add-on pack purchased — your credits have been topped up.</AlertDescription>
+        </Alert>
+      )}
+      {addonStatus === "failed" && (
+        <Alert variant="destructive">
+          <AlertDescription>
+            {addonFailureReason === "unverified"
+              ? "That payment couldn't be verified, so nothing was charged on our end — please try again."
+              : addonFailureReason === "declined"
+                ? "The payment wasn't completed."
+                : "Something went wrong finishing that purchase — if you were charged, contact support and we'll sort it out."}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {planUsage.accessStatus === "trial" && planUsage.trialDaysRemaining !== null && (
         <Alert>
@@ -60,12 +83,7 @@ export default async function BillingPage() {
       />
 
       <AddonsManager
-        razorpayConfigured={isRazorpayConfigured()}
-        prefill={{
-          name: profile ? `${profile.first_name} ${profile.last_name}`.trim() : membership.organization.name,
-          email: user.email ?? "",
-          contact: profile?.phone ?? "",
-        }}
+        payuConfigured={isPayUConfigured()}
         balances={{
           sms: planUsage.addonSmsCredits,
           email: planUsage.addonEmailCredits,

@@ -58,6 +58,7 @@ export interface MemberFieldErrors {
   dateOfBirth?: string;
   maritalStatus?: string;
   weddingDate?: string;
+  baptismDate?: string;
   custom?: Record<string, string>;
 }
 
@@ -95,8 +96,9 @@ export function validateMemberDetails(input: {
   dateOfBirth: string;
   maritalStatus: string;
   weddingDate: string;
-}): Pick<MemberFieldErrors, "dateOfBirth" | "maritalStatus" | "weddingDate"> {
-  const errors: Pick<MemberFieldErrors, "dateOfBirth" | "maritalStatus" | "weddingDate"> = {};
+  baptismDate?: string;
+}): Pick<MemberFieldErrors, "dateOfBirth" | "maritalStatus" | "weddingDate" | "baptismDate"> {
+  const errors: Pick<MemberFieldErrors, "dateOfBirth" | "maritalStatus" | "weddingDate" | "baptismDate"> = {};
   const today = new Date().toISOString().slice(0, 10);
 
   if (!input.dateOfBirth) {
@@ -116,6 +118,15 @@ export function validateMemberDetails(input: {
       errors.weddingDate = "Wedding date can't be in the future.";
     } else if (input.dateOfBirth && input.weddingDate < input.dateOfBirth) {
       errors.weddingDate = "Wedding date can't be before the date of birth.";
+    }
+  }
+
+  // Optional ("if they have") — only validated when actually provided.
+  if (input.baptismDate) {
+    if (input.baptismDate > today) {
+      errors.baptismDate = "Baptism date can't be in the future.";
+    } else if (input.dateOfBirth && input.baptismDate < input.dateOfBirth) {
+      errors.baptismDate = "Baptism date can't be before the date of birth.";
     }
   }
 

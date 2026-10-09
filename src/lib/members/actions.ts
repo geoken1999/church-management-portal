@@ -35,7 +35,8 @@ function readMemberDetails(formData: FormData) {
   const dateOfBirth = String(formData.get("dateOfBirth") ?? "").trim();
   const maritalStatus = String(formData.get("maritalStatus") ?? "").trim();
   const weddingDate = String(formData.get("weddingDate") ?? "").trim();
-  return { dateOfBirth, maritalStatus, weddingDate };
+  const baptismDate = String(formData.get("baptismDate") ?? "").trim();
+  return { dateOfBirth, maritalStatus, weddingDate, baptismDate };
 }
 
 // Checked ahead of insert/update so the form can show a friendly, field-level
@@ -238,10 +239,10 @@ export async function createMember(
   const lastName = String(formData.get("lastName") ?? "");
   const email = String(formData.get("email") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
-  const { dateOfBirth, maritalStatus, weddingDate } = readMemberDetails(formData);
+  const { dateOfBirth, maritalStatus, weddingDate, baptismDate } = readMemberDetails(formData);
 
   const basicErrors = validateMemberBasics({ firstName, lastName, email, phone });
-  const detailErrors = validateMemberDetails({ dateOfBirth, maritalStatus, weddingDate });
+  const detailErrors = validateMemberDetails({ dateOfBirth, maritalStatus, weddingDate, baptismDate });
 
   const supabase = await createClient();
   const { data: definitions } = await supabase
@@ -275,6 +276,7 @@ export async function createMember(
     date_of_birth: dateOfBirth || null,
     marital_status: maritalStatus as MaritalStatus,
     wedding_date: maritalStatus === "married" ? weddingDate || null : null,
+    baptism_date: baptismDate || null,
     custom_fields: values,
     created_by: user.id,
   });
@@ -307,10 +309,10 @@ export async function updateMember(
   const lastName = String(formData.get("lastName") ?? "");
   const email = String(formData.get("email") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
-  const { dateOfBirth, maritalStatus, weddingDate } = readMemberDetails(formData);
+  const { dateOfBirth, maritalStatus, weddingDate, baptismDate } = readMemberDetails(formData);
 
   const basicErrors = validateMemberBasics({ firstName, lastName, email, phone });
-  const detailErrors = validateMemberDetails({ dateOfBirth, maritalStatus, weddingDate });
+  const detailErrors = validateMemberDetails({ dateOfBirth, maritalStatus, weddingDate, baptismDate });
 
   const supabase = await createClient();
   const { data: definitions } = await supabase
@@ -345,6 +347,7 @@ export async function updateMember(
       date_of_birth: dateOfBirth || null,
       marital_status: maritalStatus as MaritalStatus,
       wedding_date: maritalStatus === "married" ? weddingDate || null : null,
+      baptism_date: baptismDate || null,
       custom_fields: values,
     })
     .eq("id", memberId);

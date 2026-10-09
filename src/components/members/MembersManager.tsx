@@ -243,6 +243,19 @@ function MemberFormFields({
         </div>
       )}
 
+      <div className="space-y-2">
+        <Label htmlFor="baptismDate">Baptism date (if any)</Label>
+        <Input
+          id="baptismDate"
+          name="baptismDate"
+          type="date"
+          defaultValue={member?.baptism_date ?? ""}
+          aria-invalid={Boolean(errors?.baptismDate)}
+          aria-describedby={errors?.baptismDate ? "baptismDate-error" : undefined}
+        />
+        <FieldError id="baptismDate-error" message={errors?.baptismDate} />
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="status">Status</Label>

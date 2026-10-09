@@ -9,6 +9,8 @@ import {
   deleteAutomationTriggerAction,
   upsertAutomationDestinationAction,
 } from "@/lib/automations/actions";
+import { MAX_DIGEST_LEADERS } from "@/lib/automations/date-logic";
+import { MEMBER_VARIABLE_FIELDS } from "@/lib/automations/template-mapping";
 import { AutomationTemplateManager } from "@/components/automation/AutomationTemplateManager";
 import { Stepper } from "@/components/ui/stepper";
 import { Button } from "@/components/ui/button";
@@ -26,6 +28,13 @@ import type {
   AutomationTemplate,
   AutomationTrigger,
 } from "@/types/database";
+
+export interface LeaderOption {
+  id: string;
+  name: string;
+  title: string | null;
+  hasPhone: boolean;
+}
 
 export interface DateFieldOption {
   source: "built_in" | "custom_field";
@@ -51,6 +60,7 @@ interface TriggerRowState {
   occasionLabel: string;
   daysOffset: number;
   templateId: string | null;
+  variableValues: Record<string, string>;
   isActive: boolean;
   saved: boolean;
 }
@@ -63,6 +73,7 @@ function triggerToRowState(trigger: AutomationTrigger): TriggerRowState {
     occasionLabel: trigger.occasion_label,
     daysOffset: trigger.days_offset,
     templateId: trigger.template_id,
+    variableValues: trigger.variable_values ?? {},
     isActive: trigger.is_active,
     saved: true,
   };
@@ -87,6 +98,7 @@ function TriggerRow({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const selectedTemplate = memberTemplates.find((t) => t.id === row.templateId);
 
   function handleSave() {
     const option = dateFieldOptions.find((o) => dateFieldOptionKey(o) === row.fieldKey);
@@ -105,6 +117,7 @@ function TriggerRow({
         occasionLabel: row.occasionLabel,
         daysOffset: row.daysOffset,
         templateId: row.templateId,
+        variableValues: Object.fromEntries(Object.entries(row.variableValues).filter(([, v]) => v !== "")),
         isActive: row.isActive,
       });
       if (result.error) {
@@ -171,7 +184,7 @@ function TriggerRow({
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">Message template</Label>
-          <Select value={row.templateId ?? "none"} onValueChange={(v) => onChange({ ...row, templateId: v === "none" ? null : v, saved: false })} disabled={!canWrite}>
+          <Select value={row.templateId ?? "none"} onValueChange={(v) => onChange({ ...row, templateId: v === "none" ? null : v, variableValues: {}, saved: false })} disabled={!canWrite}>
             <SelectTrigger className="w-full">
               <SelectValue>{() => memberTemplates.find((t) => t.id === row.templateId)?.meta_template_name ?? "No template selected"}</SelectValue>
             </SelectTrigger>
@@ -186,6 +199,37 @@ function TriggerRow({
           </Select>
         </div>
       </div>
+      {selectedTemplate && selectedTemplate.variable_names.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-xs">What fills each placeholder</Label>
+          {selectedTemplate.variable_names.map((name) => {
+            const source = row.variableValues[name] ?? (MEMBER_VARIABLE_FIELDS.some((f) => f.key === name) ? `field:${name}` : "");
+            const isText = source.startsWith("text:");
+            const setSource = (next: string) => onChange({ ...row, variableValues: { ...row.variableValues, [name]: next }, saved: false });
+            return (
+              <div key={name} className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[10rem_1fr_1fr]">
+                <span className="text-sm font-medium">{`{{${name}}}`}</span>
+                <Select value={isText ? "text" : source || "unset"} onValueChange={(v) => setSource(v === "text" ? "text:" : v === "unset" ? "" : (v ?? ""))} disabled={!canWrite}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue>
+                      {() => (isText ? "Custom text" : MEMBER_VARIABLE_FIELDS.find((f) => `field:${f.key}` === source)?.label ?? "Choose a value")}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MEMBER_VARIABLE_FIELDS.map((f) => (
+                      <SelectItem key={f.key} value={`field:${f.key}`}>
+                        {f.label}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="text">Custom text</SelectItem>
+                  </SelectContent>
+                </Select>
+                {isText && <Input value={source.slice(5)} onChange={(e) => setSource(`text:${e.target.value}`)} placeholder="Text to send" maxLength={200} disabled={!canWrite} />}
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <label className="flex items-center gap-2 text-sm">
           <Checkbox checked={row.isActive} onCheckedChange={(c) => onChange({ ...row, isActive: c === true, saved: false })} disabled={!canWrite} />
@@ -219,6 +263,7 @@ export function AutomationWizard({
   initialDestination,
   dateFieldOptions,
   templates,
+  leaders,
   canWrite,
 }: {
   organizationId: string;
@@ -227,6 +272,7 @@ export function AutomationWizard({
   initialDestination: AutomationDestination[];
   dateFieldOptions: DateFieldOption[];
   templates: AutomationTemplate[];
+  leaders: LeaderOption[];
   canWrite: boolean;
 }) {
   const router = useRouter();
@@ -241,7 +287,7 @@ export function AutomationWizard({
   const [directEnabled, setDirectEnabled] = useState(directDestination?.is_active ?? false);
   const [digestEnabled, setDigestEnabled] = useState(digestDestination?.is_active ?? false);
   const [digestTemplateId, setDigestTemplateId] = useState<string | null>(digestDestination?.digest_template_id ?? null);
-  const [recipientPhonesText, setRecipientPhonesText] = useState((digestDestination?.recipient_phones ?? []).join("\n"));
+  const [recipientLeaderIds, setRecipientLeaderIds] = useState<string[]>(digestDestination?.recipient_leader_ids ?? []);
   const [destinationPending, startDestinationTransition] = useTransition();
   const [destinationError, setDestinationError] = useState<string | null>(null);
   const [destinationSaved, setDestinationSaved] = useState(true);
@@ -263,17 +309,12 @@ export function AutomationWizard({
   function handleAddTrigger() {
     setTriggers((prev) => [
       ...prev,
-      { fieldKey: dateFieldOptionKey(dateFieldOptions[0]), occasionLabel: "", daysOffset: 0, templateId: null, isActive: true, saved: false },
+      { fieldKey: dateFieldOptionKey(dateFieldOptions[0]), occasionLabel: "", daysOffset: 0, templateId: null, variableValues: {}, isActive: true, saved: false },
     ]);
   }
 
   function handleSaveDestinations() {
     setDestinationError(null);
-    const recipientPhones = recipientPhonesText
-      .split("\n")
-      .map((p) => p.trim())
-      .filter(Boolean);
-
     startDestinationTransition(async () => {
       const directResult = await upsertAutomationDestinationAction({ automationId: automation.id, kind: "direct_member", isActive: directEnabled });
       if (directResult.error) {
@@ -284,7 +325,7 @@ export function AutomationWizard({
         automationId: automation.id,
         kind: "staff_digest",
         isActive: digestEnabled,
-        recipientPhones,
+        recipientLeaderIds,
         digestTemplateId,
       });
       if (digestResult.error) {
@@ -464,17 +505,33 @@ export function AutomationWizard({
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Staff WhatsApp numbers (one per line, E.164 e.g. +15551234567)</Label>
-                    <textarea
-                      className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs sm:w-80"
-                      rows={4}
-                      value={recipientPhonesText}
-                      onChange={(e) => {
-                        setRecipientPhonesText(e.target.value);
-                        setDestinationSaved(false);
-                      }}
-                      disabled={!canWrite}
-                    />
+                    <Label className="text-xs">Send the digest to (pick up to {MAX_DIGEST_LEADERS} leaders)</Label>
+                    {leaders.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No leaders yet. Add leaders first, then pick them here.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {leaders.map((leader) => {
+                          const checked = recipientLeaderIds.includes(leader.id);
+                          return (
+                            <label key={leader.id} className="flex items-center gap-2 text-sm">
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(c) => {
+                                  setRecipientLeaderIds((prev) => (c === true ? [...prev, leader.id] : prev.filter((id) => id !== leader.id)));
+                                  setDestinationSaved(false);
+                                }}
+                                disabled={!canWrite || (!checked && recipientLeaderIds.length >= MAX_DIGEST_LEADERS)}
+                              />
+                              <span>
+                                {leader.name}
+                                {leader.title ? <span className="text-muted-foreground"> · {leader.title}</span> : null}
+                                {!leader.hasPhone ? <span className="text-destructive"> · no phone on file</span> : null}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

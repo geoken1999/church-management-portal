@@ -69,8 +69,8 @@ export async function GET(request: Request) {
   for (const destination of digestDestinations ?? []) {
     const celebrants = digestBuckets.get(destination.automation_id) ?? [];
     if (celebrants.length === 0) continue;
-    await sendStaffDigest(admin, destination.automation_id, destination.organization_id, destination, celebrants, now);
-    digestsSent += 1;
+    const sent = await sendStaffDigest(admin, destination.automation_id, destination.organization_id, destination, celebrants, now);
+    if (sent) digestsSent += 1;
   }
 
   // Member follow-up is a separate pass: it creates tasks, not messages, and

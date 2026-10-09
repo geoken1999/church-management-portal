@@ -76,3 +76,6 @@ export function buildCelebrantList(celebrants: { name: string; occasionLabel: st
   const shown = lines.slice(0, maxLines);
   return `${shown.join("\n")}\n...and ${lines.length - maxLines} more`;
 }
+
+// Staff digest recipients are picked from the org's leaders, capped here.
+export const MAX_DIGEST_LEADERS = 3;

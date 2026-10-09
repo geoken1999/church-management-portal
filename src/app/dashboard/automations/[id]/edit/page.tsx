@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getAutomation, getAutomationTriggers, getAutomationDestinations, getAutomationTemplates, getEligibleDateFields } from "@/lib/automations/dal";
+import { getLeaders } from "@/lib/leaders/dal";
 import { AutomationWizard } from "@/components/automation/AutomationWizard";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
@@ -22,11 +23,12 @@ export default async function EditAutomationPage({ params }: { params: Promise<{
   if (!automation) notFound();
   if (automation.type === "member_followup") redirect(`/dashboard/automation/followup/${automation.id}`);
 
-  const [triggers, destinations, templates, dateFieldOptions] = await Promise.all([
+  const [triggers, destinations, templates, dateFieldOptions, leaders] = await Promise.all([
     getAutomationTriggers(organizationId, id),
     getAutomationDestinations(organizationId, id),
     getAutomationTemplates(organizationId),
     getEligibleDateFields(organizationId),
+    getLeaders(organizationId),
   ]);
 
   return (
@@ -43,6 +45,7 @@ export default async function EditAutomationPage({ params }: { params: Promise<{
         initialDestination={destinations}
         dateFieldOptions={dateFieldOptions}
         templates={templates}
+        leaders={leaders.map((l) => ({ id: l.id, name: l.members ? `${l.members.first_name} ${l.members.last_name}` : "Unknown", title: l.title, hasPhone: Boolean(l.members?.phone) }))}
         canWrite={membership.tabAccess.automations.write}
       />
     </div>

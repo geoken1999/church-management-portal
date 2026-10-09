@@ -4,7 +4,7 @@ import type { createAdminClient } from "@/lib/supabase/admin";
 import { sendTemplateMessage, sendBulkTemplateMessage } from "@/lib/whatsapp/client";
 import { normalizePhoneNumber, resolvePhoneCountry } from "@/lib/whatsapp/validation";
 import { describeWhatsAppError } from "@/lib/whatsapp/graph-error";
-import { resolveBodyParams } from "@/lib/automations/template-mapping";
+import { resolveBodyParams, resolveVariableValues } from "@/lib/automations/template-mapping";
 import { buildCelebrantList, buildDirectIdempotencyKey, buildDigestIdempotencyKey } from "@/lib/automations/date-logic";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
@@ -71,11 +71,17 @@ export async function sendDirectMemberMessage(
     .single();
   if (!reserved) return; // unique violation -> already sent this occurrence
 
-  const values: Record<string, string> = {
-    first_name: member.first_name,
-    church_name: organizationName,
-    occasion_label: occasionLabel,
-  };
+  const values = resolveVariableValues(
+    template.variable_names,
+    {
+      first_name: member.first_name,
+      last_name: member.last_name,
+      full_name: `${member.first_name} ${member.last_name}`.trim(),
+      church_name: organizationName,
+      occasion_label: occasionLabel,
+    },
+    trigger.variable_values,
+  );
   const bodyParams = resolveBodyParams(template.variable_names, values);
 
   try {
@@ -94,6 +100,38 @@ export async function sendDirectMemberMessage(
   }
 }
 
+// Digest recipients are the selected leaders' member phones, resolved at
+// send time (so a phone edit is picked up), plus any legacy hand-typed
+// numbers saved before leaders became the source. Deduped on the
+// normalized number.
+async function resolveDigestRecipientPhones(admin: AdminClient, destination: AutomationDestination, organizationId: string): Promise<string[]> {
+  const phones = new Set<string>();
+  for (const phone of destination.recipient_phones ?? []) phones.add(phone);
+
+  if (destination.recipient_leader_ids?.length) {
+    const [{ data: leaders }, { data: org }] = await Promise.all([
+      admin
+        .from("leaders")
+        .select("members(phone, branch_id)")
+        .eq("organization_id", organizationId)
+        .in("id", destination.recipient_leader_ids),
+      admin.from("organizations").select("country").eq("id", organizationId).maybeSingle(),
+    ]);
+    const branchIds = [...new Set((leaders ?? []).map((l) => l.members?.branch_id).filter((id): id is string => Boolean(id)))];
+    const { data: branches } = branchIds.length ? await admin.from("branches").select("id, country").in("id", branchIds) : { data: [] };
+    const countryByBranch = new Map((branches ?? []).map((b) => [b.id, b.country]));
+
+    for (const leader of leaders ?? []) {
+      const member = leader.members;
+      if (!member?.phone) continue;
+      const country = resolvePhoneCountry(member.branch_id ? countryByBranch.get(member.branch_id) : null, org?.country);
+      const phone = normalizePhoneNumber(member.phone, country);
+      if (phone) phones.add(phone);
+    }
+  }
+  return [...phones];
+}
+
 export async function sendStaffDigest(
   admin: AdminClient,
   automationId: string,
@@ -101,12 +139,24 @@ export async function sendStaffDigest(
   destination: AutomationDestination,
   celebrantsToday: { name: string; occasionLabel: string }[],
   now: Date = new Date(),
-): Promise<void> {
-  if (celebrantsToday.length === 0) return;
-  if (!destination.digest_template_id || !destination.recipient_phones?.length) return;
+): Promise<boolean> {
+  if (celebrantsToday.length === 0) return false;
+  if (!destination.digest_template_id) return false;
 
   const template = await fetchApprovedTemplate(admin, destination.digest_template_id);
-  if (!template) return;
+  if (!template) return false;
+
+  const recipientPhones = await resolveDigestRecipientPhones(admin, destination, organizationId);
+  if (recipientPhones.length === 0) {
+    await logPlatformEvent({
+      level: "warning",
+      source: "automation_send",
+      message: "Staff digest skipped: no leader with a usable phone number is selected.",
+      organizationId,
+      metadata: { automationId },
+    });
+    return false;
+  }
 
   const { data: org } = await admin.from("organizations").select("timezone").eq("id", organizationId).maybeSingle();
   const key = buildDigestIdempotencyKey(automationId, now, org?.timezone || DEFAULT_TIMEZONE);
@@ -118,11 +168,11 @@ export async function sendStaffDigest(
       destination_kind: "staff_digest",
       idempotency_key: key,
       status: "sent",
-      recipient_count: destination.recipient_phones.length,
+      recipient_count: recipientPhones.length,
     })
     .select("id")
     .single();
-  if (!reserved) return;
+  if (!reserved) return false;
 
   const celebrantList = buildCelebrantList(celebrantsToday);
   const bodyParams = resolveBodyParams(template.variable_names, { celebrant_list: celebrantList });
@@ -130,13 +180,14 @@ export async function sendStaffDigest(
   const result = await sendBulkTemplateMessage({
     templateName: template.meta_template_name,
     languageCode: template.language,
-    recipients: destination.recipient_phones.map((phone) => ({ phone, bodyParams })),
+    recipients: recipientPhones.map((phone) => ({ phone, bodyParams })),
   });
 
-  const allFailed = result.failed.length === destination.recipient_phones.length;
+  const allFailed = result.failed.length === recipientPhones.length;
   if (allFailed) {
     const message = result.failed[0]?.error ?? "Digest send failed.";
     await admin.from("automation_executions").update({ status: "failed", error_message: message }).eq("id", reserved.id);
     await logPlatformEvent({ level: "error", source: "automation_send", message, organizationId, metadata: { automationId } });
   }
+  return !allFailed;
 }

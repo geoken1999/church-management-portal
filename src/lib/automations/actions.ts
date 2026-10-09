@@ -6,6 +6,8 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { getPlanLimits, checkAutomationQuota } from "@/lib/plans/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { validateVariableValues } from "@/lib/automations/template-mapping";
+import { MAX_DIGEST_LEADERS } from "@/lib/automations/date-logic";
 import type { AutomationDateFieldSource, AutomationBuiltInField, AutomationDestinationKind, AutomationStatus } from "@/types/database";
 
 const AUTOMATIONS_PATH = "/dashboard/automations";
@@ -109,6 +111,7 @@ export async function upsertAutomationTriggerAction(params: {
   occasionLabel: string;
   daysOffset: number;
   templateId?: string | null;
+  variableValues?: Record<string, string>;
   isActive: boolean;
 }): Promise<AutomationActionResult> {
   await requireUser();
@@ -122,6 +125,10 @@ export async function upsertAutomationTriggerAction(params: {
   if (params.dateFieldSource === "built_in" && !params.builtInField) return { error: "Select a date field." };
   if (params.dateFieldSource === "custom_field" && !params.dateFieldId) return { error: "Select a date field." };
 
+  const variableValues = params.templateId ? params.variableValues ?? {} : {};
+  const variableError = validateVariableValues(variableValues);
+  if (variableError) return { error: variableError };
+
   const admin = createAdminClient();
   const row = {
     automation_id: params.automationId,
@@ -132,6 +139,7 @@ export async function upsertAutomationTriggerAction(params: {
     occasion_label: params.occasionLabel.trim(),
     days_offset: params.daysOffset,
     template_id: params.templateId ?? null,
+    variable_values: variableValues,
     is_active: params.isActive,
   };
 
@@ -165,7 +173,7 @@ export async function upsertAutomationDestinationAction(params: {
   automationId: string;
   kind: AutomationDestinationKind;
   isActive: boolean;
-  recipientPhones?: string[];
+  recipientLeaderIds?: string[];
   digestTemplateId?: string | null;
 }): Promise<AutomationActionResult> {
   await requireUser();
@@ -175,13 +183,25 @@ export async function upsertAutomationDestinationAction(params: {
   const access = await checkTabAccess(organizationId, "automations", "write");
   if (!access.ok) return { error: access.message };
 
+  const recipientLeaderIds = params.kind === "staff_digest" ? [...new Set(params.recipientLeaderIds ?? [])] : [];
+  if (recipientLeaderIds.length > MAX_DIGEST_LEADERS) return { error: `Pick at most ${MAX_DIGEST_LEADERS} leaders.` };
+
   const admin = createAdminClient();
+  if (recipientLeaderIds.length > 0) {
+    const { count } = await admin
+      .from("leaders")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .in("id", recipientLeaderIds);
+    if (count !== recipientLeaderIds.length) return { error: "One of the selected leaders no longer exists." };
+  }
+
   const row = {
     automation_id: params.automationId,
     organization_id: organizationId,
     kind: params.kind,
     is_active: params.isActive,
-    recipient_phones: params.kind === "staff_digest" ? params.recipientPhones ?? [] : null,
+    recipient_leader_ids: recipientLeaderIds,
     digest_template_id: params.kind === "staff_digest" ? params.digestTemplateId ?? null : null,
   };
 

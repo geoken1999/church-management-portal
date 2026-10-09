@@ -121,11 +121,22 @@ export async function cancelSubscription(): Promise<CancelSubscriptionState> {
     return { error: "There's no subscription to cancel." };
   }
 
-  const razorpay = createRazorpayClient();
-  try {
-    await razorpay.subscriptions.cancel(existing.razorpay_subscription_id, false);
-  } catch {
-    return { error: "Couldn't cancel the subscription. Please try again." };
+  // A subscription still in 'created' never got past Razorpay's own
+  // authorization step — no mandate or charge exists on Razorpay's side yet,
+  // so there's nothing there to actually cancel. Skipping the API call for
+  // this one status means an abandoned/failed checkout can always be
+  // cleared locally, even if Razorpay's API is unreachable or the account
+  // isn't fully activated (the exact situation this is migrating away
+  // from) — otherwise a failed cancel call would leave the admin stuck
+  // exactly where they started. Every other in-progress status (a real
+  // mandate exists) still requires Razorpay to confirm the cancellation.
+  if (existing.status !== "created") {
+    const razorpay = createRazorpayClient();
+    try {
+      await razorpay.subscriptions.cancel(existing.razorpay_subscription_id, false);
+    } catch {
+      return { error: "Couldn't cancel the subscription. Please try again." };
+    }
   }
 
   // Applied here too (not just left to the webhook) so the UI reflects

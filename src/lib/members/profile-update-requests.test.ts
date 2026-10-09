@@ -14,6 +14,8 @@ const BASE_MEMBER: Member = {
   date_of_birth: "1990-01-01",
   marital_status: "unmarried",
   wedding_date: null,
+  baptism_date: null,
+  membership_code: "membership-code-1",
   custom_fields: {},
   created_by: null,
   auth_user_id: "auth-1",

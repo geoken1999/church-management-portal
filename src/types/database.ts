@@ -227,6 +227,12 @@ export type Member = {
   date_of_birth: string | null;
   marital_status: MaritalStatus | null;
   wedding_date: string | null;
+  // Admin-set only, optional ("if they have") — never part of
+  // MemberProposedChanges/PROFILE_UPDATE_FIELDS (migration 0123).
+  baptism_date: string | null;
+  // What the mobile app's Membership screen renders as a QR code for a
+  // team member to scan and take attendance with — see migration 0124.
+  membership_code: string;
   custom_fields: Record<string, CustomFieldValue>;
   created_by: string | null;
   // Set once a member completes phone-OTP login in the mobile app — see

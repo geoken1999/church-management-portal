@@ -95,6 +95,7 @@ export async function bulkImportMembers(organizationId: string, formData: FormDa
       date_of_birth: row.dateOfBirth || null,
       marital_status: row.maritalStatus,
       wedding_date: row.weddingDate,
+      baptism_date: row.baptismDate,
       custom_fields: row.customFields,
       created_by: user.id,
     });

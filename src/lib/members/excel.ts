@@ -39,6 +39,7 @@ export function buildMemberTemplate(definitions: MemberFieldDefinition[], branch
     "Date of Birth (YYYY-MM-DD)*",
     "Marital Status (Married/Unmarried)*",
     "Wedding Date (YYYY-MM-DD)",
+    "Baptism Date (YYYY-MM-DD)",
     "Status (Active/Left)",
   ];
   if (branches.length > 0) headers.push("Branch*");
@@ -51,6 +52,7 @@ export function buildMemberTemplate(definitions: MemberFieldDefinition[], branch
     "+1 555 000 1234",
     "1990-05-15",
     "Unmarried",
+    "",
     "",
     "Active",
   ];
@@ -73,6 +75,7 @@ export function buildMemberTemplate(definitions: MemberFieldDefinition[], branch
     ["Dates use YYYY-MM-DD. Yes/No fields accept Yes, No, True, or False."],
     ["Dropdown fields must exactly match one of the options shown in the column header."],
     ["Wedding Date is required only when Marital Status is Married — leave it blank otherwise."],
+    ["Baptism Date is optional — leave it blank if not applicable."],
   ];
   if (branches.length > 0) notes.push(["Branch must exactly match a name from the Branches sheet."]);
   const notesSheet = XLSX.utils.aoa_to_sheet(notes);
@@ -92,6 +95,7 @@ export interface ParsedMemberRow {
   dateOfBirth: string;
   maritalStatus: MaritalStatus;
   weddingDate: string | null;
+  baptismDate: string | null;
   customFields: Record<string, CustomFieldValue>;
 }
 
@@ -139,6 +143,7 @@ export function parseMemberSpreadsheet(
     const dateOfBirth = readColumn(record, "Date of Birth");
     const maritalStatusRaw = readColumn(record, "Marital Status").toLowerCase();
     const weddingDate = readColumn(record, "Wedding Date");
+    const baptismDate = readColumn(record, "Baptism Date");
 
     // Skip fully blank rows — trailing empty rows are common in exported
     // spreadsheets and shouldn't surface as errors.
@@ -149,6 +154,7 @@ export function parseMemberSpreadsheet(
       dateOfBirth,
       maritalStatus: maritalStatusRaw,
       weddingDate,
+      baptismDate,
     });
     const messages = [
       ...Object.values(basicErrors).filter((v): v is string => Boolean(v)),
@@ -199,6 +205,7 @@ export function parseMemberSpreadsheet(
       dateOfBirth,
       maritalStatus: maritalStatusRaw as MaritalStatus,
       weddingDate: maritalStatusRaw === "married" ? weddingDate || null : null,
+      baptismDate: baptismDate || null,
       customFields,
     });
   });

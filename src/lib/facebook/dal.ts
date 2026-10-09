@@ -1,7 +1,7 @@
 import "server-only";
 
 import { cache } from "react";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   fetchPosts,
   fetchPageInsights,
@@ -15,7 +15,7 @@ import {
 // and every caller must be careful never to forward that field into a
 // Client Component prop.
 export const getFacebookConnection = cache(async (organizationId: string) => {
-  const supabase = await createClient();
+  const supabase = await createAdminClient();  // Callers check tab access themselves; see access.ts.
   const { data } = await supabase
     .from("facebook_connections")
     .select("*")

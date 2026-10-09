@@ -16,6 +16,7 @@ const InstagramManager = dynamic(() => import("./InstagramManager").then((mod) =
 export function InstagramManagerClient(props: {
   organizationId: string;
   canManage: boolean;
+  canWrite: boolean;
   data: InstagramDashboardData;
   accounts: InstagramAccountOption[];
 }) {

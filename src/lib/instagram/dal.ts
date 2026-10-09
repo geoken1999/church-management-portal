@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getValidAccessToken } from "@/lib/instagram/token";
 import {
   fetchMedia,
@@ -22,7 +23,7 @@ import type { InstagramCommentAutomation } from "@/types/database";
 // several connected accounts (see getInstagramConnections); the dashboard
 // operates on whichever one is active.
 export const getInstagramConnection = cache(async (organizationId: string) => {
-  const supabase = await createClient();
+  const supabase = await createAdminClient();  // Callers check tab access themselves; see access.ts.
   const { data, error } = await supabase
     .from("instagram_connections")
     .select("*")

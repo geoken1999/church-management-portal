@@ -3,7 +3,9 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
+import { checkSocialAccess, checkSocialManageAccess } from "@/lib/social/access";
 import { getFacebookConnection } from "@/lib/facebook/dal";
 import { createNotification } from "@/lib/notifications/create";
 import { PENDING_PAGES_COOKIE } from "@/lib/facebook/constants";
@@ -24,12 +26,13 @@ import {
 const FACEBOOK_PATH = "/dashboard/facebook";
 
 export async function disconnectFacebook(formData: FormData) {
-  await requireUser();
+  const user = await requireUser();
   const organizationId = String(formData.get("organizationId") ?? "");
 
-  const supabase = await createClient();
-  // RLS restricts this to admins; a non-admin's request simply deletes
-  // nothing rather than erroring.
+  const access = await checkSocialManageAccess(organizationId, user.id);
+  if (!access.ok) return;
+
+  const supabase = createAdminClient();
   await supabase.from("facebook_connections").delete().eq("organization_id", organizationId);
 
   revalidatePath(FACEBOOK_PATH);
@@ -68,6 +71,9 @@ export interface SelectPageState {
 
 export async function selectFacebookPage(organizationId: string, pageId: string): Promise<SelectPageState> {
   const user = await requireUser();
+  const access = await checkSocialManageAccess(organizationId, user.id);
+  if (!access.ok) return { error: access.message };
+
   const cookieStore = await cookies();
   const raw = cookieStore.get(PENDING_PAGES_COOKIE)?.value;
   if (!raw) {
@@ -121,6 +127,8 @@ export async function selectFacebookPage(organizationId: string, pageId: string)
 
 export async function loadMoreFacebookPosts(organizationId: string, after?: string): Promise<FacebookPostPage> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "facebook", "read");
+  if (!access.ok) return { items: [], nextCursor: null };
   const connection = await getFacebookConnection(organizationId);
   if (!connection) return { items: [], nextCursor: null };
 
@@ -135,6 +143,8 @@ export interface PostActionState {
 
 export async function createFacebookPost(organizationId: string, message: string): Promise<PostActionState> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "facebook", "write");
+  if (!access.ok) return { error: access.message };
   if (!message.trim()) {
     return { error: "Write something before posting." };
   }
@@ -165,6 +175,8 @@ export async function createFacebookPhotoPost(
   formData: FormData,
 ): Promise<PostActionState> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "facebook", "write");
+  if (!access.ok) return { error: access.message };
 
   const file = formData.get("photo");
   if (!(file instanceof File) || file.size === 0) {
@@ -198,6 +210,8 @@ export async function updateFacebookPost(
   message: string,
 ): Promise<PostActionState> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "facebook", "write");
+  if (!access.ok) return { error: access.message };
   if (!message.trim()) {
     return { error: "Message can't be empty." };
   }
@@ -229,6 +243,8 @@ export interface DeletePostState {
 
 export async function deleteFacebookPost(organizationId: string, postId: string): Promise<DeletePostState> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "facebook", "write");
+  if (!access.ok) return { error: access.message };
   const connection = await getFacebookConnection(organizationId);
   if (!connection) return { error: "Facebook isn't connected." };
 
@@ -249,6 +265,8 @@ export async function loadMoreFacebookConversations(
   after?: string,
 ): Promise<{ items: FacebookConversation[]; nextCursor: string | null }> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "facebook", "read");
+  if (!access.ok) return { items: [], nextCursor: null };
   const connection = await getFacebookConnection(organizationId);
   if (!connection) return { items: [], nextCursor: null };
 
@@ -257,6 +275,8 @@ export async function loadMoreFacebookConversations(
 
 export async function getFacebookConversationMessages(organizationId: string, conversationId: string) {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "facebook", "read");
+  if (!access.ok) return [];
   const connection = await getFacebookConnection(organizationId);
   if (!connection) return [];
 
@@ -274,6 +294,8 @@ export async function sendFacebookReply(
   text: string,
 ): Promise<ReplyState> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "facebook", "write");
+  if (!access.ok) return { error: access.message };
   if (!text.trim()) {
     return { error: "Message can't be empty." };
   }

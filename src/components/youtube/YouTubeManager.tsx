@@ -136,10 +136,12 @@ function ChannelSwitcher({
   organizationId,
   channels,
   canManage,
+  canWrite,
 }: {
   organizationId: string;
   channels: YouTubeChannelOption[];
   canManage: boolean;
+  canWrite: boolean;
 }) {
   const router = useRouter();
   const [switchingId, setSwitchingId] = useState<string | null>(null);
@@ -149,7 +151,7 @@ function ChannelSwitcher({
   if (channels.length <= 1 && !canManage) return null;
 
   function handleSwitch(channel: YouTubeChannelOption) {
-    if (channel.isActive || switchingId) return;
+    if (!canWrite || channel.isActive || switchingId) return;
     setError(null);
     setSwitchingId(channel.id);
     startTransition(async () => {
@@ -171,7 +173,7 @@ function ChannelSwitcher({
             key={channel.id}
             type="button"
             onClick={() => handleSwitch(channel)}
-            disabled={switchingId !== null}
+            disabled={!canWrite || switchingId !== null}
             className={`flex items-center gap-2 rounded-full border px-2.5 py-1 text-sm transition-colors disabled:opacity-60 ${
               channel.isActive
                 ? "border-primary bg-primary/5 font-medium text-foreground"
@@ -636,13 +638,13 @@ function DeleteVideoDialog({
 function VideoCard({
   organizationId,
   video,
-  canManage,
+  canWrite,
   onUpdated,
   onDeleted,
 }: {
   organizationId: string;
   video: YouTubeVideo;
-  canManage: boolean;
+  canWrite: boolean;
   onUpdated: (update: VideoUpdate) => void;
   onDeleted: (id: string) => void;
 }) {
@@ -704,7 +706,7 @@ function VideoCard({
             View on YouTube
             <ExternalLink className="size-3.5" />
           </a>
-          {canManage && (
+          {canWrite && (
             <div className="flex items-center gap-1">
               <EditVideoDialog organizationId={organizationId} video={video} onUpdated={onUpdated} />
               <DeleteVideoDialog organizationId={organizationId} video={video} onDeleted={onDeleted} />
@@ -1007,11 +1009,11 @@ const VIDEO_FORMAT_FILTER_LABELS: Record<VideoFormatFilter, string> = {
 
 function YouTubeVideosTab({
   organizationId,
-  canManage,
+  canWrite,
   initialVideos,
 }: {
   organizationId: string;
-  canManage: boolean;
+  canWrite: boolean;
   initialVideos: { items: YouTubeVideo[]; nextCursor: string | null };
 }) {
   const [items, setItems] = useState(initialVideos.items);
@@ -1157,7 +1159,7 @@ function YouTubeVideosTab({
         >
           <RefreshCw className={refreshing ? "size-4 animate-spin" : "size-4"} />
         </Button>
-        {canManage && <UploadVideoDialog organizationId={organizationId} onUploaded={refreshFromStart} />}
+        {canWrite && <UploadVideoDialog organizationId={organizationId} onUploaded={refreshFromStart} />}
       </div>
 
       {items.length === 0 ? (
@@ -1177,7 +1179,7 @@ function YouTubeVideosTab({
               key={video.id}
               organizationId={organizationId}
               video={video}
-              canManage={canManage}
+              canWrite={canWrite}
               onUpdated={handleVideoUpdated}
               onDeleted={handleVideoDeleted}
             />
@@ -1809,11 +1811,17 @@ function GoLiveDialog({ organizationId, channelId }: { organizationId: string; c
 export function YouTubeManager({
   organizationId,
   canManage,
+  canWrite,
   data,
   channels,
 }: {
   organizationId: string;
+  // Connecting, disconnecting, reconnecting and adding another channel:
+  // owner/admin only. Everything else that changes something (switching the
+  // active channel, going live, editing or deleting a video) just needs
+  // write access — see canWrite.
   canManage: boolean;
+  canWrite: boolean;
   data: YouTubeDashboardData;
   channels: YouTubeChannelOption[];
 }) {
@@ -1831,7 +1839,7 @@ export function YouTubeManager({
     // stuck showing the previous channel's videos/comments until a full
     // page reload remounted them from scratch.
     <div key={data.channel.id} className="space-y-4">
-      <ChannelSwitcher organizationId={organizationId} channels={channels} canManage={canManage} />
+      <ChannelSwitcher organizationId={organizationId} channels={channels} canManage={canManage} canWrite={canWrite} />
 
       <YouTubeHeader
         organizationId={organizationId}
@@ -1840,7 +1848,7 @@ export function YouTubeManager({
         canManage={canManage}
       />
 
-      {canManage && (
+      {canWrite && (
         <div className="flex justify-end">
           <GoLiveDialog organizationId={organizationId} channelId={data.channel.channelId} />
         </div>
@@ -1856,7 +1864,7 @@ export function YouTubeManager({
           <TabsTab value="comments">Comments</TabsTab>
         </TabsList>
         <TabsPanel value="videos">
-          <YouTubeVideosTab organizationId={organizationId} canManage={canManage} initialVideos={data.videos} />
+          <YouTubeVideosTab organizationId={organizationId} canWrite={canWrite} initialVideos={data.videos} />
         </TabsPanel>
         <TabsPanel value="analytics">
           <YouTubeAnalyticsTab channel={data.channel} analytics={data.analytics} topVideos={data.topVideos} />

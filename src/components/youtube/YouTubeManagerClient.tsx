@@ -18,6 +18,7 @@ const YouTubeManager = dynamic(() => import("./YouTubeManager").then((mod) => mo
 export function YouTubeManagerClient(props: {
   organizationId: string;
   canManage: boolean;
+  canWrite: boolean;
   data: YouTubeDashboardData;
   channels: YouTubeChannelOption[];
 }) {

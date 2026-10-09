@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
-import { requireOrganization } from "@/lib/organizations/dal";
 import { checkStorageQuota } from "@/lib/plans/dal";
+import { checkSocialAccess, checkSocialManageAccess } from "@/lib/social/access";
 import { getInstagramConnection, attachReadState, ensureMessagingUserId } from "@/lib/instagram/dal";
 import { getValidAccessToken } from "@/lib/instagram/token";
 import {
@@ -33,13 +34,14 @@ import type { InstagramCommentAutomation } from "@/types/database";
 const INSTAGRAM_PATH = "/dashboard/instagram";
 
 export async function disconnectInstagram(formData: FormData) {
-  await requireUser();
+  const user = await requireUser();
   const organizationId = String(formData.get("organizationId") ?? "");
   const connectionId = String(formData.get("connectionId") ?? "");
 
-  const supabase = await createClient();
-  // RLS restricts this to admins; a non-admin's request simply deletes
-  // nothing rather than erroring.
+  const access = await checkSocialManageAccess(organizationId, user.id);
+  if (!access.ok) return;
+
+  const supabase = createAdminClient();
   const { data: deleted } = await supabase
     .from("instagram_connections")
     .delete()
@@ -74,8 +76,10 @@ export interface SwitchAccountState {
 
 export async function switchInstagramAccount(organizationId: string, connectionId: string): Promise<SwitchAccountState> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "instagram", "write");
+  if (!access.ok) return { error: access.message };
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { data: target } = await supabase
     .from("instagram_connections")
     .select("id")
@@ -86,10 +90,10 @@ export async function switchInstagramAccount(organizationId: string, connectionI
     return { error: "That account could not be found." };
   }
 
-  // RLS scopes both writes to this org's admins already; sequential rather
-  // than a single statement since supabase-js has no multi-table
-  // transaction helper here — acceptable for an admin-driven, low-
-  // concurrency toggle like this one.
+  // The write-access check above already scopes this to the right org;
+  // sequential rather than a single statement since supabase-js has no
+  // multi-table transaction helper here — acceptable for a low-concurrency
+  // toggle like this one.
   await supabase.from("instagram_connections").update({ is_active: false }).eq("organization_id", organizationId).eq("is_active", true);
   const { error } = await supabase.from("instagram_connections").update({ is_active: true }).eq("id", connectionId);
   if (error) {
@@ -102,6 +106,8 @@ export async function switchInstagramAccount(organizationId: string, connectionI
 
 export async function loadMoreInstagramMedia(organizationId: string, after: string): Promise<InstagramMediaPage> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "instagram", "read");
+  if (!access.ok) return { items: [], nextCursor: null };
   const connection = await getInstagramConnection(organizationId);
   if (!connection) return { items: [], nextCursor: null };
 
@@ -114,6 +120,8 @@ export async function loadMoreInstagramConversations(
   after: string,
 ): Promise<{ items: InstagramConversation[]; nextCursor: string | null }> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "instagram", "read");
+  if (!access.ok) return { items: [], nextCursor: null };
   const connection = await getInstagramConnection(organizationId);
   if (!connection) return { items: [], nextCursor: null };
 
@@ -132,6 +140,8 @@ export async function refreshInstagramConversations(
   organizationId: string,
 ): Promise<{ items: InstagramConversation[]; nextCursor: string | null }> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "instagram", "read");
+  if (!access.ok) return { items: [], nextCursor: null };
   const connection = await getInstagramConnection(organizationId);
   if (!connection) return { items: [], nextCursor: null };
 
@@ -147,6 +157,8 @@ export async function getInstagramConversationMessages(
   conversationId: string,
 ): Promise<InstagramMessage[]> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "instagram", "read");
+  if (!access.ok) return [];
   const connection = await getInstagramConnection(organizationId);
   if (!connection) return [];
 
@@ -166,6 +178,8 @@ export async function sendInstagramReply(
   useHumanAgentTag?: boolean,
 ): Promise<SendReplyState> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "instagram", "write");
+  if (!access.ok) return { error: access.message };
   if (!text.trim()) {
     return { error: "Message can't be empty." };
   }
@@ -195,6 +209,8 @@ export async function sendInstagramReply(
 // unread rather than breaking the page.
 export async function markInstagramConversationRead(organizationId: string, conversationId: string): Promise<void> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "instagram", "read");
+  if (!access.ok) return;
   const supabase = await createClient();
   await supabase
     .from("instagram_conversation_reads")
@@ -206,6 +222,8 @@ export async function markInstagramConversationRead(organizationId: string, conv
 
 export async function getInstagramAiMode(organizationId: string, participantId: string): Promise<boolean> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "instagram", "read");
+  if (!access.ok) return false;
   return getAiMode(organizationId, participantId);
 }
 
@@ -215,16 +233,22 @@ export async function getInstagramAiMode(organizationId: string, participantId: 
 // review, for as long as it stays enabled.
 export async function setInstagramAiMode(organizationId: string, participantId: string, enabled: boolean): Promise<void> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "instagram", "write");
+  if (!access.ok) return;
   await setAiMode(organizationId, participantId, enabled);
 }
 
 export async function getInstagramAiTypingState(organizationId: string, participantId: string): Promise<boolean> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "instagram", "read");
+  if (!access.ok) return false;
   return getAiTypingState(organizationId, participantId);
 }
 
 export async function listCommentAutomations(organizationId: string): Promise<InstagramCommentAutomation[]> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "instagram", "read");
+  if (!access.ok) return [];
   return getCommentAutomations(organizationId);
 }
 
@@ -238,6 +262,8 @@ export async function addCommentAutomation(
   input: { mediaId: string | null; keyword: string | null; replyTemplate: string },
 ): Promise<CommentAutomationFormState> {
   const user = await requireUser();
+  const access = await checkSocialAccess(organizationId, "instagram", "write");
+  if (!access.ok) return { error: access.message };
   const result = await createCommentAutomation(organizationId, user.id, input);
   if (result.error) return { error: result.error };
   revalidatePath(INSTAGRAM_PATH);
@@ -246,12 +272,16 @@ export async function addCommentAutomation(
 
 export async function toggleCommentAutomation(organizationId: string, automationId: string, enabled: boolean): Promise<void> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "instagram", "write");
+  if (!access.ok) return;
   await setCommentAutomationEnabled(organizationId, automationId, enabled);
   revalidatePath(INSTAGRAM_PATH);
 }
 
 export async function removeCommentAutomation(organizationId: string, automationId: string): Promise<void> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "instagram", "write");
+  if (!access.ok) return;
   await deleteCommentAutomation(organizationId, automationId);
   revalidatePath(INSTAGRAM_PATH);
 }
@@ -274,10 +304,8 @@ export async function uploadInstagramPost(
   await requireUser();
 
   const organizationId = String(formData.get("organizationId") ?? "");
-  const membership = await requireOrganization();
-  if (membership.role !== "owner" && membership.role !== "admin") {
-    return { error: "Only owners and admins can publish to Instagram." };
-  }
+  const access = await checkSocialAccess(organizationId, "instagram", "write");
+  if (!access.ok) return { error: access.message };
 
   const file = formData.get("image");
   const caption = String(formData.get("caption") ?? "").trim();
@@ -302,7 +330,11 @@ export async function uploadInstagramPost(
     return { error: quotaError };
   }
 
-  const supabase = await createClient();
+  // The write-access check above already governs who can reach this point —
+  // the storage upload uses the admin client rather than depending on that
+  // bucket's own admin-only RLS, which would otherwise block the
+  // write-access staff this now allows.
+  const supabase = createAdminClient();
   const extension = file.type === "image/png" ? "png" : "jpg";
   const path = `${organizationId}/${crypto.randomUUID()}.${extension}`;
 

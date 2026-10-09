@@ -70,11 +70,15 @@ export function buildDigestIdempotencyKey(automationId: string, now: Date = new 
   return `digest:${automationId}:${dateKeyInOrgTimezone(now, timeZone)}`;
 }
 
+// Meta rejects a template parameter containing newlines, tabs or 4+
+// consecutive spaces (error 132018), so entries are joined inline.
+export const CELEBRANT_SEPARATOR = "; ";
+
 export function buildCelebrantList(celebrants: { name: string; occasionLabel: string }[], maxLines = 30): string {
   const lines = celebrants.map((c) => `${c.name} — ${c.occasionLabel}`);
-  if (lines.length <= maxLines) return lines.join("\n");
+  if (lines.length <= maxLines) return lines.join(CELEBRANT_SEPARATOR);
   const shown = lines.slice(0, maxLines);
-  return `${shown.join("\n")}\n...and ${lines.length - maxLines} more`;
+  return `${shown.join(CELEBRANT_SEPARATOR)}${CELEBRANT_SEPARATOR}...and ${lines.length - maxLines} more`;
 }
 
 // Staff digest recipients are picked from the org's leaders, capped here.

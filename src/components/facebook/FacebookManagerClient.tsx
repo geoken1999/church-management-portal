@@ -14,6 +14,7 @@ const FacebookManager = dynamic(() => import("./FacebookManager").then((mod) => 
 export function FacebookManagerClient(props: {
   organizationId: string;
   canManage: boolean;
+  canWrite: boolean;
   status?: string;
   data: FacebookDashboardData;
 }) {

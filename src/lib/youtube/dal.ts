@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getValidAccessToken } from "@/lib/youtube/token";
 import {
   fetchVideos,
@@ -22,7 +23,7 @@ import {
 // org can have several connected channels (see getYouTubeConnections); all
 // the video/comment/broadcast actions operate on whichever one is active.
 export const getYouTubeConnection = cache(async (organizationId: string) => {
-  const supabase = await createClient();
+  const supabase = await createAdminClient();  // Callers check tab access themselves; see access.ts.
   const { data } = await supabase
     .from("youtube_connections")
     .select("*")

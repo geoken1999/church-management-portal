@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
+import { checkSocialAccess, checkSocialManageAccess } from "@/lib/social/access";
 import { getYouTubeConnection } from "@/lib/youtube/dal";
 import { getValidAccessToken } from "@/lib/youtube/token";
 import {
@@ -35,13 +36,14 @@ import { createNotification } from "@/lib/notifications/create";
 const YOUTUBE_PATH = "/dashboard/youtube";
 
 export async function disconnectYouTube(formData: FormData) {
-  await requireUser();
+  const user = await requireUser();
   const organizationId = String(formData.get("organizationId") ?? "");
   const connectionId = String(formData.get("connectionId") ?? "");
 
-  const supabase = await createClient();
-  // RLS restricts this to admins; a non-admin's request simply deletes
-  // nothing rather than erroring.
+  const access = await checkSocialManageAccess(organizationId, user.id);
+  if (!access.ok) return;
+
+  const supabase = createAdminClient();
   const { data: deleted } = await supabase
     .from("youtube_connections")
     .delete()
@@ -76,8 +78,10 @@ export interface SwitchChannelState {
 
 export async function switchYouTubeChannel(organizationId: string, connectionId: string): Promise<SwitchChannelState> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "youtube", "write");
+  if (!access.ok) return { error: access.message };
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { data: target } = await supabase
     .from("youtube_connections")
     .select("id")
@@ -88,10 +92,10 @@ export async function switchYouTubeChannel(organizationId: string, connectionId:
     return { error: "That channel could not be found." };
   }
 
-  // RLS scopes both writes to this org's admins already; sequential
-  // rather than a single statement since supabase-js has no multi-table
-  // transaction helper here — acceptable for an admin-driven, low-
-  // concurrency toggle like this one.
+  // The write-access check above already scopes this to the right org;
+  // sequential rather than a single statement since supabase-js has no
+  // multi-table transaction helper here — acceptable for a low-concurrency
+  // toggle like this one.
   await supabase.from("youtube_connections").update({ is_active: false }).eq("organization_id", organizationId).eq("is_active", true);
   const { error } = await supabase.from("youtube_connections").update({ is_active: true }).eq("id", connectionId);
   if (error) {
@@ -107,6 +111,8 @@ export async function switchYouTubeChannel(organizationId: string, connectionId:
 // indexed into the uploads playlist instantly, so this may need a retry).
 export async function loadMoreYouTubeVideos(organizationId: string, pageToken?: string): Promise<YouTubeVideoPage> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "youtube", "read");
+  if (!access.ok) return { items: [], nextCursor: null };
   const connection = await getYouTubeConnection(organizationId);
   if (!connection) return { items: [], nextCursor: null };
 
@@ -119,6 +125,8 @@ export async function loadMoreYouTubeComments(
   pageToken: string,
 ): Promise<YouTubeCommentPage> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "youtube", "read");
+  if (!access.ok) return { items: [], nextCursor: null };
   const connection = await getYouTubeConnection(organizationId);
   if (!connection) return { items: [], nextCursor: null };
 
@@ -137,6 +145,8 @@ export async function replyToYouTubeComment(
   text: string,
 ): Promise<ReplyState> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "youtube", "write");
+  if (!access.ok) return { error: access.message };
   if (!text.trim()) {
     return { error: "Reply can't be empty." };
   }
@@ -171,6 +181,8 @@ export interface YouTubeLiveStatus {
 
 export async function getYouTubeLiveStatus(organizationId: string): Promise<YouTubeLiveStatus> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "youtube", "read");
+  if (!access.ok) return { broadcast: null, streamKey: null };
   const connection = await getYouTubeConnection(organizationId);
   if (!connection) return { broadcast: null, streamKey: null };
 
@@ -195,6 +207,8 @@ export async function startYouTubeBroadcast(
   input: { title: string; description: string; privacyStatus: YouTubePrivacyStatus },
 ): Promise<StartBroadcastState> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "youtube", "write");
+  if (!access.ok) return { error: access.message };
   if (!input.title.trim()) {
     return { error: "Give the stream a title." };
   }
@@ -230,6 +244,8 @@ export async function goLiveYouTubeBroadcast(
   broadcastId: string,
 ): Promise<BroadcastActionState> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "youtube", "write");
+  if (!access.ok) return { error: access.message };
   const connection = await getYouTubeConnection(organizationId);
   if (!connection) return { error: "YouTube isn't connected." };
 
@@ -259,6 +275,8 @@ export async function endYouTubeBroadcast(
   broadcastId: string,
 ): Promise<BroadcastActionState> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "youtube", "write");
+  if (!access.ok) return { error: access.message };
   const connection = await getYouTubeConnection(organizationId);
   if (!connection) return { error: "YouTube isn't connected." };
 
@@ -281,6 +299,8 @@ export async function cancelYouTubeBroadcast(
   broadcastId: string,
 ): Promise<CancelBroadcastState> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "youtube", "write");
+  if (!access.ok) return { error: access.message };
   const connection = await getYouTubeConnection(organizationId);
   if (!connection) return { error: "YouTube isn't connected." };
 
@@ -302,6 +322,8 @@ export async function getYouTubeVideoDetails(
   videoId: string,
 ): Promise<YouTubeVideoDetails | null> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "youtube", "read");
+  if (!access.ok) return null;
   const connection = await getYouTubeConnection(organizationId);
   if (!connection) return null;
 
@@ -319,6 +341,8 @@ export async function updateYouTubeVideo(
   input: { id: string; title: string; description: string; categoryId: string; privacyStatus: YouTubePrivacyStatus },
 ): Promise<UpdateVideoState> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "youtube", "write");
+  if (!access.ok) return { error: access.message };
   if (!input.title.trim()) {
     return { error: "Title can't be empty." };
   }
@@ -351,6 +375,8 @@ export interface DeleteVideoState {
 
 export async function deleteYouTubeVideo(organizationId: string, videoId: string): Promise<DeleteVideoState> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "youtube", "write");
+  if (!access.ok) return { error: access.message };
   const connection = await getYouTubeConnection(organizationId);
   if (!connection) return { error: "YouTube isn't connected." };
 
@@ -377,6 +403,8 @@ export async function startYouTubeUpload(
   input: UploadVideoInput,
 ): Promise<StartUploadState> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "youtube", "write");
+  if (!access.ok) return { error: access.message };
   if (!input.title.trim()) {
     return { error: "Give the video a title." };
   }
@@ -406,6 +434,8 @@ export async function updateYouTubeThumbnail(
   formData: FormData,
 ): Promise<UpdateThumbnailState> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "youtube", "write");
+  if (!access.ok) return { error: access.message };
 
   const file = formData.get("thumbnail");
   if (!(file instanceof File) || file.size === 0) {
@@ -438,6 +468,8 @@ export async function updateYouTubeThumbnail(
 // calls this explicitly once the direct upload succeeds.
 export async function notifyYouTubeVideoUploaded(organizationId: string, title: string): Promise<void> {
   await requireUser();
+  const access = await checkSocialAccess(organizationId, "youtube", "write");
+  if (!access.ok) return;
   const connection = await getYouTubeConnection(organizationId);
   if (!connection) return;
 

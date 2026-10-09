@@ -157,10 +157,12 @@ function AccountSwitcher({
   organizationId,
   accounts,
   canManage,
+  canWrite,
 }: {
   organizationId: string;
   accounts: InstagramAccountOption[];
   canManage: boolean;
+  canWrite: boolean;
 }) {
   const router = useRouter();
   const [switchingId, setSwitchingId] = useState<string | null>(null);
@@ -170,7 +172,7 @@ function AccountSwitcher({
   if (accounts.length <= 1 && !canManage) return null;
 
   function handleSwitch(account: InstagramAccountOption) {
-    if (account.isActive || switchingId) return;
+    if (!canWrite || account.isActive || switchingId) return;
     setError(null);
     setSwitchingId(account.id);
     startTransition(async () => {
@@ -192,7 +194,7 @@ function AccountSwitcher({
             key={account.id}
             type="button"
             onClick={() => handleSwitch(account)}
-            disabled={switchingId !== null}
+            disabled={!canWrite || switchingId !== null}
             className={`flex items-center gap-2 rounded-full border px-2.5 py-1 text-sm transition-colors disabled:opacity-60 ${
               account.isActive
                 ? "border-primary bg-primary/5 font-medium text-foreground"
@@ -335,13 +337,13 @@ function PostInsightsDialog({ media }: { media: InstagramMedia }) {
 function PostAutomationDialog({
   organizationId,
   media,
-  canManage,
+  canWrite,
   automations,
   onAutomationsChange,
 }: {
   organizationId: string;
   media: InstagramMedia;
-  canManage: boolean;
+  canWrite: boolean;
   automations: InstagramCommentAutomation[];
   onAutomationsChange: (next: InstagramCommentAutomation[]) => void;
 }) {
@@ -413,7 +415,7 @@ function PostAutomationDialog({
                   </Badge>
                   <p className="text-sm text-muted-foreground">{automation.reply_template}</p>
                 </div>
-                {canManage && (
+                {canWrite && (
                   <div className="flex shrink-0 items-center gap-2">
                     <Button
                       type="button"
@@ -433,7 +435,7 @@ function PostAutomationDialog({
           </div>
         )}
 
-        {canManage && (
+        {canWrite && (
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor={`post-automation-keyword-${media.id}`}>Keyword (optional)</Label>
@@ -472,13 +474,13 @@ function PostAutomationDialog({
 function PostCard({
   media,
   organizationId,
-  canManage,
+  canWrite,
   automations,
   onAutomationsChange,
 }: {
   media: InstagramMedia;
   organizationId: string;
-  canManage: boolean;
+  canWrite: boolean;
   automations: InstagramCommentAutomation[];
   onAutomationsChange: (next: InstagramCommentAutomation[]) => void;
 }) {
@@ -510,7 +512,7 @@ function PostCard({
           <PostAutomationDialog
             organizationId={organizationId}
             media={media}
-            canManage={canManage}
+            canWrite={canWrite}
             automations={automations}
             onAutomationsChange={onAutomationsChange}
           />
@@ -624,13 +626,13 @@ function UploadPostDialog({ organizationId }: { organizationId: string }) {
 
 function InstagramPostsTab({
   organizationId,
-  canManage,
+  canWrite,
   initialMedia,
   automations,
   onAutomationsChange,
 }: {
   organizationId: string;
-  canManage: boolean;
+  canWrite: boolean;
   initialMedia: { items: InstagramMedia[]; nextCursor: string | null };
   automations: InstagramCommentAutomation[];
   onAutomationsChange: (next: InstagramCommentAutomation[]) => void;
@@ -651,7 +653,7 @@ function InstagramPostsTab({
   if (items.length === 0) {
     return (
       <div className="space-y-4">
-        {canManage && (
+        {canWrite && (
           <div className="flex justify-end">
             <UploadPostDialog organizationId={organizationId} />
           </div>
@@ -665,7 +667,7 @@ function InstagramPostsTab({
 
   return (
     <div className="space-y-4">
-      {canManage && (
+      {canWrite && (
         <div className="flex justify-end">
           <UploadPostDialog organizationId={organizationId} />
         </div>
@@ -676,7 +678,7 @@ function InstagramPostsTab({
             key={media.id}
             media={media}
             organizationId={organizationId}
-            canManage={canManage}
+            canWrite={canWrite}
             automations={automations}
             onAutomationsChange={onAutomationsChange}
           />
@@ -1610,13 +1612,13 @@ function CommentAutomationRow({
 
 function InstagramAutomationTab({
   organizationId,
-  canManage,
+  canWrite,
   media,
   automations,
   onAutomationsChange,
 }: {
   organizationId: string;
-  canManage: boolean;
+  canWrite: boolean;
   media: InstagramMedia[];
   automations: InstagramCommentAutomation[];
   onAutomationsChange: (next: InstagramCommentAutomation[]) => void;
@@ -1664,7 +1666,7 @@ function InstagramAutomationTab({
 
   return (
     <div className="space-y-4">
-      {canManage && (
+      {canWrite && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -1731,7 +1733,7 @@ function InstagramAutomationTab({
       {automations.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No automation rules yet. {canManage ? "Add one above." : "Ask an admin to set one up."}
+            No automation rules yet. {canWrite ? "Add one above." : "Ask an admin to set one up."}
           </CardContent>
         </Card>
       ) : (
@@ -1758,11 +1760,17 @@ function InstagramAutomationTab({
 export function InstagramManager({
   organizationId,
   canManage,
+  canWrite,
   data,
   accounts,
 }: {
   organizationId: string;
+  // Connecting, disconnecting, reconnecting and adding another account:
+  // owner/admin only. Everything else that changes something (switching the
+  // active account, posting, comment automation) just needs write access —
+  // see canWrite.
   canManage: boolean;
+  canWrite: boolean;
   data: InstagramDashboardData;
   accounts: InstagramAccountOption[];
 }) {
@@ -1777,7 +1785,7 @@ export function InstagramManager({
 
   return (
     <div className="space-y-4">
-      <AccountSwitcher organizationId={organizationId} accounts={accounts} canManage={canManage} />
+      <AccountSwitcher organizationId={organizationId} accounts={accounts} canManage={canManage} canWrite={canWrite} />
       <InstagramHeader
         organizationId={organizationId}
         profile={data.profile}
@@ -1796,7 +1804,7 @@ export function InstagramManager({
         <TabsPanel value="posts">
           <InstagramPostsTab
             organizationId={organizationId}
-            canManage={canManage}
+            canWrite={canWrite}
             initialMedia={data.media}
             automations={automations}
             onAutomationsChange={setAutomations}
@@ -1828,7 +1836,7 @@ export function InstagramManager({
         <TabsPanel value="automation">
           <InstagramAutomationTab
             organizationId={organizationId}
-            canManage={canManage}
+            canWrite={canWrite}
             media={data.media.items}
             automations={automations}
             onAutomationsChange={setAutomations}

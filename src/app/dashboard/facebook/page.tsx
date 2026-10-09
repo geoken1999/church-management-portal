@@ -1,6 +1,4 @@
 import type { Metadata } from "next";
-import { getLinkedSocialAccounts } from "@/lib/organizations/social-accounts";
-import { LinkedAccountCard } from "@/components/social/LinkedAccountCard";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getFacebookDashboardData } from "@/lib/facebook/dal";
 import { FacebookManagerClient } from "@/components/facebook/FacebookManagerClient";
@@ -32,6 +30,7 @@ export default async function FacebookPage({
   const { status } = await searchParams;
   const membership = await requireOrganization();
   const canManage = membership.role === "owner" || membership.role === "admin";
+  const canWrite = membership.tabAccess.facebook.write;
   const organizationId = membership.organization.id;
 
   const { plan } = await getPlanUsage(organizationId);
@@ -45,11 +44,6 @@ export default async function FacebookPage({
 
   const data = await getFacebookDashboardData(organizationId);
   const statusNotice = status && status !== "choose_page" ? STATUS_MESSAGES[status] : undefined;
-
-  // A member who can't manage the connection still sees that the church has one.
-  const linkedAccount = !canManage && !data.connected
-    ? (await getLinkedSocialAccounts(organizationId)).find((a) => a.platform === "facebook" && a.isActive) ?? null
-    : null;
 
   return (
     <div className="space-y-8">
@@ -66,11 +60,7 @@ export default async function FacebookPage({
         </Alert>
       )}
 
-      {linkedAccount ? (
-        <LinkedAccountCard platformLabel="Facebook" accountName={linkedAccount.accountName} pictureUrl={linkedAccount.pictureUrl} />
-      ) : (
-        <FacebookManagerClient organizationId={organizationId} canManage={canManage} status={status} data={data} />
-      )}
+      <FacebookManagerClient organizationId={organizationId} canManage={canManage} canWrite={canWrite} status={status} data={data} />
     </div>
   );
 }

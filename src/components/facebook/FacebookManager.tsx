@@ -349,13 +349,13 @@ function DeletePostDialog({ organizationId, post, onDeleted }: { organizationId:
 function PostCard({
   organizationId,
   post,
-  canManage,
+  canWrite,
   onUpdated,
   onDeleted,
 }: {
   organizationId: string;
   post: FacebookPost;
-  canManage: boolean;
+  canWrite: boolean;
   onUpdated: (id: string, message: string) => void;
   onDeleted: (id: string) => void;
 }) {
@@ -396,7 +396,7 @@ function PostCard({
           ) : (
             <span />
           )}
-          {canManage && (
+          {canWrite && (
             <div className="flex items-center gap-1">
               <EditPostDialog organizationId={organizationId} post={post} onUpdated={onUpdated} />
               <DeletePostDialog organizationId={organizationId} post={post} onDeleted={onDeleted} />
@@ -517,11 +517,11 @@ function CreatePostDialog({ organizationId, onCreated }: { organizationId: strin
 
 function FacebookPostsTab({
   organizationId,
-  canManage,
+  canWrite,
   initialPosts,
 }: {
   organizationId: string;
-  canManage: boolean;
+  canWrite: boolean;
   initialPosts: { items: FacebookPost[]; nextCursor: string | null };
 }) {
   const [items, setItems] = useState(initialPosts.items);
@@ -570,7 +570,7 @@ function FacebookPostsTab({
         >
           <RefreshCw className={refreshing ? "size-4 animate-spin" : "size-4"} />
         </Button>
-        {canManage && <CreatePostDialog organizationId={organizationId} onCreated={refreshFromStart} />}
+        {canWrite && <CreatePostDialog organizationId={organizationId} onCreated={refreshFromStart} />}
       </div>
 
       {items.length === 0 ? (
@@ -584,7 +584,7 @@ function FacebookPostsTab({
               key={post.id}
               organizationId={organizationId}
               post={post}
-              canManage={canManage}
+              canWrite={canWrite}
               onUpdated={handleUpdated}
               onDeleted={handleDeleted}
             />
@@ -812,11 +812,16 @@ function FacebookMessagesTab({
 export function FacebookManager({
   organizationId,
   canManage,
+  canWrite,
   status,
   data,
 }: {
   organizationId: string;
+  // Connecting, disconnecting, reconnecting and choosing the Page: owner/
+  // admin only. Posting, editing and deleting posts just needs write
+  // access — see canWrite.
   canManage: boolean;
+  canWrite: boolean;
   status?: string;
   data: FacebookDashboardData;
 }) {
@@ -840,7 +845,7 @@ export function FacebookManager({
           <TabsTab value="messages">Messages</TabsTab>
         </TabsList>
         <TabsPanel value="posts">
-          <FacebookPostsTab organizationId={organizationId} canManage={canManage} initialPosts={data.posts} />
+          <FacebookPostsTab organizationId={organizationId} canWrite={canWrite} initialPosts={data.posts} />
         </TabsPanel>
         <TabsPanel value="insights">
           <FacebookInsightsTab page={data.page} insights={data.insights} />

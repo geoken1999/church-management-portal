@@ -141,8 +141,31 @@ export type OrganizationSubscription = {
   short_url: string | null;
   current_start: string | null;
   current_end: string | null;
+  payu_txnid: string | null;
+  // The mihpayid from the mandate-registration transaction — required by
+  // PayU's Recurring Payment Transaction API (as "authpayuid") to charge
+  // against this mandate.
+  payu_authpayuid: string | null;
+  payu_vpa: string | null;
+  next_charge_at: string | null;
+  predebit_notice_sent_at: string | null;
+  consecutive_charge_failures: number;
   created_at: string;
   updated_at: string;
+};
+
+export type SubscriptionChargeStatus = "charged" | "failed";
+
+export type SubscriptionCharge = {
+  id: string;
+  organization_id: string;
+  subscription_id: string;
+  txnid: string;
+  amount: number;
+  status: SubscriptionChargeStatus;
+  payu_response: Record<string, unknown> | null;
+  charged_at: string | null;
+  created_at: string;
 };
 
 export type Branch = {
@@ -1595,6 +1618,27 @@ export type Database = {
             columns: ["organization_id"];
             isOneToOne: true;
             referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      subscription_charges: {
+        Row: SubscriptionCharge;
+        Insert: Partial<SubscriptionCharge> & Pick<SubscriptionCharge, "organization_id" | "subscription_id" | "txnid" | "amount" | "status">;
+        Update: Partial<SubscriptionCharge>;
+        Relationships: [
+          {
+            foreignKeyName: "subscription_charges_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "subscription_charges_subscription_id_fkey";
+            columns: ["subscription_id"];
+            isOneToOne: false;
+            referencedRelation: "organization_subscriptions";
             referencedColumns: ["id"];
           },
         ];

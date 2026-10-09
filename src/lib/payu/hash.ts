@@ -52,6 +52,39 @@ export function buildRequestHashString(fields: PayUHashFields, salt: string): st
   ].join("|");
 }
 
+// UPI Autopay / Standing Instruction mandate registration (subscriptions)
+// uses the same _payment endpoint as a one-time payment, with si=1 and an
+// si_details JSON blob added — and per PayU's docs, si_details slots into
+// the request hash exactly where the one-time formula's trailing empty
+// udf6-10 run currently ends: right before the salt. UNLIKE the formulas
+// above, this one was NOT verified against a live PayU call (the org
+// building this doesn't have Standing Instructions/Subscriptions approved
+// yet) — it's taken directly from PayU's documentation and needs a real
+// verification pass against a live mandate-registration request before
+// being trusted the way the rest of this file's formulas are.
+export function buildSIRequestHashString(fields: PayUHashFields, siDetailsJson: string, salt: string): string {
+  return [
+    fields.key,
+    fields.txnid,
+    fields.amount,
+    fields.productinfo,
+    fields.firstname,
+    fields.email,
+    fields.udf1 ?? "",
+    fields.udf2 ?? "",
+    fields.udf3 ?? "",
+    fields.udf4 ?? "",
+    fields.udf5 ?? "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    siDetailsJson,
+    salt,
+  ].join("|");
+}
+
 export interface PayUResponseHashFields extends PayUHashFields {
   status: string;
 }

@@ -23,3 +23,16 @@ export function isPayULive(): boolean {
   const baseUrl = process.env.PAYU_BASE_URL ?? "";
   return /secure\.payu\.in/i.test(baseUrl);
 }
+
+// PayU's server-to-server "postservice" APIs (Verify Payment, and the
+// Recurring Payment Transaction API used for subscription charges) are
+// documented as living on a DIFFERENT host than the checkout endpoint in
+// live mode — secure.payu.in for checkout, but info.payu.in for these
+// postservice calls. In test mode both are test.payu.in, so PAYU_BASE_URL
+// already works as-is there. NOT verified against a live call (this app
+// has no Standing Instructions/Subscriptions approval yet to test
+// against) — confirm this against PayU's own docs/support before relying
+// on it in live mode.
+export function getPayUPostServiceBaseUrl(): string {
+  return isPayULive() ? "https://info.payu.in" : getPayUEnv().baseUrl;
+}

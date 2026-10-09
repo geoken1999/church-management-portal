@@ -15,15 +15,13 @@ export function TrialExpiredScreen({
   canManage,
   currentPlanId,
   subscription,
-  razorpayConfigured,
-  prefill,
+  payuConfigured,
 }: {
   organizationName: string;
   canManage: boolean;
   currentPlanId: PlanId;
   subscription: OrganizationSubscription | null;
-  razorpayConfigured: boolean;
-  prefill: { name: string; email: string; contact: string };
+  payuConfigured: boolean;
 }) {
   return (
     <div className="min-h-screen bg-background">
@@ -49,12 +47,7 @@ export function TrialExpiredScreen({
         </div>
 
         {canManage ? (
-          <BillingManager
-            currentPlanId={currentPlanId}
-            subscription={subscription}
-            razorpayConfigured={razorpayConfigured}
-            prefill={prefill}
-          />
+          <BillingManager currentPlanId={currentPlanId} subscription={subscription} payuConfigured={payuConfigured} />
         ) : null}
       </main>
     </div>

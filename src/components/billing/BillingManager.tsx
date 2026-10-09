@@ -166,7 +166,7 @@ export function BillingManager({
                 : ""}
             </CardDescription>
           </CardHeader>
-          {hasInProgressSubscription && subscription.status !== "created" && (
+          {hasInProgressSubscription && (
             <CardContent>
               <Button variant="outline" size="sm" onClick={handleCancel} disabled={cancelling}>
                 {cancelling ? "Cancelling..." : "Cancel subscription"}

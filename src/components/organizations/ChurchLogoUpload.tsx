@@ -24,11 +24,27 @@ const LOGO_TARGET_PX = 512;
 // never enough on its own, since a photo can be high-resolution (slow/
 // memory-heavy to decode and paint) while still being well under
 // MAX_LOGO_BYTES.
+// Thrown with one of these codes so the caller can show a specific
+// message — "that image couldn't be processed" would be misleading for an
+// image that decoded fine but is simply the wrong size.
+type LogoResizeErrorCode = "too-small" | "too-large";
+class LogoResizeError extends Error {
+  constructor(public code: LogoResizeErrorCode) {
+    super(code);
+  }
+}
+
 async function resizeLogoForUpload(file: File): Promise<File> {
   const bitmap = await createImageBitmap(file);
   try {
     if (bitmap.width > MAX_LOGO_DIMENSION_PX || bitmap.height > MAX_LOGO_DIMENSION_PX) {
-      throw new Error("Image dimensions too large");
+      throw new LogoResizeError("too-large");
+    }
+    // Enforce the 512x512 target as a floor, not just a ceiling — an image
+    // smaller than that would otherwise be accepted as-is (the scale below
+    // never upscales) and end up looking soft/blurry once shown.
+    if (bitmap.width < LOGO_TARGET_PX || bitmap.height < LOGO_TARGET_PX) {
+      throw new LogoResizeError("too-small");
     }
 
     const scale = Math.min(1, LOGO_TARGET_PX / Math.max(bitmap.width, bitmap.height));
@@ -112,8 +128,14 @@ export function ChurchLogoUpload({
           let resized: File;
           try {
             resized = await resizeLogoForUpload(file);
-          } catch {
-            setClientError("That image couldn't be processed — try a different file or a smaller image.");
+          } catch (err) {
+            setClientError(
+              err instanceof LogoResizeError && err.code === "too-small"
+                ? `Logo must be at least ${LOGO_TARGET_PX}×${LOGO_TARGET_PX} pixels.`
+                : err instanceof LogoResizeError && err.code === "too-large"
+                  ? `Logo's pixel dimensions are too large (max ${MAX_LOGO_DIMENSION_PX}×${MAX_LOGO_DIMENSION_PX}).`
+                  : "That image couldn't be processed — try a different file.",
+            );
             input.value = "";
             return;
           }

@@ -962,10 +962,14 @@ export type EventRegistrationPaymentOrder = {
   organization_id: string;
   event_id: string;
   registration_id: string;
-  razorpay_order_id: string;
+  // Legacy — no live Razorpay orders were ever created. New orders use
+  // payu_txnid/payu_mihpayid instead.
+  razorpay_order_id: string | null;
   amount: number;
   status: EventRegistrationPaymentOrderStatus;
   razorpay_payment_id: string | null;
+  payu_txnid: string | null;
+  payu_mihpayid: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -1030,6 +1034,8 @@ export type MembershipFeeInvoice = {
   public_token: string;
   razorpay_order_id: string | null;
   razorpay_payment_id: string | null;
+  payu_txnid: string | null;
+  payu_mihpayid: string | null;
   paid_at: string | null;
   request_sent_at: string | null;
   request_via: "shared" | "own" | null;
@@ -1169,11 +1175,13 @@ export type FundraiserPaymentOrder = {
   id: string;
   organization_id: string;
   fundraiser_id: string;
-  razorpay_order_id: string;
+  razorpay_order_id: string | null;
   amount: number;
   payment_mode: FundraiserPaymentMode;
   status: FundraiserPaymentOrderStatus;
   razorpay_payment_id: string | null;
+  payu_txnid: string | null;
+  payu_mihpayid: string | null;
   donor_name: string;
   donor_email: string | null;
   donor_phone: string | null;
@@ -1975,7 +1983,7 @@ export type Database = {
       fundraiser_payment_orders: {
         Row: FundraiserPaymentOrder;
         Insert: Partial<FundraiserPaymentOrder> &
-          Pick<FundraiserPaymentOrder, "organization_id" | "fundraiser_id" | "razorpay_order_id" | "amount" | "payment_mode" | "donor_name">;
+          Pick<FundraiserPaymentOrder, "organization_id" | "fundraiser_id" | "amount" | "payment_mode" | "donor_name">;
         Update: Partial<FundraiserPaymentOrder>;
         Relationships: [
           {
@@ -2467,7 +2475,7 @@ export type Database = {
       event_registration_payment_orders: {
         Row: EventRegistrationPaymentOrder;
         Insert: Partial<EventRegistrationPaymentOrder> &
-          Pick<EventRegistrationPaymentOrder, "organization_id" | "event_id" | "registration_id" | "razorpay_order_id" | "amount">;
+          Pick<EventRegistrationPaymentOrder, "organization_id" | "event_id" | "registration_id" | "payu_txnid" | "amount">;
         Update: Partial<EventRegistrationPaymentOrder>;
         Relationships: [
           {

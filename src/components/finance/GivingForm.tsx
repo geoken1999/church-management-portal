@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 import { createGivingOrder, confirmGivingPayment } from "@/lib/finance/giving-actions";
+import { redirectToPayU } from "@/lib/payu/browser";
 import { useLocale } from "@/lib/i18n/LocaleContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +12,11 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 
+// Razorpay checkout.js is only still needed for 'own'-mode fundraisers (a
+// church's own gateway keys) — 'shared' mode (the platform's own account)
+// moved to PayU's full-page redirect, which needs no SDK script at all. So
+// unlike before, this is loaded lazily on submit rather than eagerly on
+// mount, since most givers (shared mode) never need it.
 declare global {
   interface Window {
     Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
@@ -43,34 +50,58 @@ const QUICK_AMOUNTS = [500, 1000, 2500, 5000];
 
 export function GivingForm({ shareToken, organizationName }: { shareToken: string; organizationName: string }) {
   const { t } = useLocale();
+  const searchParams = useSearchParams();
   const [amount, setAmount] = useState("");
   const [donorName, setDonorName] = useState("");
   const [donorEmail, setDonorEmail] = useState("");
   const [donorPhone, setDonorPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [scriptReady, setScriptReady] = useState(false);
+  const [givingSuccess, setGivingSuccess] = useState(false);
 
-  useEffect(() => {
-    loadCheckoutScript()
-      .then(() => setScriptReady(true))
-      .catch(() => setError(t.publicGive.paymentFormLoadError));
-  }, [t.publicGive.paymentFormLoadError]);
+  // A PayU redirect-back is a full navigation — the success/failure outcome
+  // arrives as a query param, not React state (there's no persisted
+  // "already paid" row to re-check on reload the way membership fees have,
+  // since a giving link is reusable for any number of separate gifts).
+  const paymentResult = searchParams.get("payment");
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
+    setSubmitting(true);
 
-    if (!scriptReady || !window.Razorpay) {
-      setError(t.publicGive.paymentFormStillLoading);
+    const result = await createGivingOrder(shareToken, amount, donorName, donorEmail, donorPhone);
+    if (result.error) {
+      setError(result.error);
+      setSubmitting(false);
       return;
     }
 
-    setSubmitting(true);
-    const result = await createGivingOrder(shareToken, amount, donorName, donorEmail, donorPhone);
-    if (result.error || !result.orderId || !result.keyId) {
-      setError(result.error ?? "Couldn't start the payment.");
+    if (result.gateway === "payu") {
+      if (!result.payuFields || !result.payuActionUrl) {
+        setError("Couldn't start the payment.");
+        setSubmitting(false);
+        return;
+      }
+      redirectToPayU(result.payuActionUrl, result.payuFields);
+      return;
+    }
+
+    if (!result.orderId || !result.keyId) {
+      setError("Couldn't start the payment.");
+      setSubmitting(false);
+      return;
+    }
+
+    try {
+      await loadCheckoutScript();
+    } catch {
+      setError(t.publicGive.paymentFormLoadError);
+      setSubmitting(false);
+      return;
+    }
+    if (!window.Razorpay) {
+      setError(t.publicGive.paymentFormStillLoading);
       setSubmitting(false);
       return;
     }
@@ -95,7 +126,7 @@ export function GivingForm({ shareToken, organizationName }: { shareToken: strin
           setError(confirmResult.error);
           return;
         }
-        setSuccess(true);
+        setGivingSuccess(true);
       },
       modal: {
         ondismiss: () => setSubmitting(false),
@@ -104,7 +135,7 @@ export function GivingForm({ shareToken, organizationName }: { shareToken: strin
     razorpay.open();
   }
 
-  if (success) {
+  if (paymentResult === "success" || givingSuccess) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
@@ -122,9 +153,11 @@ export function GivingForm({ shareToken, organizationName }: { shareToken: strin
     <Card>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
+          {(error || paymentResult === "failed") && (
             <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>
+                {error ?? `${t.publicGive.paymentFailedTitle} ${t.publicGive.paymentFailedDescription}`}
+              </AlertDescription>
             </Alert>
           )}
 
@@ -165,7 +198,7 @@ export function GivingForm({ shareToken, organizationName }: { shareToken: strin
             </div>
           </div>
 
-          <Button type="submit" className="w-full" disabled={submitting || !scriptReady}>
+          <Button type="submit" className="w-full" disabled={submitting}>
             {submitting ? t.publicGive.processing : t.publicGive.give(amount || "0")}
           </Button>
         </form>

@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { membershipPeriodLabel } from "@/lib/membership-fees/config";
 import { MembershipPayButton } from "@/components/membership/MembershipPayButton";
 import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export const metadata: Metadata = {
   title: "Membership fee | KingdomFlow",
@@ -11,8 +12,15 @@ export const metadata: Metadata = {
 // Public: the link itself is the credential. Shows only what the member needs
 // to pay (the church's name, the month and the amount), never other members'
 // details.
-export default async function MembershipPaymentPage({ params }: { params: Promise<{ token: string }> }) {
+export default async function MembershipPaymentPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ token: string }>;
+  searchParams: Promise<{ payment?: string }>;
+}) {
   const { token } = await params;
+  const { payment } = await searchParams;
   const admin = createAdminClient();
 
   const { data: invoice } = await admin
@@ -46,6 +54,11 @@ export default async function MembershipPaymentPage({ params }: { params: Promis
       </div>
       <Card>
         <CardContent className="space-y-4 py-6">
+          {payment === "failed" && (
+            <Alert variant="destructive">
+              <AlertDescription>That payment didn&apos;t go through. You haven&apos;t been charged — you can try again below.</AlertDescription>
+            </Alert>
+          )}
           <div className="text-center">
             <p className="text-sm text-muted-foreground">Amount due</p>
             <p className="font-heading text-3xl font-bold tabular-nums">
@@ -55,7 +68,7 @@ export default async function MembershipPaymentPage({ params }: { params: Promis
           <MembershipPayButton token={token} amount={amount} />
         </CardContent>
       </Card>
-      <p className="text-center text-xs text-muted-foreground">Payments are processed securely by Razorpay.</p>
+      <p className="text-center text-xs text-muted-foreground">Payments are processed securely by PayU.</p>
     </div>
   );
 }

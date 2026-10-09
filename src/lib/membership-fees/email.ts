@@ -18,9 +18,9 @@ export async function sendMembershipEmail(params: {
   subject: string;
   html: string;
 }): Promise<MembershipEmailResult> {
-  // Read with the service role. These sends run from the cron, the Razorpay
-  // webhook and the public payment page, none of which has a signed-in user,
-  // so the user-session lookup would always miss the church's own SMTP.
+  // Read with the service role. These sends run from the cron, the PayU
+  // return route and the public payment page, none of which has a signed-in
+  // user, so the user-session lookup would always miss the church's own SMTP.
   const { data: smtp } = await createAdminClient()
     .from("email_smtp_settings")
     .select("*")

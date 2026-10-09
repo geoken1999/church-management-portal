@@ -1,12 +1,15 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   registerForEvent,
   deferEventRegistrationToCheckin,
   type PublicEventRegistrationState,
 } from "@/lib/events/public-registration-actions";
 import { EventRegistrationPayment } from "@/components/events/EventRegistrationPayment";
+import { createEventRegistrationOrder } from "@/lib/events/payu-registration";
+import { redirectToPayU } from "@/lib/payu/browser";
 import { useLocale } from "@/lib/i18n/LocaleContext";
 import type { FormField } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -95,7 +98,7 @@ function PublicFieldInput({ field }: { field: FormField }) {
 
 // The external-gateway counterpart to EventRegistrationPayment's
 // "pay at check-in instead" button — the platform-gateway version lives
-// there since it shares state with the Razorpay checkout flow; this one
+// there since it shares state with the PayU checkout flow; this one
 // has nothing else to share state with, so it's local to this file.
 function DeferToCheckinButton({ registrationId, onDeferred }: { registrationId: string; onDeferred: () => void }) {
   const { t } = useLocale();
@@ -115,13 +118,80 @@ function DeferToCheckinButton({ registrationId, onDeferred }: { registrationId: 
   );
 }
 
+// Shown after PayU redirects the browser back here (see
+// /api/payu/event-registration/return) — a full-page navigation, so the
+// useActionState above has already reset to initialState by the time this
+// mounts. payment/registrationId travel as plain query params rather than
+// through state for exactly that reason.
+function PaymentFailedCard({ registrationId }: { registrationId: string | null }) {
+  const { t } = useLocale();
+  const [retrying, setRetrying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleRetry() {
+    if (!registrationId) return;
+    setError(null);
+    setRetrying(true);
+    const result = await createEventRegistrationOrder(registrationId);
+    if (result.error || !result.payuFields || !result.payuActionUrl) {
+      setError(result.error ?? "Couldn't start the payment.");
+      setRetrying(false);
+      return;
+    }
+    redirectToPayU(result.payuActionUrl, result.payuFields);
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-4 py-8 text-center duration-300 animate-in fade-in zoom-in-95">
+      <div className="space-y-1">
+        <p className="font-heading text-lg font-bold">{t.publicEvent.paymentFailedTitle}</p>
+        <p className="text-sm text-muted-foreground">{t.publicEvent.paymentFailedDescription}</p>
+      </div>
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      {registrationId && (
+        <Button type="button" disabled={retrying} onClick={handleRetry}>
+          {retrying ? t.publicEvent.processingPayment : t.publicEvent.retryPayment}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export function PublicEventRegistrationForm({ token, fields }: { token: string; fields: FormField[] }) {
   const { t } = useLocale();
+  const searchParams = useSearchParams();
   const registerWithToken = registerForEvent.bind(null, token);
   const [state, formAction, pending] = useActionState(registerWithToken, initialState);
   const [deferredToCheckin, setDeferredToCheckin] = useState(false);
 
   const checkboxKeys = fields.filter((f) => f.field_type === "checkbox").map((f) => f.key);
+
+  // Checked before any state-driven branch below: a PayU return is a full
+  // navigation, so state is always back to initialState here, even though
+  // the registration genuinely was (or wasn't) paid for. The
+  // state-driven paymentRequired/success branches below still apply to the
+  // external-gateway path, which never navigates away from this page.
+  const paymentResult = searchParams.get("payment");
+  if (paymentResult === "success") {
+    return (
+      <div className="flex flex-col items-center gap-4 py-8 text-center duration-300 animate-in fade-in zoom-in-95">
+        <div className="flex size-16 items-center justify-center rounded-full bg-primary/10">
+          <CheckCircle2 className="size-9 text-primary" />
+        </div>
+        <div className="space-y-1">
+          <p className="font-heading text-lg font-bold">{t.publicEvent.successTitle}</p>
+          <p className="text-sm text-muted-foreground">{t.publicEvent.successDescription}</p>
+        </div>
+      </div>
+    );
+  }
+  if (paymentResult === "failed") {
+    return <PaymentFailedCard registrationId={searchParams.get("registrationId")} />;
+  }
 
   if (state.paymentRequired && state.registrationId) {
     const allowDefer = state.paymentTiming === "both";

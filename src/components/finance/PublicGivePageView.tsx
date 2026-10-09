@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress, ProgressTrack, ProgressIndicator } from "@/components/ui/progress";
 import { GivingForm } from "@/components/finance/GivingForm";
@@ -74,7 +75,12 @@ function GiveContent({ token, fundraiser }: { token: string; fundraiser: PublicF
         </p>
       </div>
 
-      <GivingForm shareToken={token} organizationName={fundraiser.organization_name} />
+      {/* GivingForm reads ?payment= via useSearchParams (set when PayU
+          redirects back here for 'shared'-mode giving) — same Suspense
+          requirement as LoginForm/SignupForm. */}
+      <Suspense fallback={null}>
+        <GivingForm shareToken={token} organizationName={fundraiser.organization_name} />
+      </Suspense>
 
       <div className="text-center">
         <p className="text-xs text-muted-foreground">{t.publicGive.securePayment}</p>

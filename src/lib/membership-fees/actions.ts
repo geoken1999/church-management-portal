@@ -7,11 +7,11 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { getOrganizationPayoutDetails } from "@/lib/organizations/payout-details-dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { requireFinancePlan } from "@/lib/finance/actions";
-import { getGivingCredentials, createGivingRazorpayClient, verifyGivingPaymentSignature } from "@/lib/finance/razorpay-giving";
 import { sharedServiceNetAmount } from "@/lib/finance/fees";
+import { buildPaymentRequestFields, type PayUFormFields } from "@/lib/payu/client";
+import { getSiteUrl } from "@/lib/site-url";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { financeEnabledForBackground } from "@/lib/plans/dal";
-import { finalizeMembershipPayment } from "@/lib/membership-fees/finalize";
 import {
   membershipPeriodLabel,
   validateMembershipFeeSettings,
@@ -69,17 +69,26 @@ export async function saveMembershipFeeSettings(
 }
 
 // ---- Member payment (public link, no login; the token is the credential) ----
+//
+// Membership fees only ever use the platform's own shared PayU account —
+// there's no "church's own gateway" option for this flow (that choice only
+// exists for fundraiser giving), so this talks to @/lib/payu/client directly
+// rather than going through the credentials lookup fundraiser giving needs.
 
 export interface CreateMembershipOrderState {
   error?: string;
   alreadyPaid?: boolean;
-  orderId?: string;
-  keyId?: string;
+  payuFields?: PayUFormFields;
+  payuActionUrl?: string;
   amount?: number;
   organizationName?: string;
   periodLabel?: string;
 }
 
+// Called on every "Pay" click, including a retry after a failed/declined
+// attempt — it reuses a still-'due' invoice's existing payu_txnid if one was
+// already created, same idempotency reasoning migration 0115/0116 established
+// for add-on packs and event registration.
 export async function createMembershipInvoiceOrder(token: string): Promise<CreateMembershipOrderState> {
   if (!/^[a-f0-9]{64}$/.test(token)) {
     return { error: "This payment link isn't valid." };
@@ -88,12 +97,18 @@ export async function createMembershipInvoiceOrder(token: string): Promise<Creat
   const admin = createAdminClient();
   const { data: invoice } = await admin
     .from("membership_fee_invoices")
-    .select("id, organization_id, amount, status, period, razorpay_order_id")
+    .select("id, organization_id, member_id, amount, status, period, payu_txnid")
     .eq("public_token", token)
     .maybeSingle();
 
   if (!invoice) return { error: "This payment link isn't valid." };
-  const { data: org } = await admin.from("organizations").select("name").eq("id", invoice.organization_id).maybeSingle();
+  // membership_fee_invoices has no declared FK relationship to either table
+  // (Relationships: [] in database.ts), so these are separate lookups rather
+  // than an embedded select.
+  const [{ data: org }, { data: member }] = await Promise.all([
+    admin.from("organizations").select("name").eq("id", invoice.organization_id).maybeSingle(),
+    admin.from("members").select("first_name, email, phone").eq("id", invoice.member_id).maybeSingle(),
+  ]);
   const organizationName = org?.name ?? "";
   const periodLabel = membershipPeriodLabel(invoice.period);
 
@@ -104,76 +119,53 @@ export async function createMembershipInvoiceOrder(token: string): Promise<Creat
     return { error: "Online payment is temporarily unavailable. Please contact the church." };
   }
 
-  const credentials = await getGivingCredentials(invoice.organization_id, "shared");
-  if (!credentials) {
-    return { error: "Online payment isn't set up correctly yet. Please contact the church." };
-  }
-
   const amount = Number(invoice.amount);
-  let orderId = invoice.razorpay_order_id;
 
-  if (!orderId) {
-    try {
-      const order = await createGivingRazorpayClient(credentials).orders.create({
-        amount: Math.round(amount * 100),
-        currency: "INR",
-        receipt: `membership_${invoice.id}`,
-        notes: { kind: "membership_fee", invoice_id: invoice.id, organization_id: invoice.organization_id },
-      });
-      orderId = order.id;
-    } catch (err) {
-      await logPlatformEvent({
-        level: "error",
-        source: "membership_fee",
-        message: `Razorpay order creation failed: ${err instanceof Error ? err.message : "unknown error"}`,
-        organizationId: invoice.organization_id,
-      });
-      return { error: "Couldn't start the payment. Please try again." };
-    }
-
-    // Only the first order is kept. A concurrent click may have stored one
-    // already, in which case that one is used and the extra order is ignored.
+  let txnid = invoice.payu_txnid;
+  if (!txnid) {
+    txnid = `mship${Date.now()}${invoice.id.replace(/-/g, "").slice(0, 8)}`;
     const { data: stored } = await admin
       .from("membership_fee_invoices")
-      .update({ razorpay_order_id: orderId })
+      .update({ payu_txnid: txnid })
       .eq("id", invoice.id)
-      .is("razorpay_order_id", null)
-      .select("razorpay_order_id")
+      .is("payu_txnid", null)
+      .select("payu_txnid")
       .maybeSingle();
     if (!stored) {
-      const { data: current } = await admin.from("membership_fee_invoices").select("razorpay_order_id").eq("id", invoice.id).maybeSingle();
-      orderId = current?.razorpay_order_id ?? orderId;
+      // Lost a concurrent-click race — use whichever txnid actually got stored.
+      const { data: current } = await admin.from("membership_fee_invoices").select("payu_txnid").eq("id", invoice.id).maybeSingle();
+      txnid = current?.payu_txnid ?? txnid;
     }
   }
 
-  return { orderId: orderId ?? undefined, keyId: credentials.keyId, amount, organizationName, periodLabel };
-}
+  const siteUrl = getSiteUrl();
+  const returnUrl = `${siteUrl}/api/payu/membership/return?token=${token}`;
 
-export interface ConfirmMembershipPaymentState {
-  error?: string;
-  success?: boolean;
-}
-
-export async function confirmMembershipPayment(
-  orderId: string,
-  paymentId: string,
-  signature: string,
-): Promise<ConfirmMembershipPaymentState> {
-  const admin = createAdminClient();
-  const { data: invoice } = await admin
-    .from("membership_fee_invoices")
-    .select("organization_id")
-    .eq("razorpay_order_id", orderId)
-    .maybeSingle();
-  if (!invoice) return { error: "That payment could not be found." };
-
-  const credentials = await getGivingCredentials(invoice.organization_id, "shared");
-  if (!credentials) return { error: "Couldn't verify this payment. Please contact the church." };
-  if (!verifyGivingPaymentSignature(orderId, paymentId, signature, credentials.keySecret)) {
-    return { error: "Couldn't verify this payment." };
+  let built;
+  try {
+    built = buildPaymentRequestFields({
+      txnid,
+      amountRupees: amount,
+      productinfo: `Membership fee: ${periodLabel}`,
+      firstname: member?.first_name ?? "Member",
+      email: member?.email ?? `no-reply+${invoice.id}@kingdomflow.app`,
+      phone: member?.phone ?? "9999999999",
+      surl: returnUrl,
+      furl: returnUrl,
+      udf1: `mship:${invoice.id}`,
+    });
+  } catch (err) {
+    await logPlatformEvent({
+      level: "error",
+      source: "membership_fee",
+      message: `PayU field build failed: ${err instanceof Error ? err.message : "unknown error"}`,
+      organizationId: invoice.organization_id,
+      metadata: { invoiceId: invoice.id, txnid },
+    });
+    return { error: "Couldn't start the payment. Please try again." };
   }
 
-  return finalizeMembershipPayment(orderId, paymentId);
+  return { payuFields: built.fields, payuActionUrl: built.actionUrl, amount, organizationName, periodLabel };
 }
 
 // ---- Church payout request (same rules as fundraiser payouts) ----

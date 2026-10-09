@@ -14,7 +14,7 @@ type Admin = ReturnType<typeof createAdminClient>;
 export async function sendMembershipReceipt(admin: Admin, invoiceId: string): Promise<boolean> {
   const { data: invoice } = await admin
     .from("membership_fee_invoices")
-    .select("id, organization_id, member_id, amount, period, paid_at, razorpay_payment_id, receipt_sent_at")
+    .select("id, organization_id, member_id, amount, period, paid_at, payu_mihpayid, receipt_sent_at")
     .eq("id", invoiceId)
     .maybeSingle();
   if (!invoice?.paid_at || invoice.receipt_sent_at) return true;
@@ -36,7 +36,7 @@ export async function sendMembershipReceipt(admin: Admin, invoiceId: string): Pr
 <tr><td>Period</td><td>${escapeHtml(periodLabel)}</td></tr>
 <tr><td>Amount paid</td><td><strong>${amountText}</strong></td></tr>
 <tr><td>Paid on</td><td>${escapeHtml(paidOn)}</td></tr>
-<tr><td>Payment reference</td><td>${escapeHtml(invoice.razorpay_payment_id ?? "—")}</td></tr>
+<tr><td>Payment reference</td><td>${escapeHtml(invoice.payu_mihpayid ?? "—")}</td></tr>
 </table>
 <p>Please keep this email as your receipt.</p>
 <p>${escapeHtml(org.name)}</p>`;

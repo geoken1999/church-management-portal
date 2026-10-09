@@ -3,18 +3,20 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendMembershipReceipt } from "@/lib/membership-fees/receipt";
 
-// Shared by the Checkout callback (which verifies the HMAC first) and the
-// Razorpay webhook (verified by its own signature). Whichever arrives first
-// wins. The status-guarded UPDATE means the second caller changes nothing.
+// Called only from the PayU return route (/api/payu/membership/return),
+// after that route has verified PayU's hash — this function itself does no
+// verification. Same atomic paid-once claim as before (previously keyed on
+// razorpay_order_id/razorpay_payment_id, now payu_txnid/payu_mihpayid): the
+// status-guarded UPDATE means a redelivered callback changes nothing.
 export async function finalizeMembershipPayment(
-  razorpayOrderId: string,
-  razorpayPaymentId: string,
+  txnid: string,
+  mihpayid: string,
 ): Promise<{ error?: string; success?: boolean }> {
   const admin = createAdminClient();
   const { data: invoice } = await admin
     .from("membership_fee_invoices")
     .select("id, status")
-    .eq("razorpay_order_id", razorpayOrderId)
+    .eq("payu_txnid", txnid)
     .maybeSingle();
 
   if (!invoice) return { error: "That payment could not be found." };
@@ -22,7 +24,7 @@ export async function finalizeMembershipPayment(
 
   const { data: claimed } = await admin
     .from("membership_fee_invoices")
-    .update({ status: "paid", razorpay_payment_id: razorpayPaymentId, paid_at: new Date().toISOString() })
+    .update({ status: "paid", payu_mihpayid: mihpayid, paid_at: new Date().toISOString() })
     .eq("id", invoice.id)
     .eq("status", "due")
     .select("id")

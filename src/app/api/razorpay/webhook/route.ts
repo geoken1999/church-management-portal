@@ -2,9 +2,6 @@ import { NextResponse } from "next/server";
 import { Razorpay } from "@/lib/billing/razorpay";
 import { getRazorpayWebhookSecret } from "@/lib/billing/env";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { finalizeGivingOrderPayment } from "@/lib/finance/razorpay-giving";
-import { finalizeEventRegistrationPayment } from "@/lib/events/razorpay-registration";
-import { finalizeMembershipPayment } from "@/lib/membership-fees/finalize";
 import { sendSubscriptionActivatedEmail, sendSubscriptionChargedEmail, sendSubscriptionCancelledEmail } from "@/lib/billing/receipts";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { PLANS, isPlanId, isBillingInterval } from "@/lib/plans/config";
@@ -42,37 +39,23 @@ export async function POST(request: Request) {
   const subscriptionEntity = payload.payload?.subscription?.entity;
   const paymentEntity = payload.payload?.payment?.entity;
 
-  // Backup confirmation path for 'shared'-mode fundraiser giving — this
-  // webhook is on the platform's own Razorpay account, the same one
-  // 'shared' mode uses, so its events cover those payments too. 'own'
-  // mode orders are created against a different (the church's own)
-  // account, which has no webhook pointed at this app, so they rely on
-  // the Checkout success callback alone (see confirmGivingPayment). The
-  // callback is normally faster; this just catches it if the browser
-  // closed before that callback fired.
-  if (event === "payment.captured" && paymentEntity?.notes?.kind === "fundraiser_giving" && paymentEntity.order_id) {
-    await finalizeGivingOrderPayment(paymentEntity.order_id, paymentEntity.id);
-    return NextResponse.json({ ok: true });
-  }
+  // 'shared'-mode fundraiser giving moved to PayU — see
+  // /api/payu/giving/return. 'own' mode (a church's own Razorpay keys)
+  // still relies solely on the Checkout success callback (see
+  // confirmGivingPayment in giving-actions.ts), unchanged — it was never
+  // covered by this webhook in the first place, since it runs against a
+  // different (the church's own) Razorpay account with no webhook pointed
+  // at this app.
 
   // Add-on pack purchases moved to PayU — see /api/payu/addon/return. PayU
   // has no equivalent of this Razorpay webhook event, so there's no branch
   // for it here anymore.
 
-  // Backup confirmation path for monthly membership fees, same reasoning as
-  // add-on purchases: the platform's own account, so this webhook sees them.
-  if (event === "payment.captured" && paymentEntity?.notes?.kind === "membership_fee" && paymentEntity.order_id) {
-    await finalizeMembershipPayment(paymentEntity.order_id, paymentEntity.id);
-    return NextResponse.json({ ok: true });
-  }
+  // Monthly membership fees moved to PayU — see
+  // /api/payu/membership/return. No branch for it here anymore.
 
-  // Backup confirmation path for paid event registration (platform
-  // gateway only — "your own payment link" never touches this app's
-  // Razorpay account at all, so it has nothing to confirm here).
-  if (event === "payment.captured" && paymentEntity?.notes?.kind === "event_registration" && paymentEntity.order_id) {
-    await finalizeEventRegistrationPayment(paymentEntity.order_id, paymentEntity.id);
-    return NextResponse.json({ ok: true });
-  }
+  // Paid event registration moved to PayU — see
+  // /api/payu/event-registration/return. No branch for it here anymore.
 
   if (!subscriptionEntity?.id) {
     // A payment/refund/other event this app doesn't act on — ack so

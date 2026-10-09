@@ -112,18 +112,18 @@ export const PLANS: Record<PlanId, PlanLimits> = {
     "Starter",
     1499,
     {
-      emailsPerMonth: 500,
+      emailsPerMonth: 1000,
       // Far smaller than the email quota — SMS costs real money per message
       // sent through the shared Twilio account, unlike email's Resend free
       // tier headroom.
       smsPerMonth: 50,
       // Same shared-Twilio cost reasoning as SMS — only counts 'shared'-mode
       // WhatsApp sends; an org's own connected number is unmetered.
-      whatsappPerMonth: 50,
+      whatsappPerMonth: 2500,
       aiRepliesPerMonth: 100,
       instagramAccountLimit: 1,
       youtubeAccountLimit: 1,
-      storageBytes: 10 * 1024 * 1024 * 1024, // 10GB
+      storageBytes: 20 * 1024 * 1024 * 1024, // 20GB
       // K-Audio auto-derives to 30 min via kaudioMaxDurationMinutes()
       // below (always kmeet + 10).
       kmeetMaxDurationMinutes: 20,
@@ -153,7 +153,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
     {
       emailsPerMonth: 5000,
       smsPerMonth: 500,
-      whatsappPerMonth: 500,
+      whatsappPerMonth: 7500,
       aiRepliesPerMonth: 500,
       instagramAccountLimit: 3,
       youtubeAccountLimit: 3,
@@ -182,9 +182,9 @@ export const PLANS: Record<PlanId, PlanLimits> = {
     "Pro",
     4999,
     {
-      emailsPerMonth: 15000,
+      emailsPerMonth: 10000,
       smsPerMonth: 1000,
-      whatsappPerMonth: 1000,
+      whatsappPerMonth: 10000,
       aiRepliesPerMonth: 1000,
       instagramAccountLimit: 5,
       youtubeAccountLimit: 5,

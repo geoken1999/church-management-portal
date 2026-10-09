@@ -4,13 +4,13 @@ import { requireOrganization, getUserOrganizations } from "@/lib/organizations/d
 import { getNotifications } from "@/lib/notifications/dal";
 import { getPlanUsage } from "@/lib/plans/dal";
 import { getOrganizationSubscription } from "@/lib/billing/dal";
-import { isRazorpayConfigured } from "@/lib/billing/env";
+import { isPayUConfigured } from "@/lib/payu/env";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { TrialExpiredScreen } from "@/components/billing/TrialExpiredScreen";
 import { toAppLocale } from "@/lib/i18n/config";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
-  const user = await requireUser();
+  await requireUser();
   const [membership, memberships, profile] = await Promise.all([
     requireOrganization(),
     getUserOrganizations(),
@@ -30,12 +30,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         canManage={canManage}
         currentPlanId={planUsage.plan.id}
         subscription={subscription}
-        razorpayConfigured={isRazorpayConfigured()}
-        prefill={{
-          name: profile ? `${profile.first_name} ${profile.last_name}`.trim() : membership.organization.name,
-          email: user.email ?? "",
-          contact: profile?.phone ?? "",
-        }}
+        payuConfigured={isPayUConfigured()}
       />
     );
   }

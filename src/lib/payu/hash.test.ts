@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRequestHashString, buildResponseHashString, sha512Hex } from "@/lib/payu/hash";
+import { buildRequestHashString, buildResponseHashString, buildSIRequestHashString, sha512Hex } from "@/lib/payu/hash";
 
 // Fixture-only key/salt — never PayU credentials, real or otherwise. These
 // tests check the field order and the hashing primitive, not any specific
@@ -44,6 +44,23 @@ describe("buildResponseHashString", () => {
 
   it("has exactly 18 fields — one more than the request's 17, for the added status", () => {
     expect(buildResponseHashString({ ...FIXTURE, status: "success" }, SALT).split("|")).toHaveLength(18);
+  });
+});
+
+describe("buildSIRequestHashString", () => {
+  // NOT verified against a live PayU mandate-registration call (see the
+  // comment on the function itself) — this only pins down the field
+  // ordering this code actually implements, from PayU's documentation.
+  const SI_DETAILS = '{"billingAmount":"100.00"}';
+
+  it("is the request sequence with si_details inserted after the five empty reserved slots, before the salt", () => {
+    expect(buildSIRequestHashString(FIXTURE, SI_DETAILS, SALT)).toBe(
+      `testkey123|txn001|100.00|A test product|Jane|jane@example.com|||||||||||${SI_DETAILS}|testsalt456`,
+    );
+  });
+
+  it("has exactly 18 fields — one more than the plain request's 17, for the added si_details", () => {
+    expect(buildSIRequestHashString(FIXTURE, SI_DETAILS, SALT).split("|")).toHaveLength(18);
   });
 });
 

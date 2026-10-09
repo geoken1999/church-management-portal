@@ -1,25 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, X, CreditCard } from "lucide-react";
-import { startSubscriptionCheckout, cancelSubscription } from "@/lib/billing/actions";
-import { PLANS, priceForInterval, type PlanId, type BillingInterval } from "@/lib/plans/config";
+import { startPayUSubscriptionCheckout, cancelPayUSubscription } from "@/lib/billing/payu-subscription-actions";
+// Legacy path: still used for any subscription a church started before
+// this moved to PayU — see handleCancel below. New checkouts never create
+// a razorpay_subscription_id, so this becomes unreachable once no org has
+// one left.
+import { cancelSubscription as cancelRazorpaySubscription } from "@/lib/billing/actions";
+import { redirectToPayU } from "@/lib/payu/browser";
+import { PLANS, priceForInterval, type PlanId } from "@/lib/plans/config";
 import { PLAN_ORDER, planFeatureRows, planDescription } from "@/lib/plans/display";
-import type { OrganizationSubscription, SubscriptionStatus } from "@/types/database";
+import type { OrganizationSubscription, SubscriptionStatus, SubscriptionBillingInterval } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Tabs, TabsList, TabsTab, TabsIndicator } from "@/components/ui/tabs";
-
-declare global {
-  interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
-  }
-}
-
-const CHECKOUT_SCRIPT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const STATUS_LABELS: Record<SubscriptionStatus, string> = {
   created: "Awaiting payment",
@@ -32,96 +31,60 @@ const STATUS_LABELS: Record<SubscriptionStatus, string> = {
   expired: "Expired",
 };
 
-const INTERVAL_LABELS: Record<BillingInterval, string> = { monthly: "Monthly", annual: "Annual" };
+const INTERVAL_LABELS: Record<SubscriptionBillingInterval, string> = { monthly: "Monthly", annual: "Annual" };
 
 const IN_PROGRESS_STATUSES: SubscriptionStatus[] = ["created", "authenticated", "active", "pending", "halted"];
-
-function loadCheckoutScript(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (window.Razorpay) {
-      resolve();
-      return;
-    }
-    const existing = document.querySelector(`script[src="${CHECKOUT_SCRIPT_SRC}"]`);
-    if (existing) {
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("Couldn't load Razorpay checkout.")));
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = CHECKOUT_SCRIPT_SRC;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Couldn't load Razorpay checkout."));
-    document.body.appendChild(script);
-  });
-}
 
 export function BillingManager({
   currentPlanId,
   subscription,
-  razorpayConfigured,
-  prefill,
+  payuConfigured,
 }: {
   currentPlanId: PlanId;
   subscription: OrganizationSubscription | null;
-  razorpayConfigured: boolean;
-  prefill: { name: string; email: string; contact: string };
+  payuConfigured: boolean;
 }) {
   const router = useRouter();
-  const [billingInterval, setBillingInterval] = useState<BillingInterval>(subscription?.billing_interval ?? "monthly");
+  const [vpa, setVpa] = useState("");
   const [pendingPlanId, setPendingPlanId] = useState<PlanId | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (razorpayConfigured) {
-      loadCheckoutScript().catch(() => setError("Couldn't load the Razorpay checkout script."));
-    }
-  }, [razorpayConfigured]);
-
   const hasInProgressSubscription = Boolean(subscription && IN_PROGRESS_STATUSES.includes(subscription.status));
 
+  // PayU subscriptions here are via UPI Autopay, which NPCI caps at
+  // ₹15,000 per recurring debit without extra per-charge authentication —
+  // Starter/Growth/Pro's monthly prices are all comfortably under that,
+  // but two of the three annual prices aren't, and there's no annual-
+  // capable mandate method (cards/e-NACH) built yet. Only monthly billing
+  // is offered for new subscriptions; an existing annual Razorpay
+  // subscription (if any) still just displays as-is below.
   async function handleSubscribe(planId: PlanId) {
     setError(null);
+    if (!vpa.trim().includes("@")) {
+      setError("Enter your UPI ID first (e.g. yourname@bank) — it's needed to set up the Autopay mandate.");
+      return;
+    }
     setPendingPlanId(planId);
 
-    const result = await startSubscriptionCheckout(planId, billingInterval);
-    if (result.error || !result.subscriptionId || !result.keyId) {
+    const result = await startPayUSubscriptionCheckout(planId, vpa);
+    if (result.error || !result.payuFields || !result.payuActionUrl) {
       setError(result.error ?? "Couldn't start checkout.");
       setPendingPlanId(null);
       return;
     }
 
-    if (!window.Razorpay) {
-      setError("Razorpay checkout hasn't finished loading yet — try again in a moment.");
-      setPendingPlanId(null);
-      return;
-    }
-
-    const razorpay = new window.Razorpay({
-      key: result.keyId,
-      subscription_id: result.subscriptionId,
-      name: "KingdomFlow",
-      description: `${PLANS[planId].name} plan subscription (${INTERVAL_LABELS[billingInterval]})`,
-      prefill: { name: prefill.name, email: prefill.email, contact: prefill.contact },
-      theme: { color: "#6C47FF" },
-      handler: () => {
-        // The webhook is what actually activates the plan server-side —
-        // this refresh just picks up whatever state has landed by now.
-        router.refresh();
-      },
-      modal: {
-        ondismiss: () => setPendingPlanId(null),
-      },
-    });
-    razorpay.open();
+    redirectToPayU(result.payuActionUrl, result.payuFields);
   }
 
   async function handleCancel() {
     setError(null);
     setCancelling(true);
-    const result = await cancelSubscription();
+    // A subscription started before this moved to PayU still has
+    // razorpay_subscription_id (and no payu_txnid) — route it to the
+    // matching cancel action rather than the new one, which wouldn't
+    // recognize it.
+    const result = subscription?.razorpay_subscription_id ? await cancelRazorpaySubscription() : await cancelPayUSubscription();
     setCancelling(false);
     if (result.error) {
       setError(result.error);
@@ -132,10 +95,10 @@ export function BillingManager({
 
   return (
     <div className="space-y-6">
-      {!razorpayConfigured && (
+      {!payuConfigured && (
         <Alert>
           <AlertDescription>
-            Billing isn&apos;t configured yet for this app — an admin needs to set the Razorpay API keys before
+            Billing isn&apos;t configured yet for this app — an admin needs to set the PayU API keys before
             subscriptions can be started.
           </AlertDescription>
         </Alert>
@@ -161,9 +124,11 @@ export function BillingManager({
             </div>
             <CardDescription>
               {PLANS[currentPlanId].name} plan — {INTERVAL_LABELS[subscription.billing_interval]}
-              {subscription.current_end && subscription.status === "active"
-                ? ` — renews ${new Date(subscription.current_end).toLocaleDateString()}`
-                : ""}
+              {subscription.next_charge_at && subscription.status === "active"
+                ? ` — next charge ${new Date(subscription.next_charge_at).toLocaleDateString()}`
+                : subscription.current_end && subscription.status === "active"
+                  ? ` — renews ${new Date(subscription.current_end).toLocaleDateString()}`
+                  : ""}
             </CardDescription>
           </CardHeader>
           {hasInProgressSubscription && (
@@ -176,31 +141,25 @@ export function BillingManager({
         </Card>
       )}
 
-      <div className="flex justify-center">
-        <Tabs value={billingInterval} onValueChange={(v) => setBillingInterval((v as BillingInterval) ?? "monthly")}>
-          <TabsList>
-            <TabsIndicator />
-            <TabsTab value="monthly">Monthly</TabsTab>
-            <TabsTab value="annual">
-              Annual
-              <Badge variant="secondary" className="ml-1.5">
-                Save 10%
-              </Badge>
-            </TabsTab>
-          </TabsList>
-        </Tabs>
-      </div>
+      {!hasInProgressSubscription && (
+        <div className="mx-auto max-w-sm space-y-2">
+          <Label htmlFor="upi-vpa">Your UPI ID</Label>
+          <Input id="upi-vpa" placeholder="yourname@bank" value={vpa} onChange={(e) => setVpa(e.target.value)} />
+          <p className="text-xs text-muted-foreground">
+            Used to set up a UPI Autopay mandate — you&apos;ll confirm it in your own UPI app, and nothing is charged
+            until that&apos;s approved.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {PLAN_ORDER.map((planId) => {
           const plan = PLANS[planId];
-          const price = priceForInterval(plan, billingInterval);
+          const price = priceForInterval(plan, "monthly");
           const isCurrent =
-            planId === currentPlanId && subscription?.status === "active" && subscription.billing_interval === billingInterval;
+            planId === currentPlanId && subscription?.status === "active" && subscription.billing_interval === "monthly";
           const blockedBySwitch =
-            hasInProgressSubscription &&
-            !isCurrent &&
-            (subscription?.plan_id !== planId || subscription?.billing_interval !== billingInterval);
+            hasInProgressSubscription && !isCurrent && (subscription?.plan_id !== planId || subscription?.billing_interval !== "monthly");
 
           return (
             <Card key={planId} className={isCurrent ? "border-primary shadow-lg" : undefined}>
@@ -228,7 +187,7 @@ export function BillingManager({
                 <Button
                   className="w-full"
                   variant={isCurrent ? "outline" : "default"}
-                  disabled={isCurrent || blockedBySwitch || pendingPlanId === planId || !razorpayConfigured}
+                  disabled={isCurrent || blockedBySwitch || pendingPlanId === planId || !payuConfigured}
                   onClick={() => handleSubscribe(planId)}
                 >
                   {isCurrent

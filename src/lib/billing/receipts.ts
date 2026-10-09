@@ -58,6 +58,27 @@ export async function sendSubscriptionCancelledEmail(organizationId: string, pla
   );
 }
 
+// RBI's e-mandate rules require notifying the customer 24-36 hours before
+// every recurring debit — this is that notice, sent by the
+// subscription-billing cron the day before next_charge_at.
+export async function sendUpcomingChargeNoticeEmail(organizationId: string, planName: string, amountRupees: number, chargeDateLabel: string): Promise<void> {
+  await sendBillingEmail(
+    organizationId,
+    `Upcoming charge for your ${planName} plan`,
+    `<p>Your UPI Autopay mandate for the <strong>${planName}</strong> plan will be charged <strong>${formatRupees(amountRupees)}</strong> on <strong>${chargeDateLabel}</strong>.</p><p>No action is needed unless you want to cancel first, from the Billing page.</p>`,
+  );
+}
+
+export async function sendSubscriptionPaymentFailedEmail(organizationId: string, planName: string, willRetry: boolean): Promise<void> {
+  await sendBillingEmail(
+    organizationId,
+    willRetry ? `Payment attempt failed — ${planName} plan` : `Subscription halted — ${planName} plan`,
+    willRetry
+      ? `<p>We couldn't collect this cycle's payment for your <strong>${planName}</strong> plan. We'll try again automatically.</p>`
+      : `<p>We couldn't collect payment for your <strong>${planName}</strong> plan after several attempts, so the subscription has been halted. Please update your UPI Autopay mandate from the Billing page to continue.</p>`,
+  );
+}
+
 export async function sendAddonPurchaseEmail(organizationId: string, packLabel: string, amountRupees: number): Promise<void> {
   await sendBillingEmail(
     organizationId,

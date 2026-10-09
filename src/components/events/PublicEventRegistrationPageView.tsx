@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { PublicEventRegistrationForm } from "@/components/events/PublicEventRegistrationForm";
 import { PublicBrandHeader, PublicPoweredByFooter } from "@/components/PublicBrandHeader";
@@ -97,7 +98,12 @@ function EventContent({ token, data }: { token: string; data: PublicEventRegistr
                 {data.spots_remaining !== null && (
                   <p className="mb-4 text-xs text-muted-foreground">{t.publicEvent.spotsRemaining(data.spots_remaining)}</p>
                 )}
-                <PublicEventRegistrationForm token={token} fields={data.registration_fields ?? []} />
+                {/* PublicEventRegistrationForm reads ?payment= via useSearchParams
+                    (set when PayU redirects back here) — same Suspense
+                    requirement as LoginForm/SignupForm. */}
+                <Suspense fallback={null}>
+                  <PublicEventRegistrationForm token={token} fields={data.registration_fields ?? []} />
+                </Suspense>
               </>
             )}
           </CardContent>

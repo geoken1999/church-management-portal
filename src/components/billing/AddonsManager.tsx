@@ -1,43 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { MessageSquareText, Mail, MessageCircle, HardDrive, Sparkles } from "lucide-react";
-import { createAddonOrder, confirmAddonPayment } from "@/lib/billing/addon-actions";
+import { createAddonOrder } from "@/lib/billing/addon-actions";
+import type { PayUFormFields } from "@/lib/payu/client";
 import { ADDON_TYPE_LABELS, addonPacksFor, type AddonType, type AddonPack } from "@/lib/plans/config";
 import { formatBytes } from "@/lib/plans/format";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-
-declare global {
-  interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
-  }
-}
-
-const CHECKOUT_SCRIPT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
-
-function loadCheckoutScript(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (window.Razorpay) {
-      resolve();
-      return;
-    }
-    const existing = document.querySelector(`script[src="${CHECKOUT_SCRIPT_SRC}"]`);
-    if (existing) {
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("Couldn't load Razorpay checkout.")));
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = CHECKOUT_SCRIPT_SRC;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Couldn't load Razorpay checkout."));
-    document.body.appendChild(script);
-  });
-}
 
 const ADDON_ICONS: Record<AddonType, typeof MessageSquareText> = {
   sms: MessageSquareText,
@@ -51,16 +22,29 @@ function formatBalance(addonType: AddonType, value: number): string {
   return addonType === "storage" ? formatBytes(value) : value.toLocaleString();
 }
 
-function PackCard({
-  pack,
-  prefill,
-  razorpayConfigured,
-}: {
-  pack: AddonPack;
-  prefill: { name: string; email: string; contact: string };
-  razorpayConfigured: boolean;
-}) {
-  const router = useRouter();
+// PayU has no JS checkout SDK to open in place — paying means the whole
+// page navigates to PayU's hosted checkout, then PayU redirects back to
+// /api/payu/addon/return once done. This builds that one-time form in the
+// DOM and submits it, rather than keeping it in React state, since nothing
+// about it needs to react to further renders — it exists only to trigger
+// one navigation.
+function redirectToPayU(actionUrl: string, fields: PayUFormFields) {
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = actionUrl;
+  form.style.display = "none";
+  for (const [name, value] of Object.entries(fields)) {
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
+  }
+  document.body.appendChild(form);
+  form.submit();
+}
+
+function PackCard({ pack, payuConfigured }: { pack: AddonPack; payuConfigured: boolean }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,41 +53,15 @@ function PackCard({
     setPending(true);
 
     const result = await createAddonOrder(pack.id);
-    if (result.error || !result.orderId || !result.keyId) {
+    if (result.error || !result.payuFields || !result.payuActionUrl) {
       setError(result.error ?? "Couldn't start the payment.");
       setPending(false);
       return;
     }
 
-    if (!window.Razorpay) {
-      setError("Checkout hasn't finished loading yet — try again in a moment.");
-      setPending(false);
-      return;
-    }
-
-    const razorpay = new window.Razorpay({
-      key: result.keyId,
-      order_id: result.orderId,
-      amount: Math.round((result.amount ?? 0) * 100),
-      currency: "INR",
-      name: "KingdomFlow",
-      description: result.packLabel ?? pack.label,
-      prefill: { name: prefill.name, email: prefill.email || undefined, contact: prefill.contact || undefined },
-      theme: { color: "#6C47FF" },
-      handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
-        const confirmResult = await confirmAddonPayment(response.razorpay_order_id, response.razorpay_payment_id, response.razorpay_signature);
-        setPending(false);
-        if (confirmResult.error) {
-          setError(confirmResult.error);
-          return;
-        }
-        router.refresh();
-      },
-      modal: {
-        ondismiss: () => setPending(false),
-      },
-    });
-    razorpay.open();
+    // The page is about to navigate away to PayU, so there's no "pending"
+    // state to clear on success — only on the error paths above.
+    redirectToPayU(result.payuActionUrl, result.payuFields);
   }
 
   return (
@@ -114,8 +72,8 @@ function PackCard({
             <p className="text-sm font-medium">{pack.label}</p>
             <p className="text-xs text-muted-foreground">₹{pack.priceInRupees.toLocaleString("en-IN")}</p>
           </div>
-          <Button type="button" size="sm" variant="outline" disabled={pending || !razorpayConfigured} onClick={handleBuy}>
-            {pending ? "Processing..." : "Buy"}
+          <Button type="button" size="sm" variant="outline" disabled={pending || !payuConfigured} onClick={handleBuy}>
+            {pending ? "Redirecting..." : "Buy"}
           </Button>
         </div>
         {error && <p className="text-xs text-destructive">{error}</p>}
@@ -125,20 +83,12 @@ function PackCard({
 }
 
 export function AddonsManager({
-  razorpayConfigured,
-  prefill,
+  payuConfigured,
   balances,
 }: {
-  razorpayConfigured: boolean;
-  prefill: { name: string; email: string; contact: string };
+  payuConfigured: boolean;
   balances: Record<AddonType, number>;
 }) {
-  useEffect(() => {
-    if (razorpayConfigured) {
-      loadCheckoutScript().catch(() => {});
-    }
-  }, [razorpayConfigured]);
-
   const types: AddonType[] = ["sms", "email", "whatsapp", "storage", "ai"];
 
   return (
@@ -150,9 +100,9 @@ export function AddonsManager({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {!razorpayConfigured && (
+        {!payuConfigured && (
           <Alert variant="destructive">
-            <AlertDescription>Payments aren&apos;t configured yet — add-on packs aren&apos;t available until Razorpay is set up.</AlertDescription>
+            <AlertDescription>Payments aren&apos;t configured yet — add-on packs aren&apos;t available until PayU is set up.</AlertDescription>
           </Alert>
         )}
         {types.map((type) => {
@@ -168,7 +118,7 @@ export function AddonsManager({
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {addonPacksFor(type).map((pack) => (
-                  <PackCard key={pack.id} pack={pack} prefill={prefill} razorpayConfigured={razorpayConfigured} />
+                  <PackCard key={pack.id} pack={pack} payuConfigured={payuConfigured} />
                 ))}
               </div>
             </div>

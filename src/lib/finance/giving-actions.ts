@@ -10,6 +10,8 @@ import {
   verifyGivingPaymentSignature,
   finalizeGivingOrderPayment,
 } from "@/lib/finance/razorpay-giving";
+import { buildPaymentRequestFields, type PayUFormFields } from "@/lib/payu/client";
+import { getSiteUrl } from "@/lib/site-url";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import type { FundraiserPaymentMode } from "@/types/database";
 
@@ -17,6 +19,14 @@ const FUNDRAISERS_PATH = "/dashboard/fundraisers";
 
 export interface CreateGivingOrderState {
   error?: string;
+  // 'shared' mode (the platform's own account) moved to PayU; 'own' mode (a
+  // church's own Razorpay keys) hasn't — PayU has no equivalent of handing a
+  // church its own merchant-level keys to plug in the way Razorpay Connect
+  // does, so that would need its own, separate product decision later. This
+  // return type carries both shapes and the caller switches on `gateway`.
+  gateway?: "payu" | "razorpay";
+  payuFields?: PayUFormFields;
+  payuActionUrl?: string;
   orderId?: string;
   keyId?: string;
   amount?: number;
@@ -58,13 +68,69 @@ export async function createGivingOrder(
   }
 
   const paymentMode = fundraiser.payment_mode as FundraiserPaymentMode;
+  const amount = Number(amountRaw);
+  const donorName = donorNameRaw.trim();
+  const organizationName = (fundraiser.organizations as { name: string } | null)?.name ?? "";
+
+  if (paymentMode === "shared") {
+    const txnid = `giving${Date.now()}${fundraiser.id.replace(/-/g, "").slice(0, 8)}`;
+    const { error: insertError } = await admin.from("fundraiser_payment_orders").insert({
+      organization_id: fundraiser.organization_id,
+      fundraiser_id: fundraiser.id,
+      payu_txnid: txnid,
+      amount,
+      payment_mode: paymentMode,
+      donor_name: donorName,
+      donor_email: donorEmail.trim() || null,
+      donor_phone: donorPhone.trim() || null,
+    });
+    if (insertError) {
+      console.error("fundraiser_payment_orders insert failed:", insertError.message);
+      return { error: "Couldn't start the payment. Please try again." };
+    }
+
+    const siteUrl = getSiteUrl();
+    const returnUrl = `${siteUrl}/api/payu/giving/return?token=${shareToken}`;
+
+    let built;
+    try {
+      built = buildPaymentRequestFields({
+        txnid,
+        amountRupees: amount,
+        productinfo: `Gift: ${fundraiser.title}`,
+        firstname: donorName,
+        email: donorEmail.trim() || `no-reply+${fundraiser.id}@kingdomflow.app`,
+        phone: donorPhone.trim() || "9999999999",
+        surl: returnUrl,
+        furl: returnUrl,
+        udf1: `giving:${fundraiser.id}`,
+      });
+    } catch (err) {
+      await logPlatformEvent({
+        level: "error",
+        source: "fundraiser_giving",
+        message: `PayU field build failed: ${err instanceof Error ? err.message : "unknown error"}`,
+        organizationId: fundraiser.organization_id,
+        metadata: { fundraiserId: fundraiser.id, txnid },
+      });
+      return { error: "Couldn't start the payment. Please try again." };
+    }
+
+    return {
+      gateway: "payu",
+      payuFields: built.fields,
+      payuActionUrl: built.actionUrl,
+      amount,
+      fundraiserTitle: fundraiser.title,
+      organizationName,
+    };
+  }
+
+  // 'own' mode — unchanged, still Razorpay, against the church's own account.
   const credentials = await getGivingCredentials(fundraiser.organization_id, paymentMode);
   if (!credentials) {
     return { error: "This giving link isn't set up correctly yet. Please try again later." };
   }
-
-  const amount = Number(amountRaw);
-  const donorName = donorNameRaw.trim();
 
   let order;
   try {
@@ -109,11 +175,12 @@ export async function createGivingOrder(
   }
 
   return {
+    gateway: "razorpay",
     orderId: order.id,
     keyId: credentials.keyId,
     amount,
     fundraiserTitle: fundraiser.title,
-    organizationName: (fundraiser.organizations as { name: string } | null)?.name ?? "",
+    organizationName,
   };
 }
 

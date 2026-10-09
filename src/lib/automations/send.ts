@@ -2,7 +2,7 @@ import "server-only";
 
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { sendTemplateMessage, sendBulkTemplateMessage } from "@/lib/whatsapp/client";
-import { normalizePhoneNumber } from "@/lib/whatsapp/validation";
+import { normalizePhoneNumber, resolvePhoneCountry } from "@/lib/whatsapp/validation";
 import { describeWhatsAppError } from "@/lib/whatsapp/graph-error";
 import { resolveBodyParams } from "@/lib/automations/template-mapping";
 import { buildCelebrantList, buildDirectIdempotencyKey, buildDigestIdempotencyKey } from "@/lib/automations/date-logic";
@@ -20,6 +20,24 @@ async function fetchApprovedTemplate(admin: AdminClient, templateId: string): Pr
   return data;
 }
 
+// Every other phone-normalizing send (the SMS/WhatsApp composers) resolves
+// this client-side, from the recipient's own branch falling back to the
+// org's country, before ever calling normalizePhoneNumber — see
+// resolvePhoneCountry's own comment. This automation has no UI step to do
+// that in (it's cron-driven, not form-submitted), so it resolves the same
+// fallback itself. Without this, a member's phone stored without a country
+// code (the common case for members entered as plain 10-digit numbers)
+// fails to parse at all, and normalizePhoneNumber's default-to-undefined
+// behavior made the send silently no-op — no execution row, no error
+// logged, nothing — rather than fail loudly.
+async function resolveMemberPhoneCountry(admin: AdminClient, member: Member, organizationId: string): Promise<string | null> {
+  const [{ data: branch }, { data: org }] = await Promise.all([
+    member.branch_id ? admin.from("branches").select("country").eq("id", member.branch_id).maybeSingle() : Promise.resolve({ data: null }),
+    admin.from("organizations").select("country").eq("id", organizationId).maybeSingle(),
+  ]);
+  return resolvePhoneCountry(branch?.country, org?.country);
+}
+
 export async function sendDirectMemberMessage(
   admin: AdminClient,
   trigger: AutomationTrigger,
@@ -32,7 +50,8 @@ export async function sendDirectMemberMessage(
   const template = await fetchApprovedTemplate(admin, trigger.template_id);
   if (!template) return; // not approved yet — skip silently, nothing to reserve
 
-  const phone = normalizePhoneNumber(member.phone ?? "");
+  const phoneCountry = await resolveMemberPhoneCountry(admin, member, trigger.organization_id);
+  const phone = normalizePhoneNumber(member.phone ?? "", phoneCountry);
   if (!phone) return;
 
   const key = buildDirectIdempotencyKey(trigger.id, member.id, occurrenceYear);

@@ -33,3 +33,46 @@ export function toPositionalBody(bodyTextNamed: string, variableNames: string[])
 export function resolveBodyParams(variableNames: string[], values: Record<string, string>): string[] {
   return variableNames.map((name) => values[name] ?? "");
 }
+
+// What a member_direct placeholder can be filled with. "field:<key>" picks
+// one of these per-member/per-org values; "text:<literal>" is fixed text.
+export const MEMBER_VARIABLE_FIELDS = [
+  { key: "first_name", label: "Member's first name" },
+  { key: "last_name", label: "Member's last name" },
+  { key: "full_name", label: "Member's full name" },
+  { key: "church_name", label: "Church name" },
+  { key: "occasion_label", label: "Occasion label (e.g. Birthday)" },
+] as const;
+
+export const MAX_VARIABLE_TEXT_LENGTH = 200;
+
+export type VariableValues = Record<string, string>;
+
+export function validateVariableValues(values: VariableValues): string | undefined {
+  for (const [name, source] of Object.entries(values)) {
+    if (source.startsWith("field:")) {
+      if (!MEMBER_VARIABLE_FIELDS.some((f) => f.key === source.slice(6))) return `Unknown value chosen for {{${name}}}.`;
+    } else if (source.startsWith("text:")) {
+      const text = source.slice(5).trim();
+      if (!text) return `Enter the text to use for {{${name}}}.`;
+      if (text.length > MAX_VARIABLE_TEXT_LENGTH) return `The text for {{${name}}} is too long.`;
+    } else {
+      return `Unknown value chosen for {{${name}}}.`;
+    }
+  }
+  return undefined;
+}
+
+// builtIns are the available field values; overrides are the trigger's
+// saved choices. A variable with no override uses the built-in of the same
+// name, which is what every trigger did before choices existed.
+export function resolveVariableValues(variableNames: string[], builtIns: Record<string, string>, overrides: VariableValues | null | undefined): Record<string, string> {
+  const resolved: Record<string, string> = { ...builtIns };
+  for (const name of variableNames) {
+    const source = overrides?.[name];
+    if (!source) continue;
+    if (source.startsWith("field:")) resolved[name] = builtIns[source.slice(6)] ?? "";
+    else if (source.startsWith("text:")) resolved[name] = source.slice(5).trim();
+  }
+  return resolved;
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractVariableNames, toPositionalBody, resolveBodyParams } from "./template-mapping";
+import { extractVariableNames, toPositionalBody, resolveBodyParams, resolveVariableValues, validateVariableValues } from "./template-mapping";
 
 describe("extractVariableNames", () => {
   it("returns names in first-occurrence order", () => {
@@ -37,5 +37,27 @@ describe("resolveBodyParams", () => {
 
   it("resolves a missing value to an empty string rather than throwing", () => {
     expect(resolveBodyParams(["first_name"], {})).toEqual([""]);
+  });
+});
+
+describe("resolveVariableValues", () => {
+  const builtIns = { first_name: "Ann", last_name: "Lee", full_name: "Ann Lee", church_name: "Grace", occasion_label: "Birthday" };
+
+  it("falls back to the built-in of the same name when no choice was saved", () => {
+    expect(resolveVariableValues(["first_name"], builtIns, {})).toMatchObject({ first_name: "Ann" });
+  });
+
+  it("maps a placeholder to a chosen field or fixed text", () => {
+    const out = resolveVariableValues(["name", "greeting"], builtIns, { name: "field:full_name", greeting: "text: God bless " });
+    expect(out.name).toBe("Ann Lee");
+    expect(out.greeting).toBe("God bless");
+  });
+});
+
+describe("validateVariableValues", () => {
+  it("rejects unknown fields and empty text", () => {
+    expect(validateVariableValues({ a: "field:nope" })).toBeDefined();
+    expect(validateVariableValues({ a: "text:  " })).toBeDefined();
+    expect(validateVariableValues({ a: "field:first_name", b: "text:Hi" })).toBeUndefined();
   });
 });

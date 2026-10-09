@@ -1547,6 +1547,7 @@ export type AutomationTrigger = {
   occasion_label: string;
   days_offset: number;
   template_id: string | null;
+  variable_values: Record<string, string>;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -1561,6 +1562,7 @@ export type AutomationDestination = {
   kind: AutomationDestinationKind;
   is_active: boolean;
   recipient_phones: string[] | null;
+  recipient_leader_ids: string[];
   digest_template_id: string | null;
   created_at: string;
   updated_at: string;

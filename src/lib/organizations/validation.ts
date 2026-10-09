@@ -63,7 +63,12 @@ export const MAX_LOGO_BYTES = 10 * 1024 * 1024;
 // rasterize it — a decompression-bomb-style failure mode raster formats
 // don't have. Raster logos cover the real need here.
 export const ALLOWED_LOGO_TYPES = ["image/png", "image/jpeg", "image/webp"];
-// Defensive cap on decoded pixel dimensions (checked client-side, see
-// ChurchLogoUpload) — an oversized raw photo (e.g. a 100MP panorama) can
-// still be under MAX_LOGO_BYTES while being expensive to decode/resize.
-export const MAX_LOGO_DIMENSION_PX = 6000;
+// A generous backstop, not the primary defense — LogoCropDialog is the
+// real answer to "this image is bigger than the 512x512 target" now (the
+// admin crops it down themselves), and decoding happens off the main
+// thread (createImageBitmap, see ChurchLogoUpload), so there's no longer
+// a performance reason to reject a merely-large photo. This only exists
+// to stop a truly degenerate file (a multi-gigapixel image) from being
+// decoded at all — any real camera or phone photo, even high-resolution
+// ones, stays well under this.
+export const MAX_LOGO_DIMENSION_PX = 20000;

@@ -7,6 +7,7 @@ import { PublicBrandHeader, PublicPoweredByFooter } from "@/components/PublicBra
 import { PublicLocaleProvider } from "@/lib/i18n/PublicLocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useLocale } from "@/lib/i18n/LocaleContext";
+import { useBilingualLabel } from "@/lib/bilingual/use-bilingual";
 import { formatInTimezone } from "@/lib/organizations/timezone";
 import { bilingualText, type BilingualConfig } from "@/lib/bilingual/config";
 import type { EventRegistrationField, EventStatus } from "@/types/database";
@@ -25,6 +26,10 @@ export interface PublicEventRegistrationData {
   organization_logo_url: string | null;
   organization_timezone: string;
   bilingual?: BilingualConfig | null;
+  // The event's own contact person, shown when registration isn't open so
+  // a visitor knows who to ask instead of hitting a dead end.
+  contact_name?: string | null;
+  contact_phone?: string | null;
 }
 
 function NotFoundCard() {
@@ -43,6 +48,7 @@ function NotFoundCard() {
 
 function EventContent({ token, data }: { token: string; data: PublicEventRegistrationData }) {
   const { t } = useLocale();
+  const bt = useBilingualLabel(data.bilingual ?? null);
 
   // is_open (from the RPC) is the authoritative gate — it already accounts
   // for the event's status (migration 0076), capacity, registration_closes_at,
@@ -54,12 +60,13 @@ function EventContent({ token, data }: { token: string; data: PublicEventRegistr
   const isClosed = data.registration_closes_at ? new Date(data.registration_closes_at) < new Date() : false;
   const statusMessage =
     data.status === "cancelled"
-      ? t.publicEvent.cancelled
+      ? bt((d) => d.publicEvent.cancelled)
       : data.status === "completed"
-        ? t.publicEvent.completed
+        ? bt((d) => d.publicEvent.completed)
         : data.status === "pending"
-          ? t.publicEvent.pending
+          ? bt((d) => d.publicEvent.pending)
           : null;
+  const hasContact = Boolean(data.contact_name?.trim() || data.contact_phone?.trim());
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-background px-4 py-12 sm:px-6">
@@ -92,9 +99,23 @@ function EventContent({ token, data }: { token: string; data: PublicEventRegistr
           </CardHeader>
           <CardContent>
             {!data.is_open ? (
-              <p className="rounded-xl bg-muted/40 p-4 text-center text-sm text-muted-foreground">
-                {statusMessage ?? (isFull ? t.publicEvent.full : isClosed ? t.publicEvent.closed : t.publicEvent.closingSoon)}
-              </p>
+              <div className="space-y-3 rounded-xl bg-muted/40 p-4 text-center text-sm text-muted-foreground">
+                <p>
+                  {statusMessage ??
+                    (isFull ? bt((d) => d.publicEvent.full) : isClosed ? bt((d) => d.publicEvent.closed) : bt((d) => d.publicEvent.closingSoon))}
+                </p>
+                {hasContact && (
+                  <div className="border-t border-border pt-3 text-foreground">
+                    <p className="text-xs text-muted-foreground">{bt((d) => d.publicEvent.contactHeading)}</p>
+                    {data.contact_name?.trim() && <p className="font-medium">{data.contact_name.trim()}</p>}
+                    {data.contact_phone?.trim() && (
+                      <a href={`tel:${data.contact_phone.replace(/[^\d+]/g, "")}`} className="font-medium text-primary hover:underline">
+                        {data.contact_phone.trim()}
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
             ) : (
               <>
                 {data.spots_remaining !== null && (

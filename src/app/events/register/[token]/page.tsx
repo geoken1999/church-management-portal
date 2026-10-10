@@ -27,10 +27,12 @@ export default async function PublicEventRegistrationPage({ params }: { params: 
   // Two-language settings are read here, not through the RPC, so it didn't
   // have to change.
   let bilingual = null;
+  let contact: { name: string | null; phone: string | null } = { name: null, phone: null };
   if (data) {
-    const { data: row } = await createAdminClient().from("events").select("registration_bilingual").eq("registration_share_token", token).maybeSingle();
+    const { data: row } = await createAdminClient().from("events").select("registration_bilingual, contact_name, contact_phone").eq("registration_share_token", token).maybeSingle();
     bilingual = sanitizeBilingual(row?.registration_bilingual);
+    contact = { name: row?.contact_name ?? null, phone: row?.contact_phone ?? null };
   }
 
-  return <PublicEventRegistrationPageView token={token} data={data ? { ...data, bilingual } : null} />;
+  return <PublicEventRegistrationPageView token={token} data={data ? { ...data, bilingual, contact_name: contact.name, contact_phone: contact.phone } : null} />;
 }

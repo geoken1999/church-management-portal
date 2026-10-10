@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
@@ -416,7 +417,11 @@ export async function startYouTubeUpload(
 
   try {
     const accessToken = await getValidAccessToken(connection);
-    const uploadUrl = await initiateResumableUpload(accessToken, input);
+    // The page's own origin, as the browser sent it with this request. A
+    // forged value can only point CORS at an origin the caller controls, for
+    // an upload session that is theirs anyway.
+    const origin = (await headers()).get("origin");
+    const uploadUrl = await initiateResumableUpload(accessToken, input, origin && /^https?:\/\/[^/\s]+$/.test(origin) ? origin : null);
     return { uploadUrl };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Couldn't start the upload." };

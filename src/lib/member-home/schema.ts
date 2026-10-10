@@ -7,9 +7,26 @@ export const LAYOUT_VERSION = 1;
 export const MAX_BLOCKS = 20;
 export const MAX_QUICK_LINKS = 8;
 
-export type BlockType = "welcome" | "announcement" | "quick_links" | "upcoming_events";
+// Banner images are always exactly this size (2:1): the editor crops to it
+// in the browser, the server rejects anything else, and the phone shows it
+// edge to edge at this ratio, so every slide lines up with no stretching.
+export const BANNER_WIDTH = 1200;
+export const BANNER_HEIGHT = 600;
+export const MAX_BANNER_SLIDES = 6;
+export const MAX_BANNER_BYTES = 1024 * 1024;
+export const BANNER_AUTOPLAY_OPTIONS = [0, 3, 5, 8] as const;
+export const HOME_IMAGES_BUCKET = "member-home-images";
+
+export interface BannerSlide {
+  /** Storage path inside HOME_IMAGES_BUCKET: "{organization_id}/{uuid}.jpg" */
+  imagePath: string;
+  linkUrl: string;
+}
+
+export type BlockType = "banner" | "welcome" | "announcement" | "quick_links" | "upcoming_events";
 
 export const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
+  banner: "Banner",
   welcome: "Welcome banner",
   announcement: "Announcement",
   quick_links: "Quick links",
@@ -36,7 +53,8 @@ export interface QuickLink {
 }
 
 export type HomeBlock =
-  | { id: string; type: "welcome"; title: string; subtitle: string; imageUrl: string }
+  | { id: string; type: "banner"; slides: BannerSlide[]; autoplaySeconds: number }
+  | { id: string; type: "welcome"; title: string; subtitle: string }
   | { id: string; type: "announcement"; title: string; body: string; imageUrl: string; buttonLabel: string; buttonUrl: string }
   | { id: string; type: "quick_links"; title: string; links: QuickLink[] }
   | { id: string; type: "upcoming_events"; title: string; count: number };
@@ -48,14 +66,16 @@ export interface HomeLayout {
 
 export const DEFAULT_LAYOUT: HomeLayout = {
   version: LAYOUT_VERSION,
-  blocks: [{ id: "welcome-default", type: "welcome", title: "", subtitle: "", imageUrl: "" }],
+  blocks: [{ id: "welcome-default", type: "welcome", title: "", subtitle: "" }],
 };
 
 export function newBlock(type: BlockType): HomeBlock {
   const id = `${type}-${Math.random().toString(36).slice(2, 9)}`;
   switch (type) {
+    case "banner":
+      return { id, type, slides: [], autoplaySeconds: 5 };
     case "welcome":
-      return { id, type, title: "", subtitle: "", imageUrl: "" };
+      return { id, type, title: "", subtitle: "" };
     case "announcement":
       return { id, type, title: "", body: "", imageUrl: "", buttonLabel: "", buttonUrl: "" };
     case "quick_links":
@@ -80,7 +100,13 @@ function str(value: unknown, max: number): string {
 // Turns untrusted JSON into a clean layout, or says what's wrong. Unknown
 // fields are dropped, strings are trimmed and length-capped, and every URL
 // must be https (members' phones will open and load these).
-export function sanitizeLayout(input: unknown): { layout: HomeLayout; error?: undefined } | { layout?: undefined; error: string } {
+const BANNER_PATH_PATTERN = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.jpg$/;
+
+export function bannerImageUrl(supabaseUrl: string, imagePath: string): string {
+  return `${supabaseUrl}/storage/v1/object/public/${HOME_IMAGES_BUCKET}/${imagePath}`;
+}
+
+export function sanitizeLayout(input: unknown, organizationId?: string): { layout: HomeLayout; error?: undefined } | { layout?: undefined; error: string } {
   if (!input || typeof input !== "object" || !Array.isArray((input as HomeLayout).blocks)) {
     return { error: "That layout isn't valid." };
   }
@@ -101,8 +127,30 @@ export function sanitizeLayout(input: unknown): { layout: HomeLayout; error?: un
     if (imageUrl && !isHttpsUrl(imageUrl)) return { error: "Image links must start with https://." };
 
     switch (block.type) {
+      case "banner": {
+        const rawSlides = Array.isArray(block.slides) ? (block.slides as unknown[]) : [];
+        if (rawSlides.length === 0) return { error: "A banner needs at least one image." };
+        if (rawSlides.length > MAX_BANNER_SLIDES) return { error: `A banner can have at most ${MAX_BANNER_SLIDES} images.` };
+        const slides: BannerSlide[] = [];
+        for (const rawSlide of rawSlides) {
+          const slide = (rawSlide ?? {}) as Record<string, unknown>;
+          const imagePath = str(slide.imagePath, 120);
+          // Must be a file in this church's own folder, so a layout can't
+          // point at (or later delete) another church's upload.
+          if (!BANNER_PATH_PATTERN.test(imagePath) || (organizationId && !imagePath.startsWith(`${organizationId}/`))) {
+            return { error: "One of the banner images isn't valid. Upload it again." };
+          }
+          const linkUrl = str(slide.linkUrl, 500);
+          if (linkUrl && !isHttpsUrl(linkUrl)) return { error: "Banner links must start with https://." };
+          slides.push({ imagePath, linkUrl });
+        }
+        const autoplay = Number(block.autoplaySeconds);
+        const autoplaySeconds = (BANNER_AUTOPLAY_OPTIONS as readonly number[]).includes(autoplay) ? autoplay : 5;
+        blocks.push({ id, type: "banner", slides, autoplaySeconds: slides.length > 1 ? autoplaySeconds : 0 });
+        break;
+      }
       case "welcome":
-        blocks.push({ id, type: "welcome", title: str(block.title, 80), subtitle: str(block.subtitle, 160), imageUrl });
+        blocks.push({ id, type: "welcome", title: str(block.title, 80), subtitle: str(block.subtitle, 160) });
         break;
       case "announcement": {
         const title = str(block.title, 80);

@@ -19,9 +19,9 @@ export async function getMemberHomeState(organizationId: string): Promise<Member
 
   const published = data?.find((row) => row.status === "published");
   const draft = data?.find((row) => row.status === "draft");
-  const publishedLayout = published ? sanitizeLayout(published.layout).layout ?? null : null;
+  const publishedLayout = published ? sanitizeLayout(published.layout, organizationId).layout ?? null : null;
   // Until anything is saved, the editor starts from what members already see.
-  const draftLayout = (draft ? sanitizeLayout(draft.layout).layout : null) ?? publishedLayout ?? DEFAULT_LAYOUT;
+  const draftLayout = (draft ? sanitizeLayout(draft.layout, organizationId).layout : null) ?? publishedLayout ?? DEFAULT_LAYOUT;
 
   return {
     draft: draftLayout,

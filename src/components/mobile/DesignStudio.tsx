@@ -1,10 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { ArrowDown, ArrowUp, Plus, Trash2, CalendarDays, Link2, Megaphone, Sparkles } from "lucide-react";
-import { saveHomeDraftAction, publishHomeLayoutAction, discardHomeDraftAction } from "@/lib/member-home/actions";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { ArrowDown, ArrowUp, Plus, Trash2, CalendarDays, Link2, Megaphone, Sparkles, ImageIcon } from "lucide-react";
+import { saveHomeDraftAction, publishHomeLayoutAction, discardHomeDraftAction, uploadBannerImageAction } from "@/lib/member-home/actions";
+import { BannerCropDialog } from "@/components/mobile/BannerCropDialog";
 import {
+  BANNER_AUTOPLAY_OPTIONS,
+  BANNER_HEIGHT,
+  BANNER_WIDTH,
   BLOCK_TYPE_LABELS,
+  MAX_BANNER_SLIDES,
+  bannerImageUrl,
   DEFAULT_LAYOUT,
   MAX_BLOCKS,
   MAX_QUICK_LINKS,
@@ -28,6 +34,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 
 const BLOCK_ICONS: Record<BlockType, typeof Sparkles> = {
+  banner: ImageIcon,
   welcome: Sparkles,
   announcement: Megaphone,
   quick_links: Link2,
@@ -43,8 +50,153 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+
+function BannerEditor({ block, onChange }: { block: Extract<HomeBlock, { type: "banner" }>; onChange: (next: HomeBlock) => void }) {
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [bitmap, setBitmap] = useState<ImageBitmap | null>(null);
+  const [uploading, startUpload] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleFile(file: File | undefined) {
+    if (!file) return;
+    setError(null);
+    try {
+      setBitmap(await createImageBitmap(file));
+    } catch {
+      setError("That file couldn't be read as an image.");
+    }
+  }
+
+  function handleCropped(file: File) {
+    setBitmap(null);
+    const data = new FormData();
+    data.append("image", file);
+    startUpload(async () => {
+      const result = await uploadBannerImageAction(data);
+      if (result.error || !result.imagePath) {
+        setError(result.error ?? "Couldn't upload that image.");
+        return;
+      }
+      onChange({ ...block, slides: [...block.slides, { imagePath: result.imagePath, linkUrl: "" }] });
+    });
+  }
+
+  const setSlide = (index: number, linkUrl: string) =>
+    onChange({ ...block, slides: block.slides.map((slide, i) => (i === index ? { ...slide, linkUrl } : slide)) });
+  const moveSlide = (index: number, delta: number) => {
+    const target = index + delta;
+    if (target < 0 || target >= block.slides.length) return;
+    const slides = [...block.slides];
+    [slides[index], slides[target]] = [slides[target], slides[index]];
+    onChange({ ...block, slides });
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">
+        Images are cropped to {BANNER_WIDTH}×{BANNER_HEIGHT} (2:1). Add up to {MAX_BANNER_SLIDES}; more than one becomes a carousel. Uploads count toward your storage.
+      </p>
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      {block.slides.map((slide, index) => (
+        <div key={slide.imagePath} className="flex gap-3 rounded-md border border-border p-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={bannerImageUrl(SUPABASE_URL, slide.imagePath)} alt="" className="aspect-[2/1] w-32 shrink-0 rounded object-cover" />
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <Input placeholder="Optional link when tapped (https://…)" value={slide.linkUrl} maxLength={500} onChange={(e) => setSlide(index, e.target.value)} />
+            <div className="flex gap-1">
+              <Button type="button" variant="ghost" size="icon" onClick={() => moveSlide(index, -1)} disabled={index === 0} aria-label="Move image earlier">
+                <ArrowUp className="size-4" />
+              </Button>
+              <Button type="button" variant="ghost" size="icon" onClick={() => moveSlide(index, 1)} disabled={index === block.slides.length - 1} aria-label="Move image later">
+                <ArrowDown className="size-4" />
+              </Button>
+              <Button type="button" variant="ghost" size="icon" onClick={() => onChange({ ...block, slides: block.slides.filter((_, i) => i !== index) })} aria-label="Remove image">
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      ))}
+      <div className="flex flex-wrap items-center gap-3">
+        {block.slides.length < MAX_BANNER_SLIDES && (
+          <>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                handleFile(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+            <Button type="button" variant="outline" size="sm" onClick={() => fileInput.current?.click()} disabled={uploading}>
+              <Plus className="size-4" /> {uploading ? "Uploading..." : "Add image"}
+            </Button>
+          </>
+        )}
+        {block.slides.length > 1 && (
+          <div className="flex items-center gap-2">
+            <Label className="text-xs">Auto-advance</Label>
+            <Select value={String(block.autoplaySeconds)} onValueChange={(v) => onChange({ ...block, autoplaySeconds: Number(v) })}>
+              <SelectTrigger className="w-32">
+                <SelectValue>{() => (block.autoplaySeconds === 0 ? "Off" : `Every ${block.autoplaySeconds}s`)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {BANNER_AUTOPLAY_OPTIONS.map((seconds) => (
+                  <SelectItem key={seconds} value={String(seconds)}>
+                    {seconds === 0 ? "Off" : `Every ${seconds}s`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
+      <BannerCropDialog bitmap={bitmap} onCancel={() => setBitmap(null)} onConfirm={handleCropped} />
+    </div>
+  );
+}
+
+function BannerPreview({ block }: { block: Extract<HomeBlock, { type: "banner" }> }) {
+  const [index, setIndex] = useState(0);
+  const count = block.slides.length;
+  const current = count === 0 ? 0 : index % count;
+
+  useEffect(() => {
+    if (count < 2 || block.autoplaySeconds === 0) return;
+    const timer = setInterval(() => setIndex((i) => i + 1), block.autoplaySeconds * 1000);
+    return () => clearInterval(timer);
+  }, [count, block.autoplaySeconds]);
+
+  if (count === 0) {
+    return <div className="flex aspect-[2/1] items-center justify-center rounded-xl bg-muted text-[10px] text-muted-foreground">Banner image</div>;
+  }
+  return (
+    <div className="relative aspect-[2/1] overflow-hidden rounded-xl bg-muted">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={bannerImageUrl(SUPABASE_URL, block.slides[current].imagePath)} alt="" className="size-full object-cover" />
+      {count > 1 && (
+        <div className="absolute inset-x-0 bottom-1.5 flex justify-center gap-1">
+          {block.slides.map((_, i) => (
+            <span key={i} className={`size-1.5 rounded-full ${i === current ? "bg-white" : "bg-white/50"}`} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BlockEditor({ block, onChange }: { block: HomeBlock; onChange: (next: HomeBlock) => void }) {
   switch (block.type) {
+    case "banner":
+      return <BannerEditor block={block} onChange={onChange} />;
     case "welcome":
       return (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -54,11 +206,6 @@ function BlockEditor({ block, onChange }: { block: HomeBlock; onChange: (next: H
           <Field label="Subtitle (blank = church name)">
             <Input value={block.subtitle} maxLength={160} onChange={(e) => onChange({ ...block, subtitle: e.target.value })} />
           </Field>
-          <div className="sm:col-span-2">
-            <Field label="Banner image link (https://…, optional)">
-              <Input value={block.imageUrl} maxLength={500} onChange={(e) => onChange({ ...block, imageUrl: e.target.value })} />
-            </Field>
-          </div>
         </div>
       );
     case "announcement":
@@ -160,24 +307,19 @@ function PhonePreview({ layout, organizationName, logoUrl }: { layout: HomeLayou
       <div className="h-[520px] space-y-3 overflow-y-auto p-3">
         {layout.blocks.map((block) => {
           switch (block.type) {
+            case "banner":
+              return <BannerPreview key={block.id} block={block} />;
             case "welcome":
               return (
-                <div key={block.id} className="overflow-hidden rounded-xl bg-accent text-center">
-                  {block.imageUrl && (
+                <div key={block.id} className="space-y-1 rounded-xl bg-accent p-4 text-center">
+                  {logoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={block.imageUrl} alt="" className="h-28 w-full object-cover" />
+                    <img src={logoUrl} alt="" className="mx-auto mb-2 size-14 rounded-full object-cover" />
+                  ) : (
+                    <div className="mx-auto mb-2 size-14 rounded-full bg-primary/20" />
                   )}
-                  <div className="space-y-1 p-4">
-                    {!block.imageUrl &&
-                      (logoUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={logoUrl} alt="" className="mx-auto mb-2 size-14 rounded-full object-cover" />
-                      ) : (
-                        <div className="mx-auto mb-2 size-14 rounded-full bg-primary/20" />
-                      ))}
-                    <p className="text-base font-bold">{block.title || "Welcome, Member!"}</p>
-                    <p className="text-xs text-muted-foreground">{block.subtitle || organizationName}</p>
-                  </div>
+                  <p className="text-base font-bold">{block.title || "Welcome, Member!"}</p>
+                  <p className="text-xs text-muted-foreground">{block.subtitle || organizationName}</p>
                 </div>
               );
             case "announcement":

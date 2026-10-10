@@ -32,6 +32,8 @@ export type Organization = {
   logo_url: string | null;
   // Centre mark for generated QR codes (migration 0131); null = plain QRs.
   qr_logo_url: string | null;
+  // Logo width as a % of the QR's width, 10-30 (migration 0132).
+  qr_logo_size: number;
   member_count_range: MemberCountRange | null;
   branch_count: number | null;
   plan: string;

@@ -139,6 +139,7 @@ export default async function ProfilePage() {
             <QrLogoUpload
               organizationId={membership.organization.id}
               qrLogoUrl={membership.organization.qr_logo_url ?? null}
+              qrLogoSize={membership.organization.qr_logo_size ?? 20}
               sampleLink={`${getSiteUrl()}/join/${membership.organization.slug}`}
             />
           </CardContent>

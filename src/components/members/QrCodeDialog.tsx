@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { renderQrDataUrl } from "@/lib/qr/render-with-logo";
-import { useQrLogoUrl } from "@/components/organizations/QrLogoContext";
+import { useQrLogo } from "@/components/organizations/QrLogoContext";
 import { QrCode as QrCodeIcon, Download, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,14 +19,14 @@ export function QrCodeDialog({ link, title }: { link: string; title: string }) {
   const [open, setOpen] = useState(false);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const logoUrl = useQrLogoUrl();
+  const { url: logoUrl, sizePercent } = useQrLogo();
   const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
 
-    renderQrDataUrl(link, { width: 640, logoUrl })
+    renderQrDataUrl(link, { width: 640, logoUrl, logoSizePercent: sizePercent })
       .then((url) => {
         if (!cancelled) setDataUrl(url);
       })
@@ -37,7 +37,7 @@ export function QrCodeDialog({ link, title }: { link: string; title: string }) {
     return () => {
       cancelled = true;
     };
-  }, [open, link, logoUrl]);
+  }, [open, link, logoUrl, sizePercent]);
 
   async function handleShare() {
     try {

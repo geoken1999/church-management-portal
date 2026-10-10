@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { removeOrganizationQrLogo, updateOrganizationQrLogo } from "@/lib/organizations/actions";
+import { removeOrganizationQrLogo, updateOrganizationQrLogo, updateOrganizationQrLogoSize } from "@/lib/organizations/actions";
+import { QR_LOGO_SIZE_MAX, QR_LOGO_SIZE_MIN } from "@/lib/qr/logo-size";
 import { renderQrDataUrl } from "@/lib/qr/render-with-logo";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -31,22 +32,24 @@ async function toSquarePng(file: File): Promise<File> {
   }
 }
 
-export function QrLogoUpload({ organizationId, qrLogoUrl, sampleLink }: { organizationId: string; qrLogoUrl: string | null; sampleLink: string }) {
+export function QrLogoUpload({ organizationId, qrLogoUrl, qrLogoSize, sampleLink }: { organizationId: string; qrLogoUrl: string | null; qrLogoSize: number; sampleLink: string }) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<{ kind: "error" | "success"; text: string } | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // What the slider shows; the saved value only changes on Save.
+  const [size, setSize] = useState(qrLogoSize);
 
   // A live sample, so the church sees exactly how their codes will look.
   useEffect(() => {
     let cancelled = false;
-    renderQrDataUrl(sampleLink, { width: 320, logoUrl: qrLogoUrl }).then((url) => {
+    renderQrDataUrl(sampleLink, { width: 320, logoUrl: qrLogoUrl, logoSizePercent: size }).then((url) => {
       if (!cancelled) setPreview(url);
     });
     return () => {
       cancelled = true;
     };
-  }, [sampleLink, qrLogoUrl]);
+  }, [sampleLink, qrLogoUrl, size]);
 
   async function handleFile(file: File | undefined) {
     if (!file) return;
@@ -64,6 +67,13 @@ export function QrLogoUpload({ organizationId, qrLogoUrl, sampleLink }: { organi
     startTransition(async () => {
       const result = await updateOrganizationQrLogo({}, data);
       setMessage(result.error ? { kind: "error", text: result.error } : { kind: "success", text: "QR logo saved." });
+    });
+  }
+
+  function handleSaveSize() {
+    startTransition(async () => {
+      const result = await updateOrganizationQrLogoSize(organizationId, size);
+      setMessage(result.error ? { kind: "error", text: result.error } : { kind: "success", text: "Logo size saved." });
     });
   }
 
@@ -98,6 +108,32 @@ export function QrLogoUpload({ organizationId, qrLogoUrl, sampleLink }: { organi
             e.target.value = "";
           }}
         />
+        {qrLogoUrl && (
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-xs">
+              <label htmlFor="qr-logo-size" className="font-medium">
+                Logo size
+              </label>
+              <span className="text-muted-foreground">{size}% of the code</span>
+            </div>
+            <input
+              id="qr-logo-size"
+              type="range"
+              min={QR_LOGO_SIZE_MIN}
+              max={QR_LOGO_SIZE_MAX}
+              step={1}
+              value={size}
+              onChange={(e) => setSize(Number(e.target.value))}
+              className="w-full max-w-xs"
+            />
+            {size > 25 && <p className="text-xs text-muted-foreground">A larger logo can make the code harder to scan. Test it with a phone before sharing it.</p>}
+            {size !== qrLogoSize && (
+              <Button type="button" size="sm" onClick={handleSaveSize} disabled={pending}>
+                Save size
+              </Button>
+            )}
+          </div>
+        )}
         <div className="flex gap-2">
           <Button type="button" size="sm" variant="outline" onClick={() => inputRef.current?.click()} disabled={pending}>
             {pending ? "Saving..." : qrLogoUrl ? "Replace logo" : "Upload logo"}

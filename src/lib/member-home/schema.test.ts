@@ -64,10 +64,24 @@ describe("banner blocks", () => {
     expect(sanitizeLayout({ blocks: [traversal] }, ORG).error).toBeDefined();
   });
 
-  it("turns autoplay off for a single slide and rejects non-https links", () => {
+  it("keeps the autoplay choice for a single slide and rejects non-https links", () => {
     const single = { ...newBlock("banner"), slides: [slide], autoplaySeconds: 5 };
-    expect(sanitizeLayout({ blocks: [single] }).layout?.blocks[0]).toMatchObject({ autoplaySeconds: 0 });
+    expect(sanitizeLayout({ blocks: [single] }).layout?.blocks[0]).toMatchObject({ autoplaySeconds: 5 });
     const bad = { ...newBlock("banner"), slides: [{ ...slide, linkUrl: "http://x.org" }] };
     expect(sanitizeLayout({ blocks: [bad] }).error).toBeDefined();
+  });
+});
+
+describe("hidden sections", () => {
+  it("keeps the hidden flag", () => {
+    const welcome = { ...newBlock("welcome"), hidden: true };
+    expect(sanitizeLayout({ blocks: [welcome] }).layout?.blocks[0]).toMatchObject({ hidden: true });
+    expect(sanitizeLayout({ blocks: [newBlock("welcome")] }).layout?.blocks[0]).not.toHaveProperty("hidden");
+  });
+
+  it("lets an unfinished hidden section through but not a visible one", () => {
+    expect(sanitizeLayout({ blocks: [{ ...newBlock("announcement"), hidden: true }] }).error).toBeUndefined();
+    expect(sanitizeLayout({ blocks: [{ ...newBlock("banner"), hidden: true }] }).error).toBeUndefined();
+    expect(sanitizeLayout({ blocks: [newBlock("announcement")] }).error).toBeDefined();
   });
 });

@@ -1,5 +1,6 @@
 "use server";
 
+import { clampQrLogoSize } from "@/lib/qr/logo-size";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -344,6 +345,16 @@ export async function updateOrganizationQrLogo(_prevState: QrLogoState, formData
     .eq("id", organizationId);
   if (updateError) return { error: "Uploaded the image, but couldn't save it to your organization." };
 
+  revalidatePath("/dashboard", "layout");
+  return { success: true };
+}
+
+export async function updateOrganizationQrLogoSize(organizationId: string, sizePercent: number): Promise<QrLogoState> {
+  await requireUser();
+  const size = clampQrLogoSize(sizePercent);
+  const supabase = await createClient();
+  const { error } = await supabase.from("organizations").update({ qr_logo_size: size }).eq("id", organizationId);
+  if (error) return { error: "Couldn't save the logo size. You may not have permission." };
   revalidatePath("/dashboard", "layout");
   return { success: true };
 }

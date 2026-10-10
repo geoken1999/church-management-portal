@@ -1,9 +1,11 @@
 import QRCode from "qrcode";
 
-// The logo covers the middle of the code, so the QR is generated with the
-// highest error correction (H, ~30% of the code can be unreadable) and the
-// logo is kept to about a fifth of the width, well inside what H recovers.
-export const QR_LOGO_RATIO = 0.22;
+import { qrLogoRatio } from "@/lib/qr/logo-size";
+
+// The logo is drawn straight over the middle of the code, with no backing,
+// so the QR is generated with the highest error correction (H, ~30% of the
+// code can be unreadable). The size is the church's choice, capped at 30%
+// of the width (about 9% of the area), well inside what H recovers.
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -19,7 +21,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 
 // Browser only. Falls back to a plain QR if the logo can't be loaded, so a
 // missing or blocked image never stops someone getting their code.
-export async function renderQrDataUrl(text: string, options: { width: number; logoUrl?: string | null }): Promise<string> {
+export async function renderQrDataUrl(text: string, options: { width: number; logoUrl?: string | null; logoSizePercent?: number }): Promise<string> {
   const canvas = document.createElement("canvas");
   await QRCode.toCanvas(canvas, text, { width: options.width, margin: 2, errorCorrectionLevel: "H" });
 
@@ -28,14 +30,9 @@ export async function renderQrDataUrl(text: string, options: { width: number; lo
       const logo = await loadImage(options.logoUrl);
       const ctx = canvas.getContext("2d");
       if (ctx) {
-        const size = Math.round(canvas.width * QR_LOGO_RATIO);
-        const pad = Math.round(size * 0.12);
+        const size = Math.round(canvas.width * qrLogoRatio(options.logoSizePercent));
         const x = Math.round((canvas.width - size) / 2);
         const y = Math.round((canvas.height - size) / 2);
-        ctx.fillStyle = "#ffffff";
-        ctx.beginPath();
-        ctx.roundRect(x - pad, y - pad, size + pad * 2, size + pad * 2, pad * 1.5);
-        ctx.fill();
         ctx.drawImage(logo, x, y, size, size);
       }
     } catch {

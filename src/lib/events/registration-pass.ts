@@ -2,6 +2,7 @@ import "server-only";
 
 import QRCode from "qrcode";
 import sharp from "sharp";
+import { qrLogoRatio } from "@/lib/qr/logo-size";
 import { sendBulkEmail } from "@/lib/email/client";
 import { isEmailConfigured } from "@/lib/email/env";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -49,21 +50,18 @@ async function buildQrPng(code: string, organizationId: string): Promise<Buffer>
   const plain = await QRCode.toBuffer(code, { width: 400, margin: 2, errorCorrectionLevel: "H" });
   try {
     const admin = createAdminClient();
-    const { data } = await admin.from("organizations").select("qr_logo_url").eq("id", organizationId).maybeSingle();
+    const { data } = await admin.from("organizations").select("qr_logo_url, qr_logo_size").eq("id", organizationId).maybeSingle();
     if (!data?.qr_logo_url) return plain;
 
     const response = await fetch(data.qr_logo_url);
     if (!response.ok) return plain;
-    const logoSize = Math.round(400 * 0.22);
-    const pad = Math.round(logoSize * 0.12);
+    const logoSize = Math.round(400 * qrLogoRatio(data.qr_logo_size));
     const logo = await sharp(Buffer.from(await response.arrayBuffer()))
       .resize(logoSize, logoSize, { fit: "contain", background: { r: 255, g: 255, b: 255, alpha: 0 } })
-      .toBuffer();
-    const backdrop = await sharp({ create: { width: logoSize + pad * 2, height: logoSize + pad * 2, channels: 4, background: "#ffffff" } })
-      .composite([{ input: logo, left: pad, top: pad }])
       .png()
       .toBuffer();
-    return await sharp(plain).composite([{ input: backdrop, gravity: "center" }]).png().toBuffer();
+    // Drawn straight onto the code, no backing.
+    return await sharp(plain).composite([{ input: logo, gravity: "center" }]).png().toBuffer();
   } catch {
     return plain;
   }

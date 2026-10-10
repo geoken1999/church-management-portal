@@ -64,6 +64,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggleLoader";
 import { CreditBalances, type CreditWallet } from "@/components/dashboard/CreditBalances";
 import { DashboardLocaleProvider } from "@/lib/i18n/DashboardLocaleProvider";
+import { QrLogoProvider } from "@/components/organizations/QrLogoContext";
 import { useLocale } from "@/lib/i18n/LocaleContext";
 import type { AppLocale } from "@/lib/i18n/config";
 import type { Notification, Organization, TabAccess } from "@/types/database";
@@ -208,7 +209,9 @@ export function DashboardShell(
   const { initialLocale, ...rest } = props;
   return (
     <DashboardLocaleProvider initialLocale={initialLocale}>
-      <DashboardShellInner {...rest} />
+      <QrLogoProvider qrLogoUrl={rest.organization.qr_logo_url ?? null}>
+        <DashboardShellInner {...rest} />
+      </QrLogoProvider>
     </DashboardLocaleProvider>
   );
 }

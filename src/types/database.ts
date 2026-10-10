@@ -30,6 +30,8 @@ export type Organization = {
   slug: string;
   created_by: string | null;
   logo_url: string | null;
+  // Centre mark for generated QR codes (migration 0131); null = plain QRs.
+  qr_logo_url: string | null;
   member_count_range: MemberCountRange | null;
   branch_count: number | null;
   plan: string;

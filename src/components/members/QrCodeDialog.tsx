@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import QRCode from "qrcode";
+import { renderQrDataUrl } from "@/lib/qr/render-with-logo";
+import { useQrLogoUrl } from "@/components/organizations/QrLogoContext";
 import { QrCode as QrCodeIcon, Download, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,13 +19,14 @@ export function QrCodeDialog({ link, title }: { link: string; title: string }) {
   const [open, setOpen] = useState(false);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const logoUrl = useQrLogoUrl();
   const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
 
-    QRCode.toDataURL(link, { width: 320, margin: 2 })
+    renderQrDataUrl(link, { width: 640, logoUrl })
       .then((url) => {
         if (!cancelled) setDataUrl(url);
       })
@@ -35,7 +37,7 @@ export function QrCodeDialog({ link, title }: { link: string; title: string }) {
     return () => {
       cancelled = true;
     };
-  }, [open, link]);
+  }, [open, link, logoUrl]);
 
   async function handleShare() {
     try {

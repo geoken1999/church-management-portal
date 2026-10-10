@@ -64,9 +64,9 @@ describe("banner blocks", () => {
     expect(sanitizeLayout({ blocks: [traversal] }, ORG).error).toBeDefined();
   });
 
-  it("turns autoplay off for a single slide and rejects non-https links", () => {
+  it("keeps the autoplay choice for a single slide and rejects non-https links", () => {
     const single = { ...newBlock("banner"), slides: [slide], autoplaySeconds: 5 };
-    expect(sanitizeLayout({ blocks: [single] }).layout?.blocks[0]).toMatchObject({ autoplaySeconds: 0 });
+    expect(sanitizeLayout({ blocks: [single] }).layout?.blocks[0]).toMatchObject({ autoplaySeconds: 5 });
     const bad = { ...newBlock("banner"), slides: [{ ...slide, linkUrl: "http://x.org" }] };
     expect(sanitizeLayout({ blocks: [bad] }).error).toBeDefined();
   });

@@ -79,7 +79,10 @@ function BannerEditor({ block, onChange }: { block: Extract<HomeBlock, { type: "
         setError(result.error ?? "Couldn't upload that image.");
         return;
       }
-      onChange({ ...block, slides: [...block.slides, { imagePath: result.imagePath, linkUrl: "" }] });
+      // Autoplay was stored as off while there was a single image; turn
+      // it on when this makes it a carousel (it can still be set to Off).
+      const slides = [...block.slides, { imagePath: result.imagePath, linkUrl: "" }];
+      onChange({ ...block, slides, autoplaySeconds: slides.length === 2 && block.autoplaySeconds === 0 ? 5 : block.autoplaySeconds });
     });
   }
 

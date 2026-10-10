@@ -146,7 +146,10 @@ export function sanitizeLayout(input: unknown, organizationId?: string): { layou
         }
         const autoplay = Number(block.autoplaySeconds);
         const autoplaySeconds = (BANNER_AUTOPLAY_OPTIONS as readonly number[]).includes(autoplay) ? autoplay : 5;
-        blocks.push({ id, type: "banner", slides, autoplaySeconds: slides.length > 1 ? autoplaySeconds : 0 });
+        // Kept even for a single slide: the phone ignores it until there are
+        // two, and zeroing it here silently turned autoplay off for anyone
+        // who later added a second image.
+        blocks.push({ id, type: "banner", slides, autoplaySeconds });
         break;
       }
       case "welcome":

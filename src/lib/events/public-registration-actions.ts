@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendRegistrationPassEmail } from "@/lib/events/registration-pass";
+import { sendPassWhatsAppForRegistration } from "@/lib/events/pass-whatsapp";
 import { eventVenueLabel, eventJoinLink } from "@/lib/events/location";
 import { DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 import type { EventMeetingMode, EventPaymentGateway, EventPaymentTiming } from "@/types/database";
@@ -93,6 +94,11 @@ export async function sendPassEmailForRegistration(registrationId: string): Prom
     passMessage: event.registration_pass_message,
     backgroundUrl: event.registration_pass_background_url,
   });
+
+  // The same pass on WhatsApp, when the event has that turned on. Separate
+  // from the email (its own best-effort), and also runs when payment clears
+  // because this function is what both paths call.
+  await sendPassWhatsAppForRegistration(registrationId);
 }
 
 // Anonymous visitor submission from the public /events/register/[token]

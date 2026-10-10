@@ -92,6 +92,7 @@ export const en = {
     full: "This event is full.",
     closed: "Registration for this event has closed.",
     closingSoon: "Registration for this event has closed — it's starting soon.",
+    contactHeading: "Questions? Contact",
     cancelled: "This event has been cancelled.",
     completed: "This event has already taken place.",
     pending: "Registration for this event isn't open yet.",

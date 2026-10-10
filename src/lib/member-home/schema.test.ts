@@ -1,15 +1,19 @@
 import { describe, it, expect } from "vitest";
 import { sanitizeLayout, newBlock, MAX_BLOCKS } from "./schema";
 
+const ORG = "11111111-1111-1111-1111-111111111111";
+const FILE = "22222222-2222-2222-2222-222222222222";
+
 describe("sanitizeLayout", () => {
   it("accepts a default new block of every type", () => {
-    const blocks = [newBlock("welcome"), { ...newBlock("announcement"), title: "Hi" }, newBlock("quick_links"), newBlock("upcoming_events")];
-    expect(sanitizeLayout({ version: 1, blocks }).layout?.blocks).toHaveLength(4);
+    const banner = { ...newBlock("banner"), slides: [{ imagePath: `${ORG}/${FILE}.jpg`, linkUrl: "" }] };
+    const blocks = [banner, newBlock("welcome"), { ...newBlock("announcement"), title: "Hi" }, newBlock("quick_links"), newBlock("upcoming_events")];
+    expect(sanitizeLayout({ version: 1, blocks }).layout?.blocks).toHaveLength(5);
   });
 
   it("rejects non-https image and button links", () => {
-    const welcome = { ...newBlock("welcome"), imageUrl: "http://example.com/a.png" };
-    expect(sanitizeLayout({ blocks: [welcome] }).error).toMatch(/https/);
+    const announcementImage = { ...newBlock("announcement"), title: "x", imageUrl: "http://example.com/a.png" };
+    expect(sanitizeLayout({ blocks: [announcementImage] }).error).toMatch(/https/);
     const announcement = { ...newBlock("announcement"), title: "x", buttonLabel: "Go", buttonUrl: "javascript:alert(1)" };
     expect(sanitizeLayout({ blocks: [announcement] }).error).toMatch(/https/);
   });
@@ -40,5 +44,30 @@ describe("sanitizeLayout", () => {
     const a = newBlock("welcome");
     expect(sanitizeLayout({ blocks: [a, a] }).error).toBeDefined();
     expect(sanitizeLayout({ blocks: [{ id: "x", type: "script" }] }).error).toBeDefined();
+  });
+});
+
+describe("banner blocks", () => {
+  const slide = { imagePath: `${ORG}/${FILE}.jpg`, linkUrl: "" };
+
+  it("needs at least one image and at most six", () => {
+    expect(sanitizeLayout({ blocks: [newBlock("banner")] }).error).toBeDefined();
+    const seven = { ...newBlock("banner"), slides: Array.from({ length: 7 }, () => slide) };
+    expect(sanitizeLayout({ blocks: [seven] }).error).toBeDefined();
+  });
+
+  it("only accepts images from the church's own folder", () => {
+    const banner = { ...newBlock("banner"), slides: [slide] };
+    expect(sanitizeLayout({ blocks: [banner] }, ORG).error).toBeUndefined();
+    expect(sanitizeLayout({ blocks: [banner] }, "99999999-9999-9999-9999-999999999999").error).toBeDefined();
+    const traversal = { ...newBlock("banner"), slides: [{ imagePath: "../etc/passwd", linkUrl: "" }] };
+    expect(sanitizeLayout({ blocks: [traversal] }, ORG).error).toBeDefined();
+  });
+
+  it("turns autoplay off for a single slide and rejects non-https links", () => {
+    const single = { ...newBlock("banner"), slides: [slide], autoplaySeconds: 5 };
+    expect(sanitizeLayout({ blocks: [single] }).layout?.blocks[0]).toMatchObject({ autoplaySeconds: 0 });
+    const bad = { ...newBlock("banner"), slides: [{ ...slide, linkUrl: "http://x.org" }] };
+    expect(sanitizeLayout({ blocks: [bad] }).error).toBeDefined();
   });
 });

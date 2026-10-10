@@ -852,7 +852,7 @@ export interface UploadVideoInput {
 // OAuth token. This is what makes browser-side upload possible at all: a
 // multi-GB file has no business round-tripping through our own serverless
 // functions (body-size and execution-time limits both rule that out).
-export async function initiateResumableUpload(accessToken: string, input: UploadVideoInput): Promise<string> {
+export async function initiateResumableUpload(accessToken: string, input: UploadVideoInput, browserOrigin?: string | null): Promise<string> {
   const url = new URL("https://www.googleapis.com/upload/youtube/v3/videos");
   url.searchParams.set("uploadType", "resumable");
   url.searchParams.set("part", "snippet,status");
@@ -868,7 +868,12 @@ export async function initiateResumableUpload(accessToken: string, input: Upload
       // that requested it — without this, the browser's follow-up PUT
       // still completes on Google's side (the video gets created) but the
       // browser can't read the response and reports it as a network error.
-      Origin: getSiteUrl(),
+      //
+      // It has to be the origin the browser is actually on (e.g.
+      // https://www.kingdomflow.in), not just the configured site URL: if the
+      // two differ (www vs. bare domain, a preview URL), CORS is enabled for
+      // the wrong one and every upload finishes with a bogus network error.
+      Origin: browserOrigin || getSiteUrl(),
     },
     body: JSON.stringify({
       snippet: { title: input.title, description: input.description },

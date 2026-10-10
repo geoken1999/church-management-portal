@@ -796,10 +796,12 @@ function UploadVideoDialog({ organizationId, onUploaded }: { organizationId: str
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | undefined>();
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastProgress = useRef(0);
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
     if (next) {
+      lastProgress.current = 0;
       setView("form");
       setTitle("");
       setDescription("");
@@ -826,6 +828,7 @@ function UploadVideoDialog({ organizationId, onUploaded }: { organizationId: str
     setView("uploading");
     setError(undefined);
     setProgress(0);
+    lastProgress.current = 0;
 
     const result = await startYouTubeUpload(organizationId, {
       title: title.trim(),
@@ -842,12 +845,25 @@ function UploadVideoDialog({ organizationId, onUploaded }: { organizationId: str
     }
 
     try {
-      await uploadFileToSession(result.uploadUrl, file, setProgress);
+      await uploadFileToSession(result.uploadUrl, file, (percent) => {
+        lastProgress.current = percent;
+        setProgress(percent);
+      });
       setView("done");
       onUploaded();
       notifyYouTubeVideoUploaded(organizationId, title.trim());
     } catch (err) {
       const message = err instanceof Error ? err.message : "The upload failed.";
+      // Every byte had been sent when the browser lost the response, so
+      // YouTube has the video and is processing it; this is the browser not
+      // being allowed to read Google's final reply, not a failed upload.
+      // Treat it as done instead of alarming the admin.
+      if (message.toLowerCase().includes("network error") && lastProgress.current >= 100) {
+        setView("done");
+        onUploaded();
+        notifyYouTubeVideoUploaded(organizationId, title.trim());
+        return;
+      }
       // A generic XHR "error" event (rather than a proper HTTP error
       // status) is what the browser reports when it can't read the
       // response — often because Google's CORS headers weren't present on

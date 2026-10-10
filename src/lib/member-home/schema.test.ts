@@ -71,3 +71,17 @@ describe("banner blocks", () => {
     expect(sanitizeLayout({ blocks: [bad] }).error).toBeDefined();
   });
 });
+
+describe("hidden sections", () => {
+  it("keeps the hidden flag", () => {
+    const welcome = { ...newBlock("welcome"), hidden: true };
+    expect(sanitizeLayout({ blocks: [welcome] }).layout?.blocks[0]).toMatchObject({ hidden: true });
+    expect(sanitizeLayout({ blocks: [newBlock("welcome")] }).layout?.blocks[0]).not.toHaveProperty("hidden");
+  });
+
+  it("lets an unfinished hidden section through but not a visible one", () => {
+    expect(sanitizeLayout({ blocks: [{ ...newBlock("announcement"), hidden: true }] }).error).toBeUndefined();
+    expect(sanitizeLayout({ blocks: [{ ...newBlock("banner"), hidden: true }] }).error).toBeUndefined();
+    expect(sanitizeLayout({ blocks: [newBlock("announcement")] }).error).toBeDefined();
+  });
+});

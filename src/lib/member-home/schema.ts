@@ -53,11 +53,11 @@ export interface QuickLink {
 }
 
 export type HomeBlock =
-  | { id: string; type: "banner"; slides: BannerSlide[]; autoplaySeconds: number }
-  | { id: string; type: "welcome"; title: string; subtitle: string }
-  | { id: string; type: "announcement"; title: string; body: string; imageUrl: string; buttonLabel: string; buttonUrl: string }
-  | { id: string; type: "quick_links"; title: string; links: QuickLink[] }
-  | { id: string; type: "upcoming_events"; title: string; count: number };
+  | { id: string; hidden?: boolean; type: "banner"; slides: BannerSlide[]; autoplaySeconds: number }
+  | { id: string; hidden?: boolean; type: "welcome"; title: string; subtitle: string }
+  | { id: string; hidden?: boolean; type: "announcement"; title: string; body: string; imageUrl: string; buttonLabel: string; buttonUrl: string }
+  | { id: string; hidden?: boolean; type: "quick_links"; title: string; links: QuickLink[] }
+  | { id: string; hidden?: boolean; type: "upcoming_events"; title: string; count: number };
 
 export interface HomeLayout {
   version: number;
@@ -122,6 +122,10 @@ export function sanitizeLayout(input: unknown, organizationId?: string): { layou
     const id = str(block.id, 64);
     if (!id || seenIds.has(id)) return { error: "That layout isn't valid." };
     seenIds.add(id);
+    // A hidden section is kept in the layout but not shown to members, so
+    // it may be unfinished (an empty announcement, a banner with no images
+    // yet) without blocking a publish.
+    const hidden = block.hidden === true;
 
     const imageUrl = str(block.imageUrl, 500);
     if (imageUrl && !isHttpsUrl(imageUrl)) return { error: "Image links must start with https://." };
@@ -129,7 +133,7 @@ export function sanitizeLayout(input: unknown, organizationId?: string): { layou
     switch (block.type) {
       case "banner": {
         const rawSlides = Array.isArray(block.slides) ? (block.slides as unknown[]) : [];
-        if (rawSlides.length === 0) return { error: "A banner needs at least one image." };
+        if (rawSlides.length === 0 && !hidden) return { error: "A banner needs at least one image." };
         if (rawSlides.length > MAX_BANNER_SLIDES) return { error: `A banner can have at most ${MAX_BANNER_SLIDES} images.` };
         const slides: BannerSlide[] = [];
         for (const rawSlide of rawSlides) {
@@ -149,26 +153,26 @@ export function sanitizeLayout(input: unknown, organizationId?: string): { layou
         // Kept even for a single slide: the phone ignores it until there are
         // two, and zeroing it here silently turned autoplay off for anyone
         // who later added a second image.
-        blocks.push({ id, type: "banner", slides, autoplaySeconds });
+        blocks.push({ id, ...(hidden && { hidden }), type: "banner", slides, autoplaySeconds });
         break;
       }
       case "welcome":
-        blocks.push({ id, type: "welcome", title: str(block.title, 80), subtitle: str(block.subtitle, 160) });
+        blocks.push({ id, ...(hidden && { hidden }), type: "welcome", title: str(block.title, 80), subtitle: str(block.subtitle, 160) });
         break;
       case "announcement": {
         const title = str(block.title, 80);
         const body = str(block.body, 1000);
-        if (!title && !body) return { error: "An announcement needs a title or a message." };
+        if (!title && !body && !hidden) return { error: "An announcement needs a title or a message." };
         const buttonLabel = str(block.buttonLabel, 30);
         const buttonUrl = str(block.buttonUrl, 500);
         if ((buttonLabel && !buttonUrl) || (!buttonLabel && buttonUrl)) return { error: "An announcement button needs both a label and a link." };
         if (buttonUrl && !isHttpsUrl(buttonUrl)) return { error: "Button links must start with https://." };
-        blocks.push({ id, type: "announcement", title, body, imageUrl, buttonLabel, buttonUrl });
+        blocks.push({ id, ...(hidden && { hidden }), type: "announcement", title, body, imageUrl, buttonLabel, buttonUrl });
         break;
       }
       case "quick_links": {
         const rawLinks = Array.isArray(block.links) ? (block.links as unknown[]) : [];
-        if (rawLinks.length === 0) return { error: "Quick links needs at least one link." };
+        if (rawLinks.length === 0 && !hidden) return { error: "Quick links needs at least one link." };
         if (rawLinks.length > MAX_QUICK_LINKS) return { error: `Quick links can have at most ${MAX_QUICK_LINKS} links.` };
         const links: QuickLink[] = [];
         for (const rawLink of rawLinks) {
@@ -182,12 +186,12 @@ export function sanitizeLayout(input: unknown, organizationId?: string): { layou
           if (target === "url" && !isHttpsUrl(url)) return { error: `"${label}" needs a link starting with https://.` };
           links.push(target === "url" ? { label, icon, target, url } : { label, icon, target });
         }
-        blocks.push({ id, type: "quick_links", title: str(block.title, 60), links });
+        blocks.push({ id, ...(hidden && { hidden }), type: "quick_links", title: str(block.title, 60), links });
         break;
       }
       case "upcoming_events": {
         const count = Math.min(10, Math.max(1, Math.round(Number(block.count) || 3)));
-        blocks.push({ id, type: "upcoming_events", title: str(block.title, 60), count });
+        blocks.push({ id, ...(hidden && { hidden }), type: "upcoming_events", title: str(block.title, 60), count });
         break;
       }
       default:

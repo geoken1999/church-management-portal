@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { ArrowDown, ArrowUp, Plus, Trash2, CalendarDays, Link2, Megaphone, Sparkles, ImageIcon } from "lucide-react";
+import { ArrowDown, ArrowUp, Eye, EyeOff, Plus, Trash2, CalendarDays, Link2, Megaphone, Sparkles, ImageIcon } from "lucide-react";
 import { saveHomeDraftAction, publishHomeLayoutAction, discardHomeDraftAction, uploadBannerImageAction } from "@/lib/member-home/actions";
 import { BannerCropDialog } from "@/components/mobile/BannerCropDialog";
 import {
@@ -308,7 +308,7 @@ function PhonePreview({ layout, organizationName, logoUrl }: { layout: HomeLayou
     <div className="mx-auto w-[300px] overflow-hidden rounded-[2rem] border-4 border-foreground/80 bg-background shadow-lg">
       <div className="bg-muted px-4 py-3 text-center text-sm font-semibold">Home</div>
       <div className="h-[520px] space-y-3 overflow-y-auto p-3">
-        {layout.blocks.map((block) => {
+        {layout.blocks.filter((block) => !block.hidden).map((block) => {
           switch (block.type) {
             case "banner":
               return <BannerPreview key={block.id} block={block} />;
@@ -367,7 +367,7 @@ function PhonePreview({ layout, organizationName, logoUrl }: { layout: HomeLayou
               );
           }
         })}
-        {layout.blocks.length === 0 && <p className="py-10 text-center text-xs text-muted-foreground">Add a section to get started.</p>}
+        {layout.blocks.every((block) => block.hidden) && <p className="py-10 text-center text-xs text-muted-foreground">Add a section to get started.</p>}
       </div>
     </div>
   );
@@ -463,12 +463,13 @@ export function DesignStudio({ organizationName, logoUrl, initial }: { organizat
         {layout.blocks.map((block, index) => {
           const Icon = BLOCK_ICONS[block.type];
           return (
-            <Card key={block.id}>
+            <Card key={block.id} className={block.hidden ? "opacity-70" : undefined}>
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 font-medium">
                     <Icon className="size-4 text-primary" />
                     {BLOCK_TYPE_LABELS[block.type]}
+                    {block.hidden && <Badge variant="secondary">Hidden from members</Badge>}
                   </div>
                   <div className="flex gap-1">
                     <Button type="button" variant="ghost" size="icon" onClick={() => move(index, -1)} disabled={index === 0} aria-label="Move up">
@@ -476,6 +477,16 @@ export function DesignStudio({ organizationName, logoUrl, initial }: { organizat
                     </Button>
                     <Button type="button" variant="ghost" size="icon" onClick={() => move(index, 1)} disabled={index === layout.blocks.length - 1} aria-label="Move down">
                       <ArrowDown className="size-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => update(layout.blocks.map((b) => (b.id === block.id ? { ...b, hidden: !b.hidden } : b)))}
+                      aria-label={block.hidden ? "Show section" : "Hide section"}
+                      title={block.hidden ? "Show to members" : "Hide from members"}
+                    >
+                      {block.hidden ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                     </Button>
                     <Button type="button" variant="ghost" size="icon" onClick={() => update(layout.blocks.filter((b) => b.id !== block.id))} aria-label="Remove section">
                       <Trash2 className="size-4" />

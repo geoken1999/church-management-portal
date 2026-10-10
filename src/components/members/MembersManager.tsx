@@ -14,6 +14,8 @@ import {
 import { approveMemberProfileUpdateRequest, rejectMemberProfileUpdateRequest } from "@/lib/members/profile-update-actions";
 import { downloadMemberTemplate, bulkImportMembers } from "@/lib/members/bulk-actions";
 import { PublicJoinLinkCard } from "@/components/members/PublicJoinLinkCard";
+import { JoinFormLanguages } from "@/components/members/JoinFormLanguages";
+import type { BilingualConfig } from "@/lib/bilingual/config";
 import type { Branch, Member, MemberFieldDefinition, MemberProfileUpdateRequest, MemberStatus } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -885,6 +887,7 @@ export function MembersManager({
   definitions,
   branches,
   profileUpdateRequests,
+  joinBilingual,
   canManage,
 }: {
   organizationId: string;
@@ -895,6 +898,7 @@ export function MembersManager({
   definitions: MemberFieldDefinition[];
   branches: Branch[];
   profileUpdateRequests: ProfileUpdateRequestWithMember[];
+  joinBilingual: BilingualConfig | null;
   canManage: boolean;
 }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -928,6 +932,7 @@ export function MembersManager({
   return (
     <div className="space-y-6">
       {canManage && <PublicJoinLinkCard orgSlug={orgSlug} orgName={orgName} siteUrl={siteUrl} />}
+      {canManage && <JoinFormLanguages initial={joinBilingual} />}
 
       {canManage && pendingMembers.length > 0 && (
         <div className="space-y-3">

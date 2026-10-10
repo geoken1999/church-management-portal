@@ -8,6 +8,7 @@ import { PublicLocaleProvider } from "@/lib/i18n/PublicLocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useLocale } from "@/lib/i18n/LocaleContext";
 import { formatInTimezone } from "@/lib/organizations/timezone";
+import { bilingualText, type BilingualConfig } from "@/lib/bilingual/config";
 import type { EventRegistrationField, EventStatus } from "@/types/database";
 
 export interface PublicEventRegistrationData {
@@ -23,6 +24,7 @@ export interface PublicEventRegistrationData {
   organization_name: string;
   organization_logo_url: string | null;
   organization_timezone: string;
+  bilingual?: BilingualConfig | null;
 }
 
 function NotFoundCard() {
@@ -74,7 +76,7 @@ function EventContent({ token, data }: { token: string; data: PublicEventRegistr
 
         <Card size="lg" className="rounded-2xl shadow-lg md:[--card-spacing:--spacing(9)]">
           <CardHeader>
-            <CardTitle className="font-heading text-2xl">{data.title}</CardTitle>
+            <CardTitle className="font-heading text-2xl">{bilingualText(data.title, data.bilingual)}</CardTitle>
             <CardDescription className="text-base">
               {/* A fixed locale AND a fixed (the org's own) timeZone, not
                   undefined for either — this renders inside a Client
@@ -86,7 +88,7 @@ function EventContent({ token, data }: { token: string; data: PublicEventRegistr
                   not in the org's own timezone. */}
               {formatInTimezone(data.start_at, data.organization_timezone, { dateStyle: "full", timeStyle: "short" }, "en-US")}
             </CardDescription>
-            {data.description && <p className="text-sm text-muted-foreground">{data.description}</p>}
+            {data.description && <p className="text-sm text-muted-foreground">{bilingualText(data.description, data.bilingual)}</p>}
           </CardHeader>
           <CardContent>
             {!data.is_open ? (
@@ -102,7 +104,7 @@ function EventContent({ token, data }: { token: string; data: PublicEventRegistr
                     (set when PayU redirects back here) — same Suspense
                     requirement as LoginForm/SignupForm. */}
                 <Suspense fallback={null}>
-                  <PublicEventRegistrationForm token={token} fields={data.registration_fields ?? []} />
+                  <PublicEventRegistrationForm token={token} fields={data.registration_fields ?? []} bilingual={data.bilingual ?? null} />
                 </Suspense>
               </>
             )}

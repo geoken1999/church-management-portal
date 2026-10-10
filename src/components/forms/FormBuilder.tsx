@@ -18,6 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTab, TabsIndicator, TabsPanel } from "@/components/ui/tabs";
 import { QrCodeDialog } from "@/components/members/QrCodeDialog";
+import { BilingualSettings, bilingualChoiceFrom, bilingualChoiceToField } from "@/components/BilingualSettings";
 
 const initialState: FormMetaState = {};
 
@@ -222,6 +223,7 @@ export function FormBuilder({
   const [title, setTitle] = useState(form.title);
   const [description, setDescription] = useState(form.description ?? "");
   const [fields, setFields] = useState<FormField[]>(form.fields);
+  const [bilingual, setBilingual] = useState(bilingualChoiceFrom(form.bilingual));
   const [state, setState] = useState<FormMetaState>(initialState);
   const [fieldErrors, setFieldErrors] = useState<Record<number, { label?: string; options?: string }>>({});
   const [pending, startTransition] = useTransition();
@@ -272,6 +274,7 @@ export function FormBuilder({
 
     setFields(finalFields);
     formData.set("fields", JSON.stringify(finalFields));
+    formData.set("bilingual", bilingualChoiceToField(bilingual));
 
     startTransition(async () => {
       const result = await updateForm(state, formData);
@@ -331,6 +334,11 @@ export function FormBuilder({
                 <AlertDescription>{state.error}</AlertDescription>
               </Alert>
             )}
+            {state.warning && (
+              <Alert>
+                <AlertDescription>{state.warning}</AlertDescription>
+              </Alert>
+            )}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="title">Title</Label>
@@ -349,6 +357,8 @@ export function FormBuilder({
                 <Input id="description" name="description" value={description} onChange={(e) => setDescription(e.target.value)} disabled={!canWrite} />
               </div>
             </div>
+
+            <BilingualSettings value={bilingual} onChange={setBilingual} disabled={!canWrite} />
 
             <div className="space-y-3">
               {fields.length === 0 ? (

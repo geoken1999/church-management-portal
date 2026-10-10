@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { submitPublicForm, type PublicFormState } from "@/lib/forms/public-actions";
 import { useLocale } from "@/lib/i18n/LocaleContext";
+import { bilingualText, type BilingualConfig } from "@/lib/bilingual/config";
 import type { FormField, FormFieldType } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,12 +43,12 @@ const FIELD_ICONS: Record<FormFieldType, typeof Type> = {
 // (long text, a list of options, a checkbox's full label) stays full-width.
 const COMPACT_FIELD_TYPES: FormFieldType[] = ["text", "email", "phone", "number", "date"];
 
-function FieldLabel({ field }: { field: FormField }) {
+function FieldLabel({ field, bilingual }: { field: FormField; bilingual: BilingualConfig | null }) {
   const Icon = FIELD_ICONS[field.field_type];
   return (
     <Label htmlFor={`field-${field.key}`} className="flex items-center gap-1.5 text-sm font-medium">
       <Icon className="size-3.5 text-primary" />
-      {field.label}
+      {bilingualText(field.label, bilingual)}
       {field.required && <span className="text-destructive">*</span>}
     </Label>
   );
@@ -55,7 +56,7 @@ function FieldLabel({ field }: { field: FormField }) {
 
 const fieldInputClassName = "h-11 rounded-xl px-3.5 text-base shadow-sm";
 
-function PublicFieldInput({ field }: { field: FormField }) {
+function PublicFieldInput({ field, bilingual }: { field: FormField; bilingual: BilingualConfig | null }) {
   const { t } = useLocale();
   const id = `field-${field.key}`;
 
@@ -64,7 +65,7 @@ function PublicFieldInput({ field }: { field: FormField }) {
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/30 p-4 text-sm transition-colors hover:bg-muted/60">
         <Checkbox name={field.key} required={field.required} className="mt-0.5" />
         <span>
-          {field.label}
+          {bilingualText(field.label, bilingual)}
           {field.required && <span className="text-destructive"> *</span>}
         </span>
       </label>
@@ -74,7 +75,7 @@ function PublicFieldInput({ field }: { field: FormField }) {
   if (field.field_type === "select") {
     return (
       <div className="space-y-2">
-        <FieldLabel field={field} />
+        <FieldLabel field={field} bilingual={bilingual} />
         <Select name={field.key}>
           <SelectTrigger id={id} className="h-11 w-full rounded-xl px-3.5 text-base shadow-sm">
             <SelectValue placeholder={t.common.selectAnOption} />
@@ -82,7 +83,7 @@ function PublicFieldInput({ field }: { field: FormField }) {
           <SelectContent>
             {(field.options ?? []).map((option) => (
               <SelectItem key={option} value={option}>
-                {option}
+                {bilingualText(option, bilingual)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -94,7 +95,7 @@ function PublicFieldInput({ field }: { field: FormField }) {
   if (field.field_type === "textarea") {
     return (
       <div className="space-y-2">
-        <FieldLabel field={field} />
+        <FieldLabel field={field} bilingual={bilingual} />
         <Textarea id={id} name={field.key} required={field.required} rows={4} className="rounded-xl px-3.5 py-3 text-base shadow-sm" />
       </div>
     );
@@ -113,13 +114,13 @@ function PublicFieldInput({ field }: { field: FormField }) {
 
   return (
     <div className="space-y-2">
-      <FieldLabel field={field} />
+      <FieldLabel field={field} bilingual={bilingual} />
       <Input id={id} name={field.key} type={inputType} required={field.required} className={fieldInputClassName} />
     </div>
   );
 }
 
-export function PublicFormFillForm({ slug, fields }: { slug: string; fields: FormField[] }) {
+export function PublicFormFillForm({ slug, fields, bilingual = null }: { slug: string; fields: FormField[]; bilingual?: BilingualConfig | null }) {
   const { t } = useLocale();
   const submitWithSlug = submitPublicForm.bind(null, slug);
   const [state, formAction, pending] = useActionState(submitWithSlug, initialState);
@@ -156,7 +157,7 @@ export function PublicFormFillForm({ slug, fields }: { slug: string; fields: For
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         {fields.map((field) => (
           <div key={field.key} className={COMPACT_FIELD_TYPES.includes(field.field_type) ? undefined : "sm:col-span-2"}>
-            <PublicFieldInput field={field} />
+            <PublicFieldInput field={field} bilingual={bilingual} />
           </div>
         ))}
       </div>

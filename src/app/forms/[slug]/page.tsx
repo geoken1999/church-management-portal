@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { sanitizeBilingual } from "@/lib/bilingual/config";
 import { PublicFormPageView } from "@/components/forms/PublicFormPageView";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -23,5 +25,14 @@ export default async function PublicFormPage({ params }: { params: Promise<{ slu
     console.error(`get_public_form(${slug}) failed:`, error.message);
   }
 
-  return <PublicFormPageView slug={slug} data={data ?? null} />;
+  // The two-language setting and its translations are read here rather than
+  // through get_public_form, so that RPC didn't have to change. Only for a
+  // form the RPC actually returned (i.e. published).
+  let bilingual = null;
+  if (data) {
+    const { data: row } = await createAdminClient().from("forms").select("bilingual").eq("slug", slug).maybeSingle();
+    bilingual = sanitizeBilingual(row?.bilingual);
+  }
+
+  return <PublicFormPageView slug={slug} data={data ? { ...data, bilingual } : null} />;
 }

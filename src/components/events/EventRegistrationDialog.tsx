@@ -28,6 +28,7 @@ import {
 import { slugifyFieldKey, validateFormField } from "@/lib/forms/validation";
 import { MEETING_MODE_LABELS } from "@/lib/events/location";
 import { QrCodeDialog } from "@/components/members/QrCodeDialog";
+import { BilingualSettings, bilingualChoiceFrom, bilingualChoiceToField } from "@/components/BilingualSettings";
 import { EventPassBackgroundUpload } from "@/components/events/EventPassBackgroundUpload";
 import { EventPassPreview } from "@/components/events/EventPassPreview";
 import type { Event, EventRegistration, EventRegistrationField, FormFieldType, EventPaymentGateway, EventPaymentTiming } from "@/types/database";
@@ -188,6 +189,7 @@ function SettingsTab({
 }) {
   const router = useRouter();
   const [fields, setFields] = useState<EventRegistrationField[]>(event.registration_fields);
+  const [bilingual, setBilingual] = useState(bilingualChoiceFrom(event.registration_bilingual));
   const [capacity, setCapacity] = useState(event.registration_capacity ? String(event.registration_capacity) : "");
   const [closesAt, setClosesAt] = useState(toDateTimeLocalValue(event.registration_closes_at));
   const [passColor, setPassColor] = useState(event.registration_pass_color);
@@ -249,6 +251,7 @@ function SettingsTab({
 
     setFields(sanitizeRegistrationFields(finalFields));
     formData.set("fields", JSON.stringify(finalFields));
+    formData.set("bilingual", bilingualChoiceToField(bilingual));
 
     startTransition(async () => {
       const result = await updateEventRegistrationSettings(state, formData);
@@ -325,6 +328,13 @@ function SettingsTab({
             <AlertDescription>{state.fieldErrors.fields}</AlertDescription>
           </Alert>
         )}
+        {state.warning && (
+          <Alert>
+            <AlertDescription>{state.warning}</AlertDescription>
+          </Alert>
+        )}
+
+        <BilingualSettings value={bilingual} onChange={setBilingual} noun="registration form" />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">

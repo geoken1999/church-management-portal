@@ -104,3 +104,32 @@ export async function generateToolCompletion(
     toolCalls: message?.tool_calls && message.tool_calls.length > 0 ? message.tool_calls : null,
   };
 }
+
+// A single JSON-object completion (no history, no tools), for structured
+// tasks like translating a list of short strings. Returns the raw JSON text
+// so the caller validates the shape itself.
+export async function generateJsonCompletion(systemPrompt: string, userContent: string, maxTokens = 3000): Promise<string | null> {
+  const { apiKey, model } = getOpenAiEnv();
+
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+      max_tokens: maxTokens,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`OpenAI request failed (${res.status}): ${await res.text()}`);
+  }
+
+  const data = (await res.json()) as { choices?: { message?: { content?: string | null } }[] };
+  return data.choices?.[0]?.message?.content ?? null;
+}

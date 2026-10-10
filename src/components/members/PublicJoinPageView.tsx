@@ -6,6 +6,8 @@ import { DEFAULT_CHURCH_LOGO, PublicPoweredByFooter } from "@/components/PublicB
 import { PublicLocaleProvider } from "@/lib/i18n/PublicLocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useLocale } from "@/lib/i18n/LocaleContext";
+import { useBilingualLabel } from "@/lib/bilingual/use-bilingual";
+import type { BilingualConfig } from "@/lib/bilingual/config";
 import type { PublicFieldDefinition } from "@/types/database";
 
 export interface PublicJoinPageData {
@@ -14,6 +16,7 @@ export interface PublicJoinPageData {
   organization_logo_url: string | null;
   field_definitions: PublicFieldDefinition[] | null;
   branches: { id: string; name: string }[] | null;
+  bilingual?: BilingualConfig | null;
 }
 
 function NotFoundCard() {
@@ -31,7 +34,7 @@ function NotFoundCard() {
 }
 
 function JoinContent({ slug, data }: { slug: string; data: PublicJoinPageData }) {
-  const { t } = useLocale();
+  const bt = useBilingualLabel(data.bilingual ?? null);
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-xl flex-col justify-center px-3 py-12 sm:px-6 md:max-w-2xl lg:max-w-3xl">
       <div className="mb-2 flex justify-end">
@@ -50,17 +53,17 @@ function JoinContent({ slug, data }: { slug: string; data: PublicJoinPageData })
         />
         <div>
           <h1 className="font-heading text-xl font-bold">{data.organization_name}</h1>
-          <p className="text-sm text-muted-foreground">{t.publicJoin.tagline}</p>
+          <p className="text-sm text-muted-foreground">{bt((d) => d.publicJoin.tagline)}</p>
         </div>
       </div>
 
       <Card size="lg">
         <CardHeader className="px-4 sm:px-7">
-          <CardTitle className="text-lg">{t.publicJoin.joinHeading(data.organization_name)}</CardTitle>
-          <CardDescription>{t.publicJoin.joinDescription}</CardDescription>
+          <CardTitle className="text-lg">{bt((d) => d.publicJoin.joinHeading(data.organization_name))}</CardTitle>
+          <CardDescription>{bt((d) => d.publicJoin.joinDescription)}</CardDescription>
         </CardHeader>
         <CardContent className="px-4 sm:px-7">
-          <PublicJoinForm orgSlug={slug} fieldDefinitions={data.field_definitions ?? []} branches={data.branches ?? []} />
+          <PublicJoinForm orgSlug={slug} fieldDefinitions={data.field_definitions ?? []} branches={data.branches ?? []} bilingual={data.bilingual ?? null} />
         </CardContent>
       </Card>
 

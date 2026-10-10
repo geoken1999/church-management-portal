@@ -3,6 +3,7 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { getMembers, getMemberFieldDefinitions, getPendingProfileUpdateRequests } from "@/lib/members/dal";
 import { getBranches } from "@/lib/branches/dal";
 import { getSiteUrl } from "@/lib/site-url";
+import { sanitizeBilingual } from "@/lib/bilingual/config";
 import { MembersManager } from "@/components/members/MembersManager";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
@@ -47,6 +48,7 @@ export default async function MembersPage() {
         definitions={definitions}
         branches={branches}
         profileUpdateRequests={profileUpdateRequests}
+        joinBilingual={sanitizeBilingual(membership.organization.join_bilingual)}
         canManage={canManage}
       />
     </div>

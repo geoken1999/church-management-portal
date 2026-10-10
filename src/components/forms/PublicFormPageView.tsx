@@ -6,6 +6,7 @@ import { PublicBrandHeader, PublicPoweredByFooter } from "@/components/PublicBra
 import { PublicLocaleProvider } from "@/lib/i18n/PublicLocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useLocale } from "@/lib/i18n/LocaleContext";
+import { bilingualText, type BilingualConfig } from "@/lib/bilingual/config";
 import type { FormField } from "@/types/database";
 
 export interface PublicFormPageData {
@@ -14,6 +15,7 @@ export interface PublicFormPageData {
   fields: FormField[] | null;
   organization_name: string;
   organization_logo_url: string | null;
+  bilingual?: BilingualConfig | null;
 }
 
 function NotFoundCard() {
@@ -50,11 +52,11 @@ function FormContent({ slug, data }: { slug: string; data: PublicFormPageData })
 
         <Card size="lg" className="rounded-2xl shadow-lg md:[--card-spacing:--spacing(9)]">
           <CardHeader>
-            <CardTitle className="font-heading text-2xl">{data.title}</CardTitle>
-            {data.description && <CardDescription className="text-base">{data.description}</CardDescription>}
+            <CardTitle className="font-heading text-2xl">{bilingualText(data.title, data.bilingual)}</CardTitle>
+            {data.description && <CardDescription className="text-base">{bilingualText(data.description, data.bilingual)}</CardDescription>}
           </CardHeader>
           <CardContent>
-            <PublicFormFillForm slug={slug} fields={data.fields ?? []} />
+            <PublicFormFillForm slug={slug} fields={data.fields ?? []} bilingual={data.bilingual ?? null} />
           </CardContent>
         </Card>
 

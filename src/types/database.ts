@@ -1,3 +1,5 @@
+import type { BilingualConfig } from "@/lib/bilingual/config";
+
 export type ProfileStatus = "active" | "inactive";
 export type OrganizationRole = "owner" | "admin" | "member";
 export type InvitationRole = "admin" | "member";
@@ -32,6 +34,7 @@ export type Organization = {
   logo_url: string | null;
   // Centre mark for generated QR codes (migration 0131); null = plain QRs.
   qr_logo_url: string | null;
+  join_bilingual: BilingualConfig | null;
   // Logo width as a % of the QR's width, 10-30 (migration 0132).
   qr_logo_size: number;
   member_count_range: MemberCountRange | null;
@@ -415,6 +418,8 @@ export type CustomForm = {
   description: string | null;
   slug: string;
   fields: FormField[];
+  // Two-language display config (migration 0133); null = single language.
+  bilingual: BilingualConfig | null;
   status: FormStatus;
   created_by: string | null;
   created_at: string;
@@ -968,6 +973,7 @@ export type Event = {
   registration_enabled: boolean;
   registration_share_token: string;
   registration_fields: EventRegistrationField[];
+  registration_bilingual: BilingualConfig | null;
   registration_capacity: number | null;
   registration_closes_at: string | null;
   registration_pass_color: string;

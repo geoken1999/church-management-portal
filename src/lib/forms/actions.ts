@@ -7,7 +7,9 @@ import { checkTabAccess } from "@/lib/permissions/dal";
 import { checkFormsQuota } from "@/lib/plans/dal";
 import { validateFormMeta, sanitizeFormFields } from "@/lib/forms/validation";
 import { slugify, randomSlugSuffix } from "@/lib/organizations/validation";
-import type { FormStatus } from "@/types/database";
+import { collectTranslatableStrings, sanitizeBilingual } from "@/lib/bilingual/config";
+import { ensureTranslations } from "@/lib/bilingual/translate";
+import type { CustomForm, FormStatus } from "@/types/database";
 
 const FORMS_PATH = "/dashboard/forms";
 const FORM_STATUSES: FormStatus[] = ["draft", "published", "closed"];
@@ -31,11 +33,23 @@ function readFieldsFromFormData(formData: FormData) {
   }
 }
 
+function readJsonField(formData: FormData, name: string): unknown {
+  const raw = String(formData.get(name) ?? "");
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
 export interface FormMetaState {
   error?: string;
   fieldErrors?: { title?: string };
   success?: boolean;
   formId?: string;
+  // Saved, but with something the admin should know (e.g. translation incomplete).
+  warning?: string;
 }
 
 export async function createForm(_prevState: FormMetaState, formData: FormData): Promise<FormMetaState> {
@@ -113,12 +127,30 @@ export async function updateForm(_prevState: FormMetaState, formData: FormData):
   }
 
   const admin = createAdminClient();
+
+  // Two-language display: translate whatever text is new or changed and
+  // keep the rest (see ensureTranslations). Off clears it.
+  const wanted = sanitizeBilingual(readJsonField(formData, "bilingual"));
+  let bilingual: CustomForm["bilingual"] = null;
+  let warning: string | undefined;
+  if (wanted) {
+    const { data: current } = await admin.from("forms").select("bilingual").eq("id", formId).maybeSingle();
+    const outcome = await ensureTranslations(
+      wanted,
+      collectTranslatableStrings({ title, description, fields }),
+      sanitizeBilingual(current?.bilingual),
+    );
+    bilingual = outcome.config;
+    warning = outcome.warning;
+  }
+
   const { error } = await admin
     .from("forms")
     .update({
       title: title.trim(),
       description: description || null,
       fields,
+      bilingual,
     })
     .eq("id", formId);
 
@@ -128,7 +160,7 @@ export async function updateForm(_prevState: FormMetaState, formData: FormData):
 
   revalidatePath(FORMS_PATH);
   revalidatePath(`${FORMS_PATH}/${formId}`);
-  return { success: true, formId };
+  return { success: true, formId, warning };
 }
 
 export async function setFormStatus(formData: FormData) {

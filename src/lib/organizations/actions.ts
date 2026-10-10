@@ -306,6 +306,60 @@ export async function updateOrganizationLogo(
   return {};
 }
 
+export interface QrLogoState {
+  error?: string;
+  success?: boolean;
+}
+
+const MAX_QR_LOGO_BYTES = 1024 * 1024;
+
+// The mark drawn in the centre of the QR codes this church shares and
+// issues. The browser crops it square and re-encodes it as a small PNG
+// first (QrLogoUpload), so this only has to confirm type and size. Stored
+// in the logo bucket, so it counts toward the storage package.
+export async function updateOrganizationQrLogo(_prevState: QrLogoState, formData: FormData): Promise<QrLogoState> {
+  await requireUser();
+
+  const organizationId = String(formData.get("organizationId") ?? "");
+  const file = formData.get("logo");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose an image to upload." };
+  if (file.type !== "image/png") return { error: "The QR logo must be a PNG." };
+  if (file.size > MAX_QR_LOGO_BYTES) return { error: "That logo is too large. Use a simpler image." };
+
+  const quotaError = await checkStorageQuota(organizationId, file.size);
+  if (quotaError) return { error: quotaError };
+
+  const supabase = await createClient();
+  const path = `${organizationId}/qr-logo`;
+  const { error: uploadError } = await supabase.storage.from("organization-logos").upload(path, file, { upsert: true, contentType: file.type });
+  if (uploadError) return { error: "Couldn't upload that logo. You may not have permission to update it." };
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from("organization-logos").getPublicUrl(path);
+
+  const { error: updateError } = await supabase
+    .from("organizations")
+    .update({ qr_logo_url: `${publicUrl}?v=${Date.now()}` })
+    .eq("id", organizationId);
+  if (updateError) return { error: "Uploaded the image, but couldn't save it to your organization." };
+
+  revalidatePath("/dashboard", "layout");
+  return { success: true };
+}
+
+export async function removeOrganizationQrLogo(organizationId: string): Promise<QrLogoState> {
+  await requireUser();
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("organizations").update({ qr_logo_url: null }).eq("id", organizationId);
+  if (error) return { error: "Couldn't remove the QR logo. You may not have permission." };
+  await supabase.storage.from("organization-logos").remove([`${organizationId}/qr-logo`]);
+
+  revalidatePath("/dashboard", "layout");
+  return { success: true };
+}
+
 export interface CreateLoginState {
   error?: string;
   fieldErrors?: { firstName?: string; lastName?: string; email?: string; phone?: string };

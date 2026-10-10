@@ -1,8 +1,10 @@
 import "server-only";
 
 import QRCode from "qrcode";
+import sharp from "sharp";
 import { sendBulkEmail } from "@/lib/email/client";
 import { isEmailConfigured } from "@/lib/email/env";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { buildEventRegistrationIcs } from "@/lib/events/registration-ics";
 import { formatInTimezone } from "@/lib/organizations/timezone";
@@ -39,6 +41,34 @@ function darken(hex: string, amount: number): string {
 // Content-ID so it can also render inline in the ticket body via `cid:`.
 // Door staff can also just read the code off the pass and type it in, which
 // is why it's rendered as large text too, not only as a QR.
+// The pass QR, with the church's QR logo in the centre when it has one.
+// Error correction H keeps the code scannable with the middle covered. If
+// the logo can't be fetched or composited, the plain QR is used instead:
+// the pass must always carry a working code.
+async function buildQrPng(code: string, organizationId: string): Promise<Buffer> {
+  const plain = await QRCode.toBuffer(code, { width: 400, margin: 2, errorCorrectionLevel: "H" });
+  try {
+    const admin = createAdminClient();
+    const { data } = await admin.from("organizations").select("qr_logo_url").eq("id", organizationId).maybeSingle();
+    if (!data?.qr_logo_url) return plain;
+
+    const response = await fetch(data.qr_logo_url);
+    if (!response.ok) return plain;
+    const logoSize = Math.round(400 * 0.22);
+    const pad = Math.round(logoSize * 0.12);
+    const logo = await sharp(Buffer.from(await response.arrayBuffer()))
+      .resize(logoSize, logoSize, { fit: "contain", background: { r: 255, g: 255, b: 255, alpha: 0 } })
+      .toBuffer();
+    const backdrop = await sharp({ create: { width: logoSize + pad * 2, height: logoSize + pad * 2, channels: 4, background: "#ffffff" } })
+      .composite([{ input: logo, left: pad, top: pad }])
+      .png()
+      .toBuffer();
+    return await sharp(plain).composite([{ input: backdrop, gravity: "center" }]).png().toBuffer();
+  } catch {
+    return plain;
+  }
+}
+
 export async function sendRegistrationPassEmail(input: {
   organizationId: string;
   organizationName: string;
@@ -64,7 +94,7 @@ export async function sendRegistrationPassEmail(input: {
 
   let qrPng: Buffer;
   try {
-    qrPng = await QRCode.toBuffer(input.confirmationCode, { width: 400, margin: 2 });
+    qrPng = await buildQrPng(input.confirmationCode, input.organizationId);
   } catch (err) {
     await logPlatformEvent({
       level: "warning",

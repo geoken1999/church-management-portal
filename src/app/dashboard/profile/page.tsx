@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { UserRound, Church, Sparkles, KeyRound } from "lucide-react";
+import { UserRound, Church, Sparkles, KeyRound, QrCode } from "lucide-react";
 import { requireUser, getProfile } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getPlanUsage } from "@/lib/plans/dal";
@@ -11,6 +11,8 @@ import { MEMBER_COUNT_OPTIONS } from "@/lib/organizations/validation";
 import { countryName } from "@/lib/phone/countries";
 import { EditProfileForm } from "@/components/profile/EditProfileForm";
 import { ChangePasswordForm } from "@/components/profile/ChangePasswordForm";
+import { QrLogoUpload } from "@/components/organizations/QrLogoUpload";
+import { getSiteUrl } from "@/lib/site-url";
 import { EditOrganizationDetailsForm } from "@/components/organizations/EditOrganizationDetailsForm";
 
 export const metadata: Metadata = {
@@ -123,6 +125,25 @@ export default async function ProfilePage() {
           </CardContent>
         </Card>
       </div>
+
+      {canManage && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <QrCode className="size-4 text-primary" />
+              QR code logo
+            </CardTitle>
+            <CardDescription>Put your church&apos;s mark in the middle of every QR code</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <QrLogoUpload
+              organizationId={membership.organization.id}
+              qrLogoUrl={membership.organization.qr_logo_url ?? null}
+              sampleLink={`${getSiteUrl()}/join/${membership.organization.slug}`}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 sm:grid-cols-2">
         <Card>

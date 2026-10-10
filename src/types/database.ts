@@ -2162,6 +2162,12 @@ export type Database = {
           },
         ];
       };
+      cron_job_runs: {
+        Row: CronJobRun;
+        Insert: Partial<CronJobRun> & Pick<CronJobRun, "job_key" | "trigger">;
+        Update: Partial<CronJobRun>;
+        Relationships: [];
+      };
       platform_events: {
         Row: PlatformEvent;
         Insert: Partial<PlatformEvent> & Pick<PlatformEvent, "level" | "source" | "message">;
@@ -3497,4 +3503,17 @@ export type Database = {
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
+};
+
+export type CronJobRun = {
+  id: string;
+  job_key: string;
+  trigger: "schedule" | "manual";
+  triggered_by_email: string | null;
+  status: "running" | "success" | "error";
+  http_status: number | null;
+  summary: Record<string, unknown> | null;
+  error_message: string | null;
+  started_at: string;
+  finished_at: string | null;
 };

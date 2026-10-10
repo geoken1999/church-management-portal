@@ -3,6 +3,7 @@ import { buildDailyHealthReport } from "@/lib/platform-admin/daily-report";
 import { sendBulkEmail } from "@/lib/email/client";
 import { isEmailConfigured } from "@/lib/email/env";
 import { logPlatformEvent } from "@/lib/platform-events/log";
+import { withCronLogging } from "@/lib/cron/run-logger";
 
 // Vercel Cron hits this at 30 4 * * * UTC = 10:00 AM IST every day (see
 // vercel.json) — no user session exists on a cron-triggered request, so
@@ -10,7 +11,7 @@ import { logPlatformEvent } from "@/lib/platform-events/log";
 // src/app/api/instagram/cron/refresh-tokens) rather than
 // requirePlatformAdmin(), which needs a signed-in user. Sends to
 // HEALTH_REPORT_EMAIL from EMAIL_FROM_ADDRESS — both @kingdomflow.in.
-export async function GET(request: Request) {
+async function run(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const auth = request.headers.get("authorization");
@@ -46,3 +47,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ sent: result.sentCount, failed: result.failed, issueCount });
 }
+
+export const GET = withCronLogging("daily-health-report", run);

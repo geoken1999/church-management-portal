@@ -4,6 +4,7 @@ import { getOccurrencesInRange } from "@/lib/events/recurrence";
 import { sendRegistrationReminderEmail } from "@/lib/events/registration-reminder";
 import { eventVenueLabel, eventJoinLink } from "@/lib/events/location";
 import { partsInTimezone, DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
+import { withCronLogging } from "@/lib/cron/run-logger";
 
 const LOOKAHEAD_MS = 25 * 60 * 60 * 1000;
 const OFFSET_MS: Record<string, number> = { "24h": 24 * 60 * 60 * 1000, "1h": 60 * 60 * 1000 };
@@ -43,7 +44,7 @@ function dateKeyAndHour(date: Date, timeZone: string): { dateKey: string; hour: 
 // shared function rather than something to fix here. The "morning of"
 // due-check below, however, now uses each event's own org timezone
 // (previously hardcoded to Asia/Kolkata for every org).
-export async function GET(request: Request) {
+async function run(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const auth = request.headers.get("authorization");
@@ -136,3 +137,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ eventsChecked, remindersSent });
 }
+
+export const GET = withCronLogging("event-reminders", run);

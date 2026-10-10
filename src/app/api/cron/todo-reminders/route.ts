@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPushToUsers } from "@/lib/push/client";
 import { dateKeyInTimezone, DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
+import { withCronLogging } from "@/lib/cron/run-logger";
 
 // A generous upper bound covering any timezone's "end of today," so the
 // SQL filter below only needs to exclude todos nowhere near due yet — the
@@ -15,7 +16,7 @@ const LOOKAHEAD_MS = 36 * 60 * 60 * 1000;
 // day digest is a good fit for "due today or overdue" (unlike "1 hour
 // before", there's no finer moment to aim for), sent once per to-do per
 // org-local calendar day via last_reminder_sent_at.
-export async function GET(request: Request) {
+async function run(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const auth = request.headers.get("authorization");
@@ -62,3 +63,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ todosChecked, remindersSent });
 }
+
+export const GET = withCronLogging("todo-reminders", run);

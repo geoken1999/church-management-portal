@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { refreshLongLivedToken } from "@/lib/instagram/client";
+import { withCronLogging } from "@/lib/cron/run-logger";
 
 // Vercel Cron hits this daily (see vercel.json) to refresh any Instagram
 // long-lived token expiring within the next week — belt-and-suspenders
@@ -9,7 +10,7 @@ import { refreshLongLivedToken } from "@/lib/instagram/client";
 // session (Vercel Cron, not a signed-in request), so it needs the
 // RLS-bypassing admin client — every org's connections have to be
 // readable here, not just one caller's.
-export async function GET(request: Request) {
+async function run(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const auth = request.headers.get("authorization");
@@ -52,3 +53,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ refreshed, failed, checked: connections?.length ?? 0 });
 }
+
+export const GET = withCronLogging("refresh-tokens", run);

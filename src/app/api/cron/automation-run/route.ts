@@ -5,6 +5,7 @@ import { sendDirectMemberMessage, sendStaffDigest } from "@/lib/automations/send
 import { runMemberFollowupAutomations } from "@/lib/automations/followup-run";
 import { runMembershipFeeCycle } from "@/lib/membership-fees/run";
 import type { AutomationTrigger } from "@/types/database";
+import { withCronLogging } from "@/lib/cron/run-logger";
 
 // Vercel Cron hits this once a day (see vercel.json) — no user session
 // exists on a cron-triggered request, so this checks CRON_SECRET, the
@@ -19,7 +20,7 @@ import type { AutomationTrigger } from "@/types/database";
 // Every send below is strictly sequential (no Promise.all), matching
 // sendBulkTemplateMessage's own sequential loop, to avoid bursting Meta's
 // per-number rate limits.
-export async function GET(request: Request) {
+async function run(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const auth = request.headers.get("authorization");
@@ -91,3 +92,5 @@ export async function GET(request: Request) {
     membershipFeeRemindersSent: membershipFees.remindersSent,
   });
 }
+
+export const GET = withCronLogging("automation-run", run);

@@ -4,6 +4,7 @@ import { triggerRecurringCharge } from "@/lib/billing/payu-subscription";
 import { sendSubscriptionChargedEmail, sendSubscriptionPaymentFailedEmail, sendUpcomingChargeNoticeEmail } from "@/lib/billing/receipts";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { isPlanId, PLANS } from "@/lib/plans/config";
+import { withCronLogging } from "@/lib/cron/run-logger";
 
 // Owns the entire recurring side of PayU plan subscriptions — see
 // migration 0119 and payu-subscription.ts's file header for why this cron
@@ -30,7 +31,7 @@ const MAX_CONSECUTIVE_FAILURES = 4;
 // stops it being sent again for the same cycle.
 const PREDEBIT_NOTICE_WINDOW_MS = 48 * 60 * 60 * 1000;
 
-export async function GET(request: Request) {
+async function run(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const auth = request.headers.get("authorization");
@@ -124,3 +125,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ ok: true, noticesSent, charged, failed, halted });
 }
+
+export const GET = withCronLogging("subscription-billing", run);

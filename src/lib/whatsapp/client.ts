@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getMetaWhatsAppEnv } from "@/lib/whatsapp/env";
+import { getPlatformWhatsAppCredentials, type WhatsAppCredentials } from "@/lib/whatsapp/credentials";
 import { parseGraphError, GraphApiError, describeWhatsAppError } from "@/lib/whatsapp/graph-error";
 
 // Meta documents recipient numbers without a leading '+' in request
@@ -11,8 +11,8 @@ function toMetaRecipient(e164: string): string {
   return e164.startsWith("+") ? e164.slice(1) : e164;
 }
 
-async function postToGraphMessages(body: Record<string, unknown>): Promise<string> {
-  const { accessToken, phoneNumberId, apiVersion } = getMetaWhatsAppEnv();
+async function postToGraphMessages(body: Record<string, unknown>, credentials?: WhatsAppCredentials): Promise<string> {
+  const { accessToken, phoneNumberId, apiVersion } = credentials ?? getPlatformWhatsAppCredentials();
 
   const res = await fetch(`https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`, {
     method: "POST",
@@ -42,12 +42,15 @@ export interface SendResult {
 // that window Meta rejects it and sendTemplateMessage must be used
 // instead. Used for chat replies and the AI auto-reply, both of which only
 // ever fire in direct response to an inbound message.
-export async function sendTextMessage(params: { to: string; body: string }): Promise<SendResult> {
-  const id = await postToGraphMessages({
-    to: toMetaRecipient(params.to),
-    type: "text",
-    text: { body: params.body },
-  });
+export async function sendTextMessage(params: { to: string; body: string; credentials?: WhatsAppCredentials }): Promise<SendResult> {
+  const id = await postToGraphMessages(
+    {
+      to: toMetaRecipient(params.to),
+      type: "text",
+      text: { body: params.body },
+    },
+    params.credentials,
+  );
   return { id };
 }
 
@@ -61,20 +64,24 @@ export async function sendTemplateMessage(params: {
   languageCode: string;
   bodyParams: string[];
   headerImageUrl?: string | null;
+  credentials?: WhatsAppCredentials;
 }): Promise<SendResult> {
   const components = [
     ...(params.headerImageUrl ? [{ type: "header", parameters: [{ type: "image", image: { link: params.headerImageUrl } }] }] : []),
     ...(params.bodyParams.length > 0 ? [{ type: "body", parameters: params.bodyParams.map((text) => ({ type: "text", text })) }] : []),
   ];
-  const id = await postToGraphMessages({
-    to: toMetaRecipient(params.to),
-    type: "template",
-    template: {
-      name: params.templateName,
-      language: { code: params.languageCode },
-      ...(components.length > 0 ? { components } : {}),
+  const id = await postToGraphMessages(
+    {
+      to: toMetaRecipient(params.to),
+      type: "template",
+      template: {
+        name: params.templateName,
+        language: { code: params.languageCode },
+        ...(components.length > 0 ? { components } : {}),
+      },
     },
-  });
+    params.credentials,
+  );
   return { id };
 }
 
@@ -92,6 +99,7 @@ export async function sendBulkTemplateMessage(params: {
   languageCode: string;
   recipients: { phone: string; bodyParams: string[] }[];
   headerImageUrl?: string | null;
+  credentials?: WhatsAppCredentials;
 }): Promise<SendBulkTemplateResult> {
   let sentCount = 0;
   const failed: { phone: string; error: string }[] = [];
@@ -104,6 +112,7 @@ export async function sendBulkTemplateMessage(params: {
         languageCode: params.languageCode,
         bodyParams,
         headerImageUrl: params.headerImageUrl,
+        credentials: params.credentials,
       });
       sentCount += 1;
     } catch (err) {

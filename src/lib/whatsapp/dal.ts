@@ -2,7 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { isWhatsAppConfigured } from "@/lib/whatsapp/env";
+import { isWhatsAppAvailableFor } from "@/lib/whatsapp/credentials";
 import { getPlanUsage } from "@/lib/plans/dal";
 
 export const getWhatsAppCampaigns = cache(async (organizationId: string) => {
@@ -21,7 +21,7 @@ export const getWhatsAppCampaigns = cache(async (organizationId: string) => {
 // more "own account unmetered" bypass, just a single monthly quota check.
 export async function getWhatsAppSendAvailability(organizationId: string) {
   const usage = await getPlanUsage(organizationId);
-  const available = isWhatsAppConfigured() && usage.whatsappRemaining > 0;
+  const available = (await isWhatsAppAvailableFor(organizationId)) && usage.whatsappRemaining > 0;
   return { available, whatsappRemaining: usage.whatsappRemaining };
 }
 

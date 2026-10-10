@@ -2162,6 +2162,12 @@ export type Database = {
           },
         ];
       };
+      organization_whatsapp_connections: {
+        Row: OrganizationWhatsAppConnection;
+        Insert: Partial<OrganizationWhatsAppConnection> & Pick<OrganizationWhatsAppConnection, "organization_id" | "connection_method" | "waba_id" | "phone_number_id" | "access_token_encrypted">;
+        Update: Partial<OrganizationWhatsAppConnection>;
+        Relationships: [];
+      };
       member_home_layouts: {
         Row: MemberHomeLayoutRow;
         Insert: Partial<MemberHomeLayoutRow> & Pick<MemberHomeLayoutRow, "organization_id" | "status" | "layout">;
@@ -3530,5 +3536,24 @@ export type MemberHomeLayoutRow = {
   status: "draft" | "published";
   layout: Record<string, unknown>;
   updated_by: string | null;
+  updated_at: string;
+};
+
+export type OrganizationWhatsAppConnection = {
+  id: string;
+  organization_id: string;
+  connection_method: "manual" | "embedded_signup";
+  waba_id: string;
+  phone_number_id: string;
+  display_phone_number: string | null;
+  verified_name: string | null;
+  access_token_encrypted: string;
+  app_secret_encrypted: string | null;
+  webhook_verify_token: string;
+  status: "active" | "error" | "disconnected";
+  last_error: string | null;
+  last_checked_at: string | null;
+  connected_by: string | null;
+  created_at: string;
   updated_at: string;
 };

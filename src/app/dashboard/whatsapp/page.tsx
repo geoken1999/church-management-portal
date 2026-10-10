@@ -4,6 +4,9 @@ import { getMembers } from "@/lib/members/dal";
 import { getBranches } from "@/lib/branches/dal";
 import { getWhatsAppCampaigns, getWhatsAppSendAvailability, getWhatsAppTemplates, getWhatsAppConversations, getWhatsAppConversationMessages } from "@/lib/whatsapp/dal";
 import { resolvePhoneCountry } from "@/lib/whatsapp/validation";
+import { getWhatsAppConnectionSummary } from "@/lib/whatsapp/credentials";
+import { WhatsAppConnectionCard } from "@/components/whatsapp/WhatsAppConnectionCard";
+import { getSiteUrl } from "@/lib/site-url";
 import { WhatsAppManager } from "@/components/whatsapp/WhatsAppManager";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
@@ -21,13 +24,14 @@ export default async function WhatsAppPage() {
     return <AccessRestricted label="WhatsApp" />;
   }
 
-  const [members, branches, campaigns, templates, conversations, availability] = await Promise.all([
+  const [members, branches, campaigns, templates, conversations, availability, connection] = await Promise.all([
     getMembers(organizationId),
     getBranches(organizationId),
     getWhatsAppCampaigns(organizationId),
     getWhatsAppTemplates(organizationId),
     getWhatsAppConversations(organizationId),
     getWhatsAppSendAvailability(organizationId),
+    getWhatsAppConnectionSummary(organizationId, isOrgAdmin),
   ]);
 
   const conversationsWithMessages = await Promise.all(
@@ -58,6 +62,8 @@ export default async function WhatsAppPage() {
         <h1 className="font-heading text-3xl font-bold tracking-tight">WhatsApp</h1>
         <p className="mt-1 text-muted-foreground">Send campaigns and reply to congregation queries over WhatsApp.</p>
       </div>
+
+      <WhatsAppConnectionCard connection={connection} isOrgAdmin={isOrgAdmin} webhookUrl={`${getSiteUrl()}/api/whatsapp/webhook`} />
 
       <WhatsAppManager
         organizationId={organizationId}

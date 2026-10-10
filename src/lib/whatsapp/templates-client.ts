@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getMetaWhatsAppEnv } from "@/lib/whatsapp/env";
+import { getPlatformWhatsAppCredentials, type WhatsAppCredentials } from "@/lib/whatsapp/credentials";
 import { parseGraphError } from "@/lib/whatsapp/graph-error";
 import type { WhatsAppTemplateButton, WhatsAppTemplateCategory, WhatsAppTemplateStatus } from "@/types/database";
 import { metaButtonsComponent, metaHeaderComponent } from "@/lib/whatsapp/template-parts";
@@ -22,8 +22,8 @@ function toMetaCategory(category: WhatsAppTemplateCategory): string {
   return category.toUpperCase();
 }
 
-async function graphFetch(path: string, init: RequestInit): Promise<Response> {
-  const { accessToken, apiVersion } = getMetaWhatsAppEnv();
+async function graphFetch(path: string, init: RequestInit, credentials?: WhatsAppCredentials): Promise<Response> {
+  const { accessToken, apiVersion } = credentials ?? getPlatformWhatsAppCredentials();
   return fetch(`https://graph.facebook.com/${apiVersion}/${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", ...init.headers },
@@ -41,10 +41,29 @@ export interface CreateTemplateResult {
 // Meta needs an example image to review an image header. It's uploaded once
 // through the app's upload session, and the handle Meta returns goes on the
 // template. The app ID is the Meta app that owns the WhatsApp account.
-export async function uploadTemplateHeaderSample(params: { bytes: Uint8Array; mime: string; fileName: string }): Promise<string> {
-  const appId = process.env.META_WHATSAPP_APP_ID;
-  if (!appId) throw new Error("META_WHATSAPP_APP_ID must be set to add an image header to a template.");
-  const { accessToken, apiVersion } = getMetaWhatsAppEnv();
+// A tenant's own number belongs to whichever Meta app issued its token, so
+// the app ID is read off the token itself; the platform number uses the
+// configured app ID.
+async function resolveAppId(credentials: WhatsAppCredentials): Promise<string> {
+  if (credentials.source === "platform") {
+    const appId = process.env.META_WHATSAPP_APP_ID;
+    if (!appId) throw new Error("META_WHATSAPP_APP_ID must be set to add an image header to a template.");
+    return appId;
+  }
+  const res = await fetch(
+    `https://graph.facebook.com/${credentials.apiVersion}/debug_token?input_token=${encodeURIComponent(credentials.accessToken)}`,
+    { headers: { Authorization: `Bearer ${credentials.accessToken}` } },
+  );
+  if (!res.ok) throw await parseGraphError(res);
+  const { data } = (await res.json()) as { data?: { app_id?: string } };
+  if (!data?.app_id) throw new Error("Couldn't determine the Meta app for your WhatsApp token.");
+  return data.app_id;
+}
+
+export async function uploadTemplateHeaderSample(params: { bytes: Uint8Array; mime: string; fileName: string; credentials?: WhatsAppCredentials }): Promise<string> {
+  const credentials = params.credentials ?? getPlatformWhatsAppCredentials();
+  const appId = await resolveAppId(credentials);
+  const { accessToken, apiVersion } = credentials;
 
   const session = await fetch(
     `https://graph.facebook.com/${apiVersion}/${appId}/uploads?file_name=${encodeURIComponent(params.fileName)}&file_length=${params.bytes.length}&file_type=${encodeURIComponent(params.mime)}`,
@@ -73,8 +92,9 @@ export async function createMetaTemplate(params: {
   exampleValues: string[];
   headerHandle?: string | null;
   buttons?: WhatsAppTemplateButton[];
+  credentials?: WhatsAppCredentials;
 }): Promise<CreateTemplateResult> {
-  const { businessAccountId } = getMetaWhatsAppEnv();
+  const { businessAccountId } = params.credentials ?? getPlatformWhatsAppCredentials();
 
   const body =
     params.exampleValues.length > 0
@@ -90,7 +110,7 @@ export async function createMetaTemplate(params: {
   const res = await graphFetch(`${businessAccountId}/message_templates`, {
     method: "POST",
     body: JSON.stringify({ name: params.name, language: params.language, category: toMetaCategory(params.category), components }),
-  });
+  }, params.credentials);
 
   if (!res.ok) throw await parseGraphError(res);
 
@@ -99,8 +119,8 @@ export async function createMetaTemplate(params: {
   return { metaTemplateId: data.id, status: data.status ? metaStatusToLocal(data.status) : "pending_review" };
 }
 
-export async function fetchMetaTemplateStatus(metaTemplateId: string): Promise<{ status: WhatsAppTemplateStatus; rejectedReason: string | null }> {
-  const res = await graphFetch(`${metaTemplateId}?fields=status,rejected_reason`, { method: "GET" });
+export async function fetchMetaTemplateStatus(metaTemplateId: string, credentials?: WhatsAppCredentials): Promise<{ status: WhatsAppTemplateStatus; rejectedReason: string | null }> {
+  const res = await graphFetch(`${metaTemplateId}?fields=status,rejected_reason`, { method: "GET" }, credentials);
   if (!res.ok) throw await parseGraphError(res);
 
   const data = (await res.json()) as { status?: string; rejected_reason?: string };
@@ -109,8 +129,8 @@ export async function fetchMetaTemplateStatus(metaTemplateId: string): Promise<{
 
 // Documented as delete-by-name against the WABA (not by template id) —
 // removes every language variant registered under that name.
-export async function deleteMetaTemplate(name: string): Promise<void> {
-  const { businessAccountId } = getMetaWhatsAppEnv();
-  const res = await graphFetch(`${businessAccountId}/message_templates?name=${encodeURIComponent(name)}`, { method: "DELETE" });
+export async function deleteMetaTemplate(name: string, credentials?: WhatsAppCredentials): Promise<void> {
+  const { businessAccountId } = credentials ?? getPlatformWhatsAppCredentials();
+  const res = await graphFetch(`${businessAccountId}/message_templates?name=${encodeURIComponent(name)}`, { method: "DELETE" }, credentials);
   if (!res.ok) throw await parseGraphError(res);
 }

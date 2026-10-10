@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getWhatsAppCredentials } from "@/lib/whatsapp/credentials";
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { sendTemplateMessage, sendBulkTemplateMessage } from "@/lib/whatsapp/client";
 import { normalizePhoneNumber, resolvePhoneCountry } from "@/lib/whatsapp/validation";
@@ -85,7 +86,13 @@ export async function sendDirectMemberMessage(
   const bodyParams = resolveBodyParams(template.variable_names, values);
 
   try {
-    const { id } = await sendTemplateMessage({ to: phone, templateName: template.meta_template_name, languageCode: template.language, bodyParams });
+    const { id } = await sendTemplateMessage({
+      to: phone,
+      templateName: template.meta_template_name,
+      languageCode: template.language,
+      bodyParams,
+      credentials: await getWhatsAppCredentials(trigger.organization_id),
+    });
     await admin.from("automation_executions").update({ meta_message_id: id }).eq("id", reserved.id);
   } catch (err) {
     const detail = describeWhatsAppError(err);
@@ -181,6 +188,7 @@ export async function sendStaffDigest(
     templateName: template.meta_template_name,
     languageCode: template.language,
     recipients: recipientPhones.map((phone) => ({ phone, bodyParams })),
+    credentials: await getWhatsAppCredentials(organizationId),
   });
 
   const allFailed = result.failed.length === recipientPhones.length;

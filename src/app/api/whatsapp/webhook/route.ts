@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { getWhatsAppCredentials } from "@/lib/whatsapp/credentials";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logPlatformEvent } from "@/lib/platform-events/log";
@@ -9,6 +10,7 @@ import { getOrganizationContextForAi } from "@/lib/ai/organization-context";
 import { getAiModeForWebhook, setAiTypingForWebhook } from "@/lib/whatsapp/automation";
 import { hasAiCreditAvailableForWebhook, recordAiReplyUsageForWebhook } from "@/lib/plans/dal";
 import { sendTextMessage } from "@/lib/whatsapp/client";
+import { decryptSecret } from "@/lib/whatsapp/secret-box";
 import { describeWhatsAppError } from "@/lib/whatsapp/graph-error";
 import { createNotificationForWebhook } from "@/lib/notifications/create";
 import { recordMessageDelivery } from "@/lib/platform-events/delivery";
@@ -29,8 +31,14 @@ export async function GET(request: Request) {
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
 
-  if (mode === "subscribe" && token && token === getMetaWhatsAppWebhookVerifyToken() && challenge) {
-    return new NextResponse(challenge, { status: 200 });
+  if (mode === "subscribe" && token && challenge) {
+    if (token === getMetaWhatsAppWebhookVerifyToken()) return new NextResponse(challenge, { status: 200 });
+
+    // A tenant subscribing their own Meta app to this endpoint uses the
+    // verify token shown on their WhatsApp settings page.
+    const admin = createAdminClient();
+    const { data } = await admin.from("organization_whatsapp_connections").select("id").eq("webhook_verify_token", token).maybeSingle();
+    if (data) return new NextResponse(challenge, { status: 200 });
   }
 
   return NextResponse.json({ error: "Verification failed" }, { status: 403 });
@@ -51,6 +59,7 @@ interface StatusUpdate {
 }
 
 interface WebhookChangeValue {
+  metadata?: { phone_number_id?: string };
   messages?: InboundMessage[];
   statuses?: StatusUpdate[];
 }
@@ -131,7 +140,7 @@ async function handleWhatsAppAiReply(organizationId: string, phoneNumber: string
     // Always a free-text send — this only ever fires in direct response to
     // an inbound message, so it's always inside the 24-hour customer
     // service window where free text is allowed.
-    const sent = await sendTextMessage({ to: phoneNumber, body: outgoingReply });
+    const sent = await sendTextMessage({ to: phoneNumber, body: outgoingReply, credentials: await getWhatsAppCredentials(organizationId) });
 
     await admin.from("whatsapp_messages").insert({
       conversation_id: conversationId,
@@ -173,14 +182,17 @@ async function handleWhatsAppAiReply(organizationId: string, phoneNumber: string
   }
 }
 
-async function handleInboundMessage(message: InboundMessage): Promise<void> {
+// tenantOrganizationId is set when the message arrived on an organization's
+// own WhatsApp number: the number itself says which church it is for, so no
+// guessing from the sender's phone is needed.
+async function handleInboundMessage(message: InboundMessage, tenantOrganizationId: string | null): Promise<void> {
   const fromRaw = message.from;
   const text = message.text?.body;
   if (!fromRaw) return;
 
   const phoneNumber = `+${fromRaw}`;
 
-  const organizationId = await resolveOrganizationForPhoneNumber(phoneNumber);
+  const organizationId = tenantOrganizationId ?? (await resolveOrganizationForPhoneNumber(phoneNumber));
   if (!organizationId) return;
 
   const admin = createAdminClient();
@@ -248,24 +260,20 @@ async function handleStatusUpdate(status: StatusUpdate): Promise<void> {
   });
 }
 
+function signatureMatches(secret: string, rawBody: string, provided: string): boolean {
+  const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+  return provided.length === expected.length && crypto.timingSafeEqual(Buffer.from(provided, "hex"), Buffer.from(expected, "hex"));
+}
+
 export async function POST(request: Request) {
-  const { appSecret } = getMetaWhatsAppEnv();
   const signature = request.headers.get("x-hub-signature-256");
   const rawBody = await request.text();
 
   if (!signature?.startsWith("sha256=")) {
     return NextResponse.json({ error: "Missing signature" }, { status: 401 });
   }
-
-  const expected = crypto.createHmac("sha256", appSecret).update(rawBody).digest("hex");
   const provided = signature.slice("sha256=".length);
-  const isValid =
-    provided.length === expected.length &&
-    crypto.timingSafeEqual(Buffer.from(provided, "hex"), Buffer.from(expected, "hex"));
-
-  if (!isValid) {
-    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-  }
+  if (!/^[0-9a-f]+$/i.test(provided)) return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
 
   let payload: WebhookPayload;
   try {
@@ -276,10 +284,58 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   }
 
+  // The payload is read before its signature is checked only to learn which
+  // phone numbers it names, so the right secret can be chosen. Nothing is
+  // acted on until every number in it verifies: a number connected with its
+  // own Meta app must be signed with that app's secret, every other number
+  // with the platform app's. A tenant can therefore never get a payload
+  // accepted for a number that isn't theirs.
+  const admin = createAdminClient();
+  const phoneNumberIds = new Set<string>();
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
+      const id = change.value?.metadata?.phone_number_id;
+      if (id) phoneNumberIds.add(id);
+    }
+  }
+
+  const { data: connections } = phoneNumberIds.size
+    ? await admin
+        .from("organization_whatsapp_connections")
+        .select("organization_id, phone_number_id, app_secret_encrypted")
+        .in("phone_number_id", [...phoneNumberIds])
+    : { data: [] };
+  const connectionByPhoneId = new Map((connections ?? []).map((c) => [c.phone_number_id, c]));
+
+  const platformSecret = (() => {
+    try {
+      return getMetaWhatsAppEnv().appSecret;
+    } catch {
+      return null;
+    }
+  })();
+
+  const secretsToCheck = new Set<string>();
+  if (phoneNumberIds.size === 0) {
+    // Nothing identifies a number (e.g. a bare status ping): platform secret.
+    if (platformSecret) secretsToCheck.add(platformSecret);
+  }
+  for (const id of phoneNumberIds) {
+    const own = connectionByPhoneId.get(id)?.app_secret_encrypted;
+    const secret = own ? decryptSecret(own) : platformSecret;
+    if (!secret || !signatureMatches(secret, rawBody, provided)) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
+  }
+  if (phoneNumberIds.size === 0 && ![...secretsToCheck].some((secret) => signatureMatches(secret, rawBody, provided))) {
+    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+  }
+
+  for (const entry of payload.entry ?? []) {
+    for (const change of entry.changes ?? []) {
+      const tenantOrganizationId = connectionByPhoneId.get(change.value?.metadata?.phone_number_id ?? "")?.organization_id ?? null;
       for (const message of change.value?.messages ?? []) {
-        await handleInboundMessage(message).catch(() => {});
+        await handleInboundMessage(message, tenantOrganizationId).catch(() => {});
       }
       for (const status of change.value?.statuses ?? []) {
         await handleStatusUpdate(status).catch(() => {});

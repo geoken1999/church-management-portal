@@ -1,5 +1,6 @@
 "use server";
 
+import { getWhatsAppCredentials } from "@/lib/whatsapp/credentials";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -70,7 +71,7 @@ export async function createAutomationTemplateAction(params: {
 
   let metaResult;
   try {
-    metaResult = await createMetaTemplate({ name, language: "en_US", category: params.category, bodyText: positionalBody, exampleValues });
+    metaResult = await createMetaTemplate({ name, language: "en_US", category: params.category, bodyText: positionalBody, exampleValues, credentials: await getWhatsAppCredentials(params.organizationId) });
   } catch (err) {
     const detail = describeWhatsAppError(err);
     await logPlatformEvent({
@@ -122,7 +123,7 @@ export async function refreshAutomationTemplateStatusAction(templateId: string):
   if (!template.meta_template_id) return { error: "This template was never submitted to WhatsApp." };
 
   try {
-    const { status, rejectedReason } = await fetchMetaTemplateStatus(template.meta_template_id);
+    const { status, rejectedReason } = await fetchMetaTemplateStatus(template.meta_template_id, await getWhatsAppCredentials(template.organization_id));
     await admin.from("automation_templates").update({ status, rejected_reason: rejectedReason }).eq("id", templateId);
   } catch (err) {
     return { error: describeWhatsAppError(err).message };
@@ -149,7 +150,7 @@ export async function deleteAutomationTemplateAction(templateId: string): Promis
   }
 
   try {
-    await deleteMetaTemplate(template.meta_template_name);
+    await deleteMetaTemplate(template.meta_template_name, await getWhatsAppCredentials(template.organization_id));
   } catch (err) {
     // Don't block deleting our own record if Meta's side is already gone
     // (e.g. removed independently) — same tradeoff whatsapp/actions.ts makes.

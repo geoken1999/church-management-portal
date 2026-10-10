@@ -3,6 +3,8 @@
 import { useActionState, useState } from "react";
 import { submitMemberRequest, type PublicJoinFormState } from "@/lib/members/public-actions";
 import { useLocale } from "@/lib/i18n/LocaleContext";
+import { useBilingualLabel } from "@/lib/bilingual/use-bilingual";
+import { bilingualText, type BilingualConfig } from "@/lib/bilingual/config";
 import type { PublicFieldDefinition, Branch } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const initialState: PublicJoinFormState = {};
 
-function PublicCustomFieldInput({ definition }: { definition: PublicFieldDefinition }) {
+function PublicCustomFieldInput({ definition, bilingual }: { definition: PublicFieldDefinition; bilingual: BilingualConfig | null }) {
   const { t } = useLocale();
   const name = `custom_${definition.key}`;
   const id = `custom-${definition.key}`;
@@ -23,7 +25,7 @@ function PublicCustomFieldInput({ definition }: { definition: PublicFieldDefinit
     return (
       <label className="flex items-center gap-2 text-sm">
         <Checkbox name={name} required={definition.required} />
-        {definition.label}
+        {bilingualText(definition.label, bilingual)}
         {definition.required && <span className="text-destructive">*</span>}
       </label>
     );
@@ -33,7 +35,7 @@ function PublicCustomFieldInput({ definition }: { definition: PublicFieldDefinit
     return (
       <div className="space-y-2">
         <Label htmlFor={id}>
-          {definition.label}
+          {bilingualText(definition.label, bilingual)}
           {definition.required && <span className="text-destructive">*</span>}
         </Label>
         <Select name={name}>
@@ -43,7 +45,7 @@ function PublicCustomFieldInput({ definition }: { definition: PublicFieldDefinit
           <SelectContent>
             {(definition.options ?? []).map((option) => (
               <SelectItem key={option} value={option}>
-                {option}
+                {bilingualText(option, bilingual)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -55,7 +57,7 @@ function PublicCustomFieldInput({ definition }: { definition: PublicFieldDefinit
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>
-        {definition.label}
+        {bilingualText(definition.label, bilingual)}
         {definition.required && <span className="text-destructive">*</span>}
       </Label>
       <Input
@@ -72,12 +74,15 @@ export function PublicJoinForm({
   orgSlug,
   fieldDefinitions,
   branches,
+  bilingual = null,
 }: {
   orgSlug: string;
   fieldDefinitions: PublicFieldDefinition[];
   branches: Pick<Branch, "id" | "name">[];
+  bilingual?: BilingualConfig | null;
 }) {
   const { t } = useLocale();
+  const bt = useBilingualLabel(bilingual);
   const boundAction = submitMemberRequest.bind(null, orgSlug);
   const [state, formAction, pending] = useActionState(boundAction, initialState);
   const [maritalStatus, setMaritalStatus] = useState("");
@@ -104,7 +109,7 @@ export function PublicJoinForm({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="firstName">
-            {t.publicJoin.firstName} <span className="text-destructive">*</span>
+            {bt((d) => d.publicJoin.firstName)} <span className="text-destructive">*</span>
           </Label>
           <Input
             id="firstName"
@@ -117,7 +122,7 @@ export function PublicJoinForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="lastName">
-            {t.publicJoin.lastName} <span className="text-destructive">*</span>
+            {bt((d) => d.publicJoin.lastName)} <span className="text-destructive">*</span>
           </Label>
           <Input
             id="lastName"
@@ -131,7 +136,7 @@ export function PublicJoinForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="email">{t.publicJoin.email}</Label>
+        <Label htmlFor="email">{bt((d) => d.publicJoin.email)}</Label>
         <Input
           id="email"
           name="email"
@@ -144,7 +149,7 @@ export function PublicJoinForm({
 
       <div className="space-y-2">
         <Label htmlFor="phone">
-          {t.publicJoin.phone} <span className="text-destructive">*</span>
+          {bt((d) => d.publicJoin.phone)} <span className="text-destructive">*</span>
         </Label>
         <Input
           id="phone"
@@ -160,7 +165,7 @@ export function PublicJoinForm({
       {branches.length > 0 && (
         <div className="space-y-2">
           <Label htmlFor="branchId">
-            {t.publicJoin.branch} <span className="text-destructive">*</span>
+            {bt((d) => d.publicJoin.branch)} <span className="text-destructive">*</span>
           </Label>
           <Select name="branchId" required aria-invalid={Boolean(state.fieldErrors?.branchId)}>
             <SelectTrigger
@@ -187,7 +192,7 @@ export function PublicJoinForm({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="dateOfBirth">
-            {t.publicJoin.dateOfBirth} <span className="text-destructive">*</span>
+            {bt((d) => d.publicJoin.dateOfBirth)} <span className="text-destructive">*</span>
           </Label>
           <Input
             id="dateOfBirth"
@@ -202,7 +207,7 @@ export function PublicJoinForm({
 
         <div className="space-y-2">
           <Label htmlFor="maritalStatus">
-            {t.publicJoin.maritalStatus} <span className="text-destructive">*</span>
+            {bt((d) => d.publicJoin.maritalStatus)} <span className="text-destructive">*</span>
           </Label>
           <input type="hidden" name="maritalStatus" value={maritalStatus} />
           <Select value={maritalStatus} onValueChange={(v) => setMaritalStatus(v ?? "")}>
@@ -213,13 +218,13 @@ export function PublicJoinForm({
             >
               <SelectValue placeholder={t.common.select}>
                 {(value: string | null) =>
-                  value === "married" ? t.publicJoin.married : value === "unmarried" ? t.publicJoin.unmarried : t.common.select
+                  value === "married" ? bt((d) => d.publicJoin.married) : value === "unmarried" ? bt((d) => d.publicJoin.unmarried) : t.common.select
                 }
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="married">{t.publicJoin.married}</SelectItem>
-              <SelectItem value="unmarried">{t.publicJoin.unmarried}</SelectItem>
+              <SelectItem value="married">{bt((d) => d.publicJoin.married)}</SelectItem>
+              <SelectItem value="unmarried">{bt((d) => d.publicJoin.unmarried)}</SelectItem>
             </SelectContent>
           </Select>
           <FieldError id="maritalStatus-error" message={state.fieldErrors?.maritalStatus} />
@@ -229,7 +234,7 @@ export function PublicJoinForm({
       {maritalStatus === "married" && (
         <div className="space-y-2">
           <Label htmlFor="weddingDate">
-            {t.publicJoin.weddingDate} <span className="text-destructive">*</span>
+            {bt((d) => d.publicJoin.weddingDate)} <span className="text-destructive">*</span>
           </Label>
           <Input
             id="weddingDate"
@@ -246,13 +251,13 @@ export function PublicJoinForm({
       {fieldDefinitions.length > 0 && (
         <div className="space-y-4 border-t border-border pt-4">
           {fieldDefinitions.map((def) => (
-            <PublicCustomFieldInput key={def.key} definition={def} />
+            <PublicCustomFieldInput key={def.key} definition={def} bilingual={bilingual} />
           ))}
         </div>
       )}
 
       <Button type="submit" disabled={pending} className="w-full">
-        {pending ? t.common.submitting : t.publicJoin.submitRequest}
+        {pending ? t.common.submitting : bt((d) => d.publicJoin.submitRequest)}
       </Button>
     </form>
   );

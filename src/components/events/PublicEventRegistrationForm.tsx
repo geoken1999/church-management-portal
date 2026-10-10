@@ -1,5 +1,6 @@
 "use client";
 
+import { bilingualText, type BilingualConfig } from "@/lib/bilingual/config";
 import { useActionState, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import {
@@ -23,16 +24,16 @@ import { CheckCircle2, Send } from "lucide-react";
 
 const initialState: PublicEventRegistrationState = {};
 
-function FieldLabel({ field }: { field: FormField }) {
+function FieldLabel({ field, bilingual }: { field: FormField; bilingual: BilingualConfig | null }) {
   return (
     <Label htmlFor={`field-${field.key}`} className="text-sm font-medium">
-      {field.label}
+      {bilingualText(field.label, bilingual)}
       {field.required && <span className="text-destructive"> *</span>}
     </Label>
   );
 }
 
-function PublicFieldInput({ field }: { field: FormField }) {
+function PublicFieldInput({ field, bilingual }: { field: FormField; bilingual: BilingualConfig | null }) {
   const { t } = useLocale();
   const id = `field-${field.key}`;
 
@@ -41,7 +42,7 @@ function PublicFieldInput({ field }: { field: FormField }) {
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/30 p-4 text-sm transition-colors hover:bg-muted/60">
         <Checkbox name={field.key} required={field.required} className="mt-0.5" />
         <span>
-          {field.label}
+          {bilingualText(field.label, bilingual)}
           {field.required && <span className="text-destructive"> *</span>}
         </span>
       </label>
@@ -51,7 +52,7 @@ function PublicFieldInput({ field }: { field: FormField }) {
   if (field.field_type === "select") {
     return (
       <div className="space-y-2">
-        <FieldLabel field={field} />
+        <FieldLabel field={field} bilingual={bilingual} />
         <Select name={field.key}>
           <SelectTrigger id={id} className="h-11 w-full rounded-xl px-3.5 text-base shadow-sm">
             <SelectValue placeholder={t.common.selectAnOption} />
@@ -59,7 +60,7 @@ function PublicFieldInput({ field }: { field: FormField }) {
           <SelectContent>
             {(field.options ?? []).map((option) => (
               <SelectItem key={option} value={option}>
-                {option}
+                {bilingualText(option, bilingual)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -71,7 +72,7 @@ function PublicFieldInput({ field }: { field: FormField }) {
   if (field.field_type === "textarea") {
     return (
       <div className="space-y-2">
-        <FieldLabel field={field} />
+        <FieldLabel field={field} bilingual={bilingual} />
         <Textarea id={id} name={field.key} required={field.required} rows={3} className="rounded-xl px-3.5 py-3 text-base shadow-sm" />
       </div>
     );
@@ -90,7 +91,7 @@ function PublicFieldInput({ field }: { field: FormField }) {
 
   return (
     <div className="space-y-2">
-      <FieldLabel field={field} />
+      <FieldLabel field={field} bilingual={bilingual} />
       <Input id={id} name={field.key} type={inputType} required={field.required} className="h-11 rounded-xl px-3.5 text-base shadow-sm" />
     </div>
   );
@@ -161,7 +162,7 @@ function PaymentFailedCard({ registrationId }: { registrationId: string | null }
   );
 }
 
-export function PublicEventRegistrationForm({ token, fields }: { token: string; fields: FormField[] }) {
+export function PublicEventRegistrationForm({ token, fields, bilingual = null }: { token: string; fields: FormField[]; bilingual?: BilingualConfig | null }) {
   const { t } = useLocale();
   const searchParams = useSearchParams();
   const registerWithToken = registerForEvent.bind(null, token);
@@ -280,7 +281,7 @@ export function PublicEventRegistrationForm({ token, fields }: { token: string; 
       )}
       <div className="space-y-4">
         {fields.map((field) => (
-          <PublicFieldInput key={field.key} field={field} />
+          <PublicFieldInput key={field.key} field={field} bilingual={bilingual} />
         ))}
       </div>
       <Button type="submit" size="lg" className="w-full rounded-xl shadow-sm" disabled={pending}>

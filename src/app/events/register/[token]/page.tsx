@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { sanitizeBilingual } from "@/lib/bilingual/config";
 import { PublicEventRegistrationPageView } from "@/components/events/PublicEventRegistrationPageView";
 
 export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
@@ -22,5 +24,13 @@ export default async function PublicEventRegistrationPage({ params }: { params: 
     console.error(`get_public_event_registration(${token}) failed:`, error.message);
   }
 
-  return <PublicEventRegistrationPageView token={token} data={data ?? null} />;
+  // Two-language settings are read here, not through the RPC, so it didn't
+  // have to change.
+  let bilingual = null;
+  if (data) {
+    const { data: row } = await createAdminClient().from("events").select("registration_bilingual").eq("registration_share_token", token).maybeSingle();
+    bilingual = sanitizeBilingual(row?.registration_bilingual);
+  }
+
+  return <PublicEventRegistrationPageView token={token} data={data ? { ...data, bilingual } : null} />;
 }

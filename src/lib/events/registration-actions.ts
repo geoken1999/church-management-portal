@@ -1,5 +1,7 @@
 "use server";
 
+import { collectTranslatableStrings, sanitizeBilingual } from "@/lib/bilingual/config";
+import { ensureTranslations } from "@/lib/bilingual/translate";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
@@ -23,7 +25,7 @@ import {
 } from "@/lib/events/registration-validation";
 import { getImageDimensions } from "@/lib/events/image-dimensions";
 import { sendPassEmailForRegistration } from "@/lib/events/public-registration-actions";
-import type { EventRegistration, EventReminderOffset, EventPaymentGateway, EventPaymentTiming, PayoutMethod } from "@/types/database";
+import type { Event, EventRegistration, EventReminderOffset, EventPaymentGateway, EventPaymentTiming, PayoutMethod } from "@/types/database";
 
 const EVENTS_PATH = "/dashboard/events";
 
@@ -55,6 +57,8 @@ export interface RegistrationSettingsState {
   error?: string;
   fieldErrors?: RegistrationSettingsErrors;
   success?: boolean;
+  // Saved, but with something the admin should know (e.g. translation incomplete).
+  warning?: string;
 }
 
 // Turns registration on for the first time, seeding the default
@@ -156,9 +160,33 @@ export async function updateEventRegistrationSettings(
   }
 
   const admin = createAdminClient();
+
+  // Two-language display: translate whatever text is new or changed (the
+  // event's title and description too, since the public page shows them).
+  let bilingual: Event["registration_bilingual"] = null;
+  let warning: string | undefined;
+  let wanted: ReturnType<typeof sanitizeBilingual> = null;
+  try {
+    const rawBilingual = String(formData.get("bilingual") ?? "");
+    wanted = rawBilingual ? sanitizeBilingual(JSON.parse(rawBilingual)) : null;
+  } catch {
+    wanted = null;
+  }
+  if (wanted) {
+    const { data: current } = await admin.from("events").select("title, description, registration_bilingual").eq("id", eventId).maybeSingle();
+    const outcome = await ensureTranslations(
+      wanted,
+      collectTranslatableStrings({ title: current?.title, description: current?.description, fields }),
+      sanitizeBilingual(current?.registration_bilingual),
+    );
+    bilingual = outcome.config;
+    warning = outcome.warning;
+  }
+
   const { error } = await admin
     .from("events")
     .update({
+      registration_bilingual: bilingual,
       registration_fields: fields,
       registration_capacity: capacity.trim() ? Number(capacity) : null,
       registration_closes_at: closesAt.trim() ? new Date(closesAt).toISOString() : null,
@@ -178,7 +206,7 @@ export async function updateEventRegistrationSettings(
   }
 
   revalidatePath(EVENTS_PATH);
-  return { success: true };
+  return { success: true, warning };
 }
 
 export async function cancelEventRegistration(formData: FormData) {

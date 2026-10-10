@@ -1,5 +1,6 @@
 "use server";
 
+import { getWhatsAppCredentials } from "@/lib/whatsapp/credentials";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -117,7 +118,7 @@ export async function createWhatsAppTemplateAction(_prevState: TemplateFormState
     const { error: storageError } = await admin.storage.from(HEADER_IMAGE_BUCKET).upload(headerPath, headerBytes, { contentType: headerFile.type, upsert: false });
     if (storageError) return { error: "Couldn't save the header image. Please try again." };
     try {
-      headerHandle = await uploadTemplateHeaderSample({ bytes: headerBytes, mime: headerFile.type, fileName: headerFile.name || "header" });
+      headerHandle = await uploadTemplateHeaderSample({ bytes: headerBytes, mime: headerFile.type, fileName: headerFile.name || "header", credentials: await getWhatsAppCredentials(organizationId) });
     } catch (err) {
       await admin.storage.from(HEADER_IMAGE_BUCKET).remove([headerPath]);
       return { error: err instanceof Error ? err.message : "Couldn't upload the header image to WhatsApp." };
@@ -126,7 +127,7 @@ export async function createWhatsAppTemplateAction(_prevState: TemplateFormState
 
   let metaResult;
   try {
-    metaResult = await createMetaTemplate({ name, language: "en_US", category, bodyText, exampleValues: exampleValues.slice(0, variableCount), headerHandle, buttons });
+    metaResult = await createMetaTemplate({ name, language: "en_US", category, bodyText, exampleValues: exampleValues.slice(0, variableCount), headerHandle, buttons, credentials: await getWhatsAppCredentials(organizationId) });
   } catch (err) {
     const detail = describeWhatsAppError(err);
     await logPlatformEvent({
@@ -276,7 +277,7 @@ export async function refreshWhatsAppTemplateStatusAction(templateId: string): P
   if (!template.meta_template_id) return { error: "This template was never submitted to WhatsApp." };
 
   try {
-    const { status, rejectedReason } = await fetchMetaTemplateStatus(template.meta_template_id);
+    const { status, rejectedReason } = await fetchMetaTemplateStatus(template.meta_template_id, await getWhatsAppCredentials(template.organization_id));
     await admin.from("whatsapp_templates").update({ status, rejected_reason: rejectedReason }).eq("id", templateId);
   } catch (err) {
     const detail = describeWhatsAppError(err);
@@ -311,7 +312,7 @@ export async function deleteWhatsAppTemplateAction(templateId: string): Promise<
   }
 
   try {
-    await deleteMetaTemplate(template.name);
+    await deleteMetaTemplate(template.name, await getWhatsAppCredentials(template.organization_id));
   } catch (err) {
     // If Meta already doesn't have it (e.g. the create call above
     // succeeded in our DB but the template was removed on Meta's side
@@ -451,7 +452,7 @@ export async function sendBulkWhatsAppAction(formData: FormData): Promise<SendWh
       template.header_type === "image" && template.header_image_path
         ? admin.storage.from(HEADER_IMAGE_BUCKET).getPublicUrl(template.header_image_path).data.publicUrl
         : null;
-    result = await sendBulkTemplateMessage({ templateName: template.name, languageCode: template.language, recipients: sendList, headerImageUrl });
+    result = await sendBulkTemplateMessage({ templateName: template.name, languageCode: template.language, recipients: sendList, headerImageUrl, credentials: await getWhatsAppCredentials(organizationId) });
   } catch (err) {
     const detail = describeWhatsAppError(err);
     await logPlatformEvent({
@@ -522,7 +523,7 @@ export async function sendWhatsAppReplyAction(conversationId: string, body: stri
 
   let messageId: string;
   try {
-    const result = await sendTextMessage({ to: conversation.phone_number, body });
+    const result = await sendTextMessage({ to: conversation.phone_number, body, credentials: await getWhatsAppCredentials(conversation.organization_id) });
     messageId = result.id;
   } catch (err) {
     // The most common cause here is WhatsApp's 24-hour customer-service

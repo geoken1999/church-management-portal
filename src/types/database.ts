@@ -2162,6 +2162,12 @@ export type Database = {
           },
         ];
       };
+      member_home_layouts: {
+        Row: MemberHomeLayoutRow;
+        Insert: Partial<MemberHomeLayoutRow> & Pick<MemberHomeLayoutRow, "organization_id" | "status" | "layout">;
+        Update: Partial<MemberHomeLayoutRow>;
+        Relationships: [];
+      };
       cron_job_runs: {
         Row: CronJobRun;
         Insert: Partial<CronJobRun> & Pick<CronJobRun, "job_key" | "trigger">;
@@ -3516,4 +3522,13 @@ export type CronJobRun = {
   error_message: string | null;
   started_at: string;
   finished_at: string | null;
+};
+
+export type MemberHomeLayoutRow = {
+  id: string;
+  organization_id: string;
+  status: "draft" | "published";
+  layout: Record<string, unknown>;
+  updated_by: string | null;
+  updated_at: string;
 };

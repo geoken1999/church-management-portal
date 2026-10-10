@@ -23,7 +23,11 @@ function toJpeg(canvas: HTMLCanvasElement, quality: number): Promise<Blob | null
 // stay under the upload limit, which also keeps it small against the
 // church's storage package.
 export function BannerCropDialog({ bitmap, onCancel, onConfirm }: { bitmap: ImageBitmap | null; onCancel: () => void; onConfirm: (file: File) => void }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // The canvas lives inside the dialog's portal, which mounts after this
+  // component renders. Tracking the element in state (via the callback ref)
+  // is what makes the draw effect re-run once it actually exists; a plain
+  // ref left the preview, and the exported file, blank (black).
+  const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
   const [zoom, setZoom] = useState(1);
   const [rawOffset, setRawOffset] = useState({ x: 0, y: 0 });
   const [encoding, setEncoding] = useState(false);
@@ -45,14 +49,18 @@ export function BannerCropDialog({ bitmap, onCancel, onConfirm }: { bitmap: Imag
     }
   }
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx || !bitmap) return;
+  function draw(target: HTMLCanvasElement) {
+    const ctx = target.getContext("2d");
+    if (!ctx || !bitmap) return;
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, BANNER_WIDTH, BANNER_HEIGHT);
     ctx.drawImage(bitmap, offset.x, offset.y, dispW, dispH);
-  }, [bitmap, offset.x, offset.y, dispW, dispH]);
+  }
+
+  useEffect(() => {
+    if (canvas) draw(canvas);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvas, bitmap, offset.x, offset.y, dispW, dispH]);
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -68,8 +76,10 @@ export function BannerCropDialog({ bitmap, onCancel, onConfirm }: { bitmap: Imag
   }
 
   async function handleConfirm() {
-    const canvas = canvasRef.current;
     if (!canvas) return;
+    // Draw once more right before encoding, so the file is never exported
+    // from a canvas that hasn't painted.
+    draw(canvas);
     setEncoding(true);
     for (const quality of [0.85, 0.7, 0.55, 0.4]) {
       const blob = await toJpeg(canvas, quality);
@@ -95,7 +105,7 @@ export function BannerCropDialog({ bitmap, onCancel, onConfirm }: { bitmap: Imag
 
         <div className="flex flex-col items-center gap-4">
           <canvas
-            ref={canvasRef}
+            ref={setCanvas}
             width={BANNER_WIDTH}
             height={BANNER_HEIGHT}
             className="aspect-[2/1] w-full max-w-md cursor-move touch-none rounded-lg border border-border"

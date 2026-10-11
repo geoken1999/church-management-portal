@@ -693,6 +693,8 @@ export type WhatsAppTemplate = {
   header_type: "none" | "image";
   header_image_path: string | null;
   buttons: WhatsAppTemplateButton[];
+  // Set when this is a church's copy of a KingdomFlow-provided template.
+  platform_template_id: string | null;
   meta_template_id: string | null;
   status: WhatsAppTemplateStatus;
   rejected_reason: string | null;
@@ -2176,6 +2178,12 @@ export type Database = {
           },
         ];
       };
+      platform_whatsapp_templates: {
+        Row: PlatformWhatsAppTemplate;
+        Insert: Partial<PlatformWhatsAppTemplate> & Pick<PlatformWhatsAppTemplate, "catalog_key" | "name" | "category" | "body_text">;
+        Update: Partial<PlatformWhatsAppTemplate>;
+        Relationships: [];
+      };
       organization_whatsapp_connections: {
         Row: OrganizationWhatsAppConnection;
         Insert: Partial<OrganizationWhatsAppConnection> & Pick<OrganizationWhatsAppConnection, "organization_id" | "connection_method" | "waba_id" | "phone_number_id" | "access_token_encrypted">;
@@ -3568,6 +3576,21 @@ export type OrganizationWhatsAppConnection = {
   last_error: string | null;
   last_checked_at: string | null;
   connected_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PlatformWhatsAppTemplate = {
+  id: string;
+  catalog_key: string;
+  name: string;
+  language: string;
+  category: WhatsAppTemplateCategory;
+  body_text: string;
+  variable_count: number;
+  meta_template_id: string | null;
+  status: WhatsAppTemplateStatus;
+  rejected_reason: string | null;
   created_at: string;
   updated_at: string;
 };

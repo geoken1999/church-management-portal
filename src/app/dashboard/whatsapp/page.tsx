@@ -5,6 +5,9 @@ import { getBranches } from "@/lib/branches/dal";
 import { getWhatsAppCampaigns, getWhatsAppSendAvailability, getWhatsAppTemplates, getWhatsAppConversations, getWhatsAppConversationMessages } from "@/lib/whatsapp/dal";
 import { resolvePhoneCountry } from "@/lib/whatsapp/validation";
 import { getWhatsAppConnectionSummary } from "@/lib/whatsapp/credentials";
+import { syncPlatformTemplatesForOrg } from "@/lib/whatsapp/platform-templates";
+import { PlatformTemplatesCard } from "@/components/whatsapp/PlatformTemplatesCard";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { WhatsAppConnectionCard } from "@/components/whatsapp/WhatsAppConnectionCard";
 import { getSiteUrl } from "@/lib/site-url";
 import { WhatsAppManager } from "@/components/whatsapp/WhatsAppManager";
@@ -23,6 +26,10 @@ export default async function WhatsAppPage() {
   if (!membership.tabAccess.whatsapp.read) {
     return <AccessRestricted label="WhatsApp" />;
   }
+
+  // KingdomFlow's ready-made templates, copied in for churches on the shared
+  // number before the list is read.
+  await syncPlatformTemplatesForOrg(organizationId);
 
   const [members, branches, campaigns, templates, conversations, availability, connection] = await Promise.all([
     getMembers(organizationId),
@@ -65,6 +72,12 @@ export default async function WhatsAppPage() {
 
       <WhatsAppConnectionCard connection={connection} isOrgAdmin={isOrgAdmin} webhookUrl={`${getSiteUrl()}/api/whatsapp/webhook`} />
 
+      {connection && isOrgAdmin && (
+        <PlatformTemplatesCard
+          templates={await getPlatformTemplatesForOwnNumber(templates.map((t) => t.name))}
+        />
+      )}
+
       <WhatsAppManager
         organizationId={organizationId}
         canSend={membership.tabAccess.whatsapp.write}
@@ -80,4 +93,12 @@ export default async function WhatsAppPage() {
       />
     </div>
   );
+}
+
+// For a church with its own number: the platform templates it hasn't added
+// to its own account yet.
+async function getPlatformTemplatesForOwnNumber(ownNames: string[]) {
+  const admin = createAdminClient();
+  const { data } = await admin.from("platform_whatsapp_templates").select("id, name, body_text").eq("status", "approved");
+  return (data ?? []).filter((t) => !ownNames.includes(t.name)).map((t) => ({ id: t.id, name: t.name, body: t.body_text }));
 }

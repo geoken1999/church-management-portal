@@ -39,6 +39,7 @@ export default async function PlatformAdminFeatureFlagsPage() {
           <li>
             <strong>Live</strong>: everyone can use it. Moving from Beta to Live shows a New tag for 15 days.
           </li>
+          <li>A newly added module starts in <strong>Testing</strong> until you move it.</li>
         </ul>
       </div>
 

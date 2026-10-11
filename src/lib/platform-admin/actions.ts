@@ -1,6 +1,6 @@
 "use server";
 
-import { FEATURE_STATUS_LABELS, isFeatureStatus, nextNewUntil, type FeatureStatus } from "@/lib/platform-admin/feature-status";
+import { defaultStatusFor, FEATURE_STATUS_LABELS, isFeatureStatus, nextNewUntil, type FeatureStatus } from "@/lib/platform-admin/feature-status";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
@@ -464,7 +464,7 @@ export async function setFeatureStatus(tabKey: TabKey, status: FeatureStatus): P
 
   const admin = createAdminClient();
   const { data: current } = await admin.from("platform_feature_flags").select("status, enabled, new_until").eq("tab_key", tabKey).maybeSingle();
-  const from: FeatureStatus = !current ? "live" : !current.enabled ? "off" : isFeatureStatus(current.status) ? current.status : "live";
+  const from: FeatureStatus = !current ? defaultStatusFor(tabKey) : !current.enabled ? "off" : isFeatureStatus(current.status) ? current.status : "live";
   const now = new Date();
 
   await admin.from("platform_feature_flags").upsert(

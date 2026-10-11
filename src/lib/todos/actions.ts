@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { validateTodo, type TodoFieldErrors } from "@/lib/todos/validation";
+import { parseAssignee } from "@/lib/todos/assignee";
 import { sendPushToUsers } from "@/lib/push/client";
 import { DEFAULT_TIMEZONE, zonedTimeToUtc } from "@/lib/organizations/timezone";
 
@@ -53,6 +54,34 @@ export interface TodoFormState {
 // updateTodo/toggleTodoStatus/deleteTodo forms only carry the todo id, not
 // organizationId — looked up from the record itself before a permission
 // check is possible.
+interface ResolvedAssignee {
+  assigned_to: string | null;
+  assigned_member_id: string | null;
+  // Who to push to: a team member's own login, or a leader's mobile login if
+  // they have signed in to the app.
+  pushTarget: string | null;
+}
+
+// Turns the form's assignee choice into the columns to save. A leader must
+// really be a leader of this church (the dropdown only offers them, but the
+// request is checked, not trusted).
+async function resolveAssignee(organizationId: string, raw: string): Promise<ResolvedAssignee | { error: string }> {
+  const choice = parseAssignee(raw);
+  if (!choice) return { error: "That assignee isn't valid." };
+  if (choice.kind === "none") return { assigned_to: null, assigned_member_id: null, pushTarget: null };
+  if (choice.kind === "user") return { assigned_to: choice.id, assigned_member_id: null, pushTarget: choice.id };
+
+  const supabase = await createClient();
+  const { data: leader } = await supabase
+    .from("leaders")
+    .select("member_id, members(auth_user_id)")
+    .eq("organization_id", organizationId)
+    .eq("member_id", choice.id)
+    .maybeSingle();
+  if (!leader) return { error: "That leader could not be found." };
+  return { assigned_to: null, assigned_member_id: choice.id, pushTarget: leader.members?.auth_user_id ?? null };
+}
+
 async function organizationIdForTodo(id: string): Promise<string | null> {
   const supabase = await createClient();
   const { data } = await supabase.from("todos").select("organization_id").eq("id", id).maybeSingle();
@@ -79,13 +108,17 @@ export async function createTodo(_prevState: TodoFormState, formData: FormData):
   const event = await resolveEvent(membership.organization.id, fields.eventId);
   if (event === undefined) return { error: "That event could not be found." };
 
+  const assignee = await resolveAssignee(membership.organization.id, fields.assignedTo);
+  if ("error" in assignee) return { error: assignee.error };
+
   const supabase = await createClient();
   const { error } = await supabase.from("todos").insert({
     organization_id: membership.organization.id,
     title: fields.title,
     description: fields.description || null,
     due_at: dueAtFromForm(fields.dueAt, membership.organization.timezone),
-    assigned_to: fields.assignedTo || null,
+    assigned_to: assignee.assigned_to,
+    assigned_member_id: assignee.assigned_member_id,
     todo_event_id: fields.eventId || null,
     created_by: user.id,
   });
@@ -94,8 +127,8 @@ export async function createTodo(_prevState: TodoFormState, formData: FormData):
     return { error: "Couldn't add that to-do. Please try again." };
   }
 
-  if (fields.assignedTo && fields.assignedTo !== user.id) {
-    void sendPushToUsers([fields.assignedTo], "todo_assigned", {
+  if (assignee.pushTarget && assignee.pushTarget !== user.id) {
+    void sendPushToUsers([assignee.pushTarget], "todo_assigned", {
       title: event ? `New to-do for ${event.title}` : "New to-do assigned to you",
       body: fields.title,
       data: { type: "todo_assigned" },
@@ -131,13 +164,16 @@ export async function updateTodo(_prevState: TodoFormState, formData: FormData):
   const event = await resolveEvent(organizationId, fields.eventId);
   if (event === undefined) return { error: "That event could not be found." };
 
+  const assignee = await resolveAssignee(organizationId, fields.assignedTo);
+  if ("error" in assignee) return { error: assignee.error };
+
   const supabase = await createClient();
 
   // Read the previous assignee first — only a change TO a new assignee
   // should notify; re-saving the same assignment on every edit would spam
   // them.
-  const { data: existing } = await supabase.from("todos").select("assigned_to").eq("id", id).maybeSingle();
-  const previousAssignedTo = existing?.assigned_to ?? null;
+  const { data: existing } = await supabase.from("todos").select("assigned_to, assigned_member_id").eq("id", id).maybeSingle();
+  const unchangedAssignee = (existing?.assigned_to ?? null) === assignee.assigned_to && (existing?.assigned_member_id ?? null) === assignee.assigned_member_id;
 
   const { error } = await supabase
     .from("todos")
@@ -145,7 +181,8 @@ export async function updateTodo(_prevState: TodoFormState, formData: FormData):
       title: fields.title,
       description: fields.description || null,
       due_at: dueAtFromForm(fields.dueAt, timeZone),
-      assigned_to: fields.assignedTo || null,
+      assigned_to: assignee.assigned_to,
+      assigned_member_id: assignee.assigned_member_id,
       todo_event_id: fields.eventId || null,
     })
     .eq("id", id);
@@ -154,9 +191,8 @@ export async function updateTodo(_prevState: TodoFormState, formData: FormData):
     return { error: "Couldn't save those changes. Please try again." };
   }
 
-  const newAssignedTo = fields.assignedTo || null;
-  if (newAssignedTo && newAssignedTo !== previousAssignedTo && newAssignedTo !== user.id) {
-    void sendPushToUsers([newAssignedTo], "todo_assigned", {
+  if (assignee.pushTarget && !unchangedAssignee && assignee.pushTarget !== user.id) {
+    void sendPushToUsers([assignee.pushTarget], "todo_assigned", {
       title: event ? `New to-do for ${event.title}` : "New to-do assigned to you",
       body: fields.title,
       data: { type: "todo_assigned" },

@@ -18,6 +18,28 @@ export const FEATURE_STATUS_HELP: Record<FeatureStatus, string> = {
 };
 
 export const NEW_TAG_DAYS = 15;
+
+// The modules that were already live before new modules started in testing.
+// A module with no saved status is live only if it is listed here; any other
+// (a module added since) starts in testing, so it reaches the test users only
+// until a platform admin moves it to Beta or Live. Adding a new module needs
+// no change here: leaving it out of this list is what makes it start in
+// testing. Once a platform admin sets a status, that is saved and this list
+// no longer matters for it.
+export const LAUNCHED_MODULES: readonly string[] = [
+  "branches", "members", "attendance", "leaders", "youth", "committee", "families",
+  "ministries", "worship", "media", "events", "todos", "planner", "kmeet", "kaudio",
+  "forms", "folder", "reports", "widget", "accounting", "fundraisers", "offerings",
+  "donations", "email", "sms", "whatsapp", "instagram", "youtube", "facebook",
+  "aitools", "airules", "automations",
+];
+
+export const DEFAULT_NEW_MODULE_STATUS: FeatureStatus = "testing";
+
+// The status of a module nobody has set yet.
+export function defaultStatusFor(tab: string): FeatureStatus {
+  return LAUNCHED_MODULES.includes(tab) ? "live" : DEFAULT_NEW_MODULE_STATUS;
+}
 const DEFAULT_TESTER_EMAILS = ["geoken199915@gmail.com"];
 
 export function isFeatureStatus(value: unknown): value is FeatureStatus {

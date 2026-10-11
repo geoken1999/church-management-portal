@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getOrganizationMembers } from "@/lib/organizations/dal";
 import { getTodos, getTodoEvents } from "@/lib/todos/dal";
+import { getLeaders } from "@/lib/leaders/dal";
 import { TodosManager } from "@/components/todos/TodosManager";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
@@ -17,16 +18,25 @@ export default async function TodosPage() {
     return <AccessRestricted label="To Do" />;
   }
 
-  const [todos, teamMembers, todoEvents] = await Promise.all([
+  const [todos, teamMembers, todoEvents, leaders] = await Promise.all([
     getTodos(organizationId),
     getOrganizationMembers(organizationId),
     getTodoEvents(organizationId),
+    getLeaders(organizationId),
   ]);
 
-  const memberOptions = teamMembers.map((m) => ({
-    authUserId: m.auth_user_id,
-    name: `${m.profiles.first_name} ${m.profiles.last_name}`,
-  }));
+  // Who a to-do can go to: leaders (church members, picked up the moment
+  // they are added as a leader) and team members who log in to the dashboard.
+  const memberOptions = [
+    ...leaders
+      .filter((l) => l.members)
+      .map((l) => ({ value: `m:${l.member_id}`, name: `${l.members?.first_name} ${l.members?.last_name}`, group: "Leaders" as const })),
+    ...teamMembers.map((m) => ({
+      value: `u:${m.auth_user_id}`,
+      name: `${m.profiles.first_name} ${m.profiles.last_name}`,
+      group: "Team" as const,
+    })),
+  ];
 
   return (
     <div className="space-y-8">

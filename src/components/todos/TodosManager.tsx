@@ -9,6 +9,7 @@ import {
   deleteTodo,
   type TodoFormState,
 } from "@/lib/todos/actions";
+import { assigneeValue } from "@/lib/todos/assignee";
 import { createTodoEventAction, deleteTodoEventAction, updateTodoEventAction } from "@/lib/todos/event-actions";
 import type { Todo } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { formatInTimezone, partsInTimezone } from "@/lib/organizations/timezone";
 import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTab, TabsIndicator } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -33,9 +34,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+// Someone a to-do can be assigned to: a team member who logs in to the
+// dashboard (value "u:<id>") or a leader (value "m:<member id>"). See
+// src/lib/todos/assignee.ts.
 export interface TeamMemberOption {
-  authUserId: string;
+  value: string;
   name: string;
+  group: "Team" | "Leaders";
 }
 
 export interface EventOption {
@@ -46,6 +51,7 @@ export interface EventOption {
 
 export type TodoRow = Todo & {
   assignee: { first_name: string; last_name: string } | null;
+  assigned_member: { first_name: string; last_name: string } | null;
   creator: { first_name: string; last_name: string } | null;
   event: { id: string; title: string; event_date: string | null } | null;
 };
@@ -161,16 +167,24 @@ function TodoFormFields({
           <Select value={assignedTo || "unassigned"} onValueChange={(v) => onAssignedToChange(v === "unassigned" ? "" : (v ?? ""))}>
             <SelectTrigger id="todo-assigned-to" className="w-full">
               <SelectValue>
-                {() => members.find((m) => m.authUserId === assignedTo)?.name ?? "Unassigned"}
+                {() => members.find((m) => m.value === assignedTo)?.name ?? "Unassigned"}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="unassigned">Unassigned</SelectItem>
-              {members.map((member) => (
-                <SelectItem key={member.authUserId} value={member.authUserId}>
-                  {member.name}
-                </SelectItem>
-              ))}
+              {(["Leaders", "Team"] as const).map((group) => {
+                const people = members.filter((m) => m.group === group);
+                return people.length === 0 ? null : (
+                  <SelectGroup key={group}>
+                    <SelectLabel>{group === "Leaders" ? "Leaders" : "Team members (with a login)"}</SelectLabel>
+                    {people.map((person) => (
+                      <SelectItem key={person.value} value={person.value}>
+                        {person.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                );
+              })}
             </SelectContent>
           </Select>
           <input type="hidden" name="assignedTo" value={assignedTo} />
@@ -281,7 +295,7 @@ function EditTodoDialog({ todo, members, events, timezone }: { todo: TodoRow; me
   const [title, setTitle] = useState(todo.title);
   const [description, setDescription] = useState(todo.description ?? "");
   const [dueAt, setDueAt] = useState(toDatetimeLocal(todo.due_at, timezone));
-  const [assignedTo, setAssignedTo] = useState(todo.assigned_to ?? "");
+  const [assignedTo, setAssignedTo] = useState(assigneeValue(todo.assigned_to, todo.assigned_member_id));
   const [eventId, setEventId] = useState(todo.todo_event_id ?? "");
 
   function handleSubmit(formData: FormData) {
@@ -302,7 +316,7 @@ function EditTodoDialog({ todo, members, events, timezone }: { todo: TodoRow; me
           setTitle(todo.title);
           setDescription(todo.description ?? "");
           setDueAt(toDatetimeLocal(todo.due_at, timezone));
-          setAssignedTo(todo.assigned_to ?? "");
+          setAssignedTo(assigneeValue(todo.assigned_to, todo.assigned_member_id));
           setEventId(todo.todo_event_id ?? "");
         }
       }}
@@ -422,10 +436,11 @@ function TodoItemRow({ todo, members, events, timezone }: { todo: TodoRow; membe
               {formatDueDate(todo.due_at, timezone)}
             </Badge>
           )}
-          {todo.assignee && (
+          {(todo.assignee ?? todo.assigned_member) && (
             <Badge variant="secondary">
               <User className="size-3" />
-              {todo.assignee.first_name} {todo.assignee.last_name}
+              {(todo.assignee ?? todo.assigned_member)?.first_name} {(todo.assignee ?? todo.assigned_member)?.last_name}
+              {todo.assigned_member && !todo.assignee ? " (leader)" : ""}
             </Badge>
           )}
         </div>

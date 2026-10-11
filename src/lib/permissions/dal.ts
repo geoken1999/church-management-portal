@@ -29,9 +29,10 @@ export async function checkTabAccess(
   // Checked before anything org/role-specific — a platform admin turning a
   // feature off applies to every tenant, including owners, who otherwise
   // bypass the tab_permissions matrix entirely below.
-  const disabledFeatures = await getDisabledFeatures();
+  const currentUser = await requireUser();
+  const disabledFeatures = await getDisabledFeatures(currentUser.email);
   if (disabledFeatures.has(tab)) {
-    return { ok: false, message: "This feature has been turned off platform-wide." };
+    return { ok: false, message: "This feature isn't available right now." };
   }
 
   // A tab the org's plan (or a platform-admin custom rule) excludes is off
@@ -41,7 +42,7 @@ export async function checkTabAccess(
     return { ok: false, message: "This feature isn't included in your plan." };
   }
 
-  const user = await requireUser();
+  const user = currentUser;
   const supabase = await createClient();
 
   const { data } = await supabase

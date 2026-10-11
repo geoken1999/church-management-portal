@@ -64,6 +64,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggleLoader";
 import { CreditBalances, type CreditWallet } from "@/components/dashboard/CreditBalances";
 import { DashboardLocaleProvider } from "@/lib/i18n/DashboardLocaleProvider";
+import type { FeatureTag } from "@/lib/platform-admin/feature-status";
 import { QrLogoProvider } from "@/components/organizations/QrLogoContext";
 import { useLocale } from "@/lib/i18n/LocaleContext";
 import type { AppLocale } from "@/lib/i18n/config";
@@ -199,6 +200,7 @@ export function DashboardShell(
     memberships: OrganizationMembership[];
     notifications: Notification[];
     tabAccess: Record<TabKey, TabAccess>;
+    featureTags: Partial<Record<TabKey, FeatureTag>>;
     planFeatures: { finance: boolean; socialMedia: boolean };
     creditBalances: { sms: CreditWallet; ai: CreditWallet; email: CreditWallet };
     trialDaysRemaining: number | null;
@@ -216,12 +218,26 @@ export function DashboardShell(
   );
 }
 
+const FEATURE_TAG_STYLES: Record<FeatureTag, { label: string; className: string }> = {
+  beta: { label: "Beta", className: "bg-amber-500/15 text-amber-700 dark:text-amber-400" },
+  new: { label: "New", className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" },
+  testing: { label: "Testing", className: "bg-violet-500/15 text-violet-700 dark:text-violet-400" },
+};
+
+// "Beta" while a module is still being proven, "New" for 15 days after it
+// graduates, "Testing" for the test users who can see it before anyone else.
+function FeatureTagBadge({ tag }: { tag: FeatureTag }) {
+  const style = FEATURE_TAG_STYLES[tag];
+  return <span className={`rounded-full px-1.5 py-0.5 text-[10px] leading-none font-semibold ${style.className}`}>{style.label}</span>;
+}
+
 function DashboardShellInner({
   organization,
   canManage,
   memberships,
   notifications,
   tabAccess,
+  featureTags,
   planFeatures,
   creditBalances,
   trialDaysRemaining,
@@ -232,6 +248,7 @@ function DashboardShellInner({
   memberships: OrganizationMembership[];
   notifications: Notification[];
   tabAccess: Record<TabKey, TabAccess>;
+  featureTags: Partial<Record<TabKey, FeatureTag>>;
   planFeatures: { finance: boolean; socialMedia: boolean };
   creditBalances: { sms: CreditWallet; ai: CreditWallet; email: CreditWallet };
   trialDaysRemaining: number | null;
@@ -327,6 +344,7 @@ function DashboardShellInner({
               >
                 <item.icon className="size-4" />
                 <span className="flex-1">{t.nav.items[item.itemKey]}</span>
+                {item.tab && featureTags[item.tab] && <FeatureTagBadge tag={featureTags[item.tab] as FeatureTag} />}
                 {locked && <Lock className="size-3" />}
               </Link>
             );

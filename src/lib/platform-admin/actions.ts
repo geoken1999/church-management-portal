@@ -1,5 +1,6 @@
 "use server";
 
+import { FEATURE_STATUS_LABELS, isFeatureStatus, nextNewUntil, type FeatureStatus } from "@/lib/platform-admin/feature-status";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
@@ -457,19 +458,32 @@ export async function revokeSession(formData: FormData) {
 // places this is actually enforced. revalidatePath("/dashboard", "layout")
 // busts every dashboard page's cache in one call so the change is visible
 // immediately, not just after this admin page's own next load.
-export async function setFeatureFlag(tabKey: TabKey, enabled: boolean): Promise<void> {
+export async function setFeatureStatus(tabKey: TabKey, status: FeatureStatus): Promise<void> {
   const platformAdmin = await requirePlatformAdmin();
+  if (!isFeatureStatus(status)) return;
 
   const admin = createAdminClient();
-  await admin
-    .from("platform_feature_flags")
-    .upsert({ tab_key: tabKey, enabled, updated_by: platformAdmin.id, updated_at: new Date().toISOString() }, { onConflict: "tab_key" });
+  const { data: current } = await admin.from("platform_feature_flags").select("status, enabled, new_until").eq("tab_key", tabKey).maybeSingle();
+  const from: FeatureStatus = !current ? "live" : !current.enabled ? "off" : isFeatureStatus(current.status) ? current.status : "live";
+  const now = new Date();
+
+  await admin.from("platform_feature_flags").upsert(
+    {
+      tab_key: tabKey,
+      status,
+      enabled: status !== "off",
+      new_until: nextNewUntil(from, status, current?.new_until ?? null, now),
+      updated_by: platformAdmin.id,
+      updated_at: now.toISOString(),
+    },
+    { onConflict: "tab_key" },
+  );
 
   await logPlatformEvent({
-    level: "warning",
+    level: status === "off" ? "warning" : "info",
     source: "platform_admin",
-    message: `Platform admin (${platformAdmin.email ?? "unknown"}) ${enabled ? "re-enabled" : "disabled"} "${TAB_LABELS[tabKey]}" platform-wide`,
-    metadata: { tabKey, enabled },
+    message: `Platform admin (${platformAdmin.email ?? "unknown"}) set "${TAB_LABELS[tabKey]}" to ${FEATURE_STATUS_LABELS[status]} (was ${FEATURE_STATUS_LABELS[from]})`,
+    metadata: { tabKey, from, status },
   });
 
   revalidatePath(FEATURE_FLAGS_PATH);

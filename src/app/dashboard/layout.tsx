@@ -8,6 +8,7 @@ import { isPayUConfigured } from "@/lib/payu/env";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { TrialExpiredScreen } from "@/components/billing/TrialExpiredScreen";
 import { toAppLocale } from "@/lib/i18n/config";
+import { getFeatureTags } from "@/lib/platform-admin/feature-flags";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   await requireUser();
@@ -17,9 +18,10 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     getProfile(),
   ]);
   const canManage = membership.role === "owner" || membership.role === "admin";
-  const [notifications, planUsage] = await Promise.all([
+  const [notifications, planUsage, featureTags] = await Promise.all([
     getNotifications(membership.organization.id),
     getPlanUsage(membership.organization.id),
+    getFeatureTags(),
   ]);
 
   if (planUsage.accessStatus === "expired") {
@@ -42,6 +44,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       memberships={memberships}
       notifications={notifications}
       tabAccess={membership.tabAccess}
+      featureTags={featureTags}
       planFeatures={{ finance: planUsage.plan.financeEnabled, socialMedia: planUsage.plan.socialMediaEnabled }}
       creditBalances={{
         sms: {

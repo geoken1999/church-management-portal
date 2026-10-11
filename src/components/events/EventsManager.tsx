@@ -1,5 +1,6 @@
 "use client";
 
+import { effectiveEventStatus } from "@/lib/events/status";
 import { useMemo, useState, useTransition } from "react";
 import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, UserRound, Repeat, Clock, MapPin, Video, Phone, Webcam } from "lucide-react";
 import { cn } from "cn";
@@ -652,6 +653,8 @@ function EventCard({
   // Formatted in the org's own timezone, not the current viewer's browser
   // — so a staff member in India and an NRI admin see the same intended
   // wall-clock time for the same event.
+  // What the event is now (a past event reads Completed even if it was saved as Active).
+  const shownStatus = effectiveEventStatus(event, new Date(), organizationTimezone);
   const startParts = partsInTimezone(new Date(event.start_at), organizationTimezone);
   const endParts = event.end_at ? partsInTimezone(new Date(event.end_at), organizationTimezone) : null;
   const sameDay = endParts
@@ -679,7 +682,7 @@ function EventCard({
               {event.is_recurring && <Repeat className="size-3" />}
               {occurrenceLabel(event)}
             </Badge>
-            <Badge variant={EVENT_STATUS_BADGE_VARIANTS[event.status ?? "active"]}>{EVENT_STATUS_LABELS[event.status ?? "active"]}</Badge>
+            <Badge variant={EVENT_STATUS_BADGE_VARIANTS[shownStatus]}>{EVENT_STATUS_LABELS[shownStatus]}</Badge>
             {event.payment_gateway === "platform" && event.collected > 0 && (
               <EventPayoutDialog
                 eventId={event.id}
@@ -795,6 +798,23 @@ function EventsListTab({
   savedPayoutDetails: PayoutDetailsDefaultValues | null;
   organizationTimezone: string;
 }) {
+  // Filed by what an event is now, not just what it was saved as: one
+  // whose date has passed counts as completed on its own, and a cancelled
+  // one goes to Cancelled. Upcoming keeps the page's soonest-first order;
+  // the two archives list the most recent first.
+  const groups = useMemo(() => {
+    const now = new Date();
+    const upcoming: EventRow[] = [];
+    const completed: EventRow[] = [];
+    const cancelled: EventRow[] = [];
+    for (const event of events) {
+      const status = effectiveEventStatus(event, now, organizationTimezone);
+      (status === "cancelled" ? cancelled : status === "completed" ? completed : upcoming).push(event);
+    }
+    const newestFirst = (a: EventRow, b: EventRow) => b.start_at.localeCompare(a.start_at);
+    return { upcoming, completed: completed.sort(newestFirst), cancelled: cancelled.sort(newestFirst) };
+  }, [events, organizationTimezone]);
+
   if (events.length === 0) {
     return (
       <Card>
@@ -805,23 +825,49 @@ function EventsListTab({
     );
   }
 
+  const panels: { value: string; label: string; items: EventRow[]; empty: string }[] = [
+    { value: "upcoming", label: "Upcoming", items: groups.upcoming, empty: "No upcoming events." },
+    { value: "completed", label: "Completed", items: groups.completed, empty: "No completed events yet. Events move here on their own once their date has passed." },
+    { value: "cancelled", label: "Cancelled", items: groups.cancelled, empty: "No cancelled events." },
+  ];
+
   return (
-    <div className="space-y-4">
-      {events.map((event) => (
-        <EventCard
-          key={event.id}
-          event={event}
-          members={members}
-          branches={branches}
-          canManage={canManage}
-          siteUrl={siteUrl}
-          kmeetMeetings={kmeetByEventId[event.id] ?? []}
-          financeEnabled={financeEnabled}
-          savedPayoutDetails={savedPayoutDetails}
-          organizationTimezone={organizationTimezone}
-        />
+    <Tabs defaultValue="upcoming">
+      <TabsList>
+        <TabsIndicator />
+        {panels.map((panel) => (
+          <TabsTab key={panel.value} value={panel.value}>
+            {panel.label} ({panel.items.length})
+          </TabsTab>
+        ))}
+      </TabsList>
+      {panels.map((panel) => (
+        <TabsPanel key={panel.value} value={panel.value}>
+          {panel.items.length === 0 ? (
+            <Card>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">{panel.empty}</CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {panel.items.map((event) => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  members={members}
+                  branches={branches}
+                  canManage={canManage}
+                  siteUrl={siteUrl}
+                  kmeetMeetings={kmeetByEventId[event.id] ?? []}
+                  financeEnabled={financeEnabled}
+                  savedPayoutDetails={savedPayoutDetails}
+                  organizationTimezone={organizationTimezone}
+                />
+              ))}
+            </div>
+          )}
+        </TabsPanel>
       ))}
-    </div>
+    </Tabs>
   );
 }
 

@@ -14,6 +14,11 @@ const JOB_DEFINITIONS: Record<string, { label: string; description: string; load
     description: "Reminds registrants about upcoming events.",
     load: () => import("@/app/api/cron/event-reminders/route"),
   },
+  "event-status": {
+    label: "Event status",
+    description: "Marks events whose date has passed as completed.",
+    load: () => import("@/app/api/cron/event-status/route"),
+  },
   "todo-reminders": {
     label: "To-do reminders",
     description: "Reminds assignees about due to-dos.",

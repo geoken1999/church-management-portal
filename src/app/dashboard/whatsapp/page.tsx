@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getMembers } from "@/lib/members/dal";
 import { getBranches } from "@/lib/branches/dal";
+import { getMemberGroups } from "@/lib/members/groups";
+import { MemberGroupsProvider } from "@/components/members/MemberGroups";
 import { getWhatsAppCampaigns, getWhatsAppSendAvailability, getWhatsAppTemplates, getWhatsAppConversations, getWhatsAppConversationMessages } from "@/lib/whatsapp/dal";
 import { resolvePhoneCountry } from "@/lib/whatsapp/validation";
 import { getWhatsAppConnectionSummary } from "@/lib/whatsapp/credentials";
@@ -31,9 +33,10 @@ export default async function WhatsAppPage() {
   // number before the list is read.
   await syncPlatformTemplatesForOrg(organizationId);
 
-  const [members, branches, campaigns, templates, conversations, availability, connection] = await Promise.all([
+  const [members, branches, memberGroups, campaigns, templates, conversations, availability, connection] = await Promise.all([
     getMembers(organizationId),
     getBranches(organizationId),
+    getMemberGroups(organizationId),
     getWhatsAppCampaigns(organizationId),
     getWhatsAppTemplates(organizationId),
     getWhatsAppConversations(organizationId),
@@ -78,19 +81,21 @@ export default async function WhatsAppPage() {
         />
       )}
 
-      <WhatsAppManager
-        organizationId={organizationId}
-        canSend={membership.tabAccess.whatsapp.write}
-        isOrgAdmin={isOrgAdmin}
-        available={availability.available}
-        whatsappRemaining={availability.whatsappRemaining}
-        members={recipientOptions}
-        branches={branchOptions}
-        templates={templates}
-        campaigns={campaigns}
-        conversations={conversationsWithMessages}
-        orgCountryCode={orgCountry}
-      />
+      <MemberGroupsProvider groups={memberGroups}>
+        <WhatsAppManager
+          organizationId={organizationId}
+          canSend={membership.tabAccess.whatsapp.write}
+          isOrgAdmin={isOrgAdmin}
+          available={availability.available}
+          whatsappRemaining={availability.whatsappRemaining}
+          members={recipientOptions}
+          branches={branchOptions}
+          templates={templates}
+          campaigns={campaigns}
+          conversations={conversationsWithMessages}
+          orgCountryCode={orgCountry}
+        />
+      </MemberGroupsProvider>
     </div>
   );
 }

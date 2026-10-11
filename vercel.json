@@ -27,6 +27,10 @@
     {
       "path": "/api/cron/event-status",
       "schedule": "45 18 * * *"
+    },
+    {
+      "path": "/api/cron/youth-sync",
+      "schedule": "20 19 * * *"
     }
   ]
 }

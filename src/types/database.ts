@@ -34,6 +34,10 @@ export type Organization = {
   logo_url: string | null;
   // Centre mark for generated QR codes (migration 0131); null = plain QRs.
   qr_logo_url: string | null;
+  // Youth age rule, in whole years: members in this range are added to Youth
+  // automatically. Both null = off (migration 0140).
+  youth_age_from: number | null;
+  youth_age_to: number | null;
   join_bilingual: BilingualConfig | null;
   // Logo width as a % of the QR's width, 10-30 (migration 0132).
   qr_logo_size: number;
@@ -442,6 +446,8 @@ export type Youth = {
   guardian_name: string | null;
   guardian_phone: string | null;
   notes: string | null;
+  // Added by the church's youth age rule rather than by hand (migration 0140).
+  auto_added: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -3470,6 +3476,10 @@ export type Database = {
       backfill_member_custom_field: {
         Args: { p_organization_id: string; p_key: string; p_value: unknown };
         Returns: undefined;
+      };
+      sync_youth_for_org: {
+        Args: { target_org_id: string };
+        Returns: { added: number; removed: number }[];
       };
       get_organization_storage_bytes: {
         Args: { target_org_id: string };

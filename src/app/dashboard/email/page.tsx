@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getMembers } from "@/lib/members/dal";
 import { getBranches } from "@/lib/branches/dal";
+import { getMemberGroups } from "@/lib/members/groups";
+import { MemberGroupsProvider } from "@/components/members/MemberGroups";
 import { getEmailCampaigns, getEmailSmtpSummary, isEmailAvailable, getLatestEmailSetupRequest } from "@/lib/email/dal";
 import { getPlanUsage } from "@/lib/plans/dal";
 import { EmailManager } from "@/components/email/EmailManager";
@@ -20,9 +22,10 @@ export default async function EmailPage() {
     return <AccessRestricted label="Email" />;
   }
 
-  const [members, branches, campaigns, smtpSummary, emailAvailable, setupRequest, planUsage] = await Promise.all([
+  const [members, branches, memberGroups, campaigns, smtpSummary, emailAvailable, setupRequest, planUsage] = await Promise.all([
     getMembers(organizationId),
     getBranches(organizationId),
+    getMemberGroups(organizationId),
     getEmailCampaigns(organizationId),
     getEmailSmtpSummary(organizationId),
     isEmailAvailable(organizationId),
@@ -53,20 +56,22 @@ export default async function EmailPage() {
         <p className="mt-1 text-muted-foreground">Send newsletters and announcements to your congregation.</p>
       </div>
 
-      <EmailManager
-        canManage={canManage}
-        canSend={membership.tabAccess.email.write}
-        customSmtpEnabled={planUsage.plan.customSmtpEnabled}
-        planName={planUsage.plan.name}
-        emailAvailable={emailAvailable}
-        quotaExhausted={quotaExhausted}
-        emailsRemaining={planUsage.emailsRemaining}
-        smtpSummary={smtpSummary}
-        setupRequestOpen={setupRequest?.status === "open"}
-        members={recipientOptions}
-        branches={branchOptions}
-        campaigns={campaigns}
-      />
+      <MemberGroupsProvider groups={memberGroups}>
+        <EmailManager
+          canManage={canManage}
+          canSend={membership.tabAccess.email.write}
+          customSmtpEnabled={planUsage.plan.customSmtpEnabled}
+          planName={planUsage.plan.name}
+          emailAvailable={emailAvailable}
+          quotaExhausted={quotaExhausted}
+          emailsRemaining={planUsage.emailsRemaining}
+          smtpSummary={smtpSummary}
+          setupRequestOpen={setupRequest?.status === "open"}
+          members={recipientOptions}
+          branches={branchOptions}
+          campaigns={campaigns}
+        />
+      </MemberGroupsProvider>
     </div>
   );
 }

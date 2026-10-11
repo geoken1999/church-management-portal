@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getMembers } from "@/lib/members/dal";
 import { getBranches } from "@/lib/branches/dal";
+import { getMemberGroups } from "@/lib/members/groups";
+import { MemberGroupsProvider } from "@/components/members/MemberGroups";
 import { getSmsCampaigns, isSmsAvailable } from "@/lib/sms/dal";
 import { getPlanUsage } from "@/lib/plans/dal";
 import { resolvePhoneCountry } from "@/lib/sms/validation";
@@ -21,9 +23,10 @@ export default async function SmsPage() {
     return <AccessRestricted label="SMS" />;
   }
 
-  const [members, branches, campaigns, smsAvailable, planUsage] = await Promise.all([
+  const [members, branches, memberGroups, campaigns, smsAvailable, planUsage] = await Promise.all([
     getMembers(organizationId),
     getBranches(organizationId),
+    getMemberGroups(organizationId),
     getSmsCampaigns(organizationId),
     isSmsAvailable(organizationId),
     getPlanUsage(organizationId),
@@ -57,15 +60,17 @@ export default async function SmsPage() {
         <p className="mt-1 text-muted-foreground">Text message announcements and reminders to your congregation.</p>
       </div>
 
-      <SmsManager
-        canSend={membership.tabAccess.sms.write}
-        smsAvailable={smsAvailable}
-        smsRemaining={planUsage.smsRemaining}
-        members={recipientOptions}
-        branches={branchOptions}
-        campaigns={campaigns}
-        orgCountryCode={orgCountry}
-      />
+      <MemberGroupsProvider groups={memberGroups}>
+        <SmsManager
+          canSend={membership.tabAccess.sms.write}
+          smsAvailable={smsAvailable}
+          smsRemaining={planUsage.smsRemaining}
+          members={recipientOptions}
+          branches={branchOptions}
+          campaigns={campaigns}
+          orgCountryCode={orgCountry}
+        />
+      </MemberGroupsProvider>
     </div>
   );
 }

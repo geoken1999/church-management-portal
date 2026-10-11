@@ -250,6 +250,7 @@ function YouthCard({ youth, canManage }: { youth: YouthRow; canManage: boolean }
                 {age} years old
               </Badge>
             )}
+            {youth.auto_added && <Badge variant="outline">Added by age rule</Badge>}
             {youth.grade && (
               <Badge variant="outline">
                 <GraduationCap className="size-3" />

@@ -1,43 +1,41 @@
 import "server-only";
 
-import sharp from "sharp";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { getWhatsAppCredentials, type WhatsAppCredentials } from "@/lib/whatsapp/credentials";
-import { sendTemplateMessage, uploadWhatsAppMedia } from "@/lib/whatsapp/client";
-import { createMetaTemplate, fetchMetaTemplateStatus, uploadTemplateHeaderSample } from "@/lib/whatsapp/templates-client";
+import { sendTemplateMessage } from "@/lib/whatsapp/client";
+import { createMetaTemplate, fetchMetaTemplateStatus, findMetaTemplateByName } from "@/lib/whatsapp/templates-client";
 import { describeWhatsAppError } from "@/lib/whatsapp/graph-error";
 import { normalizePhoneNumber, resolvePhoneCountry } from "@/lib/whatsapp/validation";
 import { checkWhatsAppQuota } from "@/lib/plans/dal";
-import { buildQrPng } from "@/lib/events/registration-pass";
 import { formatInTimezone, DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
+import { getSiteUrl } from "@/lib/site-url";
 import { pickWhatsAppNumber } from "@/lib/events/pass-whatsapp-number";
-import type { EventRegistrationField } from "@/types/database";
+import type { EventRegistrationField, WhatsAppTemplateButton } from "@/types/database";
 
-// One template per church WhatsApp account, created automatically the
-// first time an event turns the WhatsApp pass on. The header is the pass
-// (its QR code) as an image, so it is different for every message; the body
-// carries the details as text, which is why none of it is drawn into the
-// image (no fonts to depend on, and it stays readable and searchable).
-export const PASS_TEMPLATE_NAME = "event_registration_pass";
-const PASS_TEMPLATE_BODY = "Hi {{1}}, you're registered for {{2}} on {{3}}. Your confirmation code is {{4}}. Show the QR code above at check-in.";
-const PASS_TEMPLATE_EXAMPLES = ["Ann", "Sunday Service", "Sat, 21 Nov 2026, 9:00 AM", "EVT-7K3Q9A"];
+// The WhatsApp pass is a short confirmation message with a "View pass"
+// button that opens the registrant's pass page (/pass/{token}), which shows
+// their QR code. A text-only UTILITY template: an earlier version that put
+// the QR in an image header was rejected by WhatsApp as INCORRECT_CATEGORY
+// in both the Utility and Marketing categories, while plain transactional
+// text with a link is the shape WhatsApp approves as Utility.
+//
+// One template per WhatsApp account, created automatically the first time an
+// event turns the WhatsApp pass on. The name is reserved: nothing else uses
+// the "event_registration_pass" prefix (the campaign composer hides it).
+//
+// The confirmation code is deliberately NOT in the message text: "Your
+// confirmation code is X" reads as a one-time-code (Authentication) message
+// to WhatsApp's classifier, which refused it with INCORRECT_CATEGORY under
+// both Utility and Marketing. The code is shown on the pass page instead.
+export const PASS_TEMPLATE_NAME = "event_registration_pass_ready";
+const PASS_TEMPLATE_BODY = "Hi {{1}}, your registration for {{2}} on {{3}} is confirmed. Tap the button below to view your pass for check-in.";
+const PASS_TEMPLATE_EXAMPLES = ["Ann", "Sunday Service", "Sat, 21 Nov 2026, 9:00 AM"];
+// Rejected earlier versions, cleaned out of the Templates list.
+const LEGACY_PASS_TEMPLATE_NAMES = ["event_registration_pass", "event_registration_pass_v2", "event_registration_pass_link"];
 
-// A square pass: the QR on white between two bands of the event's pass
-// colour. Text-free on purpose (see above).
-export async function buildPassImagePng(code: string, passColor: string, organizationId: string): Promise<Buffer> {
-  const color = /^#[0-9a-f]{6}$/i.test(passColor) ? passColor : "#7c3aed";
-  const size = 800;
-  const band = 96;
-  const qrSize = 560;
-  const qr = await buildQrPng(code, organizationId, qrSize);
-  const background = Buffer.from(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><rect width="${size}" height="${size}" fill="#ffffff"/><rect width="${size}" height="${band}" fill="${color}"/><rect y="${size - band}" width="${size}" height="${band}" fill="${color}"/></svg>`,
-  );
-  return sharp(background)
-    .composite([{ input: qr, left: Math.round((size - qrSize) / 2), top: Math.round((size - qrSize) / 2) }])
-    .png()
-    .toBuffer();
+export function passButtons(siteUrl: string): WhatsAppTemplateButton[] {
+  return [{ type: "url", text: "View pass", url: `${siteUrl}/pass/{{1}}` }];
 }
 
 export interface PassTemplateState {
@@ -49,9 +47,11 @@ export interface PassTemplateState {
 // refreshes its approval status. Approval is Meta's, and can take minutes
 // to hours, so a pass sent before then is skipped (and the email still
 // goes). Safe to call repeatedly.
-export async function ensurePassTemplate(organizationId: string, credentials?: WhatsAppCredentials, passColor = "#7c3aed"): Promise<PassTemplateState> {
+export async function ensurePassTemplate(organizationId: string, credentials?: WhatsAppCredentials): Promise<PassTemplateState> {
   const admin = createAdminClient();
   const creds = credentials ?? (await getWhatsAppCredentials(organizationId));
+
+  await admin.from("whatsapp_templates").delete().eq("organization_id", organizationId).in("name", LEGACY_PASS_TEMPLATE_NAMES).eq("status", "rejected");
 
   const { data: existing } = await admin
     .from("whatsapp_templates")
@@ -75,32 +75,52 @@ export async function ensurePassTemplate(organizationId: string, credentials?: W
     return { status: "pending_review" };
   }
 
+  // The button's address is fixed inside the template, so it must be the
+  // live https site, not localhost or a preview URL.
+  const siteUrl = getSiteUrl();
+  if (!siteUrl.startsWith("https://")) {
+    return { status: "error", message: "The WhatsApp pass needs the live https site address (set NEXT_PUBLIC_SITE_URL)." };
+  }
+  const buttons = passButtons(siteUrl);
+
   try {
-    const sample = await buildPassImagePng("EVT-SAMPLE", passColor, organizationId);
-    const headerHandle = await uploadTemplateHeaderSample({ bytes: sample, mime: "image/png", fileName: "pass.png", credentials: creds });
-    const result = await createMetaTemplate({
-      name: PASS_TEMPLATE_NAME,
-      language: "en_US",
-      category: "utility",
-      bodyText: PASS_TEMPLATE_BODY,
-      exampleValues: PASS_TEMPLATE_EXAMPLES,
-      headerHandle,
-      credentials: creds,
-    });
+    // Churches on the shared WhatsApp number share one account, where a
+    // template name can exist only once. If another church already created
+    // this one, use it (nothing in it is specific to a church) instead of
+    // failing on the duplicate name.
+    const onMeta = await findMetaTemplateByName(PASS_TEMPLATE_NAME, "en_US", creds);
+    const created = onMeta
+      ? { metaTemplateId: onMeta.metaTemplateId, status: onMeta.status, rejectedReason: onMeta.rejectedReason }
+      : {
+          ...(await createMetaTemplate({
+            name: PASS_TEMPLATE_NAME,
+            language: "en_US",
+            category: "utility",
+            bodyText: PASS_TEMPLATE_BODY,
+            exampleValues: PASS_TEMPLATE_EXAMPLES,
+            buttons,
+            credentials: creds,
+          })),
+          rejectedReason: null as string | null,
+        };
+
     await admin.from("whatsapp_templates").insert({
       organization_id: organizationId,
       name: PASS_TEMPLATE_NAME,
       language: "en_US",
       category: "utility",
       body_text: PASS_TEMPLATE_BODY,
-      variable_count: 4,
-      header_type: "image",
+      variable_count: 3,
+      header_type: "none",
       header_image_path: null,
-      buttons: [],
-      meta_template_id: result.metaTemplateId,
-      status: result.status,
+      buttons,
+      meta_template_id: created.metaTemplateId,
+      status: created.status,
+      rejected_reason: created.rejectedReason,
     });
-    return { status: result.status === "approved" ? "approved" : "pending_review" };
+    if (created.status === "approved") return { status: "approved" };
+    if (created.status === "rejected") return { status: "rejected", message: created.rejectedReason ?? undefined };
+    return { status: "pending_review" };
   } catch (err) {
     const detail = describeWhatsAppError(err);
     await logPlatformEvent({
@@ -123,7 +143,7 @@ export async function sendPassWhatsAppForRegistration(registrationId: string): P
     const { data: registration } = await admin
       .from("event_registrations")
       .select(
-        "answers, phone, confirmation_code, organization_id, events(title, start_at, branch_id, registration_pass_whatsapp, registration_pass_color, registration_fields, organizations(name, timezone, country))",
+        "answers, phone, confirmation_code, pass_token, organization_id, events(title, start_at, branch_id, registration_pass_whatsapp, registration_fields, organizations(name, timezone, country))",
       )
       .eq("id", registrationId)
       .maybeSingle();
@@ -134,7 +154,6 @@ export async function sendPassWhatsAppForRegistration(registrationId: string): P
       start_at: string;
       branch_id: string | null;
       registration_pass_whatsapp: boolean;
-      registration_pass_color: string;
       registration_fields: EventRegistrationField[] | null;
       organizations: { name: string; timezone: string; country: string | null } | null;
     } | null;
@@ -154,7 +173,7 @@ export async function sendPassWhatsAppForRegistration(registrationId: string): P
     if (!phone) return;
 
     const credentials = await getWhatsAppCredentials(organizationId);
-    const template = await ensurePassTemplate(organizationId, credentials, event.registration_pass_color);
+    const template = await ensurePassTemplate(organizationId, credentials);
     if (template.status !== "approved") return; // not approved yet; the email already went out
 
     const quotaError = await checkWhatsAppQuota(organizationId, 1);
@@ -163,17 +182,14 @@ export async function sendPassWhatsAppForRegistration(registrationId: string): P
     const name = typeof answers.name === "string" && answers.name.trim() ? answers.name.trim() : "there";
     const startLabel = formatInTimezone(event.start_at, event.organizations?.timezone || DEFAULT_TIMEZONE, { dateStyle: "medium", timeStyle: "short" }, "en-IN");
 
-    const image = await buildPassImagePng(registration.confirmation_code, event.registration_pass_color, organizationId);
-    const mediaId = await uploadWhatsAppMedia({ bytes: image, mime: "image/png", fileName: "pass.png", credentials });
-
     let failure: string | null = null;
     try {
       await sendTemplateMessage({
         to: phone,
         templateName: PASS_TEMPLATE_NAME,
         languageCode: "en_US",
-        bodyParams: [name, event.title, startLabel, registration.confirmation_code],
-        headerImageMediaId: mediaId,
+        bodyParams: [name, event.title, startLabel],
+        buttonUrlParam: registration.pass_token,
         credentials,
       });
     } catch (err) {

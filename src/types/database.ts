@@ -1016,6 +1016,8 @@ export type EventRegistration = {
   phone: string | null;
   answers: Record<string, string | number | boolean | null>;
   confirmation_code: string;
+  // Unguessable id for the public /pass/{token} page (migration 0135).
+  pass_token: string;
   status: EventRegistrationStatus;
   checked_in_at: string | null;
   last_reminder_occurrence_date: string | null;

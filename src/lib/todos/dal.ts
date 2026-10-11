@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 // plain `profiles(...)` embed would be ambiguous — the `!fkey_name` hint
 // tells PostgREST which of the two relationships each alias means.
 const TODO_SELECT =
-  "*, assignee:profiles!todos_assigned_to_fkey(first_name, last_name), creator:profiles!todos_created_by_fkey(first_name, last_name), event:todo_events!todos_todo_event_id_fkey(id, title, event_date)";
+  "*, assignee:profiles!todos_assigned_to_fkey(first_name, last_name), creator:profiles!todos_created_by_fkey(first_name, last_name), assigned_member:members!todos_assigned_member_id_fkey(first_name, last_name), event:todo_events!todos_todo_event_id_fkey(id, title, event_date)";
 
 export const getTodos = cache(async (organizationId: string) => {
   const supabase = await createClient();

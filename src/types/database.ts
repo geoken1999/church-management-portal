@@ -851,6 +851,8 @@ export type Todo = {
   due_at: string | null;
   status: TodoStatus;
   assigned_to: string | null;
+  // Or assigned to a leader (a church member) instead of a team login (migration 0143).
+  assigned_member_id: string | null;
   // The to-do event (camp, conference, ...) this to-do belongs to, if any (migration 0141).
   todo_event_id: string | null;
   // Set for automation-created follow-up tasks; null for ordinary to-dos.
@@ -2790,6 +2792,13 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["auth_user_id"];
+          },
+          {
+            foreignKeyName: "todos_assigned_member_id_fkey";
+            columns: ["assigned_member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
           },
           {
             foreignKeyName: "todos_todo_event_id_fkey";

@@ -851,8 +851,8 @@ export type Todo = {
   due_at: string | null;
   status: TodoStatus;
   assigned_to: string | null;
-  // The event (camp, conference, ...) this to-do is for, if any (migration 0139).
-  event_id: string | null;
+  // The to-do event (camp, conference, ...) this to-do belongs to, if any (migration 0141).
+  todo_event_id: string | null;
   // Set for automation-created follow-up tasks; null for ordinary to-dos.
   member_id: string | null;
   branch_id: string | null;
@@ -2759,6 +2759,12 @@ export type Database = {
           },
         ];
       };
+      todo_events: {
+        Row: TodoEvent;
+        Insert: Partial<TodoEvent> & Pick<TodoEvent, "organization_id" | "title">;
+        Update: Partial<TodoEvent>;
+        Relationships: [];
+      };
       todos: {
         Row: Todo;
         Insert: Partial<Todo> & Pick<Todo, "organization_id" | "title">;
@@ -2786,10 +2792,10 @@ export type Database = {
             referencedColumns: ["auth_user_id"];
           },
           {
-            foreignKeyName: "todos_event_id_fkey";
-            columns: ["event_id"];
+            foreignKeyName: "todos_todo_event_id_fkey";
+            columns: ["todo_event_id"];
             isOneToOne: false;
-            referencedRelation: "events";
+            referencedRelation: "todo_events";
             referencedColumns: ["id"];
           },
         ];
@@ -3646,6 +3652,17 @@ export type PrayerRequest = {
   is_anonymous: boolean;
   status: PrayerRequestStatus;
   answered_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// A group a team creates inside To Do to keep a set of tasks together.
+export type TodoEvent = {
+  id: string;
+  organization_id: string;
+  title: string;
+  event_date: string | null;
+  created_by: string | null;
   created_at: string;
   updated_at: string;
 };

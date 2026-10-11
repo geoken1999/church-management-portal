@@ -3,11 +3,12 @@ import "server-only";
 import { cache } from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TAB_KEYS, type TabKey } from "@/lib/permissions/tabs";
-import { featureTag, isFeatureStatus, isFeatureUnavailable, type FeatureStatus, type FeatureTag } from "@/lib/platform-admin/feature-status";
+import { defaultStatusFor, featureTag, isFeatureStatus, isFeatureUnavailable, type FeatureStatus, type FeatureTag } from "@/lib/platform-admin/feature-status";
 
-// A tab with no row in platform_feature_flags is live (missing = live, not
-// missing = off) — that way adding a new TabKey never silently disables it
-// until a platform admin explicitly sets a status. Read via the admin client
+// A tab with no row in platform_feature_flags gets defaultStatusFor(tab):
+// live for the modules that existed before the testing rule, testing for any
+// added since, so a newly added TabKey reaches only the test users until a
+// platform admin moves it to Beta or Live. Read via the admin client
 // regardless of caller, same as getPlanAccess's own read of
 // organization_subscriptions: "platform admin" is an email allowlist, not
 // something RLS can evaluate, so there's no policy for a user-session client
@@ -36,8 +37,9 @@ const getFeatureStates = cache(async (): Promise<Map<TabKey, FeatureState>> => {
 export const getDisabledFeatures = cache(async (userEmail?: string | null): Promise<Set<TabKey>> => {
   const states = await getFeatureStates();
   const blocked = new Set<TabKey>();
-  for (const [tab, state] of states) {
-    if (isFeatureUnavailable(state.status, userEmail)) blocked.add(tab);
+  for (const tab of TAB_KEYS) {
+    const status = states.get(tab)?.status ?? defaultStatusFor(tab);
+    if (isFeatureUnavailable(status, userEmail)) blocked.add(tab);
   }
   return blocked;
 });
@@ -47,8 +49,9 @@ export const getFeatureTags = cache(async (): Promise<Partial<Record<TabKey, Fea
   const states = await getFeatureStates();
   const now = new Date();
   const tags: Partial<Record<TabKey, FeatureTag>> = {};
-  for (const [tab, state] of states) {
-    const tag = featureTag(state.status, state.newUntil, now);
+  for (const tab of TAB_KEYS) {
+    const state = states.get(tab);
+    const tag = featureTag(state?.status ?? defaultStatusFor(tab), state?.newUntil ?? null, now);
     if (tag) tags[tab] = tag;
   }
   return tags;
@@ -67,6 +70,6 @@ export const getAllFeatureFlags = cache(async (): Promise<FeatureFlagRow[]> => {
   const states = await getFeatureStates();
   return TAB_KEYS.map((tab) => {
     const state = states.get(tab);
-    return { tab, status: state?.status ?? "live", newUntil: state?.newUntil ?? null, updatedAt: state?.updatedAt ?? null };
+    return { tab, status: state?.status ?? defaultStatusFor(tab), newUntil: state?.newUntil ?? null, updatedAt: state?.updatedAt ?? null };
   });
 });

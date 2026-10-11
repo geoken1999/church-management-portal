@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { featureTag, featureTesterEmails, isFeatureUnavailable, nextNewUntil } from "./feature-status";
+import { TAB_KEYS } from "@/lib/permissions/tabs";
+import { DEFAULT_NEW_MODULE_STATUS, LAUNCHED_MODULES, defaultStatusFor, featureTag, featureTesterEmails, isFeatureUnavailable, nextNewUntil } from "./feature-status";
 
 const NOW = new Date("2026-10-11T00:00:00Z");
 
@@ -40,5 +41,24 @@ describe("nextNewUntil", () => {
   it("keeps the period when re-saving live and clears it when leaving live", () => {
     expect(nextNewUntil("live", "live", "2026-10-20T00:00:00Z", NOW)).toBe("2026-10-20T00:00:00Z");
     expect(nextNewUntil("live", "beta", "2026-10-20T00:00:00Z", NOW)).toBeNull();
+  });
+});
+
+describe("new modules", () => {
+  it("start in testing, so only the test users see them", () => {
+    expect(DEFAULT_NEW_MODULE_STATUS).toBe("testing");
+    expect(isFeatureUnavailable(DEFAULT_NEW_MODULE_STATUS, "someone@church.org")).toBe(true);
+    expect(isFeatureUnavailable(DEFAULT_NEW_MODULE_STATUS, "geoken199915@gmail.com")).toBe(false);
+  });
+
+  it("leaves the modules that already existed live, and puts any other in testing", () => {
+    expect(defaultStatusFor("events")).toBe("live");
+    expect(defaultStatusFor("automations")).toBe("live");
+    expect(defaultStatusFor("prayer")).toBe("testing");
+    expect(defaultStatusFor("some_future_module")).toBe("testing");
+  });
+
+  it("only lists real modules as launched", () => {
+    for (const tab of LAUNCHED_MODULES) expect(TAB_KEYS as readonly string[]).toContain(tab);
   });
 });

@@ -1,6 +1,8 @@
 "use server";
 
 import { isMarketingCategory } from "@/lib/whatsapp/contact-health";
+import { checkMarketingAllowed } from "@/lib/whatsapp/reputation";
+import { renderTemplateText } from "@/lib/whatsapp/template-render";
 import { logOutboundMessages, senderKeyFor, splitBlocked } from "@/lib/whatsapp/message-log";
 import { getWhatsAppCredentials } from "@/lib/whatsapp/credentials";
 import { revalidatePath } from "next/cache";
@@ -423,34 +425,33 @@ export async function sendBulkWhatsAppAction(formData: FormData): Promise<SendWh
   const specProblem = specs.map(validatePlaceholderSpec).find(Boolean);
   if (specProblem) return { error: specProblem };
 
-  // WhatsApp caps marketing messages per person. Anyone it has recently
-  // refused to deliver one to is skipped (and shown as skipped, not failed)
-  // instead of failing again and lowering this number's standing; they are
-  // tried again after the pause. Other categories are never held back.
+  const marketing = isMarketingCategory(template.category);
   const credentials = await getWhatsAppCredentials(organizationId);
   const senderKey = senderKeyFor(credentials);
-  const { sendable, skipped } = await splitBlocked(senderKey, isMarketingCategory(template.category), recipients);
-  if (sendable.length === 0) {
-    return {
-      error: `WhatsApp is limiting marketing messages to ${skipped.length === 1 ? "this person" : "all of these people"} right now, so nothing was sent. Try again in a few days, or send by SMS or email.`,
-      skippedCount: skipped.length,
-    };
+
+  // A church on the shared number whose recent messages keep being refused by
+  // WhatsApp would drag every other church's standing down with it, so its
+  // marketing sends pause until it gets back on track (or a platform admin
+  // lifts it, or it connects its own number).
+  if (marketing && credentials.source === "platform") {
+    const reputationError = await checkMarketingAllowed(organizationId);
+    if (reputationError) return { error: reputationError };
   }
 
-  const quotaError = await checkWhatsAppQuota(organizationId, sendable.length);
-  if (quotaError) return { error: quotaError };
-
-  // Member details for the recipients that are members. Read from the database
-  // here, not taken from the browser, so a name can't be changed in transit.
-  const memberIds = [...new Set(sendable.map((r) => r.memberId).filter((id): id is string => Boolean(id)))];
+  // Member details for the recipients that are members, for the placeholders
+  // and the opt-out check. Read from the database here, not taken from the
+  // browser, so a name can't be changed in transit.
+  const memberIds = [...new Set(recipients.map((r) => r.memberId).filter((id): id is string => Boolean(id)))];
   const memberContexts = new Map<string, MemberContext>();
-  if (memberIds.length > 0 && specs.some((spec) => spec.kind === "member")) {
+  const optedOut = new Set<string>();
+  if (memberIds.length > 0) {
     const [{ data: members }, { data: branches }] = await Promise.all([
-      admin.from("members").select("id, first_name, last_name, branch_id").eq("organization_id", organizationId).in("id", memberIds),
+      admin.from("members").select("id, first_name, last_name, branch_id, whatsapp_opt_in").eq("organization_id", organizationId).in("id", memberIds),
       admin.from("branches").select("id, name").eq("organization_id", organizationId),
     ]);
     const branchNames = new Map((branches ?? []).map((b) => [b.id, b.name]));
     for (const m of members ?? []) {
+      if (m.whatsapp_opt_in === false) optedOut.add(m.id);
       memberContexts.set(m.id, {
         firstName: m.first_name,
         fullName: `${m.first_name} ${m.last_name}`.trim(),
@@ -459,10 +460,37 @@ export async function sendBulkWhatsAppAction(formData: FormData): Promise<SendWh
     }
   }
 
-  const sendList = sendable.map((recipient) => {
+  const withParams = recipients.map((recipient) => {
     const member = recipient.memberId ? memberContexts.get(recipient.memberId) ?? null : null;
-    return { phone: recipient.phone, bodyParams: specs.map((spec) => resolvePlaceholder(spec, member)) };
+    const bodyParams = specs.map((spec) => resolvePlaceholder(spec, member));
+    return { phone: recipient.phone, memberId: recipient.memberId, bodyParams, text: renderTemplateText(template.body_text, bodyParams) };
   });
+
+  // Anyone who opted out (replied STOP) is never messaged by marketing.
+  // WhatsApp also caps marketing messages per person: anyone it has recently
+  // refused to deliver one to is skipped (shown as skipped, not failed)
+  // instead of failing again and lowering this number's standing; they are
+  // tried again after the pause. Other categories are never held back.
+  const optOutSkipped = marketing ? withParams.filter((r) => r.memberId && optedOut.has(r.memberId)) : [];
+  const notOptedOut = withParams.filter((r) => !optOutSkipped.includes(r));
+  const { sendable: sendableAll, skipped: limitSkipped } = await splitBlocked(senderKey, marketing, notOptedOut);
+  const skipped = [
+    ...optOutSkipped.map((r) => ({ phone: r.phone, reason: "This person opted out of WhatsApp messages.", text: r.text })),
+    ...limitSkipped.map((r) => ({ ...r, text: withParams.find((w) => w.phone === r.phone)?.text })),
+  ] as { phone: string; reason: string; text?: string }[];
+  const sendable = sendableAll;
+  if (sendable.length === 0) {
+    return {
+      error: `Nothing was sent: ${skipped.length === 1 ? "this person has" : "these people have"} opted out, or WhatsApp is limiting marketing messages to them right now. Try again in a few days, or send by SMS or email.`,
+      skippedCount: skipped.length,
+    };
+  }
+
+  const quotaError = await checkWhatsAppQuota(organizationId, sendable.length);
+  if (quotaError) return { error: quotaError };
+
+  const sendList = sendable.map((r) => ({ phone: r.phone, bodyParams: r.bodyParams }));
+  const textByPhone = new Map(withParams.map((r) => [r.phone, r.text]));
 
   // What actually gets stored/shown in history: the template body with each
   // placeholder shown as its typed value, or as a marker for a member field.
@@ -503,7 +531,7 @@ export async function sendBulkWhatsAppAction(formData: FormData): Promise<SendWh
       recipient_count: recipients.length,
       sent_count: result.sentCount,
       failed_count: result.failed.length,
-      failed_recipients: result.failed,
+      failed_recipients: result.failed.map((f) => ({ ...f, text: textByPhone.get(f.phone) })),
       skipped_count: skipped.length,
       skipped_recipients: skipped,
       status,
@@ -524,6 +552,7 @@ export async function sendBulkWhatsAppAction(formData: FormData): Promise<SendWh
       templateName: template.name,
       category: template.category,
       senderKey,
+      bodyText: textByPhone.get(sent.phone) ?? null,
     })),
   );
 

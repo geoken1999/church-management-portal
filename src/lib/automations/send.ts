@@ -1,6 +1,8 @@
 import "server-only";
 
 import { friendlyDeliveryReason, isMarketingCategory } from "@/lib/whatsapp/contact-health";
+import { getFallbackChannel, sendFallbackMessage } from "@/lib/whatsapp/fallback";
+import { renderNamedTemplate } from "@/lib/whatsapp/template-render";
 import { findBlockedRecipients, logOutboundMessages, senderKeyFor, splitBlocked } from "@/lib/whatsapp/message-log";
 import { getWhatsAppCredentials } from "@/lib/whatsapp/credentials";
 import type { createAdminClient } from "@/lib/supabase/admin";
@@ -64,6 +66,20 @@ export async function sendDirectMemberMessage(
   const credentials = await getWhatsAppCredentials(trigger.organization_id);
   const senderKey = senderKeyFor(credentials);
   const blocked = isMarketingCategory(template.category) ? (await findBlockedRecipients(senderKey, [phone])).has(phone) : false;
+  const messageText = renderNamedTemplate(
+    template.body_text_named,
+    resolveVariableValues(
+      template.variable_names,
+      {
+        first_name: member.first_name,
+        last_name: member.last_name,
+        full_name: `${member.first_name} ${member.last_name}`.trim(),
+        church_name: organizationName,
+        occasion_label: occasionLabel,
+      },
+      trigger.variable_values,
+    ),
+  );
 
   const key = buildDirectIdempotencyKey(trigger.id, member.id, occurrenceYear);
   const { data: reserved } = await admin
@@ -82,7 +98,16 @@ export async function sendDirectMemberMessage(
     .select("id")
     .single();
   if (!reserved) return; // unique violation -> already sent this occurrence
-  if (blocked) return;
+  if (blocked) {
+    // WhatsApp won't take it: if the church chose a fallback, send the same
+    // greeting by SMS or email instead of dropping it.
+    const channel = await getFallbackChannel(trigger.organization_id);
+    if (channel !== "none") {
+      const result = await sendFallbackMessage({ organizationId: trigger.organization_id, channel, phone, text: messageText });
+      if (result.ok) await admin.from("automation_executions").update({ error_message: `${friendlyDeliveryReason("131049")} Sent by ${channel} instead.` }).eq("id", reserved.id);
+    }
+    return;
+  }
 
   const values = resolveVariableValues(
     template.variable_names,
@@ -116,6 +141,7 @@ export async function sendDirectMemberMessage(
         templateName: template.meta_template_name,
         category: template.category,
         senderKey,
+        bodyText: messageText,
       },
     ]);
   } catch (err) {
@@ -240,6 +266,7 @@ export async function sendStaffDigest(
       templateName: template.meta_template_name,
       category: template.category,
       senderKey,
+      bodyText: renderNamedTemplate(template.body_text_named, { celebrant_list: celebrantList }),
     })),
   );
 

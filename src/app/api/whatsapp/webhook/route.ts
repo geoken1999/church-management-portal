@@ -11,6 +11,8 @@ import { getAiModeForWebhook, setAiTypingForWebhook } from "@/lib/whatsapp/autom
 import { hasAiCreditAvailableForWebhook, recordAiReplyUsageForWebhook } from "@/lib/plans/dal";
 import { sendTextMessage } from "@/lib/whatsapp/client";
 import { applyDeliveryStatus, clearContactHealth } from "@/lib/whatsapp/message-log";
+import { setWhatsAppOptIn } from "@/lib/whatsapp/opt-in";
+import { isStartMessage, isStopMessage } from "@/lib/whatsapp/template-render";
 import { decryptSecret } from "@/lib/whatsapp/secret-box";
 import { describeWhatsAppError } from "@/lib/whatsapp/graph-error";
 import { createNotificationForWebhook } from "@/lib/notifications/create";
@@ -198,6 +200,22 @@ async function handleInboundMessage(message: InboundMessage, tenantOrganizationI
 
   const organizationId = tenantOrganizationId ?? (await resolveOrganizationForPhoneNumber(phoneNumber));
   if (!organizationId) return;
+
+  // STOP / START: the person opts out of (or back into) WhatsApp messages
+  // from this church. Marketing sends skip anyone who opted out. The reply
+  // is free text, which is allowed right after they messaged us.
+  const optOut = isStopMessage(text);
+  if (optOut || isStartMessage(text)) {
+    const updated = await setWhatsAppOptIn(organizationId, phoneNumber, !optOut);
+    if (updated > 0) {
+      await sendTextMessage({
+        to: phoneNumber,
+        body: optOut ? "You've been unsubscribed from WhatsApp messages. Reply START anytime to receive them again." : "You're subscribed to WhatsApp messages again. Reply STOP anytime to unsubscribe.",
+        credentials: await getWhatsAppCredentials(organizationId),
+      }).catch(() => {});
+      return;
+    }
+  }
 
   const admin = createAdminClient();
 

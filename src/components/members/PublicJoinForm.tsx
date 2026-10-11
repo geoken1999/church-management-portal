@@ -256,6 +256,11 @@ export function PublicJoinForm({
         </div>
       )}
 
+      <label className="flex items-start gap-2 text-sm">
+        <Checkbox name="whatsappOptIn" defaultChecked className="mt-0.5" />
+        <span>{bt((d) => d.publicJoin.whatsappOptIn)}</span>
+      </label>
+
       <Button type="submit" disabled={pending} className="w-full">
         {pending ? t.common.submitting : bt((d) => d.publicJoin.submitRequest)}
       </Button>

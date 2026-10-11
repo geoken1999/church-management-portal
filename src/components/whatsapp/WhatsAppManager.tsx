@@ -1,5 +1,6 @@
 "use client";
 
+import { CampaignFallbackButtons } from "@/components/whatsapp/CampaignFallbackButtons";
 import { ALL_GROUPS, GroupFilterSelect, inGroup, useMemberGroups } from "@/components/members/MemberGroups";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -114,6 +115,9 @@ export interface WhatsAppCampaignRow {
   sent_count: number;
   failed_count: number;
   skipped_count?: number;
+  failed_recipients?: { phone: string; error: string; text?: string }[];
+  skipped_recipients?: { phone: string; reason: string; text?: string }[];
+  fallback_sent_phones?: string[];
   status: "sent" | "partial_failure" | "failed";
   created_at: string;
   profiles: { first_name: string; last_name: string } | null;
@@ -892,13 +896,26 @@ function Composer({
 // History
 // ---------------------------------------------------------------------------
 
+// People a campaign left unreached on WhatsApp who can still be resent by SMS
+// or email: failed or skipped (not opted out), with their text, and not
+// already resent.
+function unreachedCount(campaign: WhatsAppCampaignRow): number {
+  const sent = new Set(campaign.fallback_sent_phones ?? []);
+  const phones = new Set<string>();
+  for (const failed of campaign.failed_recipients ?? []) if (failed.text && !sent.has(failed.phone)) phones.add(failed.phone);
+  for (const skipped of campaign.skipped_recipients ?? []) {
+    if (skipped.text && !skipped.reason.startsWith("This person opted out") && !sent.has(skipped.phone)) phones.add(skipped.phone);
+  }
+  return phones.size;
+}
+
 function statusBadge(status: WhatsAppCampaignRow["status"]) {
   if (status === "sent") return <Badge variant="secondary">Sent</Badge>;
   if (status === "partial_failure") return <Badge variant="outline">Partially sent</Badge>;
   return <Badge variant="destructive">Failed</Badge>;
 }
 
-function WhatsAppHistory({ campaigns }: { campaigns: WhatsAppCampaignRow[] }) {
+function WhatsAppHistory({ campaigns, canSend }: { campaigns: WhatsAppCampaignRow[]; canSend: boolean }) {
   return (
     <Card>
       <CardHeader>
@@ -920,6 +937,7 @@ function WhatsAppHistory({ campaigns }: { campaigns: WhatsAppCampaignRow[] }) {
                     {campaign.whatsapp_templates ? ` · ${campaign.whatsapp_templates.name}` : ""}
                     {campaign.profiles ? ` · ${campaign.profiles.first_name} ${campaign.profiles.last_name}` : ""}
                   </p>
+                  {canSend && unreachedCount(campaign) > 0 && <CampaignFallbackButtons campaignId={campaign.id} count={unreachedCount(campaign)} />}
                 </div>
                 {statusBadge(campaign.status)}
               </div>
@@ -1229,7 +1247,7 @@ export function WhatsAppManager({
                 </CardContent>
               </Card>
             )}
-            <WhatsAppHistory campaigns={campaigns} />
+            <WhatsAppHistory campaigns={campaigns} canSend={canSend} />
           </div>
         </TabsPanel>
         <TabsPanel value="templates">

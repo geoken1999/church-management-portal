@@ -157,6 +157,7 @@ export const en = {
     unmarried: "Unmarried",
     weddingDate: "Wedding date",
     submitRequest: "Submit request",
+    whatsappOptIn: "Send me updates on WhatsApp",
     successMessage: "Thanks! Your request has been received and is pending approval from the church team.",
   },
   publicFolder: {

@@ -21,6 +21,8 @@ export interface OutboundLogEntry {
   templateName: string | null;
   category: string | null;
   senderKey: string;
+  // The text this person received, so it can be resent by SMS/email.
+  bodyText?: string | null;
 }
 
 // Remembers each message WhatsApp accepted, by its id, so the delivery
@@ -41,6 +43,7 @@ export async function logOutboundMessages(entries: OutboundLogEntry[]): Promise<
         template_name: e.templateName,
         category: e.category,
         sender_key: e.senderKey,
+        body_text: e.bodyText ?? null,
       })),
       { onConflict: "wamid", ignoreDuplicates: true },
     );
@@ -158,12 +161,19 @@ export async function applyDeliveryStatus(input: { wamid: string; status: string
           .update({
             sent_count: Math.max(0, campaign.sent_count - 1),
             failed_count: campaign.failed_count + 1,
-            failed_recipients: [...campaign.failed_recipients, { phone: log.recipient, error: friendlyDeliveryReason(input.errorCode) }],
+            failed_recipients: [...campaign.failed_recipients, { phone: log.recipient, error: friendlyDeliveryReason(input.errorCode), ...(log.body_text ? { text: log.body_text } : {}) }],
           })
           .eq("id", log.ref_id);
         await admin.from("whatsapp_message_log").update({ credited_back: true }).eq("id", log.id);
       }
     }
+  }
+
+  // An automation message nobody is watching (a birthday greeting): resend
+  // it by the church's chosen fallback channel, once.
+  if (input.status === "failed" && log.status !== "failed" && log.kind === "automation") {
+    const { fallbackForLoggedMessage } = await import("@/lib/whatsapp/fallback");
+    await fallbackForLoggedMessage(input.wamid).catch((err) => console.error("WhatsApp fallback failed:", err));
   }
 
   return { organizationId: log.organization_id, kind: log.kind, refId: log.ref_id };

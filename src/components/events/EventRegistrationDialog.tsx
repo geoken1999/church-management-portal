@@ -527,7 +527,7 @@ function SettingsTab({
               <span className="font-medium">Also send the pass on WhatsApp</span>
               <br />
               <span className="text-muted-foreground">
-                Sends the QR pass to the registrant&apos;s WhatsApp number (the form needs a phone field) as well as by email. Each message counts toward your monthly WhatsApp limit, and
+                Sends a WhatsApp message with a &ldquo;View pass&rdquo; button that opens the registrant&apos;s QR pass, as well as the email. The form needs a phone field. Each message counts toward your monthly WhatsApp limit, and
                 uses your own WhatsApp number if you&apos;ve connected one.
               </span>
             </span>

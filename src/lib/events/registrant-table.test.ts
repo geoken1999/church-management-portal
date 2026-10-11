@@ -12,6 +12,7 @@ const reg = (over: Partial<EventRegistration>): EventRegistration => ({
   phone: null,
   answers: {},
   confirmation_code: "EVT-AAA",
+  pass_token: "11111111-1111-1111-1111-111111111111",
   status: "confirmed",
   checked_in_at: null,
   last_reminder_occurrence_date: null,

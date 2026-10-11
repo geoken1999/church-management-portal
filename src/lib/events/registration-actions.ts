@@ -212,7 +212,7 @@ export async function updateEventRegistrationSettings(
   // right away, so it is likely approved by the time registrations arrive.
   let whatsappNote: string | undefined;
   if (passWhatsapp) {
-    const template = await ensurePassTemplate(organizationId, undefined, passColor.trim());
+    const template = await ensurePassTemplate(organizationId);
     if (template.status === "pending_review") {
       whatsappNote = "WhatsApp passes will start going out once WhatsApp approves the pass message (usually minutes to a few hours). Until then registrants get the email pass only.";
     } else if (template.status === "rejected") {

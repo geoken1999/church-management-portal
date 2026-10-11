@@ -40,7 +40,7 @@ export const getApprovedWhatsAppTemplates = cache(async (organizationId: string)
   const templates = await getWhatsAppTemplates(organizationId);
   // The event-pass template needs a per-recipient header image, so it can't
   // be used from the campaign composer.
-  return templates.filter((t) => t.status === "approved" && t.name !== "event_registration_pass");
+  return templates.filter((t) => t.status === "approved" && !t.name.startsWith("event_registration_pass"));
 });
 
 // ---------------------------------------------------------------------------

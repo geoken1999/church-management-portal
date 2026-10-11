@@ -33,27 +33,6 @@ async function postToGraphMessages(body: Record<string, unknown>, credentials?: 
   return id;
 }
 
-// Uploads an image to WhatsApp's own media storage and returns its id, for
-// a header that is different for every recipient (so it isn't worth hosting
-// a public file for, or counting against the church's storage).
-export async function uploadWhatsAppMedia(params: { bytes: Uint8Array; mime: string; fileName: string; credentials?: WhatsAppCredentials }): Promise<string> {
-  const { accessToken, phoneNumberId, apiVersion } = params.credentials ?? getPlatformWhatsAppCredentials();
-  const form = new FormData();
-  form.append("messaging_product", "whatsapp");
-  form.append("type", params.mime);
-  form.append("file", new Blob([params.bytes as unknown as BlobPart], { type: params.mime }), params.fileName);
-
-  const res = await fetch(`https://graph.facebook.com/${apiVersion}/${phoneNumberId}/media`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}` },
-    body: form,
-  });
-  if (!res.ok) throw await parseGraphError(res);
-  const data = (await res.json()) as { id?: string };
-  if (!data.id) throw new Error("WhatsApp didn't return a media id.");
-  return data.id;
-}
-
 export interface SendResult {
   id: string;
 }
@@ -85,15 +64,15 @@ export async function sendTemplateMessage(params: {
   languageCode: string;
   bodyParams: string[];
   headerImageUrl?: string | null;
-  // An image already uploaded to WhatsApp (see uploadWhatsAppMedia), used
-  // instead of a public link for one-off images like a registrant's pass.
-  headerImageMediaId?: string | null;
+  // Fills the {{1}} of a template's first button when that button is a
+  // dynamic link (e.g. https://site/pass/{{1}}).
+  buttonUrlParam?: string | null;
   credentials?: WhatsAppCredentials;
 }): Promise<SendResult> {
-  const headerImage = params.headerImageMediaId ? { id: params.headerImageMediaId } : params.headerImageUrl ? { link: params.headerImageUrl } : null;
   const components = [
-    ...(headerImage ? [{ type: "header", parameters: [{ type: "image", image: headerImage }] }] : []),
+    ...(params.headerImageUrl ? [{ type: "header", parameters: [{ type: "image", image: { link: params.headerImageUrl } }] }] : []),
     ...(params.bodyParams.length > 0 ? [{ type: "body", parameters: params.bodyParams.map((text) => ({ type: "text", text })) }] : []),
+    ...(params.buttonUrlParam ? [{ type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: params.buttonUrlParam }] }] : []),
   ];
   const id = await postToGraphMessages(
     {

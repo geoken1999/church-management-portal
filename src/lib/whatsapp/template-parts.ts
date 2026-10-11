@@ -67,7 +67,12 @@ export function metaButtonsComponent(buttons: WhatsAppTemplateButton[]): Record<
   return {
     type: "BUTTONS",
     buttons: buttons.map((b) => {
-      if (b.type === "url") return { type: "URL", text: b.text.trim(), url: b.url.trim() };
+      // A link ending in {{1}} is a dynamic button (the part after the fixed
+      // address is supplied per message), and Meta needs an example of it.
+      if (b.type === "url") {
+        const url = b.url.trim();
+        return url.includes("{{1}}") ? { type: "URL", text: b.text.trim(), url, example: [url.replace("{{1}}", "example")] } : { type: "URL", text: b.text.trim(), url };
+      }
       if (b.type === "phone") return { type: "PHONE_NUMBER", text: b.text.trim(), phone_number: b.phone.trim() };
       return { type: "QUICK_REPLY", text: b.text.trim() };
     }),

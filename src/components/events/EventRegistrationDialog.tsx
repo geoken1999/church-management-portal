@@ -28,6 +28,7 @@ import {
 import { slugifyFieldKey, validateFormField } from "@/lib/forms/validation";
 import { MEETING_MODE_LABELS } from "@/lib/events/location";
 import { QrCodeDialog } from "@/components/members/QrCodeDialog";
+import { ExportRegistrantsButtons } from "@/components/events/ExportRegistrantsButtons";
 import { BilingualSettings, bilingualChoiceFrom, bilingualChoiceToField } from "@/components/BilingualSettings";
 import { EventPassBackgroundUpload } from "@/components/events/EventPassBackgroundUpload";
 import { EventPassPreview } from "@/components/events/EventPassPreview";
@@ -646,6 +647,12 @@ function RegistrantsTab({
 
   return (
     <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">
+          {registrations.length} registered · {registrations.filter((r) => r.status === "checked_in").length} checked in
+        </p>
+        <ExportRegistrantsButtons eventId={eventId} />
+      </div>
       <div className="relative">
         <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input

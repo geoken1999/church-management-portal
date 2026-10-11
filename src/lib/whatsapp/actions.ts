@@ -301,7 +301,7 @@ export async function deleteWhatsAppTemplateAction(templateId: string): Promise<
   const admin = createAdminClient();
   const { data: template } = await admin
     .from("whatsapp_templates")
-    .select("organization_id, name")
+    .select("organization_id, name, platform_template_id")
     .eq("id", templateId)
     .maybeSingle();
 
@@ -311,8 +311,16 @@ export async function deleteWhatsAppTemplateAction(templateId: string): Promise<
     return { error: "Only an owner or admin can delete a WhatsApp template." };
   }
 
+  const credentials = await getWhatsAppCredentials(template.organization_id);
+  // A KingdomFlow template on the shared number is one approved template
+  // used by every church: deleting it at WhatsApp would remove it for all of
+  // them, so it can't be deleted from here.
+  if (template.platform_template_id && credentials.source === "platform") {
+    return { error: "This is a KingdomFlow template shared by every church, so it can't be deleted. It just stays available to you." };
+  }
+
   try {
-    await deleteMetaTemplate(template.name, await getWhatsAppCredentials(template.organization_id));
+    await deleteMetaTemplate(template.name, credentials);
   } catch (err) {
     // If Meta already doesn't have it (e.g. the create call above
     // succeeded in our DB but the template was removed on Meta's side

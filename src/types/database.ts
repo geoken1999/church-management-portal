@@ -720,6 +720,10 @@ export type WhatsAppCampaign = {
   sent_count: number;
   failed_count: number;
   failed_recipients: { phone: string; error: string }[];
+  // People skipped because WhatsApp is limiting marketing messages to them
+  // (migration 0144).
+  skipped_count: number;
+  skipped_recipients: { phone: string; reason: string }[];
   status: WhatsAppCampaignStatus;
   sent_by: string | null;
   // The template actually sent, and the values filled into its {{n}}
@@ -2761,6 +2765,18 @@ export type Database = {
           },
         ];
       };
+      whatsapp_message_log: {
+        Row: WhatsAppMessageLog;
+        Insert: Partial<WhatsAppMessageLog> & Pick<WhatsAppMessageLog, "organization_id" | "kind" | "recipient" | "wamid" | "sender_key">;
+        Update: Partial<WhatsAppMessageLog>;
+        Relationships: [];
+      };
+      whatsapp_contact_health: {
+        Row: WhatsAppContactHealth;
+        Insert: Partial<WhatsAppContactHealth> & Pick<WhatsAppContactHealth, "sender_key" | "recipient">;
+        Update: Partial<WhatsAppContactHealth>;
+        Relationships: [];
+      };
       todo_events: {
         Row: TodoEvent;
         Insert: Partial<TodoEvent> & Pick<TodoEvent, "organization_id" | "title">;
@@ -3673,5 +3689,33 @@ export type TodoEvent = {
   event_date: string | null;
   created_by: string | null;
   created_at: string;
+  updated_at: string;
+};
+
+export type WhatsAppMessageKind = "campaign" | "automation" | "event_pass";
+
+export type WhatsAppMessageLog = {
+  id: string;
+  organization_id: string;
+  kind: WhatsAppMessageKind;
+  ref_id: string | null;
+  recipient: string;
+  wamid: string;
+  template_name: string | null;
+  category: string | null;
+  sender_key: string;
+  status: string;
+  error_code: string | null;
+  credited_back: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WhatsAppContactHealth = {
+  sender_key: string;
+  recipient: string;
+  marketing_blocked_until: string | null;
+  consecutive_failures: number;
+  last_error_code: string | null;
   updated_at: string;
 };

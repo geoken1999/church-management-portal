@@ -1,5 +1,6 @@
 import "server-only";
 
+import { logOutboundMessages, senderKeyFor } from "@/lib/whatsapp/message-log";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { getWhatsAppCredentials, type WhatsAppCredentials } from "@/lib/whatsapp/credentials";
@@ -184,7 +185,7 @@ export async function sendPassWhatsAppForRegistration(registrationId: string): P
 
     let failure: string | null = null;
     try {
-      await sendTemplateMessage({
+      const sent = await sendTemplateMessage({
         to: phone,
         templateName: PASS_TEMPLATE_NAME,
         languageCode: "en_US",
@@ -192,6 +193,9 @@ export async function sendPassWhatsAppForRegistration(registrationId: string): P
         buttonUrlParam: registration.pass_token,
         credentials,
       });
+      await logOutboundMessages([
+        { organizationId, kind: "event_pass", refId: null, recipient: phone, wamid: sent.id, templateName: PASS_TEMPLATE_NAME, category: "utility", senderKey: senderKeyFor(credentials) },
+      ]);
     } catch (err) {
       failure = describeWhatsAppError(err).message;
       await logPlatformEvent({

@@ -10,6 +10,7 @@ import { getOrganizationContextForAi } from "@/lib/ai/organization-context";
 import { getAiModeForWebhook, setAiTypingForWebhook } from "@/lib/whatsapp/automation";
 import { hasAiCreditAvailableForWebhook, recordAiReplyUsageForWebhook } from "@/lib/plans/dal";
 import { sendTextMessage } from "@/lib/whatsapp/client";
+import { applyDeliveryStatus, clearContactHealth } from "@/lib/whatsapp/message-log";
 import { decryptSecret } from "@/lib/whatsapp/secret-box";
 import { describeWhatsAppError } from "@/lib/whatsapp/graph-error";
 import { createNotificationForWebhook } from "@/lib/notifications/create";
@@ -185,12 +186,15 @@ async function handleWhatsAppAiReply(organizationId: string, phoneNumber: string
 // tenantOrganizationId is set when the message arrived on an organization's
 // own WhatsApp number: the number itself says which church it is for, so no
 // guessing from the sender's phone is needed.
-async function handleInboundMessage(message: InboundMessage, tenantOrganizationId: string | null): Promise<void> {
+async function handleInboundMessage(message: InboundMessage, tenantOrganizationId: string | null, senderKey: string | null): Promise<void> {
   const fromRaw = message.from;
   const text = message.text?.body;
   if (!fromRaw) return;
 
   const phoneNumber = `+${fromRaw}`;
+
+  // They messaged us, so they can clearly be reached: lift any marketing pause.
+  if (senderKey) await clearContactHealth(senderKey, phoneNumber).catch(() => {});
 
   const organizationId = tenantOrganizationId ?? (await resolveOrganizationForPhoneNumber(phoneNumber));
   if (!organizationId) return;
@@ -249,8 +253,18 @@ async function handleStatusUpdate(status: StatusUpdate): Promise<void> {
     .maybeSingle();
 
   const firstError = status.errors?.[0];
+
+  // A campaign, automation or pass message: tie the result to its sender and
+  // act on it (pause marketing to a person WhatsApp won't deliver to, take a
+  // failed campaign message off the church's count).
+  const logged = await applyDeliveryStatus({
+    wamid: messageId,
+    status: newStatus,
+    errorCode: firstError?.code != null ? String(firstError.code) : null,
+  });
+
   await recordMessageDelivery({
-    organizationId: message?.organization_id ?? null,
+    organizationId: message?.organization_id ?? logged?.organizationId ?? null,
     channel: "whatsapp",
     providerId: messageId,
     recipient: status.recipient_id ? `+${status.recipient_id}` : null,
@@ -335,7 +349,7 @@ export async function POST(request: Request) {
     for (const change of entry.changes ?? []) {
       const tenantOrganizationId = connectionByPhoneId.get(change.value?.metadata?.phone_number_id ?? "")?.organization_id ?? null;
       for (const message of change.value?.messages ?? []) {
-        await handleInboundMessage(message, tenantOrganizationId).catch(() => {});
+        await handleInboundMessage(message, tenantOrganizationId, change.value?.metadata?.phone_number_id ?? null).catch(() => {});
       }
       for (const status of change.value?.statuses ?? []) {
         await handleStatusUpdate(status).catch(() => {});

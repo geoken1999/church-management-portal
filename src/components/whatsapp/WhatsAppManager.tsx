@@ -113,6 +113,7 @@ export interface WhatsAppCampaignRow {
   recipient_count: number;
   sent_count: number;
   failed_count: number;
+  skipped_count?: number;
   status: "sent" | "partial_failure" | "failed";
   created_at: string;
   profiles: { first_name: string; last_name: string } | null;
@@ -753,7 +754,7 @@ function Composer({
         setResult({ error: response.error });
         return;
       }
-      setResult({ success: `Sent to ${response.sentCount} recipient${response.sentCount === 1 ? "" : "s"}${response.failedCount ? ` (${response.failedCount} failed)` : ""}.` });
+      setResult({ success: `Sent to ${response.sentCount} recipient${response.sentCount === 1 ? "" : "s"}${response.failedCount ? ` (${response.failedCount} failed)` : ""}${response.skippedCount ? `. ${response.skippedCount} skipped because WhatsApp is limiting marketing messages to them right now` : ""}.` });
       setSelectedIds(new Set());
       setExtraNumbers("");
     });
@@ -915,6 +916,7 @@ function WhatsAppHistory({ campaigns }: { campaigns: WhatsAppCampaignRow[] }) {
                   <p className="line-clamp-2 text-sm font-medium">{campaign.body}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {new Date(campaign.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · {campaign.sent_count}/{campaign.recipient_count} delivered
+                    {campaign.skipped_count ? ` · ${campaign.skipped_count} skipped (WhatsApp limit)` : ""}
                     {campaign.whatsapp_templates ? ` · ${campaign.whatsapp_templates.name}` : ""}
                     {campaign.profiles ? ` · ${campaign.profiles.first_name} ${campaign.profiles.last_name}` : ""}
                   </p>

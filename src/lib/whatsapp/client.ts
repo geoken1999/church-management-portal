@@ -91,6 +91,9 @@ export async function sendTemplateMessage(params: {
 
 export interface SendBulkTemplateResult {
   sentCount: number;
+  // The WhatsApp message id of each accepted message, so its delivery can be
+  // tracked later (see message-log.ts).
+  sentIds: { phone: string; id: string }[];
   failed: { phone: string; error: string }[];
 }
 
@@ -106,11 +109,12 @@ export async function sendBulkTemplateMessage(params: {
   credentials?: WhatsAppCredentials;
 }): Promise<SendBulkTemplateResult> {
   let sentCount = 0;
+  const sentIds: { phone: string; id: string }[] = [];
   const failed: { phone: string; error: string }[] = [];
 
   for (const [index, { phone, bodyParams }] of params.recipients.entries()) {
     try {
-      await sendTemplateMessage({
+      const { id } = await sendTemplateMessage({
         to: phone,
         templateName: params.templateName,
         languageCode: params.languageCode,
@@ -119,6 +123,7 @@ export async function sendBulkTemplateMessage(params: {
         credentials: params.credentials,
       });
       sentCount += 1;
+      sentIds.push({ phone, id });
     } catch (err) {
       failed.push({ phone, error: describeWhatsAppError(err).message });
       // An invalid/expired access token fails identically for every
@@ -133,5 +138,5 @@ export async function sendBulkTemplateMessage(params: {
     }
   }
 
-  return { sentCount, failed };
+  return { sentCount, sentIds, failed };
 }

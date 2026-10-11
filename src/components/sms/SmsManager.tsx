@@ -1,5 +1,6 @@
 "use client";
 
+import { ALL_GROUPS, GroupFilterSelect, inGroup, useMemberGroups } from "@/components/members/MemberGroups";
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { MessageSquareText, Search, Send, TriangleAlert } from "lucide-react";
@@ -81,15 +82,18 @@ function RecipientPicker({
 }) {
   const [search, setSearch] = useState("");
   const [branchId, setBranchId] = useState<string>("all");
+  const [groupKey, setGroupKey] = useState<string>(ALL_GROUPS);
+  const groups = useMemberGroups();
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return members.filter((m) => {
       if (branchId !== "all" && m.branchId !== branchId) return false;
+      if (!inGroup(m.id, groupKey, groups)) return false;
       if (!term) return true;
       return m.name.toLowerCase().includes(term) || m.phone.includes(term);
     });
-  }, [members, search, branchId]);
+  }, [members, search, branchId, groupKey, groups]);
 
   const allFilteredSelected = filtered.length > 0 && filtered.every((m) => selectedIds.has(m.id));
   const extraCount = parseExtraNumbers(extraNumbers, orgCountryCode).length;
@@ -122,6 +126,7 @@ function RecipientPicker({
             </SelectContent>
           </Select>
         )}
+        <GroupFilterSelect value={groupKey} onChange={setGroupKey} disabled={disabled} />
       </div>
 
       <div className="rounded-lg border border-border">

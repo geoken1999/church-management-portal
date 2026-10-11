@@ -51,6 +51,7 @@ export const ta: Dictionary = {
       worship: "வழிபாடு",
       media: "ஊடகம்",
       events: "நிகழ்வுகள்",
+      prayer: "ஜெபம்",
       todos: "செய்ய வேண்டியவை",
       planner: "திட்டமிடுபவர்",
       kmeet: "K-Meet",

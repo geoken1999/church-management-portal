@@ -51,6 +51,7 @@ export const hi: Dictionary = {
       worship: "आराधना",
       media: "मीडिया",
       events: "कार्यक्रम",
+      prayer: "प्रार्थना",
       todos: "कार्य सूची",
       planner: "योजनाकार",
       kmeet: "K-Meet",

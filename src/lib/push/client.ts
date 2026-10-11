@@ -5,7 +5,7 @@ import { getMessaging } from "firebase-admin/messaging";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPushEnv, isPushConfigured } from "@/lib/push/env";
 
-export type PushCategory = "event_new" | "todo_assigned" | "todo_due_soon";
+export type PushCategory = "event_new" | "todo_assigned" | "todo_due_soon" | "prayer_request";
 
 let app: App | null = null;
 
@@ -46,7 +46,7 @@ export async function sendPushToUsers(authUserIds: string[], category: PushCateg
 
   const { data: preferences } = await admin
     .from("notification_preferences")
-    .select("auth_user_id, event_new, todo_assigned, todo_due_soon")
+    .select("auth_user_id, event_new, todo_assigned, todo_due_soon, prayer_request")
     .in("auth_user_id", authUserIds);
 
   const optedOut = new Set(

@@ -938,6 +938,7 @@ export type NotificationPreferences = {
   event_new: boolean;
   todo_assigned: boolean;
   todo_due_soon: boolean;
+  prayer_request: boolean;
   updated_at: string;
 };
 
@@ -1471,7 +1472,8 @@ export type NotificationType =
   | "facebook_post_updated"
   | "support_ticket_reply"
   | "instagram_ai_followup"
-  | "whatsapp_ai_followup";
+  | "whatsapp_ai_followup"
+  | "prayer_request";
 
 export type Notification = {
   id: string;
@@ -2178,6 +2180,20 @@ export type Database = {
             columns: ["resolved_payout_id"];
             isOneToOne: false;
             referencedRelation: "fundraiser_payouts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      prayer_requests: {
+        Row: PrayerRequest;
+        Insert: Partial<PrayerRequest> & Pick<PrayerRequest, "organization_id" | "member_id" | "request">;
+        Update: Partial<PrayerRequest>;
+        Relationships: [
+          {
+            foreignKeyName: "prayer_requests_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
             referencedColumns: ["id"];
           },
         ];
@@ -3595,6 +3611,22 @@ export type PlatformWhatsAppTemplate = {
   meta_template_id: string | null;
   status: WhatsAppTemplateStatus;
   rejected_reason: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PrayerRequestVisibility = "private" | "shared";
+export type PrayerRequestStatus = "open" | "answered";
+
+export type PrayerRequest = {
+  id: string;
+  organization_id: string;
+  member_id: string;
+  request: string;
+  visibility: PrayerRequestVisibility;
+  is_anonymous: boolean;
+  status: PrayerRequestStatus;
+  answered_at: string | null;
   created_at: string;
   updated_at: string;
 };

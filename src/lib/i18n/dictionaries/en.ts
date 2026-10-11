@@ -53,6 +53,7 @@ export const en = {
       worship: "Worship",
       media: "Media",
       events: "Events",
+      prayer: "Prayer",
       todos: "To Do",
       planner: "Planner",
       kmeet: "K-Meet",

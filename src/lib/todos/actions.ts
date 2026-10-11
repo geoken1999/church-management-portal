@@ -23,12 +23,12 @@ function readTodoFields(formData: FormData) {
   };
 }
 
-// The event a to-do is for must be one of this church's own; returns its
-// title (for notifications), null for no event, or undefined if invalid.
+// The to-do event a to-do belongs to must be one of this church's own;
+// returns its title (for notifications), null for none, or undefined if invalid.
 async function resolveEvent(organizationId: string, eventId: string): Promise<{ title: string } | null | undefined> {
   if (!eventId) return null;
   const supabase = await createClient();
-  const { data } = await supabase.from("events").select("title").eq("id", eventId).eq("organization_id", organizationId).maybeSingle();
+  const { data } = await supabase.from("todo_events").select("title").eq("id", eventId).eq("organization_id", organizationId).maybeSingle();
   return data ? { title: data.title } : undefined;
 }
 
@@ -86,7 +86,7 @@ export async function createTodo(_prevState: TodoFormState, formData: FormData):
     description: fields.description || null,
     due_at: dueAtFromForm(fields.dueAt, membership.organization.timezone),
     assigned_to: fields.assignedTo || null,
-    event_id: fields.eventId || null,
+    todo_event_id: fields.eventId || null,
     created_by: user.id,
   });
 
@@ -146,7 +146,7 @@ export async function updateTodo(_prevState: TodoFormState, formData: FormData):
       description: fields.description || null,
       due_at: dueAtFromForm(fields.dueAt, timeZone),
       assigned_to: fields.assignedTo || null,
-      event_id: fields.eventId || null,
+      todo_event_id: fields.eventId || null,
     })
     .eq("id", id);
 

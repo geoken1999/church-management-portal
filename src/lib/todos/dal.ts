@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 // plain `profiles(...)` embed would be ambiguous — the `!fkey_name` hint
 // tells PostgREST which of the two relationships each alias means.
 const TODO_SELECT =
-  "*, assignee:profiles!todos_assigned_to_fkey(first_name, last_name), creator:profiles!todos_created_by_fkey(first_name, last_name), event:events!todos_event_id_fkey(id, title, start_at)";
+  "*, assignee:profiles!todos_assigned_to_fkey(first_name, last_name), creator:profiles!todos_created_by_fkey(first_name, last_name), event:todo_events!todos_todo_event_id_fkey(id, title, event_date)";
 
 export const getTodos = cache(async (organizationId: string) => {
   const supabase = await createClient();
@@ -59,4 +59,16 @@ export const getTodo = cache(async (id: string) => {
   const supabase = await createClient();
   const { data } = await supabase.from("todos").select("*").eq("id", id).maybeSingle();
   return data;
+});
+
+export const getTodoEvents = cache(async (organizationId: string) => {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("todo_events")
+    .select("id, title, event_date")
+    .eq("organization_id", organizationId)
+    .order("event_date", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false });
+
+  return data ?? [];
 });

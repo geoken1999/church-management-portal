@@ -9,6 +9,7 @@ import {
   deleteTodo,
   type TodoFormState,
 } from "@/lib/todos/actions";
+import { createTodoEventAction, deleteTodoEventAction, updateTodoEventAction } from "@/lib/todos/event-actions";
 import type { Todo } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,13 +41,13 @@ export interface TeamMemberOption {
 export interface EventOption {
   id: string;
   title: string;
-  startAt: string;
+  eventDate: string | null;
 }
 
 export type TodoRow = Todo & {
   assignee: { first_name: string; last_name: string } | null;
   creator: { first_name: string; last_name: string } | null;
-  event: { id: string; title: string; start_at: string } | null;
+  event: { id: string; title: string; event_date: string | null } | null;
 };
 
 // The church's local date and time, in the form the datetime-local input
@@ -130,7 +131,7 @@ function TodoFormFields({
           </SelectContent>
         </Select>
         <input type="hidden" name="eventId" value={eventId} />
-        <p className="text-xs text-muted-foreground">Pick an event, like a camp, to keep its tasks together.</p>
+        <p className="text-xs text-muted-foreground">Put it in an event, like a camp, to keep its tasks together. Add events with New event.</p>
       </div>
       <div className="space-y-2">
         <Label htmlFor="todo-description">Description (optional)</Label>
@@ -281,7 +282,7 @@ function EditTodoDialog({ todo, members, events, timezone }: { todo: TodoRow; me
   const [description, setDescription] = useState(todo.description ?? "");
   const [dueAt, setDueAt] = useState(toDatetimeLocal(todo.due_at, timezone));
   const [assignedTo, setAssignedTo] = useState(todo.assigned_to ?? "");
-  const [eventId, setEventId] = useState(todo.event_id ?? "");
+  const [eventId, setEventId] = useState(todo.todo_event_id ?? "");
 
   function handleSubmit(formData: FormData) {
     startTransition(async () => {
@@ -302,7 +303,7 @@ function EditTodoDialog({ todo, members, events, timezone }: { todo: TodoRow; me
           setDescription(todo.description ?? "");
           setDueAt(toDatetimeLocal(todo.due_at, timezone));
           setAssignedTo(todo.assigned_to ?? "");
-          setEventId(todo.event_id ?? "");
+          setEventId(todo.todo_event_id ?? "");
         }
       }}
     >
@@ -456,40 +457,140 @@ function TodoItemRow({ todo, members, events, timezone }: { todo: TodoRow; membe
 const ALL_EVENTS = "all";
 const NO_EVENT = "none";
 
-export function TodosManager({ todos, members, events, timezone }: { todos: TodoRow[]; members: TeamMemberOption[]; events: EventOption[]; timezone: string }) {
+function formatEventDate(date: string): string {
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+// Create or rename an event (a camp, a conference): just a name and an
+// optional date. Adding one selects it, so the next thing is adding its to-dos.
+function EventFormDialog({ event, onSaved, trigger }: { event?: EventOption; onSaved?: (id: string) => void; trigger: React.ReactElement }) {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState(event?.title ?? "");
+  const [eventDate, setEventDate] = useState(event?.eventDate ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    startTransition(async () => {
+      const result = event ? await updateTodoEventAction(event.id, title, eventDate) : await createTodoEventAction(title, eventDate);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setOpen(false);
+      onSaved?.(event?.id ?? result.id ?? "");
+    });
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) {
+          setTitle(event?.title ?? "");
+          setEventDate(event?.eventDate ?? "");
+          setError(null);
+        }
+      }}
+    >
+      <DialogTrigger render={trigger} />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{event ? "Rename event" : "New event"}</DialogTitle>
+          <DialogDescription>{event ? "Change the name or date." : "A camp, a conference, a trip. You can then add its to-dos and assign them."}</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <div className="space-y-2">
+            <Label htmlFor="todo-event-title">Event name</Label>
+            <Input id="todo-event-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Youth Camp 2026" maxLength={80} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="todo-event-date">Date (optional)</Label>
+            <Input id="todo-event-date" type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Saving..." : event ? "Save" : "Add event"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeleteEventButton({ event, onDeleted }: { event: EventOption; onDeleted: () => void }) {
+  const [pending, startTransition] = useTransition();
+  function handleDelete() {
+    if (!window.confirm(`Delete the event "${event.title}"? Its to-dos are kept, just no longer grouped under it.`)) return;
+    startTransition(async () => {
+      const result = await deleteTodoEventAction(event.id);
+      if (!result.error) onDeleted();
+    });
+  }
+  return (
+    <Button type="button" variant="ghost" size="icon-sm" onClick={handleDelete} disabled={pending} aria-label="Delete event">
+      <Trash2 className="size-3.5" />
+    </Button>
+  );
+}
+
+export function TodosManager({
+  todos,
+  members,
+  events,
+  canWrite,
+  canDelete,
+  timezone,
+}: {
+  todos: TodoRow[];
+  members: TeamMemberOption[];
+  events: EventOption[];
+  canWrite: boolean;
+  canDelete: boolean;
+  timezone: string;
+}) {
   const [filter, setFilter] = useState<"active" | "completed" | "all">("active");
-  // "all" (every to-do), "none" (not tied to an event), or an event id.
+  // "all" (every to-do), "none" (not in an event), or an event id.
   const [eventFilter, setEventFilter] = useState<string>(ALL_EVENTS);
+  const selectedEvent = events.find((e) => e.id === eventFilter) ?? null;
 
   const filtered = useMemo(() => {
     const byStatus = filter === "active" ? todos.filter((t) => t.status === "pending") : filter === "completed" ? todos.filter((t) => t.status === "completed") : todos;
     if (eventFilter === ALL_EVENTS) return byStatus;
-    if (eventFilter === NO_EVENT) return byStatus.filter((t) => !t.event_id);
-    return byStatus.filter((t) => t.event_id === eventFilter);
+    if (eventFilter === NO_EVENT) return byStatus.filter((t) => !t.todo_event_id);
+    return byStatus.filter((t) => t.todo_event_id === eventFilter);
   }, [todos, filter, eventFilter]);
 
-  // With every to-do showing, those tied to an event sit together under the
-  // event's name (soonest event first), then the ordinary ones.
+  // With every to-do showing, those in an event sit together under the
+  // event's name (soonest first, undated last), then the ordinary ones.
   const groups = useMemo(() => {
     if (eventFilter !== ALL_EVENTS) return [{ key: "flat", title: null as string | null, items: filtered }];
-    const byEvent = new Map<string, { title: string; startAt: string; items: TodoRow[] }>();
+    const byEvent = new Map<string, { title: string; sortKey: string; items: TodoRow[] }>();
     const general: TodoRow[] = [];
     for (const todo of filtered) {
       if (todo.event) {
-        const group = byEvent.get(todo.event.id) ?? { title: todo.event.title, startAt: todo.event.start_at, items: [] };
+        const group = byEvent.get(todo.event.id) ?? { title: todo.event.title, sortKey: todo.event.event_date ?? "9999-12-31", items: [] };
         group.items.push(todo);
         byEvent.set(todo.event.id, group);
       } else {
         general.push(todo);
       }
     }
-    const eventGroups = [...byEvent.entries()].sort((a, b) => a[1].startAt.localeCompare(b[1].startAt)).map(([id, g]) => ({ key: id, title: g.title as string | null, items: g.items }));
+    const eventGroups = [...byEvent.entries()].sort((a, b) => a[1].sortKey.localeCompare(b[1].sortKey)).map(([id, g]) => ({ key: id, title: g.title as string | null, items: g.items }));
     return [...eventGroups, ...(general.length > 0 ? [{ key: "general", title: eventGroups.length > 0 ? "General" : null, items: general }] : [])];
   }, [filtered, eventFilter]);
 
   const activeCount = todos.filter((t) => t.status === "pending").length;
-  const usedEventIds = new Set(todos.map((t) => t.event_id).filter(Boolean));
-  const filterableEvents = events.filter((e) => usedEventIds.has(e.id));
+  const selectedTodos = selectedEvent ? todos.filter((t) => t.todo_event_id === selectedEvent.id) : [];
 
   return (
     <div className="space-y-4">
@@ -503,17 +604,15 @@ export function TodosManager({ todos, members, events, timezone }: { todos: Todo
           </TabsList>
         </Tabs>
         <div className="flex flex-wrap items-center gap-2">
-          {filterableEvents.length > 0 && (
+          {events.length > 0 && (
             <Select value={eventFilter} onValueChange={(v) => setEventFilter(v ?? ALL_EVENTS)}>
-              <SelectTrigger className="w-48" aria-label="Filter by event">
-                <SelectValue>
-                  {() => (eventFilter === ALL_EVENTS ? "All events" : eventFilter === NO_EVENT ? "No event" : (events.find((e) => e.id === eventFilter)?.title ?? "Event"))}
-                </SelectValue>
+              <SelectTrigger className="w-48" aria-label="Show an event">
+                <SelectValue>{() => (eventFilter === ALL_EVENTS ? "All events" : eventFilter === NO_EVENT ? "No event" : (selectedEvent?.title ?? "Event"))}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL_EVENTS}>All events</SelectItem>
                 <SelectItem value={NO_EVENT}>No event</SelectItem>
-                {filterableEvents.map((event) => (
+                {events.map((event) => (
                   <SelectItem key={event.id} value={event.id}>
                     {event.title}
                   </SelectItem>
@@ -521,15 +620,58 @@ export function TodosManager({ todos, members, events, timezone }: { todos: Todo
               </SelectContent>
             </Select>
           )}
-          <CreateTodoDialog members={members} events={events} defaultEventId={eventFilter !== ALL_EVENTS && eventFilter !== NO_EVENT ? eventFilter : ""} />
+          {canWrite && (
+            <EventFormDialog
+              onSaved={(id) => id && setEventFilter(id)}
+              trigger={
+                <Button type="button" variant="outline">
+                  <CalendarDays className="size-4" />
+                  New event
+                </Button>
+              }
+            />
+          )}
+          <CreateTodoDialog members={members} events={events} defaultEventId={selectedEvent ? selectedEvent.id : ""} />
         </div>
       </div>
+
+      {selectedEvent && (
+        <Card>
+          <CardContent className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-full bg-accent">
+                <CalendarDays className="size-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium">{selectedEvent.title}</p>
+                <p className="text-xs text-muted-foreground">
+                  {selectedEvent.eventDate ? `${formatEventDate(selectedEvent.eventDate)} · ` : ""}
+                  {selectedTodos.filter((t) => t.status === "pending").length} open · {selectedTodos.length} total
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              {canWrite && (
+                <EventFormDialog
+                  event={selectedEvent}
+                  trigger={
+                    <Button type="button" variant="ghost" size="icon-sm" aria-label="Rename event">
+                      <Pencil className="size-3.5" />
+                    </Button>
+                  }
+                />
+              )}
+              {canDelete && <DeleteEventButton event={selectedEvent} onDeleted={() => setEventFilter(ALL_EVENTS)} />}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent>
           {filtered.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">
-              {filter === "active" ? "Nothing to do — you're all caught up." : "No to-dos here."}
+              {selectedEvent ? "No to-dos in this event yet. Use Add to-do to add the first one." : filter === "active" ? "Nothing to do — you're all caught up." : "No to-dos here."}
             </p>
           ) : (
             <div className="space-y-4">

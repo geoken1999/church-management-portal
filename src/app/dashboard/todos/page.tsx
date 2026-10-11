@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getOrganizationMembers } from "@/lib/organizations/dal";
-import { getTodos } from "@/lib/todos/dal";
-import { createClient } from "@/lib/supabase/server";
+import { getTodos, getTodoEvents } from "@/lib/todos/dal";
 import { TodosManager } from "@/components/todos/TodosManager";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
@@ -18,12 +17,10 @@ export default async function TodosPage() {
     return <AccessRestricted label="To Do" />;
   }
 
-  const supabase = await createClient();
-  const [todos, teamMembers, { data: events }] = await Promise.all([
+  const [todos, teamMembers, todoEvents] = await Promise.all([
     getTodos(organizationId),
     getOrganizationMembers(organizationId),
-    // Cancelled events can't have new to-dos added; ones already linked still show.
-    supabase.from("events").select("id, title, start_at, status").eq("organization_id", organizationId).order("start_at", { ascending: false }).limit(200),
+    getTodoEvents(organizationId),
   ]);
 
   const memberOptions = teamMembers.map((m) => ({
@@ -35,10 +32,10 @@ export default async function TodosPage() {
     <div className="space-y-8">
       <div>
         <h1 className="font-heading text-3xl font-bold tracking-tight">To Do</h1>
-        <p className="mt-1 text-muted-foreground">Track tasks for your team, with optional reminders. Link a to-do to an event, like a camp, to keep its tasks together.</p>
+        <p className="mt-1 text-muted-foreground">Track tasks for your team, with optional reminders. Add an event, like a camp, and keep its tasks together inside it.</p>
       </div>
 
-      <TodosManager todos={todos} members={memberOptions} events={(events ?? []).filter((e) => e.status !== "cancelled" || todos.some((t) => t.event_id === e.id)).map((e) => ({ id: e.id, title: e.title, startAt: e.start_at }))} timezone={membership.organization.timezone} />
+      <TodosManager todos={todos} members={memberOptions} events={todoEvents.map((e) => ({ id: e.id, title: e.title, eventDate: e.event_date }))} canWrite={membership.tabAccess.todos.write} canDelete={membership.tabAccess.todos.delete} timezone={membership.organization.timezone} />
     </div>
   );
 }

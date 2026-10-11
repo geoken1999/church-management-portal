@@ -119,6 +119,24 @@ export async function createMetaTemplate(params: {
   return { metaTemplateId: data.id, status: data.status ? metaStatusToLocal(data.status) : "pending_review" };
 }
 
+// Looks a template up by exact name and language in the WhatsApp account.
+// Used to reuse a template another church on the same (shared) number
+// already created, since a name can only exist once per account.
+export async function findMetaTemplateByName(
+  name: string,
+  language: string,
+  credentials?: WhatsAppCredentials,
+): Promise<{ metaTemplateId: string; status: WhatsAppTemplateStatus; rejectedReason: string | null } | null> {
+  const { businessAccountId } = credentials ?? getPlatformWhatsAppCredentials();
+  const res = await graphFetch(`${businessAccountId}/message_templates?name=${encodeURIComponent(name)}&fields=id,name,language,status,rejected_reason&limit=20`, { method: "GET" }, credentials);
+  if (!res.ok) throw await parseGraphError(res);
+
+  const data = (await res.json()) as { data?: { id: string; name: string; language: string; status?: string; rejected_reason?: string }[] };
+  const match = data.data?.find((t) => t.name === name && t.language === language);
+  if (!match) return null;
+  return { metaTemplateId: match.id, status: match.status ? metaStatusToLocal(match.status) : "pending_review", rejectedReason: match.rejected_reason ?? null };
+}
+
 export async function fetchMetaTemplateStatus(metaTemplateId: string, credentials?: WhatsAppCredentials): Promise<{ status: WhatsAppTemplateStatus; rejectedReason: string | null }> {
   const res = await graphFetch(`${metaTemplateId}?fields=status,rejected_reason`, { method: "GET" }, credentials);
   if (!res.ok) throw await parseGraphError(res);

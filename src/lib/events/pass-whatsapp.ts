@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { getWhatsAppCredentials, type WhatsAppCredentials } from "@/lib/whatsapp/credentials";
 import { sendTemplateMessage, uploadWhatsAppMedia } from "@/lib/whatsapp/client";
-import { createMetaTemplate, fetchMetaTemplateStatus, uploadTemplateHeaderSample } from "@/lib/whatsapp/templates-client";
+import { createMetaTemplate, fetchMetaTemplateStatus, findMetaTemplateByName, uploadTemplateHeaderSample } from "@/lib/whatsapp/templates-client";
 import { describeWhatsAppError } from "@/lib/whatsapp/graph-error";
 import { normalizePhoneNumber, resolvePhoneCountry } from "@/lib/whatsapp/validation";
 import { checkWhatsAppQuota } from "@/lib/plans/dal";
@@ -76,6 +76,31 @@ export async function ensurePassTemplate(organizationId: string, credentials?: W
   }
 
   try {
+    // Churches on the shared WhatsApp number share one account, where a
+    // template name can exist only once. If another church already created
+    // this one, use it (it is generic: nothing in it is specific to a
+    // church) instead of failing on the duplicate name.
+    const onMeta = await findMetaTemplateByName(PASS_TEMPLATE_NAME, "en_US", creds);
+    if (onMeta) {
+      await admin.from("whatsapp_templates").insert({
+        organization_id: organizationId,
+        name: PASS_TEMPLATE_NAME,
+        language: "en_US",
+        category: "utility",
+        body_text: PASS_TEMPLATE_BODY,
+        variable_count: 4,
+        header_type: "image",
+        header_image_path: null,
+        buttons: [],
+        meta_template_id: onMeta.metaTemplateId,
+        status: onMeta.status,
+        rejected_reason: onMeta.rejectedReason,
+      });
+      if (onMeta.status === "approved") return { status: "approved" };
+      if (onMeta.status === "rejected") return { status: "rejected", message: onMeta.rejectedReason ?? undefined };
+      return { status: "pending_review" };
+    }
+
     const sample = await buildPassImagePng("EVT-SAMPLE", passColor, organizationId);
     const headerHandle = await uploadTemplateHeaderSample({ bytes: sample, mime: "image/png", fileName: "pass.png", credentials: creds });
     const result = await createMetaTemplate({

@@ -626,6 +626,11 @@ export interface ActiveSession {
   sessionId: string;
   userId: string;
   userEmail: string;
+  // The sign-in has no email when it is a church member signed in to the
+  // mobile app with their phone.
+  hasEmail: boolean;
+  userPhone: string | null;
+  memberName: string | null;
   organizationNames: string[];
   createdAt: string;
   updatedAt: string;
@@ -641,7 +646,10 @@ export async function getActiveSessions(): Promise<ActiveSession[]> {
   return data.map((row) => ({
     sessionId: row.session_id,
     userId: row.user_id,
-    userEmail: row.user_email ?? "(no email)",
+    userEmail: row.user_email ?? row.member_name ?? row.user_phone ?? "(unknown)",
+    hasEmail: Boolean(row.user_email),
+    userPhone: row.user_phone,
+    memberName: row.member_name,
     organizationNames: row.organization_names,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

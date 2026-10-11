@@ -3540,6 +3540,8 @@ export type Database = {
           session_id: string;
           user_id: string;
           user_email: string | null;
+          user_phone: string | null;
+          member_name: string | null;
           organization_names: string[];
           created_at: string;
           updated_at: string;

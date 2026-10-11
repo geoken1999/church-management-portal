@@ -1,5 +1,9 @@
 import "server-only";
 
+import { friendlyDeliveryReason, isMarketingCategory } from "@/lib/whatsapp/contact-health";
+import { getFallbackChannel, sendFallbackMessage } from "@/lib/whatsapp/fallback";
+import { renderNamedTemplate } from "@/lib/whatsapp/template-render";
+import { findBlockedRecipients, logOutboundMessages, senderKeyFor, splitBlocked } from "@/lib/whatsapp/message-log";
 import { getWhatsAppCredentials } from "@/lib/whatsapp/credentials";
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { sendTemplateMessage, sendBulkTemplateMessage } from "@/lib/whatsapp/client";
@@ -55,6 +59,28 @@ export async function sendDirectMemberMessage(
   const phone = normalizePhoneNumber(member.phone ?? "", phoneCountry);
   if (!phone) return;
 
+  // A marketing template (a birthday greeting, say) isn't sent to someone
+  // WhatsApp is currently refusing to deliver marketing to: it would only
+  // fail again and count against this number's standing. The occasion is
+  // recorded as skipped, with the reason, instead of silently dropped.
+  const credentials = await getWhatsAppCredentials(trigger.organization_id);
+  const senderKey = senderKeyFor(credentials);
+  const blocked = isMarketingCategory(template.category) ? (await findBlockedRecipients(senderKey, [phone])).has(phone) : false;
+  const messageText = renderNamedTemplate(
+    template.body_text_named,
+    resolveVariableValues(
+      template.variable_names,
+      {
+        first_name: member.first_name,
+        last_name: member.last_name,
+        full_name: `${member.first_name} ${member.last_name}`.trim(),
+        church_name: organizationName,
+        occasion_label: occasionLabel,
+      },
+      trigger.variable_values,
+    ),
+  );
+
   const key = buildDirectIdempotencyKey(trigger.id, member.id, occurrenceYear);
   const { data: reserved } = await admin
     .from("automation_executions")
@@ -65,12 +91,23 @@ export async function sendDirectMemberMessage(
       trigger_id: trigger.id,
       member_id: member.id,
       idempotency_key: key,
-      status: "sent",
+      status: blocked ? "skipped" : "sent",
+      error_message: blocked ? friendlyDeliveryReason("131049") : null,
       recipient_count: 1,
     })
     .select("id")
     .single();
   if (!reserved) return; // unique violation -> already sent this occurrence
+  if (blocked) {
+    // WhatsApp won't take it: if the church chose a fallback, send the same
+    // greeting by SMS or email instead of dropping it.
+    const channel = await getFallbackChannel(trigger.organization_id);
+    if (channel !== "none") {
+      const result = await sendFallbackMessage({ organizationId: trigger.organization_id, channel, phone, text: messageText });
+      if (result.ok) await admin.from("automation_executions").update({ error_message: `${friendlyDeliveryReason("131049")} Sent by ${channel} instead.` }).eq("id", reserved.id);
+    }
+    return;
+  }
 
   const values = resolveVariableValues(
     template.variable_names,
@@ -91,9 +128,22 @@ export async function sendDirectMemberMessage(
       templateName: template.meta_template_name,
       languageCode: template.language,
       bodyParams,
-      credentials: await getWhatsAppCredentials(trigger.organization_id),
+      credentials,
     });
     await admin.from("automation_executions").update({ meta_message_id: id }).eq("id", reserved.id);
+    await logOutboundMessages([
+      {
+        organizationId: trigger.organization_id,
+        kind: "automation",
+        refId: reserved.id,
+        recipient: phone,
+        wamid: id,
+        templateName: template.meta_template_name,
+        category: template.category,
+        senderKey,
+        bodyText: messageText,
+      },
+    ]);
   } catch (err) {
     const detail = describeWhatsAppError(err);
     await admin.from("automation_executions").update({ status: "failed", error_message: detail.message }).eq("id", reserved.id);
@@ -153,7 +203,23 @@ export async function sendStaffDigest(
   const template = await fetchApprovedTemplate(admin, destination.digest_template_id);
   if (!template) return false;
 
-  const recipientPhones = await resolveDigestRecipientPhones(admin, destination, organizationId);
+  const credentials = await getWhatsAppCredentials(organizationId);
+  const senderKey = senderKeyFor(credentials);
+  const allPhones = await resolveDigestRecipientPhones(admin, destination, organizationId);
+  // The same hold as for member messages: a marketing digest isn't sent to a
+  // leader WhatsApp is refusing marketing to. Tomorrow's run tries again.
+  const { sendable } = await splitBlocked(senderKey, isMarketingCategory(template.category), allPhones.map((phone) => ({ phone })));
+  const recipientPhones = sendable.map((r) => r.phone);
+  if (allPhones.length > 0 && recipientPhones.length === 0) {
+    await logPlatformEvent({
+      level: "info",
+      source: "automation_send",
+      message: "Staff digest not sent: WhatsApp is limiting marketing messages to every recipient right now.",
+      organizationId,
+      metadata: { automationId },
+    });
+    return false;
+  }
   if (recipientPhones.length === 0) {
     await logPlatformEvent({
       level: "warning",
@@ -188,8 +254,21 @@ export async function sendStaffDigest(
     templateName: template.meta_template_name,
     languageCode: template.language,
     recipients: recipientPhones.map((phone) => ({ phone, bodyParams })),
-    credentials: await getWhatsAppCredentials(organizationId),
+    credentials,
   });
+  await logOutboundMessages(
+    result.sentIds.map((sent) => ({
+      organizationId,
+      kind: "automation" as const,
+      refId: reserved.id,
+      recipient: sent.phone,
+      wamid: sent.id,
+      templateName: template.meta_template_name,
+      category: template.category,
+      senderKey,
+      bodyText: renderNamedTemplate(template.body_text_named, { celebrant_list: celebrantList }),
+    })),
+  );
 
   const allFailed = result.failed.length === recipientPhones.length;
   if (allFailed) {

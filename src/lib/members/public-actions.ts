@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { validateMemberBasics, validateMemberDetails } from "@/lib/members/validation";
 
 export interface PublicJoinFormState {
@@ -16,6 +17,28 @@ export interface PublicJoinFormState {
     weddingDate?: string;
   };
   success?: boolean;
+}
+
+// Saves whether the new member agreed to WhatsApp updates, on the pending
+// request the join RPC just created for this phone.
+async function recordJoinWhatsAppChoice(orgSlug: string, phone: string, optIn: boolean): Promise<void> {
+  try {
+    const admin = createAdminClient();
+    const { data: org } = await admin.from("organizations").select("id").eq("slug", orgSlug).maybeSingle();
+    if (!org) return;
+    const { data: request } = await admin
+      .from("members")
+      .select("id")
+      .eq("organization_id", org.id)
+      .eq("phone", phone)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (request) await admin.from("members").update({ whatsapp_opt_in: optIn }).eq("id", request.id);
+  } catch (err) {
+    console.error("recordJoinWhatsAppChoice failed:", err);
+  }
 }
 
 // Bound with the organization's slug via .bind(null, orgSlug) on the client,
@@ -84,6 +107,10 @@ export async function submitMemberRequest(
   if (error) {
     return { error: error.message || "Couldn't submit your request. Please try again." };
   }
+
+  // Their WhatsApp choice goes on the request just created (the join RPC
+  // doesn't carry it). Best-effort: the request is already submitted.
+  await recordJoinWhatsAppChoice(orgSlug, phone, formData.get("whatsappOptIn") === "on");
 
   return { success: true };
 }

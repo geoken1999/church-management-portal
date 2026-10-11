@@ -155,6 +155,7 @@ export const hi: Dictionary = {
     unmarried: "अविवाहित",
     weddingDate: "शादी की तारीख",
     submitRequest: "अनुरोध जमा करें",
+    whatsappOptIn: "मुझे व्हाट्सएप पर अपडेट भेजें",
     successMessage: "धन्यवाद! आपका अनुरोध प्राप्त हो गया है और चर्च टीम की मंजूरी की प्रतीक्षा में है।",
   },
   publicFolder: {

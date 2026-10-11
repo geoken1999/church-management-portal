@@ -9,6 +9,7 @@ const BASE_MEMBER: Member = {
   last_name: "Doe",
   email: "jane@example.com",
   phone: "9876543210",
+  whatsapp_opt_in: null,
   status: "active",
   branch_id: null,
   date_of_birth: "1990-01-01",

@@ -10,6 +10,7 @@ import { getWhatsAppConnectionSummary } from "@/lib/whatsapp/credentials";
 import { syncPlatformTemplatesForOrg } from "@/lib/whatsapp/platform-templates";
 import { PlatformTemplatesCard } from "@/components/whatsapp/PlatformTemplatesCard";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { WhatsAppFallbackCard } from "@/components/whatsapp/WhatsAppFallbackCard";
 import { WhatsAppConnectionCard } from "@/components/whatsapp/WhatsAppConnectionCard";
 import { getSiteUrl } from "@/lib/site-url";
 import { WhatsAppManager } from "@/components/whatsapp/WhatsAppManager";
@@ -74,6 +75,8 @@ export default async function WhatsAppPage() {
       </div>
 
       <WhatsAppConnectionCard connection={connection} isOrgAdmin={isOrgAdmin} webhookUrl={`${getSiteUrl()}/api/whatsapp/webhook`} />
+
+      {isOrgAdmin && <WhatsAppFallbackCard initial={membership.organization.whatsapp_fallback ?? "none"} />}
 
       {connection && isOrgAdmin && (
         <PlatformTemplatesCard

@@ -34,6 +34,11 @@ export type Organization = {
   logo_url: string | null;
   // Centre mark for generated QR codes (migration 0131); null = plain QRs.
   qr_logo_url: string | null;
+  // What to do when WhatsApp can't deliver, and a platform override for a
+  // church whose delivery record would otherwise pause its marketing sends
+  // (migration 0145).
+  whatsapp_fallback: "none" | "sms" | "email";
+  whatsapp_marketing_override: boolean;
   // Youth age rule, in whole years: members in this range are added to Youth
   // automatically. Both null = off (migration 0140).
   youth_age_from: number | null;
@@ -233,6 +238,9 @@ export type Member = {
   last_name: string;
   email: string | null;
   phone: string | null;
+  // Agreed to WhatsApp updates: null = never asked (allowed), false = opted
+  // out (replied STOP or declined), true = agreed (migration 0145).
+  whatsapp_opt_in: boolean | null;
   status: MemberStatus;
   branch_id: string | null;
   date_of_birth: string | null;
@@ -719,7 +727,13 @@ export type WhatsAppCampaign = {
   recipient_count: number;
   sent_count: number;
   failed_count: number;
-  failed_recipients: { phone: string; error: string }[];
+  failed_recipients: { phone: string; error: string; text?: string }[];
+  // People skipped because WhatsApp is limiting marketing messages to them
+  // (migration 0144).
+  skipped_count: number;
+  skipped_recipients: { phone: string; reason: string; text?: string }[];
+  // Recipients already resent by SMS/email (migration 0145).
+  fallback_sent_phones: string[];
   status: WhatsAppCampaignStatus;
   sent_by: string | null;
   // The template actually sent, and the values filled into its {{n}}
@@ -2761,6 +2775,18 @@ export type Database = {
           },
         ];
       };
+      whatsapp_message_log: {
+        Row: WhatsAppMessageLog;
+        Insert: Partial<WhatsAppMessageLog> & Pick<WhatsAppMessageLog, "organization_id" | "kind" | "recipient" | "wamid" | "sender_key">;
+        Update: Partial<WhatsAppMessageLog>;
+        Relationships: [];
+      };
+      whatsapp_contact_health: {
+        Row: WhatsAppContactHealth;
+        Insert: Partial<WhatsAppContactHealth> & Pick<WhatsAppContactHealth, "sender_key" | "recipient">;
+        Update: Partial<WhatsAppContactHealth>;
+        Relationships: [];
+      };
       todo_events: {
         Row: TodoEvent;
         Insert: Partial<TodoEvent> & Pick<TodoEvent, "organization_id" | "title">;
@@ -3673,5 +3699,35 @@ export type TodoEvent = {
   event_date: string | null;
   created_by: string | null;
   created_at: string;
+  updated_at: string;
+};
+
+export type WhatsAppMessageKind = "campaign" | "automation" | "event_pass";
+
+export type WhatsAppMessageLog = {
+  id: string;
+  organization_id: string;
+  kind: WhatsAppMessageKind;
+  ref_id: string | null;
+  recipient: string;
+  wamid: string;
+  template_name: string | null;
+  category: string | null;
+  sender_key: string;
+  status: string;
+  error_code: string | null;
+  credited_back: boolean;
+  body_text: string | null;
+  fallback_sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WhatsAppContactHealth = {
+  sender_key: string;
+  recipient: string;
+  marketing_blocked_until: string | null;
+  consecutive_failures: number;
+  last_error_code: string | null;
   updated_at: string;
 };

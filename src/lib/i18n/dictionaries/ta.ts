@@ -155,6 +155,7 @@ export const ta: Dictionary = {
     unmarried: "திருமணமாகாதவர்",
     weddingDate: "திருமண தேதி",
     submitRequest: "கோரிக்கையை சமர்ப்பிக்கவும்",
+    whatsappOptIn: "வாட்ஸ்அப்பில் எனக்கு அறிவிப்புகளை அனுப்புங்கள்",
     successMessage: "நன்றி! உங்கள் கோரிக்கை பெறப்பட்டது மற்றும் தேவாலய குழுவின் ஒப்புதலுக்காக காத்திருக்கிறது.",
   },
   publicFolder: {

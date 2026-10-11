@@ -49,6 +49,7 @@ export default async function MembersPage() {
         branches={branches}
         profileUpdateRequests={profileUpdateRequests}
         joinBilingual={sanitizeBilingual(membership.organization.join_bilingual)}
+        youthAgeRule={{ from: membership.organization.youth_age_from ?? null, to: membership.organization.youth_age_to ?? null }}
         canManage={canManage}
       />
     </div>

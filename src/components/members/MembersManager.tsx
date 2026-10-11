@@ -15,6 +15,7 @@ import { approveMemberProfileUpdateRequest, rejectMemberProfileUpdateRequest } f
 import { downloadMemberTemplate, bulkImportMembers } from "@/lib/members/bulk-actions";
 import { PublicJoinLinkCard } from "@/components/members/PublicJoinLinkCard";
 import { JoinFormLanguages } from "@/components/members/JoinFormLanguages";
+import { YouthAgeRuleCard } from "@/components/members/YouthAgeRuleCard";
 import type { BilingualConfig } from "@/lib/bilingual/config";
 import type { Branch, Member, MemberFieldDefinition, MemberProfileUpdateRequest, MemberStatus } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -888,6 +889,7 @@ export function MembersManager({
   branches,
   profileUpdateRequests,
   joinBilingual,
+  youthAgeRule,
   canManage,
 }: {
   organizationId: string;
@@ -899,6 +901,7 @@ export function MembersManager({
   branches: Branch[];
   profileUpdateRequests: ProfileUpdateRequestWithMember[];
   joinBilingual: BilingualConfig | null;
+  youthAgeRule: { from: number | null; to: number | null };
   canManage: boolean;
 }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -933,6 +936,7 @@ export function MembersManager({
     <div className="space-y-6">
       {canManage && <PublicJoinLinkCard orgSlug={orgSlug} orgName={orgName} siteUrl={siteUrl} />}
       {canManage && <JoinFormLanguages initial={joinBilingual} />}
+      {canManage && <YouthAgeRuleCard initialFrom={youthAgeRule.from} initialTo={youthAgeRule.to} />}
 
       {canManage && pendingMembers.length > 0 && (
         <div className="space-y-3">

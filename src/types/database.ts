@@ -845,6 +845,8 @@ export type Todo = {
   due_at: string | null;
   status: TodoStatus;
   assigned_to: string | null;
+  // The event (camp, conference, ...) this to-do is for, if any (migration 0139).
+  event_id: string | null;
   // Set for automation-created follow-up tasks; null for ordinary to-dos.
   member_id: string | null;
   branch_id: string | null;
@@ -2776,6 +2778,13 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["auth_user_id"];
+          },
+          {
+            foreignKeyName: "todos_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "events";
+            referencedColumns: ["id"];
           },
         ];
       };

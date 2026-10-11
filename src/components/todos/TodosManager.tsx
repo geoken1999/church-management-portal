@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Plus, Pencil, Trash2, CalendarPlus, CalendarClock, User } from "lucide-react";
+import { Plus, Pencil, Trash2, CalendarPlus, CalendarClock, CalendarDays, User } from "lucide-react";
 import {
   createTodo,
   updateTodo,
@@ -37,9 +37,16 @@ export interface TeamMemberOption {
   name: string;
 }
 
+export interface EventOption {
+  id: string;
+  title: string;
+  startAt: string;
+}
+
 export type TodoRow = Todo & {
   assignee: { first_name: string; last_name: string } | null;
   creator: { first_name: string; last_name: string } | null;
+  event: { id: string; title: string; start_at: string } | null;
 };
 
 // The church's local date and time, in the form the datetime-local input
@@ -66,6 +73,9 @@ function formatDueDate(iso: string, timeZone: string): string {
 
 function TodoFormFields({
   members,
+  events,
+  eventId,
+  onEventIdChange,
   title,
   onTitleChange,
   description,
@@ -77,6 +87,9 @@ function TodoFormFields({
   errors,
 }: {
   members: TeamMemberOption[];
+  events: EventOption[];
+  eventId: string;
+  onEventIdChange: (value: string) => void;
   title: string;
   onTitleChange: (value: string) => void;
   description: string;
@@ -100,6 +113,24 @@ function TodoFormFields({
           aria-invalid={Boolean(errors?.title)}
         />
         <FieldError id="todo-title-error" message={errors?.title} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="todo-event">Event (optional)</Label>
+        <Select value={eventId || "none"} onValueChange={(v) => onEventIdChange(v === "none" ? "" : (v ?? ""))}>
+          <SelectTrigger id="todo-event" className="w-full">
+            <SelectValue>{() => events.find((e) => e.id === eventId)?.title ?? "No event"}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No event</SelectItem>
+            {events.map((event) => (
+              <SelectItem key={event.id} value={event.id}>
+                {event.title}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <input type="hidden" name="eventId" value={eventId} />
+        <p className="text-xs text-muted-foreground">Pick an event, like a camp, to keep its tasks together.</p>
       </div>
       <div className="space-y-2">
         <Label htmlFor="todo-description">Description (optional)</Label>
@@ -154,7 +185,7 @@ function TodoFormFields({
 
 const initialFormState: TodoFormState = {};
 
-function CreateTodoDialog({ members }: { members: TeamMemberOption[] }) {
+function CreateTodoDialog({ members, events, defaultEventId }: { members: TeamMemberOption[]; events: EventOption[]; defaultEventId: string }) {
   const [state, setState] = useState<TodoFormState>(initialFormState);
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
@@ -162,6 +193,7 @@ function CreateTodoDialog({ members }: { members: TeamMemberOption[] }) {
   const [description, setDescription] = useState("");
   const [dueAt, setDueAt] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
+  const [eventId, setEventId] = useState(defaultEventId);
 
   function reset() {
     setState(initialFormState);
@@ -169,6 +201,8 @@ function CreateTodoDialog({ members }: { members: TeamMemberOption[] }) {
     setDescription("");
     setDueAt("");
     setAssignedTo("");
+    // Adding a to-do while looking at one event's tasks starts on that event.
+    setEventId(defaultEventId);
   }
 
   function handleSubmit(formData: FormData) {
@@ -211,6 +245,9 @@ function CreateTodoDialog({ members }: { members: TeamMemberOption[] }) {
           )}
           <TodoFormFields
             members={members}
+            events={events}
+            eventId={eventId}
+            onEventIdChange={setEventId}
             title={title}
             onTitleChange={setTitle}
             description={description}
@@ -236,7 +273,7 @@ function CreateTodoDialog({ members }: { members: TeamMemberOption[] }) {
 // Edit
 // ---------------------------------------------------------------------------
 
-function EditTodoDialog({ todo, members, timezone }: { todo: TodoRow; members: TeamMemberOption[]; timezone: string }) {
+function EditTodoDialog({ todo, members, events, timezone }: { todo: TodoRow; members: TeamMemberOption[]; events: EventOption[]; timezone: string }) {
   const [state, setState] = useState<TodoFormState>(initialFormState);
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
@@ -244,6 +281,7 @@ function EditTodoDialog({ todo, members, timezone }: { todo: TodoRow; members: T
   const [description, setDescription] = useState(todo.description ?? "");
   const [dueAt, setDueAt] = useState(toDatetimeLocal(todo.due_at, timezone));
   const [assignedTo, setAssignedTo] = useState(todo.assigned_to ?? "");
+  const [eventId, setEventId] = useState(todo.event_id ?? "");
 
   function handleSubmit(formData: FormData) {
     startTransition(async () => {
@@ -264,6 +302,7 @@ function EditTodoDialog({ todo, members, timezone }: { todo: TodoRow; members: T
           setDescription(todo.description ?? "");
           setDueAt(toDatetimeLocal(todo.due_at, timezone));
           setAssignedTo(todo.assigned_to ?? "");
+          setEventId(todo.event_id ?? "");
         }
       }}
     >
@@ -283,6 +322,9 @@ function EditTodoDialog({ todo, members, timezone }: { todo: TodoRow; members: T
           )}
           <TodoFormFields
             members={members}
+            events={events}
+            eventId={eventId}
+            onEventIdChange={setEventId}
             title={title}
             onTitleChange={setTitle}
             description={description}
@@ -345,7 +387,7 @@ function DeleteTodoDialog({ todo }: { todo: TodoRow }) {
 // Row
 // ---------------------------------------------------------------------------
 
-function TodoItemRow({ todo, members, timezone }: { todo: TodoRow; members: TeamMemberOption[]; timezone: string }) {
+function TodoItemRow({ todo, members, events, timezone }: { todo: TodoRow; members: TeamMemberOption[]; events: EventOption[]; timezone: string }) {
   const [pending, startTransition] = useTransition();
   const overdue = isOverdue(todo);
 
@@ -400,7 +442,7 @@ function TodoItemRow({ todo, members, timezone }: { todo: TodoRow; members: Team
             <CalendarPlus className="size-3.5" />
           </Button>
         )}
-        <EditTodoDialog todo={todo} members={members} timezone={timezone} />
+        <EditTodoDialog todo={todo} members={members} events={events} timezone={timezone} />
         <DeleteTodoDialog todo={todo} />
       </div>
     </div>
@@ -411,20 +453,47 @@ function TodoItemRow({ todo, members, timezone }: { todo: TodoRow; members: Team
 // Root
 // ---------------------------------------------------------------------------
 
-export function TodosManager({ todos, members, timezone }: { todos: TodoRow[]; members: TeamMemberOption[]; timezone: string }) {
+const ALL_EVENTS = "all";
+const NO_EVENT = "none";
+
+export function TodosManager({ todos, members, events, timezone }: { todos: TodoRow[]; members: TeamMemberOption[]; events: EventOption[]; timezone: string }) {
   const [filter, setFilter] = useState<"active" | "completed" | "all">("active");
+  // "all" (every to-do), "none" (not tied to an event), or an event id.
+  const [eventFilter, setEventFilter] = useState<string>(ALL_EVENTS);
 
   const filtered = useMemo(() => {
-    if (filter === "active") return todos.filter((t) => t.status === "pending");
-    if (filter === "completed") return todos.filter((t) => t.status === "completed");
-    return todos;
-  }, [todos, filter]);
+    const byStatus = filter === "active" ? todos.filter((t) => t.status === "pending") : filter === "completed" ? todos.filter((t) => t.status === "completed") : todos;
+    if (eventFilter === ALL_EVENTS) return byStatus;
+    if (eventFilter === NO_EVENT) return byStatus.filter((t) => !t.event_id);
+    return byStatus.filter((t) => t.event_id === eventFilter);
+  }, [todos, filter, eventFilter]);
+
+  // With every to-do showing, those tied to an event sit together under the
+  // event's name (soonest event first), then the ordinary ones.
+  const groups = useMemo(() => {
+    if (eventFilter !== ALL_EVENTS) return [{ key: "flat", title: null as string | null, items: filtered }];
+    const byEvent = new Map<string, { title: string; startAt: string; items: TodoRow[] }>();
+    const general: TodoRow[] = [];
+    for (const todo of filtered) {
+      if (todo.event) {
+        const group = byEvent.get(todo.event.id) ?? { title: todo.event.title, startAt: todo.event.start_at, items: [] };
+        group.items.push(todo);
+        byEvent.set(todo.event.id, group);
+      } else {
+        general.push(todo);
+      }
+    }
+    const eventGroups = [...byEvent.entries()].sort((a, b) => a[1].startAt.localeCompare(b[1].startAt)).map(([id, g]) => ({ key: id, title: g.title as string | null, items: g.items }));
+    return [...eventGroups, ...(general.length > 0 ? [{ key: "general", title: eventGroups.length > 0 ? "General" : null, items: general }] : [])];
+  }, [filtered, eventFilter]);
 
   const activeCount = todos.filter((t) => t.status === "pending").length;
+  const usedEventIds = new Set(todos.map((t) => t.event_id).filter(Boolean));
+  const filterableEvents = events.filter((e) => usedEventIds.has(e.id));
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs value={filter} onValueChange={(v) => setFilter((v as typeof filter) ?? "active")}>
           <TabsList>
             <TabsIndicator />
@@ -433,7 +502,27 @@ export function TodosManager({ todos, members, timezone }: { todos: TodoRow[]; m
             <TabsTab value="all">All</TabsTab>
           </TabsList>
         </Tabs>
-        <CreateTodoDialog members={members} />
+        <div className="flex flex-wrap items-center gap-2">
+          {filterableEvents.length > 0 && (
+            <Select value={eventFilter} onValueChange={(v) => setEventFilter(v ?? ALL_EVENTS)}>
+              <SelectTrigger className="w-48" aria-label="Filter by event">
+                <SelectValue>
+                  {() => (eventFilter === ALL_EVENTS ? "All events" : eventFilter === NO_EVENT ? "No event" : (events.find((e) => e.id === eventFilter)?.title ?? "Event"))}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_EVENTS}>All events</SelectItem>
+                <SelectItem value={NO_EVENT}>No event</SelectItem>
+                {filterableEvents.map((event) => (
+                  <SelectItem key={event.id} value={event.id}>
+                    {event.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <CreateTodoDialog members={members} events={events} defaultEventId={eventFilter !== ALL_EVENTS && eventFilter !== NO_EVENT ? eventFilter : ""} />
+        </div>
       </div>
 
       <Card>
@@ -443,9 +532,24 @@ export function TodosManager({ todos, members, timezone }: { todos: TodoRow[]; m
               {filter === "active" ? "Nothing to do — you're all caught up." : "No to-dos here."}
             </p>
           ) : (
-            <div className="divide-y divide-border">
-              {filtered.map((todo) => (
-                <TodoItemRow key={todo.id} todo={todo} members={members} timezone={timezone} />
+            <div className="space-y-4">
+              {groups.map((group) => (
+                <div key={group.key}>
+                  {group.title && (
+                    <div className="flex items-center gap-2 border-b border-border pt-2 pb-1.5">
+                      <CalendarDays className="size-4 text-primary" />
+                      <p className="text-sm font-semibold">{group.title}</p>
+                      <span className="text-xs text-muted-foreground">
+                        {group.items.filter((t) => t.status === "pending").length} open · {group.items.length} total
+                      </span>
+                    </div>
+                  )}
+                  <div className="divide-y divide-border">
+                    {group.items.map((todo) => (
+                      <TodoItemRow key={todo.id} todo={todo} members={members} events={events} timezone={timezone} />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}

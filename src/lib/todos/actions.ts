@@ -19,7 +19,17 @@ function readTodoFields(formData: FormData) {
     description: String(formData.get("description") ?? "").trim(),
     dueAt: String(formData.get("dueAt") ?? "").trim(),
     assignedTo: String(formData.get("assignedTo") ?? "").trim(),
+    eventId: String(formData.get("eventId") ?? "").trim(),
   };
+}
+
+// The event a to-do is for must be one of this church's own; returns its
+// title (for notifications), null for no event, or undefined if invalid.
+async function resolveEvent(organizationId: string, eventId: string): Promise<{ title: string } | null | undefined> {
+  if (!eventId) return null;
+  const supabase = await createClient();
+  const { data } = await supabase.from("events").select("title").eq("id", eventId).eq("organization_id", organizationId).maybeSingle();
+  return data ? { title: data.title } : undefined;
 }
 
 // The form's date and time have no timezone. They mean the church's local
@@ -66,6 +76,9 @@ export async function createTodo(_prevState: TodoFormState, formData: FormData):
     return { fieldErrors };
   }
 
+  const event = await resolveEvent(membership.organization.id, fields.eventId);
+  if (event === undefined) return { error: "That event could not be found." };
+
   const supabase = await createClient();
   const { error } = await supabase.from("todos").insert({
     organization_id: membership.organization.id,
@@ -73,6 +86,7 @@ export async function createTodo(_prevState: TodoFormState, formData: FormData):
     description: fields.description || null,
     due_at: dueAtFromForm(fields.dueAt, membership.organization.timezone),
     assigned_to: fields.assignedTo || null,
+    event_id: fields.eventId || null,
     created_by: user.id,
   });
 
@@ -82,7 +96,7 @@ export async function createTodo(_prevState: TodoFormState, formData: FormData):
 
   if (fields.assignedTo && fields.assignedTo !== user.id) {
     void sendPushToUsers([fields.assignedTo], "todo_assigned", {
-      title: "New to-do assigned to you",
+      title: event ? `New to-do for ${event.title}` : "New to-do assigned to you",
       body: fields.title,
       data: { type: "todo_assigned" },
     });
@@ -114,6 +128,9 @@ export async function updateTodo(_prevState: TodoFormState, formData: FormData):
 
   const timeZone = (await timezoneForOrganization(organizationId)) ?? DEFAULT_TIMEZONE;
 
+  const event = await resolveEvent(organizationId, fields.eventId);
+  if (event === undefined) return { error: "That event could not be found." };
+
   const supabase = await createClient();
 
   // Read the previous assignee first — only a change TO a new assignee
@@ -129,6 +146,7 @@ export async function updateTodo(_prevState: TodoFormState, formData: FormData):
       description: fields.description || null,
       due_at: dueAtFromForm(fields.dueAt, timeZone),
       assigned_to: fields.assignedTo || null,
+      event_id: fields.eventId || null,
     })
     .eq("id", id);
 
@@ -139,7 +157,7 @@ export async function updateTodo(_prevState: TodoFormState, formData: FormData):
   const newAssignedTo = fields.assignedTo || null;
   if (newAssignedTo && newAssignedTo !== previousAssignedTo && newAssignedTo !== user.id) {
     void sendPushToUsers([newAssignedTo], "todo_assigned", {
-      title: "New to-do assigned to you",
+      title: event ? `New to-do for ${event.title}` : "New to-do assigned to you",
       body: fields.title,
       data: { type: "todo_assigned" },
     });

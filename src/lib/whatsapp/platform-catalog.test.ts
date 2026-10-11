@@ -20,3 +20,16 @@ describe("platform template catalog", () => {
     for (const t of PLATFORM_TEMPLATE_CATALOG) expect(t.body.toLowerCase()).not.toMatch(/\b(otp|verification|confirmation) code\b|\bcode is\b/);
   });
 });
+
+describe("WhatsApp placement rules", () => {
+  // WhatsApp refuses a template that starts or ends with a variable, even if
+  // only punctuation follows it ("Variables can't be at the start or end of
+  // the template").
+  it("never starts or ends with a variable", () => {
+    for (const t of PLATFORM_TEMPLATE_CATALOG) {
+      const trimmed = t.body.trim();
+      expect(trimmed, `${t.name} starts with a variable`).not.toMatch(/^\{\{\d+\}\}/);
+      expect(trimmed, `${t.name} ends with a variable`).not.toMatch(/\{\{\d+\}\}[\s.,!?;:]*$/);
+    }
+  });
+});

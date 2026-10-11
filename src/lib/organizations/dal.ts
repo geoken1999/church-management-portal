@@ -26,7 +26,7 @@ export const getUserOrganizations = cache(async (): Promise<OrganizationMembersh
   const supabase = await createClient();
   const [{ data }, disabledFeatures] = await Promise.all([
     supabase.from("organization_members").select("role, tab_permissions, organizations(*)").eq("auth_user_id", user.id),
-    getDisabledFeatures(),
+    getDisabledFeatures(user.email),
   ]);
 
   if (!data) return [];

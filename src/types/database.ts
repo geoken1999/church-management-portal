@@ -1439,6 +1439,10 @@ export type PlatformEvent = {
 export type PlatformFeatureFlag = {
   tab_key: string;
   enabled: boolean;
+  // off | testing | beta | live (migration 0137); enabled is false only for off.
+  status: "off" | "testing" | "beta" | "live";
+  // End of the "New" tag after moving from beta to live.
+  new_until: string | null;
   updated_by: string | null;
   updated_at: string;
 };

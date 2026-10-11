@@ -1,5 +1,6 @@
 "use server";
 
+import { ensurePassTemplate } from "@/lib/events/pass-whatsapp";
 import { collectTranslatableStrings, sanitizeBilingual } from "@/lib/bilingual/config";
 import { ensureTranslations } from "@/lib/bilingual/translate";
 import { revalidatePath } from "next/cache";
@@ -132,6 +133,7 @@ export async function updateEventRegistrationSettings(
   const passColor = String(formData.get("passColor") ?? "#7c3aed");
   const passMessage = String(formData.get("passMessage") ?? "").trim();
   const reminderOffset = String(formData.get("reminderOffset") ?? "").trim();
+  const passWhatsapp = formData.get("passWhatsapp") === "true";
   const paymentRequired = formData.get("paymentRequired") === "true";
   const paymentGateway = String(formData.get("paymentGateway") ?? "").trim();
   const paymentAmount = String(formData.get("paymentAmount") ?? "").trim();
@@ -192,6 +194,7 @@ export async function updateEventRegistrationSettings(
       registration_closes_at: closesAt.trim() ? new Date(closesAt).toISOString() : null,
       registration_pass_color: passColor.trim(),
       registration_pass_message: passMessage || null,
+      registration_pass_whatsapp: passWhatsapp,
       reminder_offset: (reminderOffset || null) as EventReminderOffset | null,
       payment_required: paymentRequired,
       payment_gateway: paymentRequired ? (paymentGateway as EventPaymentGateway) : null,
@@ -205,8 +208,22 @@ export async function updateEventRegistrationSettings(
     return { error: "Couldn't save those changes. Please try again." };
   }
 
+  // Turning the WhatsApp pass on starts Meta's review of the pass template
+  // right away, so it is likely approved by the time registrations arrive.
+  let whatsappNote: string | undefined;
+  if (passWhatsapp) {
+    const template = await ensurePassTemplate(organizationId, undefined, passColor.trim());
+    if (template.status === "pending_review") {
+      whatsappNote = "WhatsApp passes will start going out once WhatsApp approves the pass message (usually minutes to a few hours). Until then registrants get the email pass only.";
+    } else if (template.status === "rejected") {
+      whatsappNote = `WhatsApp rejected the pass message${template.message ? `: ${template.message}` : "."} Passes will keep going by email only.`;
+    } else if (template.status === "error") {
+      whatsappNote = `Couldn't set up the WhatsApp pass: ${template.message ?? "WhatsApp isn't available for this church."} Passes will keep going by email only.`;
+    }
+  }
+
   revalidatePath(EVENTS_PATH);
-  return { success: true, warning };
+  return { success: true, warning: [warning, whatsappNote].filter(Boolean).join(" ") || undefined };
 }
 
 export async function cancelEventRegistration(formData: FormData) {

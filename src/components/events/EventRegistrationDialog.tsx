@@ -194,6 +194,7 @@ function SettingsTab({
   const [closesAt, setClosesAt] = useState(toDateTimeLocalValue(event.registration_closes_at));
   const [passColor, setPassColor] = useState(event.registration_pass_color);
   const [passMessage, setPassMessage] = useState(event.registration_pass_message ?? "");
+  const [passWhatsapp, setPassWhatsapp] = useState(event.registration_pass_whatsapp ?? false);
   const [backgroundPreviewUrl, setBackgroundPreviewUrl] = useState(event.registration_pass_background_url);
   const [reminderOffset, setReminderOffset] = useState(event.reminder_offset ?? "");
   const [paymentRequired, setPaymentRequired] = useState(event.payment_required);
@@ -518,6 +519,18 @@ function SettingsTab({
               />
             </div>
           </div>
+          <input type="hidden" name="passWhatsapp" value={String(passWhatsapp)} />
+          <label className="flex items-start gap-2">
+            <Checkbox checked={passWhatsapp} onCheckedChange={(c) => setPassWhatsapp(c === true)} />
+            <span className="text-sm">
+              <span className="font-medium">Also send the pass on WhatsApp</span>
+              <br />
+              <span className="text-muted-foreground">
+                Sends the QR pass to the registrant&apos;s WhatsApp number (the form needs a phone field) as well as by email. Each message counts toward your monthly WhatsApp limit, and
+                uses your own WhatsApp number if you&apos;ve connected one.
+              </span>
+            </span>
+          </label>
         </div>
 
         <div className="space-y-3">

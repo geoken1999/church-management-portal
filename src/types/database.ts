@@ -974,6 +974,8 @@ export type Event = {
   registration_share_token: string;
   registration_fields: EventRegistrationField[];
   registration_bilingual: BilingualConfig | null;
+  // Also send the pass on WhatsApp (migration 0134).
+  registration_pass_whatsapp: boolean;
   registration_capacity: number | null;
   registration_closes_at: string | null;
   registration_pass_color: string;

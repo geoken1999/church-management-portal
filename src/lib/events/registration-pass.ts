@@ -46,8 +46,8 @@ function darken(hex: string, amount: number): string {
 // Error correction H keeps the code scannable with the middle covered. If
 // the logo can't be fetched or composited, the plain QR is used instead:
 // the pass must always carry a working code.
-async function buildQrPng(code: string, organizationId: string): Promise<Buffer> {
-  const plain = await QRCode.toBuffer(code, { width: 400, margin: 2, errorCorrectionLevel: "H" });
+export async function buildQrPng(code: string, organizationId: string, width = 400): Promise<Buffer> {
+  const plain = await QRCode.toBuffer(code, { width, margin: 2, errorCorrectionLevel: "H" });
   try {
     const admin = createAdminClient();
     const { data } = await admin.from("organizations").select("qr_logo_url, qr_logo_size").eq("id", organizationId).maybeSingle();
@@ -55,7 +55,7 @@ async function buildQrPng(code: string, organizationId: string): Promise<Buffer>
 
     const response = await fetch(data.qr_logo_url);
     if (!response.ok) return plain;
-    const logoSize = Math.round(400 * qrLogoRatio(data.qr_logo_size));
+    const logoSize = Math.round(width * qrLogoRatio(data.qr_logo_size));
     const logo = await sharp(Buffer.from(await response.arrayBuffer()))
       .resize(logoSize, logoSize, { fit: "contain", background: { r: 255, g: 255, b: 255, alpha: 0 } })
       .png()

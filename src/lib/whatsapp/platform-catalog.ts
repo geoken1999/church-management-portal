@@ -87,7 +87,7 @@ export const PLATFORM_TEMPLATE_CATALOG: PlatformTemplateDefinition[] = [
     description: "Let a member know they are being prayed for.",
     category: "marketing",
     language: "en_US",
-    body: "Hi {{1}}, we are keeping you in our prayers. If there is anything we can pray for with you, simply reply to this message. With love, {{2}}.",
+    body: "Hi {{1}}, we are keeping you in our prayers. If there is anything we can pray for with you, simply reply to this message. With love from all of us at {{2}}, and God bless you.",
     examples: ["Ann", "Grace Church"],
   },
 ];

@@ -13,10 +13,11 @@ export async function generateMetadata({ params }: { params: Promise<{ meetingId
 // (the whole point of an "invite link"). Only exposes what
 // getPublicKmeetMeeting selects (title/status), same minimal-exposure
 // shape as this app's other invite-link pages.
-export default async function PublicKmeetPage({ params }: { params: Promise<{ meetingId: string }> }) {
+export default async function PublicKmeetPage({ params, searchParams }: { params: Promise<{ meetingId: string }>; searchParams: Promise<{ name?: string }> }) {
   const { meetingId } = await params;
+  const { name } = await searchParams;
   const meeting = await getPublicKmeetMeeting(meetingId, "video");
   if (!meeting) notFound();
 
-  return <KmeetGuestJoin mode="video" meetingId={meeting.id} title={meeting.title} alreadyEnded={meeting.status === "ended"} />;
+  return <KmeetGuestJoin mode="video" meetingId={meeting.id} title={meeting.title} alreadyEnded={meeting.status === "ended"} presetName={name?.slice(0, 60)} />;
 }

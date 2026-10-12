@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { ArrowDown, ArrowUp, Eye, EyeOff, Plus, Trash2, CalendarDays, Link2, Megaphone, Sparkles, ImageIcon, PlayCircle } from "lucide-react";
+import { ArrowDown, ArrowUp, Eye, EyeOff, Plus, Trash2, CalendarDays, Link2, Megaphone, Sparkles, ImageIcon, PlayCircle, Webcam } from "lucide-react";
 import { saveHomeDraftAction, publishHomeLayoutAction, discardHomeDraftAction, uploadBannerImageAction, lookupYoutubeVideoAction } from "@/lib/member-home/actions";
 import { youtubeThumbnailUrl } from "@/lib/member-home/youtube";
 import { BannerCropDialog } from "@/components/mobile/BannerCropDialog";
@@ -42,6 +42,7 @@ const BLOCK_ICONS: Record<BlockType, typeof Sparkles> = {
   quick_links: Link2,
   upcoming_events: CalendarDays,
   videos: PlayCircle,
+  live_calls: Webcam,
 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -234,6 +235,17 @@ function BlockEditor({ block, onChange }: { block: HomeBlock; onChange: (next: H
           <Field label="Button link (https://…)">
             <Input value={block.buttonUrl} maxLength={500} onChange={(e) => onChange({ ...block, buttonUrl: e.target.value })} />
           </Field>
+        </div>
+      );
+    case "live_calls":
+      return (
+        <div className="grid gap-3">
+          <Field label="Heading">
+            <Input value={block.title} maxLength={60} onChange={(e) => onChange({ ...block, title: e.target.value })} />
+          </Field>
+          <p className="text-xs text-muted-foreground">
+            A card appears here whenever a K-Connect video or audio call is live, with a Join button that opens the call inside the app. It stays out of the way when nothing is live.
+          </p>
         </div>
       );
     case "upcoming_events":
@@ -447,6 +459,19 @@ function PhonePreview({ layout, organizationName, logoUrl }: { layout: HomeLayou
                         {video.title && <p className="mt-1 line-clamp-2 text-[10px] leading-tight">{video.title}</p>}
                       </div>
                     ))}
+                  </div>
+                </div>
+              );
+            case "live_calls":
+              return (
+                <div key={block.id} className="space-y-2">
+                  {block.title && <p className="text-sm font-semibold">{block.title}</p>}
+                  <div className="flex items-center justify-between rounded-lg border border-border p-2.5">
+                    <div>
+                      <p className="text-xs font-medium">Sunday service</p>
+                      <p className="text-[10px] text-muted-foreground">Video call · live now</p>
+                    </div>
+                    <span className="rounded-md bg-primary px-2 py-1 text-[10px] font-medium text-primary-foreground">Join</span>
                   </div>
                 </div>
               );

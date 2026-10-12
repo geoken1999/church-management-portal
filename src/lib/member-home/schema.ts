@@ -26,7 +26,7 @@ export interface BannerSlide {
   linkUrl: string;
 }
 
-export type BlockType = "banner" | "welcome" | "announcement" | "quick_links" | "upcoming_events" | "videos";
+export type BlockType = "banner" | "welcome" | "announcement" | "quick_links" | "upcoming_events" | "videos" | "live_calls";
 
 export const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   banner: "Banner",
@@ -35,6 +35,7 @@ export const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   quick_links: "Quick links",
   upcoming_events: "Upcoming events",
   videos: "Videos",
+  live_calls: "Live calls",
 };
 
 // Destinations a quick link can open that exist in the member app today.
@@ -68,7 +69,8 @@ export type HomeBlock =
   | { id: string; hidden?: boolean; type: "announcement"; title: string; body: string; imageUrl: string; buttonLabel: string; buttonUrl: string }
   | { id: string; hidden?: boolean; type: "quick_links"; title: string; links: QuickLink[] }
   | { id: string; hidden?: boolean; type: "upcoming_events"; title: string; count: number }
-  | { id: string; hidden?: boolean; type: "videos"; title: string; videos: VideoItem[] };
+  | { id: string; hidden?: boolean; type: "videos"; title: string; videos: VideoItem[] }
+  | { id: string; hidden?: boolean; type: "live_calls"; title: string };
 
 export interface HomeLayout {
   version: number;
@@ -95,6 +97,8 @@ export function newBlock(type: BlockType): HomeBlock {
       return { id, type, title: "Upcoming events", count: 3 };
     case "videos":
       return { id, type, title: "Videos", videos: [] };
+    case "live_calls":
+      return { id, type, title: "Live now" };
   }
 }
 
@@ -229,6 +233,9 @@ export function sanitizeLayout(input: unknown, organizationId?: string): { layou
         blocks.push({ id, ...(hidden && { hidden }), type: "videos", title: str(block.title, 60), videos });
         break;
       }
+      case "live_calls":
+        blocks.push({ id, ...(hidden && { hidden }), type: "live_calls", title: str(block.title, 60) });
+        break;
       default:
         return { error: "That layout isn't valid." };
     }

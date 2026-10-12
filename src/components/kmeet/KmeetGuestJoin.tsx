@@ -15,14 +15,18 @@ export function KmeetGuestJoin({
   meetingId,
   title,
   alreadyEnded,
+  presetName,
 }: {
   mode?: KmeetMode;
   meetingId: string;
   title: string;
   alreadyEnded: boolean;
+  // Set when a member joins from the mobile app: their own name, so the name
+  // screen is skipped.
+  presetName?: string;
 }) {
-  const [name, setName] = useState("");
-  const [joining, setJoining] = useState(false);
+  const [name, setName] = useState(presetName ?? "");
+  const [joining, setJoining] = useState(Boolean(presetName?.trim()) && !alreadyEnded);
   const Icon = mode === "audio" ? Headphones : Webcam;
 
   if (joining) {

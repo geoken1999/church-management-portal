@@ -14,10 +14,11 @@ export async function generateMetadata({ params }: { params: Promise<{ meetingId
 // getPublicKmeetMeeting selects (title/status), same minimal-exposure
 // shape as this app's other invite-link pages. Mirrors
 // src/app/kmeet/[meetingId]/page.tsx exactly, just mode="audio".
-export default async function PublicKaudioPage({ params }: { params: Promise<{ meetingId: string }> }) {
+export default async function PublicKaudioPage({ params, searchParams }: { params: Promise<{ meetingId: string }>; searchParams: Promise<{ name?: string }> }) {
   const { meetingId } = await params;
+  const { name } = await searchParams;
   const meeting = await getPublicKmeetMeeting(meetingId, "audio");
   if (!meeting) notFound();
 
-  return <KmeetGuestJoin mode="audio" meetingId={meeting.id} title={meeting.title} alreadyEnded={meeting.status === "ended"} />;
+  return <KmeetGuestJoin mode="audio" meetingId={meeting.id} title={meeting.title} alreadyEnded={meeting.status === "ended"} presetName={name?.slice(0, 60)} />;
 }

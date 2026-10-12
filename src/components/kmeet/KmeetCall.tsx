@@ -23,7 +23,7 @@ import {
   X,
   Headphones,
 } from "lucide-react";
-import { joinMeetingAction, joinMeetingAsGuestAction, endMeetingAction, toggleAdmissionModeAction, kmeetHeartbeatAction } from "@/lib/kmeet/actions";
+import { joinMeetingAction, joinMeetingAsGuestAction, endMeetingAction, toggleAdmissionModeAction, kmeetHeartbeatAction, listEntryRequestsAction, answerEntryRequestAction } from "@/lib/kmeet/actions";
 import { publicBasePathForMode } from "@/lib/kmeet/mode";
 import type { KmeetMode } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -522,6 +522,38 @@ function CallView({
     if (cameraId) changeWebcam(cameraId).catch(() => {});
     if (micId) changeMic(micId).catch(() => {});
   }, [joined, cameraId, micId, changeWebcam, changeMic]);
+
+  // People joining from the mobile app wait in our own waiting room (not the call
+  // provider's), so hosts pick those requests up here.
+  useEffect(() => {
+    if (!isModerator) return;
+    let cancelled = false;
+    async function poll() {
+      const requests = await listEntryRequestsAction(meetingId).catch(() => []);
+      if (cancelled) return;
+      setPendingRequests((prev) => [
+        ...prev.filter((r) => !r.participantId.startsWith("app:")),
+        ...requests.map((r) => ({
+          participantId: `app:${r.id}`,
+          name: r.name,
+          allow: () => {
+            answerEntryRequestAction(meetingId, r.id, true);
+            setPendingRequests((p) => p.filter((x) => x.participantId !== `app:${r.id}`));
+          },
+          deny: () => {
+            answerEntryRequestAction(meetingId, r.id, false);
+            setPendingRequests((p) => p.filter((x) => x.participantId !== `app:${r.id}`));
+          },
+        })),
+      ]);
+    }
+    poll();
+    const interval = setInterval(poll, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isModerator, meetingId]);
 
   function handleToggleAdmission() {
     const next = !requireAdmission;

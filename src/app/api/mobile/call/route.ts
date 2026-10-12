@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateParticipantToken } from "@/lib/kmeet/token";
 import { participantPermissionsFor, resolveMeetingRoom } from "@/lib/kmeet/join";
+import { answerEntry, listPendingEntries, requestEntry } from "@/lib/kmeet/entry";
 import { tabKeyForMode } from "@/lib/kmeet/mode";
 import { fullTabAccess, normalizeTabPermissions } from "@/lib/permissions/tabs";
 import { getDisabledFeatures } from "@/lib/platform-admin/feature-flags";
@@ -69,13 +70,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, ended: !data });
   }
 
+  // Hosts see who is waiting and answer them.
+  if (body.action === "pending" || body.action === "respond") {
+    if (!isModerator) return NextResponse.json({ ok: false, error: "Only a host can do this." }, { status: 403 });
+    if (body.action === "respond") {
+      const requestId = typeof body.requestId === "string" ? body.requestId : "";
+      await answerEntry(meetingId, requestId, body.decision === "allowed" ? "allowed" : "denied");
+      return NextResponse.json({ ok: true });
+    }
+    return NextResponse.json({ ok: true, requests: await listPendingEntries(meetingId) });
+  }
+
   if (body.action !== "join") return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
   const resolved = await resolveMeetingRoom(meetingId);
   if ("error" in resolved) return NextResponse.json({ ok: false, error: resolved.error });
+
+  // A call that admits people one by one: everyone but a host waits here until a
+  // host answers. (Asked again every couple of seconds by the app.)
+  let waitStatus: "pending" | "denied" | null = null;
+  if (resolved.requireAdmission && !isModerator) {
+    const status = await requestEntry(meetingId, user.id, displayName);
+    if (status !== "allowed") waitStatus = status;
+  }
+  if (waitStatus) return NextResponse.json({ ok: true, waiting: waitStatus });
+
   return NextResponse.json({
     ok: true,
     roomId: resolved.roomId,
-    token: generateParticipantToken(resolved.roomId, participantPermissionsFor(isModerator, resolved.requireAdmission)),
+    // Admission was already settled above, so people go straight in.
+    token: generateParticipantToken(resolved.roomId, participantPermissionsFor(isModerator, false)),
     displayName,
     isModerator,
     requireAdmission: resolved.requireAdmission,

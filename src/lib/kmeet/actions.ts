@@ -9,6 +9,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createVideoSdkRoom } from "@/lib/kmeet/client";
 import { generateParticipantToken } from "@/lib/kmeet/token";
 import { isVideoSdkConfigured } from "@/lib/kmeet/env";
+import { answerEntry, listPendingEntries } from "@/lib/kmeet/entry";
 import { maxDurationMinutesForMode, participantPermissionsFor, resolveMeetingRoom } from "@/lib/kmeet/join";
 import { tabKeyForMode, dashboardBasePathForMode, KCONNECT_PATH } from "@/lib/kmeet/mode";
 import { getPlanLimits } from "@/lib/plans/dal";
@@ -301,4 +302,28 @@ export async function kmeetHeartbeatAction(meetingId: string): Promise<{ ended: 
     .select("id")
     .maybeSingle();
   return { ended: !data };
+}
+
+// Hosts on the web: people from the mobile app waiting to be let into a call that
+// admits one by one (see kmeet/entry.ts). Polled by the call page.
+export async function listEntryRequestsAction(meetingId: string): Promise<{ id: string; name: string }[]> {
+  await requireUser();
+  const membership = await requireOrganization();
+  const organizationId = membership.organization.id;
+  const mode = await meetingModeOrNull(organizationId, meetingId);
+  if (!mode) return [];
+  const access = await checkTabAccess(organizationId, tabKeyForMode(mode), "write");
+  if (!access.ok) return [];
+  return listPendingEntries(meetingId);
+}
+
+export async function answerEntryRequestAction(meetingId: string, requestId: string, allow: boolean): Promise<void> {
+  await requireUser();
+  const membership = await requireOrganization();
+  const organizationId = membership.organization.id;
+  const mode = await meetingModeOrNull(organizationId, meetingId);
+  if (!mode) return;
+  const access = await checkTabAccess(organizationId, tabKeyForMode(mode), "write");
+  if (!access.ok) return;
+  await answerEntry(meetingId, requestId, allow ? "allowed" : "denied");
 }

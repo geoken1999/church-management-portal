@@ -959,6 +959,17 @@ export type KmeetMeeting = {
   last_active_at: string;
 };
 
+// Someone from the mobile app waiting to be let into a call (migration 0162).
+export type KmeetEntryRequest = {
+  id: string;
+  meeting_id: string;
+  user_id: string;
+  name: string;
+  status: "pending" | "allowed" | "denied";
+  created_at: string;
+  decided_at: string | null;
+};
+
 export type DevicePlatform = "ios" | "android";
 
 export type DevicePushToken = {
@@ -2928,6 +2939,12 @@ export type Database = {
             referencedColumns: ["auth_user_id"];
           },
         ];
+      };
+      kmeet_entry_requests: {
+        Row: KmeetEntryRequest;
+        Insert: Partial<KmeetEntryRequest> & Pick<KmeetEntryRequest, "meeting_id" | "user_id" | "name">;
+        Update: Partial<KmeetEntryRequest>;
+        Relationships: [];
       };
       kmeet_meetings: {
         Row: KmeetMeeting;

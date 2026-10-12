@@ -54,3 +54,16 @@ export async function cancelEntry(meetingId: string, userId: string): Promise<vo
   const admin = createAdminClient();
   await admin.from("kmeet_entry_requests").delete().eq("meeting_id", meetingId).eq("user_id", userId).eq("status", "pending");
 }
+
+// The current answer to a person's request, without creating one: null when they
+// have none (or it is stale).
+export async function entryStatus(meetingId: string, userId: string): Promise<EntryStatus | null> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("kmeet_entry_requests")
+    .select("status, created_at")
+    .eq("meeting_id", meetingId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  return data && data.created_at > freshAfter() ? (data.status as EntryStatus) : null;
+}

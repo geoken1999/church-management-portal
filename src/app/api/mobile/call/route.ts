@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateParticipantToken } from "@/lib/kmeet/token";
 import { participantPermissionsFor, resolveMeetingRoom } from "@/lib/kmeet/join";
-import { answerEntry, cancelEntry, listPendingEntries, requestEntry } from "@/lib/kmeet/entry";
+import { answerEntry, cancelEntry, entryStatus, listPendingEntries, requestEntry } from "@/lib/kmeet/entry";
 import { tabKeyForMode } from "@/lib/kmeet/mode";
 import { fullTabAccess, normalizeTabPermissions } from "@/lib/permissions/tabs";
 import { getDisabledFeatures } from "@/lib/platform-admin/feature-flags";
@@ -31,6 +31,13 @@ export async function POST(request: Request) {
   const { data: userData, error } = await admin.auth.getUser(token);
   if (error || !userData.user) return NextResponse.json({ ok: false, error: "That session could not be verified." }, { status: 401 });
   const user = userData.user;
+
+  // The waiting room's quick check, asked every second or so: just the answer so
+  // far, without the full join work.
+  if (body.action === "status") {
+    const status = await entryStatus(meetingId, user.id);
+    return NextResponse.json({ ok: true, status });
+  }
 
   const { data: meeting } = await admin.from("kmeet_meetings").select("id, organization_id, mode, status").eq("id", meetingId).maybeSingle();
   if (!meeting) return NextResponse.json({ ok: false, error: "That meeting could not be found." }, { status: 404 });

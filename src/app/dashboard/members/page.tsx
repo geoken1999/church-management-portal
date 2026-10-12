@@ -4,6 +4,7 @@ import { getMembers, getMemberFieldDefinitions, getPendingProfileUpdateRequests 
 import { getBranches } from "@/lib/branches/dal";
 import { getSiteUrl } from "@/lib/site-url";
 import { sanitizeBilingual } from "@/lib/bilingual/config";
+import { getChurchDeletionRequests } from "@/lib/account-deletion/dal";
 import { MembersManager } from "@/components/members/MembersManager";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
@@ -49,6 +50,7 @@ export default async function MembersPage() {
         branches={branches}
         profileUpdateRequests={profileUpdateRequests}
         joinBilingual={sanitizeBilingual(membership.organization.join_bilingual)}
+        deletionRequests={canManage ? await getChurchDeletionRequests(membership.organization.id) : []}
         youthAgeRule={{ from: membership.organization.youth_age_from ?? null, to: membership.organization.youth_age_to ?? null }}
         canManage={canManage}
       />

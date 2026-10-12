@@ -1497,7 +1497,8 @@ export type NotificationType =
   | "support_ticket_reply"
   | "instagram_ai_followup"
   | "whatsapp_ai_followup"
-  | "prayer_request";
+  | "prayer_request"
+  | "account_deletion_request";
 
 export type Notification = {
   id: string;
@@ -2787,6 +2788,20 @@ export type Database = {
         Update: Partial<WhatsAppContactHealth>;
         Relationships: [];
       };
+      account_deletion_requests: {
+        Row: AccountDeletionRequest;
+        Insert: Partial<AccountDeletionRequest> & Pick<AccountDeletionRequest, "auth_user_id" | "requester_kind" | "display_name">;
+        Update: Partial<AccountDeletionRequest>;
+        Relationships: [
+          {
+            foreignKeyName: "account_deletion_requests_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       todo_events: {
         Row: TodoEvent;
         Insert: Partial<TodoEvent> & Pick<TodoEvent, "organization_id" | "title">;
@@ -3732,4 +3747,23 @@ export type WhatsAppContactHealth = {
   consecutive_failures: number;
   last_error_code: string | null;
   updated_at: string;
+};
+
+export type AccountDeletionStatus = "pending" | "completed" | "rejected";
+
+export type AccountDeletionRequest = {
+  id: string;
+  auth_user_id: string;
+  organization_id: string | null;
+  requester_kind: "member" | "team" | "owner";
+  member_id: string | null;
+  display_name: string;
+  contact: string | null;
+  reason: string | null;
+  status: AccountDeletionStatus;
+  outcome: string | null;
+  processed_note: string | null;
+  processed_by: string | null;
+  processed_at: string | null;
+  requested_at: string;
 };

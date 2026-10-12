@@ -2,13 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
-import { sendBulkEmail } from "@/lib/email/client";
-import { sendBulkEmailViaSmtp, verifySmtpConnection } from "@/lib/email/smtp";
+import { sendEmailCampaign } from "@/lib/email/send";
+import { verifySmtpConnection } from "@/lib/email/smtp";
 import { getEmailSmtpSettings, getLatestEmailSetupRequest } from "@/lib/email/dal";
-import { sanitizeEmailHtml } from "@/lib/email/sanitize";
 import {
   ALLOWED_IMAGE_TYPES,
   MAX_IMAGE_BYTES,
@@ -16,10 +14,8 @@ import {
   MAX_ATTACHMENTS,
   MAX_TOTAL_ATTACHMENT_BYTES,
 } from "@/lib/email/validation";
-import { checkEmailQuota, checkStorageQuota, getPlanUsage } from "@/lib/plans/dal";
-import { logPlatformEvent } from "@/lib/platform-events/log";
+import { checkStorageQuota, getPlanUsage } from "@/lib/plans/dal";
 import type { EmailAttachment } from "@/lib/email/client";
-import type { EmailCampaignStatus, EmailCampaignProvider } from "@/types/database";
 
 const EMAIL_PATH = "/dashboard/email";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -39,41 +35,11 @@ export async function sendBulkEmailAction(formData: FormData): Promise<SendEmail
     return { error: "You don't have permission to send email." };
   }
 
-  const subject = String(formData.get("subject") ?? "").trim();
-  const html = String(formData.get("html") ?? "");
-  const recipientsRaw = String(formData.get("recipients") ?? "[]");
-
-  if (!subject) {
-    return { error: "Subject is required." };
-  }
-
-  const cleanHtml = sanitizeEmailHtml(html);
-  const plainText = cleanHtml.replace(/<[^>]+>/g, "").trim();
-  if (!plainText) {
-    return { error: "Write a message before sending." };
-  }
-
   let rawRecipients: unknown;
   try {
-    rawRecipients = JSON.parse(recipientsRaw);
+    rawRecipients = JSON.parse(String(formData.get("recipients") ?? "[]"));
   } catch {
     return { error: "Select at least one recipient." };
-  }
-
-  if (!Array.isArray(rawRecipients)) {
-    return { error: "Select at least one recipient." };
-  }
-
-  const recipients = Array.from(
-    new Set(
-      rawRecipients
-        .map((entry) => (typeof entry === "string" ? entry.trim().toLowerCase() : ""))
-        .filter((email) => EMAIL_PATTERN.test(email)),
-    ),
-  );
-
-  if (recipients.length === 0) {
-    return { error: "Select at least one valid recipient." };
   }
 
   const attachmentFiles = formData.getAll("attachments").filter((entry): entry is File => entry instanceof File);
@@ -100,83 +66,18 @@ export async function sendBulkEmailAction(formData: FormData): Promise<SendEmail
     })),
   );
 
-  const smtpSettings = await getEmailSmtpSettings(membership.organization.id);
-  const provider: EmailCampaignProvider = smtpSettings ? "smtp" : "shared";
-
-  // The shared Resend account is metered by plan; an org's own SMTP isn't
-  // — it never touches our account, so there's nothing to check.
-  if (provider === "shared") {
-    const quotaError = await checkEmailQuota(membership.organization.id, recipients.length);
-    if (quotaError) {
-      return { error: quotaError };
-    }
-  }
-
-  let result;
-  try {
-    result = smtpSettings
-      ? await sendBulkEmailViaSmtp(
-          {
-            host: smtpSettings.host,
-            port: smtpSettings.port,
-            secure: smtpSettings.secure,
-            username: smtpSettings.username,
-            password: smtpSettings.password,
-            fromEmail: smtpSettings.from_email,
-            fromName: smtpSettings.from_name || membership.organization.name,
-          },
-          { subject, html: cleanHtml, recipients, replyTo: user.email ?? undefined, attachments },
-        )
-      : await sendBulkEmail({
-          fromName: membership.organization.name,
-          subject,
-          html: cleanHtml,
-          recipients,
-          replyTo: user.email ?? undefined,
-          attachments,
-          organizationId: membership.organization.id,
-        });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Couldn't send that email.";
-    await logPlatformEvent({
-      level: "error",
-      source: "email_send",
-      message: `Email send failed: ${message}`,
-      organizationId: membership.organization.id,
-      metadata: { recipientCount: recipients.length, provider },
-    });
-    return { error: message };
-  }
-
-  const status: EmailCampaignStatus =
-    result.failed.length === 0 ? "sent" : result.sentCount === 0 ? "failed" : "partial_failure";
-
-  // Recording the campaign is RLS-restricted to admins by default (see
-  // migration 0026) — the admin client performs the actual insert so a
-  // "member" role granted email write via the tab permissions matrix can
-  // still send; the tabAccess check above is what actually gates who
-  // gets here.
-  const admin = createAdminClient();
-  await admin.from("email_campaigns").insert({
-    organization_id: membership.organization.id,
-    subject,
-    body_html: cleanHtml,
-    recipient_count: recipients.length,
-    sent_count: result.sentCount,
-    failed_count: result.failed.length,
-    failed_recipients: result.failed,
-    status,
-    provider,
-    sent_by: user.id,
+  const result = await sendEmailCampaign({
+    organizationId: membership.organization.id,
+    organizationName: membership.organization.name,
+    userId: user.id,
+    userEmail: user.email ?? null,
+    subject: String(formData.get("subject") ?? ""),
+    html: String(formData.get("html") ?? ""),
+    rawRecipients,
+    attachments,
   });
-
   revalidatePath(EMAIL_PATH);
-
-  if (status === "failed") {
-    return { error: result.failed[0]?.error ?? "Couldn't send that email.", sentCount: 0, failedCount: recipients.length };
-  }
-
-  return { success: true, sentCount: result.sentCount, failedCount: result.failed.length };
+  return result;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,22 +1,17 @@
 "use server";
 
-import { isMarketingCategory } from "@/lib/whatsapp/contact-health";
-import { checkMarketingAllowed } from "@/lib/whatsapp/reputation";
-import { renderTemplateText } from "@/lib/whatsapp/template-render";
-import { logOutboundMessages, senderKeyFor, splitBlocked } from "@/lib/whatsapp/message-log";
 import { getWhatsAppCredentials } from "@/lib/whatsapp/credentials";
 import { revalidatePath } from "next/cache";
+import { sendWhatsAppCampaign } from "@/lib/whatsapp/send-campaign";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
-import { checkWhatsAppQuota } from "@/lib/plans/dal";
 import { logPlatformEvent } from "@/lib/platform-events/log";
-import { sendBulkTemplateMessage, sendTextMessage } from "@/lib/whatsapp/client";
+import { sendTextMessage } from "@/lib/whatsapp/client";
 import { createMetaTemplate, deleteMetaTemplate, fetchMetaTemplateStatus } from "@/lib/whatsapp/templates-client";
 import { getAiMode, setAiMode, getAiTypingState } from "@/lib/whatsapp/automation";
 import {
-  normalizePhoneNumber,
   validateWhatsAppBody,
   validateWhatsAppTemplateName,
   validateWhatsAppTemplateBody,
@@ -25,8 +20,7 @@ import {
 } from "@/lib/whatsapp/validation";
 import { generateReply } from "@/lib/ai/openai";
 import { describeWhatsAppError } from "@/lib/whatsapp/graph-error";
-import type { WhatsAppCampaignStatus, WhatsAppTemplateCategory } from "@/types/database";
-import { parsePlaceholderSpecs, placeholderLabel, resolvePlaceholder, validatePlaceholderSpec, type MemberContext } from "@/lib/whatsapp/placeholders";
+import type { WhatsAppTemplateCategory } from "@/types/database";
 import { HEADER_IMAGE_BUCKET, parseTemplateButtons, validateHeaderImage, validateTemplateButtons } from "@/lib/whatsapp/template-parts";
 import { uploadTemplateHeaderSample } from "@/lib/whatsapp/templates-client";
 
@@ -366,203 +360,28 @@ export async function sendBulkWhatsAppAction(formData: FormData): Promise<SendWh
     return { error: access.message };
   }
 
-  const templateId = String(formData.get("templateId") ?? "");
-  if (!templateId) return { error: "Select a message template." };
-
-  // Each placeholder is either a typed value or a member field. Read after the
-  // template is loaded, since the number of placeholders comes from it.
-  const specsRaw = String(formData.get("placeholderSpecs") ?? "[]");
   let specsInput: unknown;
   try {
-    specsInput = JSON.parse(specsRaw);
+    specsInput = JSON.parse(String(formData.get("placeholderSpecs") ?? "[]"));
   } catch {
     return { error: "Couldn't read the template's fill-in values." };
   }
-
-  const recipientsRaw = String(formData.get("recipients") ?? "[]");
   let rawRecipients: unknown;
   try {
-    rawRecipients = JSON.parse(recipientsRaw);
+    rawRecipients = JSON.parse(String(formData.get("recipients") ?? "[]"));
   } catch {
     return { error: "Select at least one recipient." };
   }
-  if (!Array.isArray(rawRecipients)) {
-    return { error: "Select at least one recipient." };
-  }
 
-  // One entry per phone number. A memberId links it to a member record, whose
-  // details fill any member-field placeholders. Typed-in numbers have none.
-  const seenPhones = new Set<string>();
-  const recipients: { phone: string; memberId: string | null }[] = [];
-  for (const entry of rawRecipients) {
-    if (!entry || typeof entry !== "object") continue;
-    const { phone, countryCode, memberId } = entry as { phone?: unknown; countryCode?: unknown; memberId?: unknown };
-    if (typeof phone !== "string") continue;
-    const normalized = normalizePhoneNumber(phone, typeof countryCode === "string" ? countryCode : null);
-    if (!normalized || seenPhones.has(normalized)) continue;
-    seenPhones.add(normalized);
-    recipients.push({ phone: normalized, memberId: typeof memberId === "string" ? memberId : null });
-  }
-
-  if (recipients.length === 0) {
-    return { error: "Select at least one valid recipient." };
-  }
-
-  const admin = createAdminClient();
-  const { data: template } = await admin
-    .from("whatsapp_templates")
-    .select("id, name, language, category, body_text, variable_count, status, header_type, header_image_path")
-    .eq("id", templateId)
-    .eq("organization_id", organizationId)
-    .maybeSingle();
-
-  if (!template) return { error: "That template could not be found." };
-  if (template.status !== "approved") return { error: "This template hasn't been approved by WhatsApp yet." };
-  const specs = parsePlaceholderSpecs(specsInput, template.variable_count);
-  if (!specs) {
-    return { error: `Fill in all ${template.variable_count} placeholder${template.variable_count === 1 ? "" : "s"} before sending.` };
-  }
-  const specProblem = specs.map(validatePlaceholderSpec).find(Boolean);
-  if (specProblem) return { error: specProblem };
-
-  const marketing = isMarketingCategory(template.category);
-  const credentials = await getWhatsAppCredentials(organizationId);
-  const senderKey = senderKeyFor(credentials);
-
-  // A church on the shared number whose recent messages keep being refused by
-  // WhatsApp would drag every other church's standing down with it, so its
-  // marketing sends pause until it gets back on track (or a platform admin
-  // lifts it, or it connects its own number).
-  if (marketing && credentials.source === "platform") {
-    const reputationError = await checkMarketingAllowed(organizationId);
-    if (reputationError) return { error: reputationError };
-  }
-
-  // Member details for the recipients that are members, for the placeholders
-  // and the opt-out check. Read from the database here, not taken from the
-  // browser, so a name can't be changed in transit.
-  const memberIds = [...new Set(recipients.map((r) => r.memberId).filter((id): id is string => Boolean(id)))];
-  const memberContexts = new Map<string, MemberContext>();
-  const optedOut = new Set<string>();
-  if (memberIds.length > 0) {
-    const [{ data: members }, { data: branches }] = await Promise.all([
-      admin.from("members").select("id, first_name, last_name, branch_id, whatsapp_opt_in").eq("organization_id", organizationId).in("id", memberIds),
-      admin.from("branches").select("id, name").eq("organization_id", organizationId),
-    ]);
-    const branchNames = new Map((branches ?? []).map((b) => [b.id, b.name]));
-    for (const m of members ?? []) {
-      if (m.whatsapp_opt_in === false) optedOut.add(m.id);
-      memberContexts.set(m.id, {
-        firstName: m.first_name,
-        fullName: `${m.first_name} ${m.last_name}`.trim(),
-        branchName: m.branch_id ? branchNames.get(m.branch_id) ?? null : null,
-      });
-    }
-  }
-
-  const withParams = recipients.map((recipient) => {
-    const member = recipient.memberId ? memberContexts.get(recipient.memberId) ?? null : null;
-    const bodyParams = specs.map((spec) => resolvePlaceholder(spec, member));
-    return { phone: recipient.phone, memberId: recipient.memberId, bodyParams, text: renderTemplateText(template.body_text, bodyParams) };
+  const result = await sendWhatsAppCampaign({
+    organizationId,
+    userId: user.id,
+    templateId: String(formData.get("templateId") ?? ""),
+    specsInput,
+    rawRecipients,
   });
-
-  // Anyone who opted out (replied STOP) is never messaged by marketing.
-  // WhatsApp also caps marketing messages per person: anyone it has recently
-  // refused to deliver one to is skipped (shown as skipped, not failed)
-  // instead of failing again and lowering this number's standing; they are
-  // tried again after the pause. Other categories are never held back.
-  const optOutSkipped = marketing ? withParams.filter((r) => r.memberId && optedOut.has(r.memberId)) : [];
-  const notOptedOut = withParams.filter((r) => !optOutSkipped.includes(r));
-  const { sendable: sendableAll, skipped: limitSkipped } = await splitBlocked(senderKey, marketing, notOptedOut);
-  const skipped = [
-    ...optOutSkipped.map((r) => ({ phone: r.phone, reason: "This person opted out of WhatsApp messages.", text: r.text })),
-    ...limitSkipped.map((r) => ({ ...r, text: withParams.find((w) => w.phone === r.phone)?.text })),
-  ] as { phone: string; reason: string; text?: string }[];
-  const sendable = sendableAll;
-  if (sendable.length === 0) {
-    return {
-      error: `Nothing was sent: ${skipped.length === 1 ? "this person has" : "these people have"} opted out, or WhatsApp is limiting marketing messages to them right now. Try again in a few days, or send by SMS or email.`,
-      skippedCount: skipped.length,
-    };
-  }
-
-  const quotaError = await checkWhatsAppQuota(organizationId, sendable.length);
-  if (quotaError) return { error: quotaError };
-
-  const sendList = sendable.map((r) => ({ phone: r.phone, bodyParams: r.bodyParams }));
-  const textByPhone = new Map(withParams.map((r) => [r.phone, r.text]));
-
-  // What actually gets stored/shown in history: the template body with each
-  // placeholder shown as its typed value, or as a marker for a member field.
-  const renderedBody = template.body_text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_match, index: string) => {
-    const spec = specs[Number(index) - 1];
-    return spec ? placeholderLabel(spec) : `{{${index}}}`;
-  });
-
-  let result;
-  try {
-    const headerImageUrl =
-      template.header_type === "image" && template.header_image_path
-        ? admin.storage.from(HEADER_IMAGE_BUCKET).getPublicUrl(template.header_image_path).data.publicUrl
-        : null;
-    result = await sendBulkTemplateMessage({ templateName: template.name, languageCode: template.language, recipients: sendList, headerImageUrl, credentials });
-  } catch (err) {
-    const detail = describeWhatsAppError(err);
-    await logPlatformEvent({
-      level: "error",
-      source: "whatsapp_send",
-      message: `WhatsApp send failed: ${err instanceof Error ? err.message : "unknown error"}`,
-      organizationId,
-      metadata: { recipientCount: recipients.length, templateId, code: detail.code, type: detail.type },
-    });
-    return { error: detail.message };
-  }
-
-  const status: WhatsAppCampaignStatus =
-    result.failed.length === 0 ? "sent" : result.sentCount === 0 ? "failed" : "partial_failure";
-
-  const { data: campaign } = await admin
-    .from("whatsapp_campaigns")
-    .insert({
-      organization_id: organizationId,
-      body: renderedBody,
-      template_id: template.id,
-      template_variables: specs.map(placeholderLabel),
-      recipient_count: recipients.length,
-      sent_count: result.sentCount,
-      failed_count: result.failed.length,
-      failed_recipients: result.failed.map((f) => ({ ...f, text: textByPhone.get(f.phone) })),
-      skipped_count: skipped.length,
-      skipped_recipients: skipped,
-      status,
-      sent_by: user.id,
-    })
-    .select("id")
-    .single();
-
-  // So each message's delivery result, when WhatsApp reports it, lands on
-  // this campaign (and the church's count stays honest).
-  await logOutboundMessages(
-    result.sentIds.map((sent) => ({
-      organizationId,
-      kind: "campaign" as const,
-      refId: campaign?.id ?? null,
-      recipient: sent.phone,
-      wamid: sent.id,
-      templateName: template.name,
-      category: template.category,
-      senderKey,
-      bodyText: textByPhone.get(sent.phone) ?? null,
-    })),
-  );
-
   revalidatePath(WHATSAPP_PATH);
-
-  if (status === "failed") {
-    return { error: result.failed[0]?.error ?? "Couldn't send that message.", sentCount: 0, failedCount: sendable.length, skippedCount: skipped.length };
-  }
-
-  return { success: true, sentCount: result.sentCount, failedCount: result.failed.length, skippedCount: skipped.length };
+  return result;
 }
 
 // ---------------------------------------------------------------------------

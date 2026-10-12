@@ -88,8 +88,6 @@ function ParticipantTile({ participantId, isModerator }: { participantId: string
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const screenRef = useRef<HTMLVideoElement>(null);
-  const orientation = useVideoOrientation(videoRef, [webcamStream]);
-
   useEffect(() => {
     if (!videoRef.current) return;
     if (webcamOn && webcamStream) {
@@ -132,7 +130,9 @@ function ParticipantTile({ participantId, isModerator }: { participantId: string
   // object-contain instead — the full portrait frame stays visible,
   // centered, rather than being cropped top/bottom by object-cover or the
   // whole cell being resized around it.
-  const videoFitClass = orientation === "portrait" ? "object-contain" : "object-cover";
+  // Always fit the whole frame: filling the cell crops (zooms in on) a camera whose
+  // shape differs from the cell, which is what a phone or the mobile app sends.
+  const videoFitClass = "object-contain";
 
   return (
     <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg bg-muted">

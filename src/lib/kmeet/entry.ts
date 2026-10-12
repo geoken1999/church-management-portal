@@ -48,3 +48,9 @@ export async function answerEntry(meetingId: string, requestId: string, decision
     .eq("id", requestId)
     .eq("meeting_id", meetingId);
 }
+
+// The person stopped waiting.
+export async function cancelEntry(meetingId: string, userId: string): Promise<void> {
+  const admin = createAdminClient();
+  await admin.from("kmeet_entry_requests").delete().eq("meeting_id", meetingId).eq("user_id", userId).eq("status", "pending");
+}

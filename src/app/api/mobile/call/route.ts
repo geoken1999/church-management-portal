@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateParticipantToken } from "@/lib/kmeet/token";
 import { participantPermissionsFor, resolveMeetingRoom } from "@/lib/kmeet/join";
-import { answerEntry, listPendingEntries, requestEntry } from "@/lib/kmeet/entry";
+import { answerEntry, cancelEntry, listPendingEntries, requestEntry } from "@/lib/kmeet/entry";
 import { tabKeyForMode } from "@/lib/kmeet/mode";
 import { fullTabAccess, normalizeTabPermissions } from "@/lib/permissions/tabs";
 import { getDisabledFeatures } from "@/lib/platform-admin/feature-flags";
@@ -68,6 +68,12 @@ export async function POST(request: Request) {
   if (body.action === "heartbeat") {
     const { data } = await admin.from("kmeet_meetings").update({ last_active_at: new Date().toISOString() }).eq("id", meetingId).eq("status", "live").select("id").maybeSingle();
     return NextResponse.json({ ok: true, ended: !data });
+  }
+
+  // Someone gave up waiting: take their request off the hosts' list.
+  if (body.action === "cancel") {
+    await cancelEntry(meetingId, user.id);
+    return NextResponse.json({ ok: true });
   }
 
   // Hosts see who is waiting and answer them.

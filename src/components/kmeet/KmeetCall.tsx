@@ -392,7 +392,23 @@ function CallControls({
   onToggleChat: () => void;
   onLeft: () => void;
 }) {
-  const { leave, end, toggleMic, toggleWebcam, toggleScreenShare, localMicOn, localWebcamOn, localScreenShareOn } = useMeeting();
+  const { leave, end, toggleMic, toggleWebcam, toggleScreenShare, localMicOn, localWebcamOn, localScreenShareOn, localParticipant } = useMeeting();
+
+  // A badge on the chat button for messages that arrive while the chat is closed.
+  const [unreadChat, setUnreadChat] = useState(0);
+  const chatOpenRef = useRef(chatOpen);
+  const localIdRef = useRef(localParticipant?.id);
+  useEffect(() => {
+    chatOpenRef.current = chatOpen;
+    localIdRef.current = localParticipant?.id;
+    if (chatOpen) setUnreadChat(0);
+  }, [chatOpen, localParticipant?.id]);
+  usePubSub("CHAT", {
+    onMessageReceived: (message: { senderId?: string }) => {
+      if (chatOpenRef.current || message.senderId === localIdRef.current) return;
+      setUnreadChat((n) => n + 1);
+    },
+  });
 
   function handleLeave() {
     leave();
@@ -420,8 +436,13 @@ function CallControls({
         {localScreenShareOn ? <ScreenShareOff className="size-4" /> : <ScreenShare className="size-4" />}
       </Button>
       <ReactionBar />
-      <Button type="button" variant={chatOpen ? "default" : "outline"} size="icon" onClick={onToggleChat} title="Chat">
+      <Button type="button" variant={chatOpen ? "default" : "outline"} size="icon" onClick={onToggleChat} title={unreadChat > 0 ? `Chat (${unreadChat} new)` : "Chat"} className="relative">
         <MessageSquare className="size-4" />
+        {unreadChat > 0 && (
+          <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-medium text-white">
+            {unreadChat > 9 ? "9+" : unreadChat}
+          </span>
+        )}
       </Button>
       <CopyInviteLinkButton meetingId={meetingId} audioOnly={audioOnly} />
       {isModerator && (

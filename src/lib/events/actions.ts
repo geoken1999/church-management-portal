@@ -114,15 +114,16 @@ export async function createEvent(_prevState: EventFormState, formData: FormData
     return { error: "Couldn't add that event. Please try again." };
   }
 
-  void notifyOrgOfNewEvent(organizationId, user.id, created.title);
+  await notifyOrgOfNewEvent(organizationId, user.id, created.title);
 
   revalidatePath(EVENTS_PATH);
   return { success: true };
 }
 
-// Fire-and-forget (the `void` at the call site) — a push failure shouldn't
-// turn a successful event creation into an error response for the admin
-// who just created it.
+// Awaited at the call site (a serverless function can be stopped once it has
+// responded, which would silently drop an un-awaited push). Sending is
+// best-effort and never throws, so a push failure can't turn a successful
+// event creation into an error for the admin who just created it.
 async function notifyOrgOfNewEvent(organizationId: string, creatorAuthUserId: string, eventTitle: string) {
   const admin = createAdminClient();
   const { data: members } = await admin
@@ -194,7 +195,7 @@ export async function updateEvent(_prevState: EventFormState, formData: FormData
   if (before) {
     const { data: after } = await supabase.from("events").select(snapshotColumns).eq("id", id).maybeSingle<EventSnapshot>();
     const change = after ? describeEventChange(before, after) : null;
-    if (change) void notifyEventRegistrants(id, change.headline, change.detail);
+    if (change) await notifyEventRegistrants(id, change.headline, change.detail);
   }
 
   revalidatePath(EVENTS_PATH);

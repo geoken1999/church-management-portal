@@ -9,9 +9,9 @@ import { pushToTeam } from "@/lib/push/team";
 // are too minor to buzz a phone.
 const NO_TEAM_PUSH: NotificationType[] = ["prayer_request", "account_deletion_request", "member_request", "youtube_video_updated", "facebook_post_updated"];
 
-function pushForNotification(input: { organizationId: string; type: NotificationType; title: string; body?: string | null; link?: string | null }): void {
+async function pushForNotification(input: { organizationId: string; type: NotificationType; title: string; body?: string | null; link?: string | null }): Promise<void> {
   if (NO_TEAM_PUSH.includes(input.type)) return;
-  void pushToTeam({ organizationId: input.organizationId, title: input.title, body: input.body ?? input.title, link: input.link ?? undefined });
+  await pushToTeam({ organizationId: input.organizationId, title: input.title, body: input.body ?? input.title, link: input.link ?? undefined });
 }
 
 // Not itself a Server Action — a plain server-only helper other Server
@@ -33,7 +33,7 @@ export async function createNotification(input: {
     body: input.body ?? null,
     link: input.link ?? null,
   });
-  pushForNotification(input);
+  await pushForNotification(input);
 }
 
 // Same insert, but via the admin client — for callers with no user session
@@ -55,5 +55,5 @@ export async function createNotificationForWebhook(input: {
     body: input.body ?? null,
     link: input.link ?? null,
   });
-  pushForNotification(input);
+  await pushForNotification(input);
 }

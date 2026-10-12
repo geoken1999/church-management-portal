@@ -115,7 +115,7 @@ export async function submitMemberRequest(
 
   const { data: organization } = await createAdminClient().from("organizations").select("id").eq("slug", orgSlug).maybeSingle();
   if (organization) {
-    void pushToTeam({ organizationId: organization.id, tab: "members", title: "New membership request", body: `${firstName.trim()} ${lastName.trim()} asked to join.`, link: "/dashboard/members" });
+    await pushToTeam({ organizationId: organization.id, tab: "members", title: "New membership request", body: `${firstName.trim()} ${lastName.trim()} asked to join.`, link: "/dashboard/members" });
   }
 
   return { success: true };

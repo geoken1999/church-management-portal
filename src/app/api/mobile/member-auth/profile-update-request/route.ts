@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Couldn't submit that change. Please try again." }, { status: 500 });
   }
 
-  void pushToTeam({
+  await pushToTeam({
     organizationId: member.organization_id,
     tab: "members",
     title: "Profile change to review",

@@ -157,7 +157,7 @@ export async function registerForEvent(
 
   if (event) {
     const registrant = typeof answers.name === "string" && answers.name ? answers.name : "Someone";
-    void pushToTeam({ organizationId: event.organization_id, tab: "events", title: "New event registration", body: `${registrant} registered for ${event.title}.`, link: "/dashboard/events" });
+    await pushToTeam({ organizationId: event.organization_id, tab: "events", title: "New event registration", body: `${registrant} registered for ${event.title}.`, link: "/dashboard/events" });
   }
 
   const paymentPending =

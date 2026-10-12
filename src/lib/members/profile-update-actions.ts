@@ -3,9 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { validateProposedChanges } from "@/lib/members/profile-update-requests";
-import type { MemberProposedChanges, MemberProfileUpdateRequestStatus } from "@/types/database";
+import { reviewProfileUpdateRequest } from "@/lib/members/profile-update-review";
+import type { MemberProfileUpdateRequestStatus } from "@/types/database";
 
 const MEMBERS_PATH = "/dashboard/members";
 
@@ -23,35 +22,7 @@ async function reviewRequest(requestId: string, decision: Exclude<MemberProfileU
   const membership = await requireOrganization();
   if (membership.role !== "owner" && membership.role !== "admin") return;
 
-  const admin = createAdminClient();
-  const { data: request } = await admin
-    .from("member_profile_update_requests")
-    .select("id, organization_id, member_id, proposed_changes, status")
-    .eq("id", requestId)
-    .maybeSingle();
-
-  if (!request || request.organization_id !== membership.organization.id || request.status !== "pending") {
-    return;
-  }
-
-  if (decision === "approved") {
-    const { data: member } = await admin.from("members").select("*").eq("id", request.member_id).maybeSingle();
-    if (!member) return;
-
-    // Defense in depth — the submit route already validated this, but a
-    // request can sit pending for a while, so re-check against whatever
-    // the member's row looks like NOW before writing it, rather than
-    // trusting a check that ran when the request was first submitted.
-    const validationError = validateProposedChanges(member, request.proposed_changes as MemberProposedChanges);
-    if (validationError) return;
-
-    await admin.from("members").update(request.proposed_changes as MemberProposedChanges).eq("id", member.id);
-  }
-
-  await admin
-    .from("member_profile_update_requests")
-    .update({ status: decision, reviewed_by: user.id, reviewed_at: new Date().toISOString() })
-    .eq("id", requestId);
+  await reviewProfileUpdateRequest({ requestId, organizationId: membership.organization.id, reviewerId: user.id, decision });
 
   revalidatePath(MEMBERS_PATH);
 }

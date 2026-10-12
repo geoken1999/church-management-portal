@@ -1,5 +1,6 @@
 "use server";
 
+import { notifyMember } from "@/lib/push/member-notice";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -134,6 +135,13 @@ export async function deletePlan(formData: FormData) {
 // rather than a single targeted column update. Fine at the size a
 // checklist actually reaches; not built for hundreds of items.
 
+// Tells the member (if they use the app) that a planner task is now theirs.
+async function notifyTaskAssigned(planId: string, memberId: string, taskText: string): Promise<void> {
+  const supabase = await createClient();
+  const { data: plan } = await supabase.from("plans").select("title").eq("id", planId).maybeSingle();
+  await notifyMember(memberId, "New task assigned to you", `${taskText}${plan ? ` (${plan.title})` : ""}`);
+}
+
 export interface AddPlanItemState {
   error?: string;
 }
@@ -171,6 +179,8 @@ export async function addPlanItem(formData: FormData): Promise<AddPlanItemState>
 
   const supabase = await createClient();
   await supabase.from("plans").update({ items: nextItems }).eq("id", id);
+
+  if (assignedTo) await notifyTaskAssigned(id, assignedTo, text);
 
   revalidatePath(PLANNER_PATH);
   return {};
@@ -211,6 +221,9 @@ export async function assignPlanItem(formData: FormData) {
 
   const supabase = await createClient();
   await supabase.from("plans").update({ items: nextItems }).eq("id", id);
+
+  const changed = items.find((item) => item.id === itemId);
+  if (assignedTo && changed && changed.assignedTo !== assignedTo) await notifyTaskAssigned(id, assignedTo, changed.text);
 
   revalidatePath(PLANNER_PATH);
 }

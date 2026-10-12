@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getBranches } from "@/lib/branches/dal";
 import { getLeaderMembers } from "@/lib/leaders/dal";
-import { getFundraisers, getOrganizationRazorpayAccount } from "@/lib/finance/dal";
+import { getFundraisers } from "@/lib/finance/dal";
+import { connectedGateways, getOwnGatewayChoice } from "@/lib/payments/own-accounts";
 import { getOrganizationPayoutDetails } from "@/lib/organizations/payout-details-dal";
 import { getPlanUsage } from "@/lib/plans/dal";
 import { getSiteUrl } from "@/lib/site-url";
@@ -27,11 +28,12 @@ export default async function FundraisersPage() {
     return <AccessRestricted label="Fund Raiser" />;
   }
 
-  const [fundraisers, branches, leaderMembers, razorpayAccount, payoutDetails] = await Promise.all([
+  const [fundraisers, branches, leaderMembers, connected, ownGateway, payoutDetails] = await Promise.all([
     getFundraisers(organizationId),
     getBranches(organizationId),
     getLeaderMembers(organizationId),
-    getOrganizationRazorpayAccount(organizationId),
+    connectedGateways(organizationId),
+    getOwnGatewayChoice(organizationId),
     getOrganizationPayoutDetails(organizationId),
   ]);
 
@@ -55,7 +57,9 @@ export default async function FundraisersPage() {
         siteUrl={getSiteUrl()}
         isOrgAdmin={isOrgAdmin}
         ownPaymentGatewayEnabled={plan.ownPaymentGatewayEnabled}
-        hasOwnAccount={Boolean(razorpayAccount)}
+        hasOwnAccount={connected[ownGateway]}
+        connectedGateways={connected}
+        ownGateway={ownGateway}
         canWrite={membership.tabAccess.fundraisers.write}
         canDelete={membership.tabAccess.fundraisers.delete}
         savedPayoutDetails={payoutDetails}

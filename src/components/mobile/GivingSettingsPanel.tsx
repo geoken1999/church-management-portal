@@ -73,13 +73,13 @@ export function GivingSettingsPanel({ config }: { config: GivingConfig }) {
             <label className={`flex items-start gap-3 ${ownDisabled ? "opacity-60" : ""}`}>
               <input type="radio" name="mode" className="mt-1" disabled={ownDisabled} checked={mode === "own"} onChange={() => setMode("own")} />
               <span>
-                <span className="block text-sm font-medium">Your own Razorpay account</span>
+                <span className="block text-sm font-medium">Your own payment gateway ({config.ownGatewayLabel})</span>
                 <span className="block text-sm text-muted-foreground">
                   {!config.ownGatewayAvailable
                     ? config.ownGatewayMessage
                     : config.ownConnected
                       ? "Gifts go straight to your own account."
-                      : "Connect your Razorpay keys first (Finance > Fundraisers > Payment settings)."}
+                      : `Connect your ${config.ownGatewayLabel} account below first.`}
                 </span>
               </span>
             </label>

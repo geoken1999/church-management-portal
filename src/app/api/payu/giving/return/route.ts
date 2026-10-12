@@ -4,6 +4,21 @@ import { finalizePayUGivingOrderPayment } from "@/lib/finance/payu-giving";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { getSiteUrl } from "@/lib/site-url";
 import { isGivingType } from "@/lib/finance/giving-types";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getOwnAccount } from "@/lib/payments/own-accounts";
+import { payuBaseUrl } from "@/lib/payments/gateways";
+import type { PayUAccount } from "@/lib/payu/client";
+
+// The church a giving link belongs to: a church-wide link, or a fundraiser's.
+async function organizationIdForGivingToken(token: string, isChurch: boolean): Promise<string | null> {
+  const admin = createAdminClient();
+  if (isChurch) {
+    const { data } = await admin.from("organizations").select("id").eq("giving_share_token", token).maybeSingle();
+    return data?.id ?? null;
+  }
+  const { data } = await admin.from("fundraisers").select("organization_id").eq("share_token", token).maybeSingle();
+  return data?.organization_id ?? null;
+}
 
 // PayU redirects the browser here with a POST, for both success (surl) and
 // failure (furl) — only for 'shared'-mode fundraiser giving; 'own' mode
@@ -42,7 +57,17 @@ export async function POST(request: Request) {
   const mihpayid = get("mihpayid");
   const hash = get("hash");
 
-  const valid = verifyPayUReturn({
+  // A church's own PayU account verifies with its own salt, not the platform's.
+  let account: PayUAccount | undefined;
+  if (url.searchParams.get("own") === "1") {
+    const organizationId = await organizationIdForGivingToken(token, isChurch);
+    const own = organizationId ? await getOwnAccount(organizationId, "payu") : null;
+    if (!own) return giveUrl("failed", "reason=unverified");
+    account = { merchantKey: own.keyId, salt: own.keySecret, baseUrl: payuBaseUrl(own.environment) };
+  }
+
+  const valid = verifyPayUReturn(
+    {
     status,
     txnid,
     amount: get("amount"),
@@ -51,7 +76,9 @@ export async function POST(request: Request) {
     email: get("email"),
     udf1: get("udf1"),
     hash,
-  });
+    },
+    account,
+  );
 
   if (!valid) {
     await logPlatformEvent({

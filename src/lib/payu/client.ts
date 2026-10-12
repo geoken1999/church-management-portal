@@ -45,8 +45,16 @@ function formatAmount(rupees: number): string {
   return rupees.toFixed(2);
 }
 
-export function buildPaymentRequestFields(input: BuildPaymentRequestInput): { fields: PayUFormFields; actionUrl: string } {
-  const { merchantKey, salt, baseUrl } = getPayUEnv();
+// A church's own PayU account (its merchant key and salt, and host) can be passed
+// instead of the platform's.
+export interface PayUAccount {
+  merchantKey: string;
+  salt: string;
+  baseUrl: string;
+}
+
+export function buildPaymentRequestFields(input: BuildPaymentRequestInput, account?: PayUAccount): { fields: PayUFormFields; actionUrl: string } {
+  const { merchantKey, salt, baseUrl } = account ?? getPayUEnv();
   const amount = formatAmount(input.amountRupees);
   const udf1 = input.udf1 ?? "";
 
@@ -95,8 +103,8 @@ export interface PayUReturnFields {
 // to an S2S webhook using the same field set. Returns false on any
 // mismatch — the caller must treat that exactly like a failed payment,
 // never partially trust it.
-export function verifyPayUReturn(fields: PayUReturnFields): boolean {
-  const { merchantKey, salt } = getPayUEnv();
+export function verifyPayUReturn(fields: PayUReturnFields, account?: PayUAccount): boolean {
+  const { merchantKey, salt } = account ?? getPayUEnv();
   if (fields.hash.length === 0) return false;
 
   const expected = sha512Hex(

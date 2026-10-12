@@ -10,7 +10,10 @@ import {
   verifyGivingPaymentSignature,
   finalizeGivingOrderPayment,
 } from "@/lib/finance/razorpay-giving";
-import { buildPaymentRequestFields, type PayUFormFields } from "@/lib/payu/client";
+import { buildPaymentRequestFields, type PayUAccount, type PayUFormFields } from "@/lib/payu/client";
+import { createCashfreeOrder } from "@/lib/cashfree/client";
+import { getOwnAccount } from "@/lib/payments/own-accounts";
+import { payuBaseUrl, type Gateway } from "@/lib/payments/gateways";
 import { getSiteUrl } from "@/lib/site-url";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { GIVING_TYPE_LABELS, isGivingType, type GivingType } from "@/lib/finance/giving-types";
@@ -25,7 +28,10 @@ export interface CreateGivingOrderState {
   // church its own merchant-level keys to plug in the way Razorpay Connect
   // does, so that would need its own, separate product decision later. This
   // return type carries both shapes and the caller switches on `gateway`.
-  gateway?: "payu" | "razorpay";
+  gateway?: "payu" | "razorpay" | "cashfree";
+  // Cashfree: the session the browser opens checkout with, and its mode.
+  cashfreeSessionId?: string;
+  cashfreeMode?: "production" | "sandbox";
   payuFields?: PayUFormFields;
   payuActionUrl?: string;
   orderId?: string;
@@ -39,6 +45,8 @@ interface GivingTarget {
   organizationId: string;
   organizationName: string;
   paymentMode: FundraiserPaymentMode;
+  // The gateway behind 'own' mode (ignored for 'shared', which is always PayU).
+  ownGateway: Gateway;
   // null for a church-wide gift (offering / tithe / donation).
   fundraiserId: string | null;
   givingType: "fundraiser" | GivingType;
@@ -77,29 +85,43 @@ async function startGivingPayment(
     donor_phone: donorPhone.trim() || null,
   };
 
-  if (target.paymentMode === "shared") {
+  const gateway: Gateway = target.paymentMode === "shared" ? "payu" : target.ownGateway;
+  const platformPayU = target.paymentMode === "shared";
+
+  if (gateway === "payu") {
+    // Shared mode uses the platform's PayU account; own mode the church's own.
+    let account: PayUAccount | undefined;
+    if (!platformPayU) {
+      const own = await getOwnAccount(target.organizationId, "payu");
+      if (!own) return { error: "This giving link isn't set up correctly yet. Please try again later." };
+      account = { merchantKey: own.keyId, salt: own.keySecret, baseUrl: payuBaseUrl(own.environment) };
+    }
+
     const txnid = `giving${Date.now()}${target.referenceId.replace(/-/g, "").slice(0, 8)}`;
-    const { error: insertError } = await admin.from("fundraiser_payment_orders").insert({ ...orderBase, payu_txnid: txnid });
+    const { error: insertError } = await admin.from("fundraiser_payment_orders").insert({ ...orderBase, gateway: "payu", payu_txnid: txnid });
     if (insertError) {
       console.error("fundraiser_payment_orders insert failed:", insertError.message);
       return { error: "Couldn't start the payment. Please try again." };
     }
 
-    const returnUrl = `${getSiteUrl()}${target.returnPath}`;
+    const returnUrl = `${getSiteUrl()}${target.returnPath}${platformPayU ? "" : "&own=1"}`;
 
     let built;
     try {
-      built = buildPaymentRequestFields({
-        txnid,
-        amountRupees: amount,
-        productinfo: `Gift: ${target.title}`,
-        firstname: donorName,
-        email: donorEmail.trim() || `no-reply+${target.referenceId}@kingdomflow.app`,
-        phone: donorPhone.trim() || "9999999999",
-        surl: returnUrl,
-        furl: returnUrl,
-        udf1: `giving:${target.referenceId}`,
-      });
+      built = buildPaymentRequestFields(
+        {
+          txnid,
+          amountRupees: amount,
+          productinfo: `Gift: ${target.title}`,
+          firstname: donorName,
+          email: donorEmail.trim() || `no-reply+${target.referenceId}@kingdomflow.app`,
+          phone: donorPhone.trim() || "9999999999",
+          surl: returnUrl,
+          furl: returnUrl,
+          udf1: `giving:${target.referenceId}`,
+        },
+        account,
+      );
     } catch (err) {
       await logPlatformEvent({
         level: "error",
@@ -115,6 +137,52 @@ async function startGivingPayment(
       gateway: "payu",
       payuFields: built.fields,
       payuActionUrl: built.actionUrl,
+      amount,
+      fundraiserTitle: target.title,
+      organizationName: target.organizationName,
+    };
+  }
+
+  if (gateway === "cashfree") {
+    const own = await getOwnAccount(target.organizationId, "cashfree");
+    if (!own) return { error: "This giving link isn't set up correctly yet. Please try again later." };
+
+    const orderId = `cf${Date.now()}${target.referenceId.replace(/-/g, "").slice(0, 8)}`;
+    const returnUrl = `${getSiteUrl()}/api/cashfree/giving/return?order_id={order_id}&${target.returnPath.split("?")[1] ?? ""}`;
+    const created = await createCashfreeOrder(
+      { appId: own.keyId, secretKey: own.keySecret, environment: own.environment },
+      {
+        orderId,
+        amount,
+        customerId: `giver_${Date.now()}`,
+        customerName: donorName,
+        customerEmail: donorEmail.trim() || `no-reply+${target.referenceId}@kingdomflow.app`,
+        customerPhone: donorPhone.trim() || "9999999999",
+        returnUrl,
+        note: `Gift: ${target.title}`,
+      },
+    );
+    if ("error" in created) {
+      await logPlatformEvent({
+        level: "error",
+        source: "fundraiser_giving",
+        message: `Cashfree order creation failed: ${created.error}`,
+        organizationId: target.organizationId,
+        metadata: { referenceId: target.referenceId },
+      });
+      return { error: "Couldn't start the payment. Please try again." };
+    }
+
+    const { error: insertError } = await admin.from("fundraiser_payment_orders").insert({ ...orderBase, gateway: "cashfree", cashfree_order_id: orderId });
+    if (insertError) {
+      console.error("fundraiser_payment_orders insert failed:", insertError.message);
+      return { error: "Couldn't start the payment. Please try again." };
+    }
+
+    return {
+      gateway: "cashfree",
+      cashfreeSessionId: created.paymentSessionId,
+      cashfreeMode: own.environment === "test" ? "sandbox" : "production",
       amount,
       fundraiserTitle: target.title,
       organizationName: target.organizationName,
@@ -154,7 +222,7 @@ async function startGivingPayment(
     return { error: "Couldn't start the payment. Please try again." };
   }
 
-  const { error: insertError } = await admin.from("fundraiser_payment_orders").insert({ ...orderBase, razorpay_order_id: order.id });
+  const { error: insertError } = await admin.from("fundraiser_payment_orders").insert({ ...orderBase, gateway: "razorpay", razorpay_order_id: order.id });
   if (insertError) {
     console.error("fundraiser_payment_orders insert failed:", insertError.message);
     return { error: "Couldn't start the payment. Please try again." };
@@ -190,7 +258,7 @@ export async function createGivingOrder(
   const admin = createAdminClient();
   const { data: fundraiser } = await admin
     .from("fundraisers")
-    .select("id, organization_id, title, payment_mode, payment_link_enabled, organizations(name)")
+    .select("id, organization_id, title, payment_mode, payment_link_enabled, organizations(name, own_gateway)")
     .eq("share_token", shareToken)
     .maybeSingle();
 
@@ -203,6 +271,7 @@ export async function createGivingOrder(
       organizationId: fundraiser.organization_id,
       organizationName: (fundraiser.organizations as { name: string } | null)?.name ?? "",
       paymentMode: fundraiser.payment_mode as FundraiserPaymentMode,
+      ownGateway: ((fundraiser.organizations as { own_gateway: Gateway } | null)?.own_gateway ?? "razorpay") as Gateway,
       fundraiserId: fundraiser.id,
       givingType: "fundraiser",
       title: fundraiser.title,
@@ -235,7 +304,7 @@ export async function createChurchGivingOrder(
   const admin = createAdminClient();
   const { data: organization } = await admin
     .from("organizations")
-    .select("id, name, giving_enabled, giving_mode, giving_types")
+    .select("id, name, giving_enabled, giving_mode, giving_types, own_gateway")
     .eq("giving_share_token", orgToken)
     .maybeSingle();
 
@@ -251,6 +320,7 @@ export async function createChurchGivingOrder(
       organizationId: organization.id,
       organizationName: organization.name,
       paymentMode: organization.giving_mode as FundraiserPaymentMode,
+      ownGateway: organization.own_gateway as Gateway,
       fundraiserId: null,
       givingType: givingTypeRaw,
       title: GIVING_TYPE_LABELS[givingTypeRaw],

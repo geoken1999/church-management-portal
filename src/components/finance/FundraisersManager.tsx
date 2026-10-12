@@ -1,22 +1,21 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
-import { Plus, Pencil, Trash2, Target, UserRound, MapPin, CalendarDays, Link2, Landmark, Wallet } from "lucide-react";
+import { Plus, Pencil, Trash2, Target, UserRound, MapPin, CalendarDays, Link2, Wallet } from "lucide-react";
 import {
   createFundraiser,
   updateFundraiser,
   deleteFundraiser,
-  saveOwnRazorpayAccount,
-  removeOwnRazorpayAccount,
   updateFundraiserPaymentSettings,
   requestFundraiserPayout,
   cancelFundraiserPayoutRequest,
   type FundraiserFormState,
-  type RazorpayAccountState,
   type FundraiserPaymentSettingsState,
   type PayoutRequestState,
 } from "@/lib/finance/actions";
 import { FUNDRAISER_STATUSES } from "@/lib/finance/validation";
+import { GatewayAccountsCard } from "@/components/finance/GatewayAccountsCard";
+import type { Gateway } from "@/lib/payments/gateways";
 import { SHARED_SERVICE_FEE_RATE, sharedServiceFee, sharedServiceNetAmount } from "@/lib/finance/fees";
 import {
   PayoutDetailsFields,
@@ -108,95 +107,6 @@ function CopyLinkRow({ link }: { link: string }) {
   );
 }
 
-const razorpayAccountInitialState: RazorpayAccountState = {};
-
-function RazorpayAccountCard({ organizationId, connected }: { organizationId: string; connected: boolean }) {
-  const [state, setState] = useState<RazorpayAccountState>(razorpayAccountInitialState);
-  const [pending, startTransition] = useTransition();
-  const [open, setOpen] = useState(false);
-
-  function handleSubmit(formData: FormData) {
-    startTransition(async () => {
-      const result = await saveOwnRazorpayAccount(state, formData);
-      setState(result);
-      if (result.success) setOpen(false);
-    });
-  }
-
-  return (
-    <Card>
-      <CardContent className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent">
-              <Landmark className="size-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-heading text-sm font-bold">Your Razorpay account</h3>
-              <p className="text-xs text-muted-foreground">
-                {connected
-                  ? "Connected — fundraisers set to \"Own account\" pay out straight to you."
-                  : "Connect your own Razorpay account to receive giving-link payments directly."}
-              </p>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {!open && (
-              <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
-                {connected ? "Update" : "Connect"}
-              </Button>
-            )}
-            {connected && !open && (
-              <form action={removeOwnRazorpayAccount}>
-                <input type="hidden" name="organizationId" value={organizationId} />
-                <Button type="submit" size="sm" variant="ghost">
-                  Disconnect
-                </Button>
-              </form>
-            )}
-          </div>
-        </div>
-
-        {open && (
-          <form action={handleSubmit} className="space-y-3 border-t border-border pt-3">
-            <input type="hidden" name="organizationId" value={organizationId} />
-            {state.error && (
-              <Alert variant="destructive">
-                <AlertDescription>{state.error}</AlertDescription>
-              </Alert>
-            )}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="keyId" className="text-xs">
-                  Key ID
-                </Label>
-                <Input id="keyId" name="keyId" placeholder="rzp_live_xxxxxxxx" required />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="keySecret" className="text-xs">
-                  Key Secret
-                </Label>
-                <Input id="keySecret" name="keySecret" type="password" placeholder="••••••••••••" required />
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Found under Settings → API Keys in your Razorpay Dashboard. Stored securely — never shown again after saving.
-            </p>
-            <div className="flex gap-2">
-              <Button type="submit" size="sm" disabled={pending}>
-                {pending ? "Saving..." : "Save"}
-              </Button>
-              <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-            </div>
-          </form>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
 const paymentSettingsInitialState: FundraiserPaymentSettingsState = {};
 
 function GivingLinkSettings({
@@ -253,7 +163,7 @@ function GivingLinkSettings({
           <SelectTrigger size="sm" className="w-56">
             <SelectValue>
               {(value: string | null) =>
-                value === "own" ? "Own Razorpay account" : value === "shared" ? "Shared service" : "Off"
+                value === "own" ? "Own payment gateway" : value === "shared" ? "Shared service" : "Off"
               }
             </SelectValue>
           </SelectTrigger>
@@ -261,7 +171,7 @@ function GivingLinkSettings({
             <SelectItem value="none">Off</SelectItem>
             <SelectItem value="shared">Shared service (KingdomFlow account)</SelectItem>
             <SelectItem value="own" disabled={!hasOwnAccount}>
-              Own Razorpay account{!hasOwnAccount ? " (connect one above first)" : ""}
+              Own payment gateway{!hasOwnAccount ? " (connect one above first)" : ""}
             </SelectItem>
           </SelectContent>
         </Select>
@@ -851,6 +761,8 @@ export function FundraisersManager({
   isOrgAdmin,
   ownPaymentGatewayEnabled,
   hasOwnAccount,
+  connectedGateways,
+  ownGateway,
   canWrite,
   canDelete,
   savedPayoutDetails,
@@ -863,13 +775,15 @@ export function FundraisersManager({
   isOrgAdmin: boolean;
   ownPaymentGatewayEnabled: boolean;
   hasOwnAccount: boolean;
+  connectedGateways: Record<Gateway, boolean>;
+  ownGateway: Gateway;
   canWrite: boolean;
   canDelete: boolean;
   savedPayoutDetails: PayoutDetailsDefaultValues | null;
 }) {
   return (
     <div className="space-y-4">
-      {isOrgAdmin && ownPaymentGatewayEnabled && <RazorpayAccountCard organizationId={organizationId} connected={hasOwnAccount} />}
+      {isOrgAdmin && ownPaymentGatewayEnabled && <GatewayAccountsCard connected={connectedGateways} active={ownGateway} />}
 
       {canWrite && (
         <div className="flex flex-wrap items-center justify-end gap-2">

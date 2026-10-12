@@ -1,5 +1,7 @@
 "use server";
 
+import { connectedGateways, getOwnGatewayChoice } from "@/lib/payments/own-accounts";
+import { GATEWAY_LABELS } from "@/lib/payments/gateways";
 import { dateKeyInTimezone } from "@/lib/organizations/timezone";
 import { getOrganizationTimezone } from "@/lib/organizations/org-timezone";
 import { revalidatePath } from "next/cache";
@@ -593,14 +595,10 @@ export async function updateFundraiserPaymentSettings(
   const paymentMode = modeRaw as FundraiserPaymentMode;
 
   if (paymentMode === "own") {
-    const admin = createAdminClient();
-    const { data: account } = await admin
-      .from("organization_razorpay_accounts")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .maybeSingle();
-    if (!account) {
-      return { error: "Connect your Razorpay account first." };
+    const ownGateway = await getOwnGatewayChoice(organizationId);
+    const connected = await connectedGateways(organizationId);
+    if (!connected[ownGateway]) {
+      return { error: `Connect your ${GATEWAY_LABELS[ownGateway]} account first.` };
     }
   }
 

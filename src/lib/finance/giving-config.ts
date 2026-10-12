@@ -5,6 +5,8 @@ import { requireFinancePlan, requireOwnPaymentGateway } from "@/lib/finance/acti
 import { validateGivingSettings } from "@/lib/finance/giving-settings";
 import { normalizeGivingTypes } from "@/lib/finance/giving-types";
 import { getSiteUrl } from "@/lib/site-url";
+import { connectedGateways } from "@/lib/payments/own-accounts";
+import { GATEWAY_LABELS, type Gateway } from "@/lib/payments/gateways";
 
 export interface GivingConfig {
   enabled: boolean;
@@ -16,17 +18,22 @@ export interface GivingConfig {
   ownGatewayAvailable: boolean;
   ownGatewayMessage: string | null;
   ownConnected: boolean;
+  // Which gateway "own account" uses, and which are connected.
+  ownGateway: Gateway;
+  ownGatewayLabel: string;
+  connected: Record<Gateway, boolean>;
 }
 
 async function readState(organizationId: string) {
   const admin = createAdminClient();
-  const [{ data: org }, { data: account }, financeError, ownAllowedError] = await Promise.all([
-    admin.from("organizations").select("giving_enabled, giving_mode, giving_types, giving_share_token").eq("id", organizationId).maybeSingle(),
-    admin.from("organization_razorpay_accounts").select("id").eq("organization_id", organizationId).maybeSingle(),
+  const [{ data: org }, connected, financeError, ownAllowedError] = await Promise.all([
+    admin.from("organizations").select("giving_enabled, giving_mode, giving_types, giving_share_token, own_gateway").eq("id", organizationId).maybeSingle(),
+    connectedGateways(organizationId),
     requireFinancePlan(organizationId),
     requireOwnPaymentGateway(organizationId),
   ]);
-  return { org, ownConnected: Boolean(account), financeError, ownAllowedError };
+  const ownGateway = (org?.own_gateway ?? "razorpay") as Gateway;
+  return { org, connected, ownGateway, ownConnected: connected[ownGateway], financeError, ownAllowedError };
 }
 
 function toConfig(state: Awaited<ReturnType<typeof readState>>): GivingConfig {
@@ -40,6 +47,9 @@ function toConfig(state: Awaited<ReturnType<typeof readState>>): GivingConfig {
     ownGatewayAvailable: !state.ownAllowedError,
     ownGatewayMessage: state.ownAllowedError,
     ownConnected: state.ownConnected,
+    ownGateway: state.ownGateway,
+    ownGatewayLabel: GATEWAY_LABELS[state.ownGateway],
+    connected: state.connected,
   };
 }
 

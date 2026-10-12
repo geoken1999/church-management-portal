@@ -21,7 +21,31 @@ import { Card, CardContent } from "@/components/ui/card";
 declare global {
   interface Window {
     Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
+    Cashfree?: (options: { mode: string }) => { checkout: (options: { paymentSessionId: string; redirectTarget: string }) => Promise<unknown> };
   }
+}
+
+const CASHFREE_SCRIPT_SRC = "https://sdk.cashfree.com/js/v3/cashfree.js";
+
+function loadCashfreeScript(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (window.Cashfree) {
+      resolve();
+      return;
+    }
+    const existing = document.querySelector(`script[src="${CASHFREE_SCRIPT_SRC}"]`);
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("Couldn't load Cashfree checkout.")));
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = CASHFREE_SCRIPT_SRC;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Couldn't load Cashfree checkout."));
+    document.body.appendChild(script);
+  });
 }
 
 const CHECKOUT_SCRIPT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
@@ -98,6 +122,24 @@ export function GivingForm({
         return;
       }
       redirectToPayU(result.payuActionUrl, result.payuFields);
+      return;
+    }
+
+    if (result.gateway === "cashfree") {
+      if (!result.cashfreeSessionId) {
+        setError("Couldn't start the payment.");
+        setSubmitting(false);
+        return;
+      }
+      try {
+        await loadCashfreeScript();
+        if (!window.Cashfree) throw new Error("missing");
+        // Cashfree takes over the page, then returns to this one with the result.
+        await window.Cashfree({ mode: result.cashfreeMode ?? "production" }).checkout({ paymentSessionId: result.cashfreeSessionId, redirectTarget: "_self" });
+      } catch {
+        setError(t.publicGive.paymentFormLoadError);
+        setSubmitting(false);
+      }
       return;
     }
 

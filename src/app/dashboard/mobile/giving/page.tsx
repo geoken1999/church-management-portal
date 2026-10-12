@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getGivingConfig } from "@/lib/finance/giving-config";
 import { GivingSettingsPanel } from "@/components/mobile/GivingSettingsPanel";
+import { GatewayAccountsCard } from "@/components/finance/GatewayAccountsCard";
 
 export const metadata: Metadata = {
   title: "Online Giving | KingdomFlow",
@@ -21,6 +22,7 @@ export default async function MobileGivingPage() {
         </p>
       </div>
       <GivingSettingsPanel config={config} />
+      {config.ownGatewayAvailable && config.financeAvailable && <GatewayAccountsCard connected={config.connected} active={config.ownGateway} />}
     </div>
   );
 }

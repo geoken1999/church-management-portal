@@ -51,6 +51,7 @@ export type Organization = {
   giving_mode: FundraiserPaymentMode | null;
   giving_types: string[];
   giving_share_token: string;
+  own_gateway: "razorpay" | "payu" | "cashfree";
   member_count_range: MemberCountRange | null;
   branch_count: number | null;
   plan: string;
@@ -1260,6 +1261,18 @@ export type OrganizationRazorpayAccount = {
   updated_at: string;
 };
 
+export type OrganizationGatewayAccount = {
+  id: string;
+  organization_id: string;
+  gateway: "payu" | "cashfree";
+  key_id: string;
+  key_secret: string;
+  environment: "live" | "test";
+  connected_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type PayoutMethod = "upi" | "bank_transfer";
 
 // Where the platform should actually wire money for a Fund Raiser or
@@ -1285,6 +1298,8 @@ export type FundraiserPaymentOrder = {
   id: string;
   organization_id: string;
   fundraiser_id: string | null;
+  gateway: "razorpay" | "payu" | "cashfree";
+  cashfree_order_id: string | null;
   giving_type: "fundraiser" | "offering" | "tithe" | "donation";
   offering_id: string | null;
   razorpay_order_id: string | null;
@@ -2114,6 +2129,12 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      organization_gateway_accounts: {
+        Row: OrganizationGatewayAccount;
+        Insert: Partial<OrganizationGatewayAccount> & Pick<OrganizationGatewayAccount, "organization_id" | "gateway" | "key_id" | "key_secret">;
+        Update: Partial<OrganizationGatewayAccount>;
+        Relationships: [];
       };
       organization_razorpay_accounts: {
         Row: OrganizationRazorpayAccount;

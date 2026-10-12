@@ -72,6 +72,13 @@ export function KmeetGuestJoin({
               <Button type="button" className="w-full" disabled={!name.trim()} onClick={() => setJoining(true)}>
                 Join meeting
               </Button>
+              {/* On a phone with the KingdomFlow app installed, this opens the call in the app. */}
+              <a
+                href={`kingdomflow://${mode === "audio" ? "kaudio" : "kmeet"}/${meetingId}`}
+                className="block text-center text-sm font-medium text-primary underline-offset-4 hover:underline sm:hidden"
+              >
+                Open in the KingdomFlow app
+              </a>
             </>
           )}
         </CardContent>

@@ -46,11 +46,16 @@ export async function sendBroadcastAction(audienceType: string, groupKey: string
   const recipients = await resolveAudienceAuthIds(organizationId, audience);
   if (recipients.length === 0) return { error: "Nobody in that audience has the mobile app yet." };
 
-  await sendPushToUsers(recipients, "church_announcement", {
+  const result = await sendPushToUsers(recipients, "church_announcement", {
     title: cleanTitle,
     body: cleanBody,
     data: { type: "church_announcement" },
   });
+  if (result.delivered === 0) {
+    if (result.skipped === "no_devices") return { error: "Those members haven't allowed notifications on a device yet." };
+    if (result.skipped === "opted_out") return { error: "Those members have turned notifications off." };
+    return { error: `The notification could not be delivered${result.error ? `: ${result.error}` : "."}` };
+  }
 
   await admin.from("push_broadcasts").insert({
     organization_id: organizationId,
@@ -59,10 +64,10 @@ export async function sendBroadcastAction(audienceType: string, groupKey: string
     member_id: audience.type === "member" ? audience.memberId : null,
     title: cleanTitle,
     body: cleanBody,
-    recipient_count: recipients.length,
+    recipient_count: result.delivered,
     created_by: user.id,
   });
 
   revalidatePath("/dashboard/mobile/notifications");
-  return { success: true, sent: recipients.length };
+  return { success: true, sent: result.delivered };
 }

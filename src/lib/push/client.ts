@@ -39,8 +39,19 @@ export interface PushPayload {
 // silently a no-op if Firebase isn't configured yet (isPushConfigured()),
 // so this is safe to leave wired in before FIREBASE_SERVICE_ACCOUNT_JSON
 // exists in every environment.
-export async function sendPushToUsers(authUserIds: string[], category: PushCategory, payload: PushPayload): Promise<void> {
-  if (authUserIds.length === 0 || !isPushConfigured()) return;
+export interface PushResult {
+  // Why nothing was sent, when that is the case.
+  skipped?: "no_recipients" | "not_configured" | "opted_out" | "no_devices" | "send_failed";
+  devices: number;
+  delivered: number;
+  failed: number;
+  // First FCM error code/message, to make a failure diagnosable.
+  error?: string;
+}
+
+export async function sendPushToUsers(authUserIds: string[], category: PushCategory, payload: PushPayload): Promise<PushResult> {
+  if (authUserIds.length === 0) return { skipped: "no_recipients", devices: 0, delivered: 0, failed: 0 };
+  if (!isPushConfigured()) return { skipped: "not_configured", devices: 0, delivered: 0, failed: 0 };
 
   const admin = createAdminClient();
 
@@ -55,11 +66,11 @@ export async function sendPushToUsers(authUserIds: string[], category: PushCateg
     category === "account_deletion" ? [] : (preferences ?? []).filter((row) => row[category] === false).map((row) => row.auth_user_id),
   );
   const recipients = authUserIds.filter((id) => !optedOut.has(id));
-  if (recipients.length === 0) return;
+  if (recipients.length === 0) return { skipped: "opted_out", devices: 0, delivered: 0, failed: 0 };
 
   const { data: tokenRows } = await admin.from("device_push_tokens").select("token").in("auth_user_id", recipients);
   const tokens = (tokenRows ?? []).map((row) => row.token);
-  if (tokens.length === 0) return;
+  if (tokens.length === 0) return { skipped: "no_devices", devices: 0, delivered: 0, failed: 0 };
 
   let response;
   try {
@@ -70,7 +81,7 @@ export async function sendPushToUsers(authUserIds: string[], category: PushCateg
     });
   } catch (error) {
     console.error("sendPushToUsers: FCM send failed", error);
-    return;
+    return { skipped: "send_failed", devices: tokens.length, delivered: 0, failed: tokens.length, error: error instanceof Error ? error.message : String(error) };
   }
 
   // A token stops being valid when the app is uninstalled or the user
@@ -87,4 +98,13 @@ export async function sendPushToUsers(authUserIds: string[], category: PushCateg
   if (staleTokens.length > 0) {
     await admin.from("device_push_tokens").delete().in("token", staleTokens);
   }
+
+  const firstError = response.responses.find((result) => result.error)?.error;
+  if (firstError) console.error("sendPushToUsers: FCM rejected a message", firstError.code, firstError.message);
+  return {
+    devices: tokens.length,
+    delivered: response.successCount,
+    failed: response.failureCount,
+    error: firstError ? `${firstError.code}: ${firstError.message}` : undefined,
+  };
 }

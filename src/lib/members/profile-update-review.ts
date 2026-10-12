@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { notifyMember } from "@/lib/push/member-notice";
 import { validateProposedChanges } from "@/lib/members/profile-update-requests";
 import type { MemberProposedChanges } from "@/types/database";
 
@@ -40,6 +41,12 @@ export async function reviewProfileUpdateRequest(input: {
     .from("member_profile_update_requests")
     .update({ status: input.decision, reviewed_by: input.reviewerId, reviewed_at: new Date().toISOString() })
     .eq("id", input.requestId);
+
+  await notifyMember(
+    request.member_id,
+    input.decision === "approved" ? "Your change was approved" : "Your change was not approved",
+    input.decision === "approved" ? "Your details have been updated." : "Your church didn't approve the change to your details.",
+  );
 
   return { ok: true };
 }

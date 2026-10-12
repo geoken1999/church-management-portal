@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { checkMemberQuota } from "@/lib/plans/dal";
+import { notifyMember } from "@/lib/push/member-notice";
 import {
   validateFieldDefinition,
   validateMemberBasics,
@@ -358,6 +359,8 @@ export async function updateMember(
     }
     return { error: "Couldn't save those changes. Please try again." };
   }
+
+  await notifyMember(memberId, "Your details were updated", "Your church updated your details. Open the app to review them.");
 
   revalidatePath("/dashboard/members");
   return { success: true };

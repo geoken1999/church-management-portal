@@ -1,6 +1,8 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/types/database";
 import type { ReportFilters, ReportId } from "@/lib/reports/registry";
 import type { MemberStatus, DonationMethod } from "@/types/database";
 import { MEETING_MODE_LABELS } from "@/lib/events/location";
@@ -21,8 +23,15 @@ function formatMoney(amount: number): string {
 // Every report returns display-ready string cells keyed by its column
 // definitions — the same shape powers the on-screen table, the Excel
 // sheet, and the PDF table, so formatting only happens once per report.
-export async function getReportRows(organizationId: string, reportId: ReportId, filters: ReportFilters): Promise<Record<string, string>[]> {
-  const supabase = await createClient();
+// [client] lets a caller without a browser session (the staff mobile app's API)
+// pass a client already signed in as the person, so the same access rules apply.
+export async function getReportRows(
+  organizationId: string,
+  reportId: ReportId,
+  filters: ReportFilters,
+  client?: SupabaseClient<Database>,
+): Promise<Record<string, string>[]> {
+  const supabase = client ?? (await createClient());
 
   switch (reportId) {
     case "members": {

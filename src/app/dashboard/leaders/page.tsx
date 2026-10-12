@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
+import { getGroupPosts } from "@/lib/groups/dal";
+import { GroupSharesPanel } from "@/components/groups/GroupSharesPanel";
 import { getMembers } from "@/lib/members/dal";
 import { getLeaders } from "@/lib/leaders/dal";
 import { LeadersManager } from "@/components/leaders/LeadersManager";
@@ -26,6 +28,8 @@ export default async function LeadersPage() {
     .filter((member) => member.status !== "pending")
     .map((member) => ({ id: member.id, first_name: member.first_name, last_name: member.last_name, phone: member.phone }));
 
+  const groupPosts = await getGroupPosts(membership.organization.id, "leaders");
+
   return (
     <div className="space-y-8">
       <div>
@@ -34,6 +38,8 @@ export default async function LeadersPage() {
           Members designated as leaders — selectable as a manager for ministries, branches, and events.
         </p>
       </div>
+
+      <GroupSharesPanel groupKey="leaders" posts={groupPosts} canWrite={membership.tabAccess.leaders.write} canDelete={membership.tabAccess.leaders.delete} pagePath="/dashboard/leaders" />
 
       <LeadersManager organizationId={organizationId} leaders={leaders} members={assignableMembers} canManage={canManage} />
     </div>

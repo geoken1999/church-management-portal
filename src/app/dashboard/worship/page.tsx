@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
+import { getGroupPosts } from "@/lib/groups/dal";
+import { GroupSharesPanel } from "@/components/groups/GroupSharesPanel";
 import { getMembers } from "@/lib/members/dal";
 import { getWorshipTeamMembers, getWorshipDocuments } from "@/lib/worship/dal";
 import { getSiteUrl } from "@/lib/site-url";
@@ -33,6 +35,8 @@ export default async function WorshipPage() {
     .filter((member) => member.status !== "pending")
     .map((member) => ({ id: member.id, first_name: member.first_name, last_name: member.last_name }));
 
+  const groupPosts = await getGroupPosts(membership.organization.id, "worship");
+
   return (
     <div className="space-y-8">
       <div>
@@ -41,6 +45,8 @@ export default async function WorshipPage() {
           The team and shared documents behind {membership.organization.name}&apos;s worship services.
         </p>
       </div>
+
+      <GroupSharesPanel groupKey="worship" posts={groupPosts} canWrite={membership.tabAccess.worship.write} canDelete={membership.tabAccess.worship.delete} pagePath="/dashboard/worship" note="Worship team members also see the documents in your worship library there." />
 
       <WorshipManager
         organizationId={organizationId}

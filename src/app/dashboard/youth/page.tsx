@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
+import { getGroupPosts } from "@/lib/groups/dal";
+import { GroupSharesPanel } from "@/components/groups/GroupSharesPanel";
 import { getMembers } from "@/lib/members/dal";
 import { getYouths } from "@/lib/youth/dal";
 import { YouthManager } from "@/components/youth/YouthManager";
@@ -32,12 +34,16 @@ export default async function YouthPage() {
       date_of_birth: member.date_of_birth,
     }));
 
+  const groupPosts = await getGroupPosts(membership.organization.id, "youth");
+
   return (
     <div className="space-y-8">
       <div>
         <h1 className="font-heading text-3xl font-bold tracking-tight">Youth</h1>
         <p className="mt-1 text-muted-foreground">The members of {membership.organization.name}&apos;s youth ministry.</p>
       </div>
+
+      <GroupSharesPanel groupKey="youth" posts={groupPosts} canWrite={membership.tabAccess.youth.write} canDelete={membership.tabAccess.youth.delete} pagePath="/dashboard/youth" />
 
       <YouthManager organizationId={organizationId} youths={youths} members={assignableMembers} canManage={canManage} />
     </div>

@@ -500,13 +500,18 @@ export function DesignStudio({ organizationName, logoUrl, initial }: { organizat
       return;
     }
     startTransition(async () => {
-      const result = await action();
-      if (result.error) {
-        setMessage({ kind: "error", text: result.error });
-        return;
+      try {
+        const result = await action();
+        if (result.error) {
+          setMessage({ kind: "error", text: result.error });
+          return;
+        }
+        onDone();
+        setMessage({ kind: "success", text: successText });
+      } catch (error) {
+        // A server error or a lost connection: say so, rather than doing nothing.
+        setMessage({ kind: "error", text: `Couldn't reach the server (${error instanceof Error ? error.message : "unknown error"}). Please try again.` });
       }
-      onDone();
-      setMessage({ kind: "success", text: successText });
     });
   }
 

@@ -17,7 +17,7 @@ export interface RecipientOption {
 
 export interface BroadcastHistoryRow {
   id: string;
-  audience: "church" | "group" | "member";
+  audience: "church" | "branch" | "group" | "member";
   group_key: GroupKey | null;
   title: string;
   body: string;
@@ -27,12 +27,14 @@ export interface BroadcastHistoryRow {
 
 function audienceLabel(row: BroadcastHistoryRow): string {
   if (row.audience === "church") return "Whole church";
+  if (row.audience === "branch") return "A branch";
   if (row.audience === "group" && row.group_key) return GROUP_LABELS[row.group_key];
   return "One member";
 }
 
-export function PushBroadcastPanel({ recipients, history }: { recipients: RecipientOption[]; history: BroadcastHistoryRow[] }) {
-  const [audience, setAudience] = useState<"church" | "group" | "member">("church");
+export function PushBroadcastPanel({ recipients, history, branches }: { recipients: RecipientOption[]; history: BroadcastHistoryRow[]; branches: { id: string; name: string }[] }) {
+  const [audience, setAudience] = useState<"church" | "branch" | "group" | "member">("church");
+  const [branchId, setBranchId] = useState("");
   const [groupKey, setGroupKey] = useState<GroupKey>("youth");
   const [memberId, setMemberId] = useState("");
   const [search, setSearch] = useState("");
@@ -49,7 +51,7 @@ export function PushBroadcastPanel({ recipients, history }: { recipients: Recipi
     setError(null);
     setNotice(null);
     startTransition(async () => {
-      const result = await sendBroadcastAction(audience, groupKey, memberId, title, body);
+      const result = await sendBroadcastAction(audience, groupKey, memberId, title, body, branchId);
       if (result.error) {
         setError(result.error);
         return;
@@ -82,6 +84,7 @@ export function PushBroadcastPanel({ recipients, history }: { recipients: Recipi
                 {(
                   [
                     ["church", "Whole church"],
+                    ...(branches.length > 0 ? ([["branch", "A branch"]] as const) : []),
                     ["group", "A group"],
                     ["member", "One member"],
                   ] as const
@@ -92,6 +95,16 @@ export function PushBroadcastPanel({ recipients, history }: { recipients: Recipi
                 ))}
               </div>
             </div>
+
+            {audience === "branch" && (
+              <div className="flex flex-wrap gap-2">
+                {branches.map((branch) => (
+                  <Button key={branch.id} type="button" size="sm" variant={branchId === branch.id ? "secondary" : "outline"} onClick={() => setBranchId(branch.id)}>
+                    {branch.name}
+                  </Button>
+                ))}
+              </div>
+            )}
 
             {audience === "group" && (
               <div className="flex flex-wrap gap-2">

@@ -3,6 +3,7 @@ import { verifyPayUReturn } from "@/lib/payu/client";
 import { finalizePayUGivingOrderPayment } from "@/lib/finance/payu-giving";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { getSiteUrl } from "@/lib/site-url";
+import { isGivingType } from "@/lib/finance/giving-types";
 
 // PayU redirects the browser here with a POST, for both success (surl) and
 // failure (furl) — only for 'shared'-mode fundraiser giving; 'own' mode
@@ -20,8 +21,13 @@ export async function POST(request: Request) {
     return NextResponse.redirect(`${siteUrl}/`, { status: 303 });
   }
 
+  // A church-wide gift lands back on the church's own giving page.
+  const isChurch = url.searchParams.get("scope") === "church";
+  const typeParam = url.searchParams.get("type");
+  const basePath = isChurch ? `/give/church/${token}` : `/give/${token}`;
+  const typeQuery = isChurch && typeParam && isGivingType(typeParam) ? `&type=${typeParam}` : "";
   const giveUrl = (status: string, extra?: string) =>
-    NextResponse.redirect(`${siteUrl}/give/${token}?payment=${status}${extra ? `&${extra}` : ""}`, { status: 303 });
+    NextResponse.redirect(`${siteUrl}${basePath}?payment=${status}${typeQuery}${extra ? `&${extra}` : ""}`, { status: 303 });
 
   let form: FormData;
   try {

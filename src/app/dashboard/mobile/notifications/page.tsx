@@ -12,7 +12,7 @@ export default async function AppNotificationsPage() {
   const supabase = await createClient();
   const organizationId = membership.organization.id;
 
-  const [{ data: members }, { data: history }] = await Promise.all([
+  const [{ data: members }, { data: history }, { data: branches }] = await Promise.all([
     supabase
       .from("members")
       .select("id, first_name, last_name")
@@ -22,6 +22,7 @@ export default async function AppNotificationsPage() {
       .order("first_name")
       .limit(1000),
     supabase.from("push_broadcasts").select("id, audience, group_key, title, body, recipient_count, created_at").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(20),
+    supabase.from("branches").select("id, name").eq("organization_id", organizationId).order("name"),
   ]);
 
   const recipients: RecipientOption[] = (members ?? []).map((m) => ({ id: m.id, name: `${m.first_name} ${m.last_name ?? ""}`.trim() }));
@@ -35,7 +36,7 @@ export default async function AppNotificationsPage() {
           anniversaries notify automatically.
         </p>
       </div>
-      <PushBroadcastPanel recipients={recipients} history={(history ?? []) as BroadcastHistoryRow[]} />
+      <PushBroadcastPanel recipients={recipients} history={(history ?? []) as BroadcastHistoryRow[]} branches={branches ?? []} />
     </div>
   );
 }

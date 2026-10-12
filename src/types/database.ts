@@ -46,6 +46,11 @@ export type Organization = {
   join_bilingual: BilingualConfig | null;
   // Logo width as a % of the QR's width, 10-30 (migration 0132).
   qr_logo_size: number;
+  // Church-wide online giving (migration 0154).
+  giving_enabled: boolean;
+  giving_mode: FundraiserPaymentMode | null;
+  giving_types: string[];
+  giving_share_token: string;
   member_count_range: MemberCountRange | null;
   branch_count: number | null;
   plan: string;
@@ -1279,7 +1284,9 @@ export type FundraiserPaymentOrderStatus = "created" | "paid" | "failed";
 export type FundraiserPaymentOrder = {
   id: string;
   organization_id: string;
-  fundraiser_id: string;
+  fundraiser_id: string | null;
+  giving_type: "fundraiser" | "offering" | "tithe" | "donation";
+  offering_id: string | null;
   razorpay_order_id: string | null;
   amount: number;
   payment_mode: FundraiserPaymentMode;
@@ -2139,7 +2146,7 @@ export type Database = {
       fundraiser_payment_orders: {
         Row: FundraiserPaymentOrder;
         Insert: Partial<FundraiserPaymentOrder> &
-          Pick<FundraiserPaymentOrder, "organization_id" | "fundraiser_id" | "amount" | "payment_mode" | "donor_name">;
+          Pick<FundraiserPaymentOrder, "organization_id" | "amount" | "payment_mode" | "donor_name">;
         Update: Partial<FundraiserPaymentOrder>;
         Relationships: [
           {
@@ -3522,6 +3529,16 @@ export type Database = {
         Args: { token: string };
         Returns: { title: string; file_path: string; file_type: string }[];
       };
+      get_church_giving: {
+        Args: { token: string };
+        Returns: {
+          organization_id: string;
+          organization_name: string;
+          organization_logo_url: string | null;
+          giving_mode: FundraiserPaymentMode | null;
+          giving_types: string[];
+        }[];
+      };
       get_shared_fundraiser: {
         Args: { token: string };
         Returns: {
@@ -3806,8 +3823,9 @@ export type GroupPost = {
 export type PushBroadcast = {
   id: string;
   organization_id: string;
-  audience: "church" | "group" | "member";
+  audience: "church" | "branch" | "group" | "member";
   group_key: GroupPost["group_key"] | null;
+  branch_id: string | null;
   member_id: string | null;
   title: string;
   body: string;

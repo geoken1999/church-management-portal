@@ -5,6 +5,7 @@ import { Razorpay } from "@/lib/billing/razorpay";
 import { getRazorpayEnv } from "@/lib/billing/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendGivingReceiptEmail } from "@/lib/finance/giving-receipt";
+import { givingTitle, recordGivingPayment } from "@/lib/finance/record-giving";
 import type { FundraiserPaymentMode } from "@/types/database";
 import { DEFAULT_TIMEZONE, dateKeyInTimezone } from "@/lib/organizations/timezone";
 
@@ -76,7 +77,7 @@ export async function finalizeGivingOrderPayment(razorpayOrderId: string, razorp
   const { data: order } = await admin
     .from("fundraiser_payment_orders")
     .select(
-      "id, organization_id, fundraiser_id, amount, payment_mode, donor_name, donor_email, status, donation_id, fundraisers(title), organizations(name)",
+      "id, organization_id, fundraiser_id, giving_type, amount, payment_mode, donor_name, donor_email, status, donation_id, offering_id, fundraisers(title), organizations(name)",
     )
     .eq("razorpay_order_id", razorpayOrderId)
     .maybeSingle();
@@ -85,7 +86,7 @@ export async function finalizeGivingOrderPayment(razorpayOrderId: string, razorp
     return { error: "That payment could not be found." };
   }
 
-  if (order.status === "paid" && order.donation_id) {
+  if (order.status === "paid" && (order.donation_id || order.offering_id)) {
     return { success: true };
   }
 
@@ -112,32 +113,20 @@ export async function finalizeGivingOrderPayment(razorpayOrderId: string, razorp
   // midnight in India is dated the right day.
   const { data: org } = await admin.from("organizations").select("timezone").eq("id", order.organization_id).maybeSingle();
   const donatedOn = dateKeyInTimezone(new Date(), org?.timezone ?? DEFAULT_TIMEZONE);
-  const { data: donation, error: donationError } = await admin
-    .from("donations")
-    .insert({
-      organization_id: order.organization_id,
-      fundraiser_id: order.fundraiser_id,
-      amount: order.amount,
-      donated_on: donatedOn,
-      method: "online",
-      payment_mode: order.payment_mode,
-      donor_name: order.donor_name,
-      notes: `Online gift via ${order.payment_mode === "own" ? "the church's" : "KingdomFlow's shared"} Razorpay account.`,
-    })
-    .select("id")
-    .single();
-
-  if (donationError || !donation) {
-    console.error("fundraiser giving donation insert failed:", donationError?.message);
+  const recorded = await recordGivingPayment(
+    admin,
+    order,
+    `Online gift via ${order.payment_mode === "own" ? "the church's" : "KingdomFlow's shared"} Razorpay account.`,
+    donatedOn,
+  );
+  if (!recorded.ok) {
     return { error: "Payment succeeded but couldn't be recorded. Please contact the church directly." };
   }
-
-  await admin.from("fundraiser_payment_orders").update({ donation_id: donation.id }).eq("id", order.id);
 
   await sendGivingReceiptEmail({
     organizationId: order.organization_id,
     organizationName: (order.organizations as { name: string } | null)?.name ?? "Your church",
-    fundraiserTitle: (order.fundraisers as { title: string } | null)?.title ?? "General fund",
+    fundraiserTitle: givingTitle(order, (order.fundraisers as { title: string } | null)?.title ?? null),
     donorEmail: order.donor_email,
     donorName: order.donor_name,
     amount: order.amount,

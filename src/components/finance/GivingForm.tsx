@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
-import { createGivingOrder, confirmGivingPayment } from "@/lib/finance/giving-actions";
+import { createGivingOrder, createChurchGivingOrder, confirmGivingPayment } from "@/lib/finance/giving-actions";
+import { GIVING_TYPE_LABELS, type GivingType } from "@/lib/finance/giving-types";
 import { redirectToPayU } from "@/lib/payu/browser";
 import { useLocale } from "@/lib/i18n/LocaleContext";
 import { Button } from "@/components/ui/button";
@@ -48,10 +49,21 @@ function loadCheckoutScript(): Promise<void> {
 
 const QUICK_AMOUNTS = [500, 1000, 2500, 5000];
 
-export function GivingForm({ shareToken, organizationName }: { shareToken: string; organizationName: string }) {
+// A fundraiser gift (shareToken), or a church-wide gift (church): the giver
+// picks offering / tithe / donation from the types the church accepts.
+export function GivingForm({
+  shareToken,
+  organizationName,
+  church,
+}: {
+  shareToken?: string;
+  organizationName: string;
+  church?: { token: string; types: GivingType[]; initialType: GivingType };
+}) {
   const { t } = useLocale();
   const searchParams = useSearchParams();
   const [amount, setAmount] = useState("");
+  const [givingType, setGivingType] = useState<GivingType | null>(church?.initialType ?? null);
   const [donorName, setDonorName] = useState("");
   const [donorEmail, setDonorEmail] = useState("");
   const [donorPhone, setDonorPhone] = useState("");
@@ -70,7 +82,9 @@ export function GivingForm({ shareToken, organizationName }: { shareToken: strin
     setError(null);
     setSubmitting(true);
 
-    const result = await createGivingOrder(shareToken, amount, donorName, donorEmail, donorPhone);
+    const result = church
+      ? await createChurchGivingOrder(church.token, givingType ?? "", amount, donorName, donorEmail, donorPhone)
+      : await createGivingOrder(shareToken ?? "", amount, donorName, donorEmail, donorPhone);
     if (result.error) {
       setError(result.error);
       setSubmitting(false);
@@ -159,6 +173,19 @@ export function GivingForm({ shareToken, organizationName }: { shareToken: strin
                 {error ?? `${t.publicGive.paymentFailedTitle} ${t.publicGive.paymentFailedDescription}`}
               </AlertDescription>
             </Alert>
+          )}
+
+          {church && (
+            <div className="space-y-2">
+              <Label>What would you like to give?</Label>
+              <div className="flex flex-wrap gap-2">
+                {church.types.map((type) => (
+                  <Button key={type} type="button" size="sm" variant={givingType === type ? "default" : "outline"} onClick={() => setGivingType(type)}>
+                    {GIVING_TYPE_LABELS[type]}
+                  </Button>
+                ))}
+              </div>
+            </div>
           )}
 
           <div className="space-y-2">

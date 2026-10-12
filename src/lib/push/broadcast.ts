@@ -1,0 +1,80 @@
+import "server-only";
+
+import { createAdminClient } from "@/lib/supabase/admin";
+import { isGroupKey } from "@/lib/groups/shares";
+import { sendPushToUsers } from "@/lib/push/client";
+import { isPushConfigured } from "@/lib/push/env";
+import { resolveAudienceAuthIds, type PushAudience } from "@/lib/push/audience";
+
+export interface BroadcastResult {
+  error?: string;
+  success?: boolean;
+  sent?: number;
+}
+
+// Sends a push notification to the whole church, one branch, one group or one
+// member, and records it in the history. The caller has already checked that
+// [userId] is an owner/admin of [organizationId].
+export async function sendBroadcast(input: {
+  organizationId: string;
+  userId: string;
+  audienceType: string;
+  groupKey?: string;
+  memberId?: string;
+  branchId?: string;
+  title: string;
+  body: string;
+}): Promise<BroadcastResult> {
+  const cleanTitle = input.title.trim();
+  const cleanBody = input.body.trim();
+  if (cleanTitle.length < 2 || cleanTitle.length > 60) return { error: "Title must be 2 to 60 characters." };
+  if (cleanBody.length < 2 || cleanBody.length > 240) return { error: "Message must be 2 to 240 characters." };
+
+  let audience: PushAudience;
+  if (input.audienceType === "church") audience = { type: "church" };
+  else if (input.audienceType === "branch" && input.branchId) audience = { type: "branch", branchId: input.branchId };
+  else if (input.audienceType === "group" && isGroupKey(input.groupKey)) audience = { type: "group", groupKey: input.groupKey };
+  else if (input.audienceType === "member" && input.memberId) audience = { type: "member", memberId: input.memberId };
+  else return { error: "Choose who should get this." };
+
+  if (!isPushConfigured()) return { error: "Push notifications aren't set up on this server yet." };
+
+  const admin = createAdminClient();
+
+  if (audience.type === "member") {
+    const { data: member } = await admin.from("members").select("id").eq("id", audience.memberId).eq("organization_id", input.organizationId).maybeSingle();
+    if (!member) return { error: "That member could not be found." };
+  }
+  if (audience.type === "branch") {
+    const { data: branch } = await admin.from("branches").select("id").eq("id", audience.branchId).eq("organization_id", input.organizationId).maybeSingle();
+    if (!branch) return { error: "That branch could not be found." };
+  }
+
+  const recipients = await resolveAudienceAuthIds(input.organizationId, audience);
+  if (recipients.length === 0) return { error: "Nobody in that audience has the mobile app yet." };
+
+  const result = await sendPushToUsers(recipients, "church_announcement", {
+    title: cleanTitle,
+    body: cleanBody,
+    data: { type: "church_announcement" },
+  });
+  if (result.delivered === 0) {
+    if (result.skipped === "no_devices") return { error: "Those members haven't allowed notifications on a device yet." };
+    if (result.skipped === "opted_out") return { error: "Those members have turned notifications off." };
+    return { error: `The notification could not be delivered${result.error ? `: ${result.error}` : "."}` };
+  }
+
+  await admin.from("push_broadcasts").insert({
+    organization_id: input.organizationId,
+    audience: audience.type,
+    group_key: audience.type === "group" ? audience.groupKey : null,
+    member_id: audience.type === "member" ? audience.memberId : null,
+    branch_id: audience.type === "branch" ? audience.branchId : null,
+    title: cleanTitle,
+    body: cleanBody,
+    recipient_count: result.delivered,
+    created_by: input.userId,
+  });
+
+  return { success: true, sent: result.delivered };
+}

@@ -13,6 +13,7 @@ import {
 import { buildPaymentRequestFields, type PayUFormFields } from "@/lib/payu/client";
 import { getSiteUrl } from "@/lib/site-url";
 import { logPlatformEvent } from "@/lib/platform-events/log";
+import { GIVING_TYPE_LABELS, isGivingType, type GivingType } from "@/lib/finance/giving-types";
 import type { FundraiserPaymentMode } from "@/types/database";
 
 const FUNDRAISERS_PATH = "/dashboard/fundraisers";
@@ -32,6 +33,141 @@ export interface CreateGivingOrderState {
   amount?: number;
   fundraiserTitle?: string;
   organizationName?: string;
+}
+
+interface GivingTarget {
+  organizationId: string;
+  organizationName: string;
+  paymentMode: FundraiserPaymentMode;
+  // null for a church-wide gift (offering / tithe / donation).
+  fundraiserId: string | null;
+  givingType: "fundraiser" | GivingType;
+  // What the gift is for, shown at checkout ("Tithe", or the fundraiser's title).
+  title: string;
+  // Where the PayU return should land, and how to find the page again.
+  returnPath: string;
+  referenceId: string;
+}
+
+// Starts the payment for a validated gift: records a payment order and returns
+// what the browser needs to take the money — PayU's form ('shared' mode, the
+// platform's own account) or a Razorpay order against the church's own keys
+// ('own' mode). Shared by fundraiser giving and church-wide giving.
+async function startGivingPayment(
+  target: GivingTarget,
+  amount: number,
+  donorName: string,
+  donorEmail: string,
+  donorPhone: string,
+): Promise<CreateGivingOrderState> {
+  const admin = createAdminClient();
+  const planError = await requireFinancePlan(target.organizationId);
+  if (planError) {
+    return { error: "This giving link is temporarily unavailable." };
+  }
+
+  const orderBase = {
+    organization_id: target.organizationId,
+    fundraiser_id: target.fundraiserId,
+    giving_type: target.givingType,
+    amount,
+    payment_mode: target.paymentMode,
+    donor_name: donorName,
+    donor_email: donorEmail.trim() || null,
+    donor_phone: donorPhone.trim() || null,
+  };
+
+  if (target.paymentMode === "shared") {
+    const txnid = `giving${Date.now()}${target.referenceId.replace(/-/g, "").slice(0, 8)}`;
+    const { error: insertError } = await admin.from("fundraiser_payment_orders").insert({ ...orderBase, payu_txnid: txnid });
+    if (insertError) {
+      console.error("fundraiser_payment_orders insert failed:", insertError.message);
+      return { error: "Couldn't start the payment. Please try again." };
+    }
+
+    const returnUrl = `${getSiteUrl()}${target.returnPath}`;
+
+    let built;
+    try {
+      built = buildPaymentRequestFields({
+        txnid,
+        amountRupees: amount,
+        productinfo: `Gift: ${target.title}`,
+        firstname: donorName,
+        email: donorEmail.trim() || `no-reply+${target.referenceId}@kingdomflow.app`,
+        phone: donorPhone.trim() || "9999999999",
+        surl: returnUrl,
+        furl: returnUrl,
+        udf1: `giving:${target.referenceId}`,
+      });
+    } catch (err) {
+      await logPlatformEvent({
+        level: "error",
+        source: "fundraiser_giving",
+        message: `PayU field build failed: ${err instanceof Error ? err.message : "unknown error"}`,
+        organizationId: target.organizationId,
+        metadata: { referenceId: target.referenceId, txnid },
+      });
+      return { error: "Couldn't start the payment. Please try again." };
+    }
+
+    return {
+      gateway: "payu",
+      payuFields: built.fields,
+      payuActionUrl: built.actionUrl,
+      amount,
+      fundraiserTitle: target.title,
+      organizationName: target.organizationName,
+    };
+  }
+
+  // 'own' mode — Razorpay, against the church's own account.
+  const credentials = await getGivingCredentials(target.organizationId, target.paymentMode);
+  if (!credentials) {
+    return { error: "This giving link isn't set up correctly yet. Please try again later." };
+  }
+
+  let order;
+  try {
+    const client = createGivingRazorpayClient(credentials);
+    order = await client.orders.create({
+      amount: Math.round(amount * 100),
+      currency: "INR",
+      receipt: `fr_${target.referenceId}_${Date.now()}`,
+      notes: {
+        kind: "fundraiser_giving",
+        giving_type: target.givingType,
+        fundraiser_id: target.fundraiserId ?? "",
+        organization_id: target.organizationId,
+        payment_mode: target.paymentMode,
+      },
+    });
+  } catch (err) {
+    console.error("giving order creation failed:", err);
+    await logPlatformEvent({
+      level: "error",
+      source: "fundraiser_giving",
+      message: "Razorpay giving order creation failed",
+      organizationId: target.organizationId,
+      metadata: { referenceId: target.referenceId, paymentMode: target.paymentMode },
+    });
+    return { error: "Couldn't start the payment. Please try again." };
+  }
+
+  const { error: insertError } = await admin.from("fundraiser_payment_orders").insert({ ...orderBase, razorpay_order_id: order.id });
+  if (insertError) {
+    console.error("fundraiser_payment_orders insert failed:", insertError.message);
+    return { error: "Couldn't start the payment. Please try again." };
+  }
+
+  return {
+    gateway: "razorpay",
+    orderId: order.id,
+    keyId: credentials.keyId,
+    amount,
+    fundraiserTitle: target.title,
+    organizationName: target.organizationName,
+  };
 }
 
 // Called from the public /give/[token] page — no authenticated session, so
@@ -62,126 +198,70 @@ export async function createGivingOrder(
     return { error: "This giving link is no longer available." };
   }
 
-  const planError = await requireFinancePlan(fundraiser.organization_id);
-  if (planError) {
-    return { error: "This giving link is temporarily unavailable." };
-  }
-
-  const paymentMode = fundraiser.payment_mode as FundraiserPaymentMode;
-  const amount = Number(amountRaw);
-  const donorName = donorNameRaw.trim();
-  const organizationName = (fundraiser.organizations as { name: string } | null)?.name ?? "";
-
-  if (paymentMode === "shared") {
-    const txnid = `giving${Date.now()}${fundraiser.id.replace(/-/g, "").slice(0, 8)}`;
-    const { error: insertError } = await admin.from("fundraiser_payment_orders").insert({
-      organization_id: fundraiser.organization_id,
-      fundraiser_id: fundraiser.id,
-      payu_txnid: txnid,
-      amount,
-      payment_mode: paymentMode,
-      donor_name: donorName,
-      donor_email: donorEmail.trim() || null,
-      donor_phone: donorPhone.trim() || null,
-    });
-    if (insertError) {
-      console.error("fundraiser_payment_orders insert failed:", insertError.message);
-      return { error: "Couldn't start the payment. Please try again." };
-    }
-
-    const siteUrl = getSiteUrl();
-    const returnUrl = `${siteUrl}/api/payu/giving/return?token=${shareToken}`;
-
-    let built;
-    try {
-      built = buildPaymentRequestFields({
-        txnid,
-        amountRupees: amount,
-        productinfo: `Gift: ${fundraiser.title}`,
-        firstname: donorName,
-        email: donorEmail.trim() || `no-reply+${fundraiser.id}@kingdomflow.app`,
-        phone: donorPhone.trim() || "9999999999",
-        surl: returnUrl,
-        furl: returnUrl,
-        udf1: `giving:${fundraiser.id}`,
-      });
-    } catch (err) {
-      await logPlatformEvent({
-        level: "error",
-        source: "fundraiser_giving",
-        message: `PayU field build failed: ${err instanceof Error ? err.message : "unknown error"}`,
-        organizationId: fundraiser.organization_id,
-        metadata: { fundraiserId: fundraiser.id, txnid },
-      });
-      return { error: "Couldn't start the payment. Please try again." };
-    }
-
-    return {
-      gateway: "payu",
-      payuFields: built.fields,
-      payuActionUrl: built.actionUrl,
-      amount,
-      fundraiserTitle: fundraiser.title,
-      organizationName,
-    };
-  }
-
-  // 'own' mode — unchanged, still Razorpay, against the church's own account.
-  const credentials = await getGivingCredentials(fundraiser.organization_id, paymentMode);
-  if (!credentials) {
-    return { error: "This giving link isn't set up correctly yet. Please try again later." };
-  }
-
-  let order;
-  try {
-    const client = createGivingRazorpayClient(credentials);
-    order = await client.orders.create({
-      amount: Math.round(amount * 100),
-      currency: "INR",
-      receipt: `fr_${fundraiser.id}_${Date.now()}`,
-      notes: {
-        kind: "fundraiser_giving",
-        fundraiser_id: fundraiser.id,
-        organization_id: fundraiser.organization_id,
-        payment_mode: paymentMode,
-      },
-    });
-  } catch (err) {
-    console.error("fundraiser giving order creation failed:", err);
-    await logPlatformEvent({
-      level: "error",
-      source: "fundraiser_giving",
-      message: "Razorpay giving order creation failed",
+  return startGivingPayment(
+    {
       organizationId: fundraiser.organization_id,
-      metadata: { fundraiserId: fundraiser.id, paymentMode },
-    });
-    return { error: "Couldn't start the payment. Please try again." };
+      organizationName: (fundraiser.organizations as { name: string } | null)?.name ?? "",
+      paymentMode: fundraiser.payment_mode as FundraiserPaymentMode,
+      fundraiserId: fundraiser.id,
+      givingType: "fundraiser",
+      title: fundraiser.title,
+      returnPath: `/api/payu/giving/return?token=${shareToken}`,
+      referenceId: fundraiser.id,
+    },
+    Number(amountRaw),
+    donorNameRaw.trim(),
+    donorEmail,
+    donorPhone,
+  );
+}
+
+// Church-wide giving (offering / tithe / donation) from /give/church/[token],
+// on whichever gateway the church chose. Same re-validation as above.
+export async function createChurchGivingOrder(
+  orgToken: string,
+  givingTypeRaw: string,
+  amountRaw: string,
+  donorNameRaw: string,
+  donorEmail: string,
+  donorPhone: string,
+): Promise<CreateGivingOrderState> {
+  if (!isGivingType(givingTypeRaw)) return { error: "Choose what you'd like to give." };
+  const amountError = validateGivingAmount(amountRaw);
+  if (amountError) return { error: amountError };
+  const donorNameError = validateDonorName(donorNameRaw);
+  if (donorNameError) return { error: donorNameError };
+
+  const admin = createAdminClient();
+  const { data: organization } = await admin
+    .from("organizations")
+    .select("id, name, giving_enabled, giving_mode, giving_types")
+    .eq("giving_share_token", orgToken)
+    .maybeSingle();
+
+  if (!organization || !organization.giving_enabled || !organization.giving_mode) {
+    return { error: "Online giving isn't available right now." };
+  }
+  if (!organization.giving_types.includes(givingTypeRaw)) {
+    return { error: `${GIVING_TYPE_LABELS[givingTypeRaw]} isn't accepted online by this church.` };
   }
 
-  const { error: insertError } = await admin.from("fundraiser_payment_orders").insert({
-    organization_id: fundraiser.organization_id,
-    fundraiser_id: fundraiser.id,
-    razorpay_order_id: order.id,
-    amount,
-    payment_mode: paymentMode,
-    donor_name: donorName,
-    donor_email: donorEmail.trim() || null,
-    donor_phone: donorPhone.trim() || null,
-  });
-
-  if (insertError) {
-    console.error("fundraiser_payment_orders insert failed:", insertError.message);
-    return { error: "Couldn't start the payment. Please try again." };
-  }
-
-  return {
-    gateway: "razorpay",
-    orderId: order.id,
-    keyId: credentials.keyId,
-    amount,
-    fundraiserTitle: fundraiser.title,
-    organizationName,
-  };
+  return startGivingPayment(
+    {
+      organizationId: organization.id,
+      organizationName: organization.name,
+      paymentMode: organization.giving_mode as FundraiserPaymentMode,
+      fundraiserId: null,
+      givingType: givingTypeRaw,
+      title: GIVING_TYPE_LABELS[givingTypeRaw],
+      returnPath: `/api/payu/giving/return?token=${orgToken}&scope=church&type=${givingTypeRaw}`,
+      referenceId: organization.id,
+    },
+    Number(amountRaw),
+    donorNameRaw.trim(),
+    donorEmail,
+    donorPhone,
+  );
 }
 
 export interface ConfirmGivingPaymentState {

@@ -963,6 +963,9 @@ export type NotificationPreferences = {
   todo_assigned: boolean;
   todo_due_soon: boolean;
   prayer_request: boolean;
+  church_announcement: boolean;
+  group_post: boolean;
+  special_day: boolean;
   updated_at: string;
 };
 
@@ -2794,6 +2797,18 @@ export type Database = {
         Update: Partial<GroupPost>;
         Relationships: [];
       };
+      push_broadcasts: {
+        Row: PushBroadcast;
+        Insert: Partial<PushBroadcast> & Pick<PushBroadcast, "organization_id" | "audience" | "title" | "body">;
+        Update: Partial<PushBroadcast>;
+        Relationships: [];
+      };
+      special_day_pushes: {
+        Row: SpecialDayPush;
+        Insert: Partial<SpecialDayPush> & Pick<SpecialDayPush, "member_id" | "kind" | "year">;
+        Update: Partial<SpecialDayPush>;
+        Relationships: [];
+      };
       account_deletion_requests: {
         Row: AccountDeletionRequest;
         Insert: Partial<AccountDeletionRequest> & Pick<AccountDeletionRequest, "auth_user_id" | "requester_kind" | "display_name">;
@@ -3784,4 +3799,24 @@ export type GroupPost = {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type PushBroadcast = {
+  id: string;
+  organization_id: string;
+  audience: "church" | "group" | "member";
+  group_key: GroupPost["group_key"] | null;
+  member_id: string | null;
+  title: string;
+  body: string;
+  recipient_count: number;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type SpecialDayPush = {
+  member_id: string;
+  kind: "birthday" | "anniversary";
+  year: number;
+  sent_at: string;
 };

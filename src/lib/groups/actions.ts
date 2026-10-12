@@ -5,7 +5,9 @@ import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { GROUP_TAB, isGroupKey, parseGroupPost } from "@/lib/groups/shares";
+import { GROUP_LABELS, GROUP_TAB, isGroupKey, parseGroupPost } from "@/lib/groups/shares";
+import { sendPushToUsers } from "@/lib/push/client";
+import { resolveAudienceAuthIds } from "@/lib/push/audience";
 
 export interface GroupShareResult {
   error?: string;
@@ -15,7 +17,7 @@ export interface GroupShareResult {
 // Shares a note and/or link with a group of members (Youth, Worship team,
 // ...). Who may: anyone who can edit that group's own tab. Members of the
 // group see it in the mobile app's Space tab.
-export async function createGroupPostAction(groupKey: string, title: string, body: string, linkUrl: string, pagePath: string): Promise<GroupShareResult> {
+export async function createGroupPostAction(groupKey: string, title: string, body: string, linkUrl: string, pagePath: string, notify = true): Promise<GroupShareResult> {
   const user = await requireUser();
   const membership = await requireOrganization();
   if (!isGroupKey(groupKey)) return { error: "That group isn't valid." };
@@ -36,6 +38,20 @@ export async function createGroupPostAction(groupKey: string, title: string, bod
     created_by: user.id,
   });
   if (error) return { error: "Couldn't share that. Please try again." };
+
+  // Tell the group's app users. Best-effort: a push problem never fails the post.
+  if (notify) {
+    try {
+      const recipients = (await resolveAudienceAuthIds(membership.organization.id, { type: "group", groupKey })).filter((id) => id !== user.id);
+      await sendPushToUsers(recipients, "group_post", {
+        title: `${GROUP_LABELS[groupKey]}: ${parsed.post.title}`,
+        body: parsed.post.body ? parsed.post.body.slice(0, 120) : "New announcement for your group.",
+        data: { type: "group_post", group: groupKey },
+      });
+    } catch (pushError) {
+      console.error("createGroupPostAction: push failed", pushError);
+    }
+  }
 
   revalidatePath(pagePath);
   return { success: true };

@@ -24,6 +24,11 @@ const JOB_DEFINITIONS: Record<string, { label: string; description: string; load
     description: "Adds members who fall in a church's youth age range to Youth, and removes ones the rule added who have aged out.",
     load: () => import("@/app/api/cron/youth-sync/route"),
   },
+  "special-days": {
+    label: "Special-day pushes",
+    description: "Sends app users a birthday or wedding-anniversary notification on their day.",
+    load: () => import("@/app/api/cron/special-days/route"),
+  },
   "todo-reminders": {
     label: "To-do reminders",
     description: "Reminds assignees about due to-dos.",

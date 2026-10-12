@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireOrganization } from "@/lib/organizations/dal";
+import { VALID_MOBILE_FEATURE_KEYS } from "@/lib/organizations/mobile-features";
 import { MobileFeaturesManager } from "@/components/organizations/MobileFeaturesManager";
 
 export const metadata: Metadata = {
@@ -24,7 +25,7 @@ export default async function MobileFeaturesPage() {
         </p>
       </div>
 
-      <MobileFeaturesManager organizationId={membership.organization.id} initialFeatures={membership.organization.mobile_features ?? []} />
+      <MobileFeaturesManager organizationId={membership.organization.id} initialFeatures={(membership.organization.mobile_features ?? []).filter((key) => VALID_MOBILE_FEATURE_KEYS.includes(key))} />
     </div>
   );
 }

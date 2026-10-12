@@ -12,18 +12,19 @@ type NavItemKey = keyof Dictionary["nav"]["items"];
 // DashboardShell, rather than importing a "use client" component file into
 // this server-side module. Keep all three in sync when the nav changes;
 // the DB also enforces this exact key list (migration 0084).
+// The dashboard is always in the app, and social accounts and documentation
+// aren't part of it, so none of them is offered here (the DB constraint still
+// allows the old keys, so existing saved values stay valid).
 export const MOBILE_FEATURE_LIMIT = 15;
 
 export const MOBILE_FEATURE_GROUPS: { groupKey: NavGroupKey; itemKeys: NavItemKey[] }[] = [
-  { groupKey: "overview", itemKeys: ["dashboard"] },
   { groupKey: "organization", itemKeys: ["profile", "team", "billing", "branches"] },
   { groupKey: "people", itemKeys: ["members", "leaders", "youth", "committee", "families"] },
   { groupKey: "ministry", itemKeys: ["ministries", "worship", "media", "events", "todos"] },
   { groupKey: "tools", itemKeys: ["planner", "forms", "folder", "attendance", "reports", "widget", "accounting"] },
   { groupKey: "finance", itemKeys: ["fundraisers", "offerings", "donations"] },
   { groupKey: "messaging", itemKeys: ["email", "sms", "whatsapp"] },
-  { groupKey: "socialMedia", itemKeys: ["instagram", "youtube", "facebook"] },
-  { groupKey: "help", itemKeys: ["documentation", "support"] },
+  { groupKey: "help", itemKeys: ["support"] },
 ];
 
 export const VALID_MOBILE_FEATURE_KEYS: string[] = MOBILE_FEATURE_GROUPS.flatMap((g) => g.itemKeys);

@@ -2788,6 +2788,12 @@ export type Database = {
         Update: Partial<WhatsAppContactHealth>;
         Relationships: [];
       };
+      group_posts: {
+        Row: GroupPost;
+        Insert: Partial<GroupPost> & Pick<GroupPost, "organization_id" | "group_key" | "title">;
+        Update: Partial<GroupPost>;
+        Relationships: [];
+      };
       account_deletion_requests: {
         Row: AccountDeletionRequest;
         Insert: Partial<AccountDeletionRequest> & Pick<AccountDeletionRequest, "auth_user_id" | "requester_kind" | "display_name">;
@@ -3766,4 +3772,16 @@ export type AccountDeletionRequest = {
   processed_by: string | null;
   processed_at: string | null;
   requested_at: string;
+};
+
+export type GroupPost = {
+  id: string;
+  organization_id: string;
+  group_key: "leaders" | "youth" | "worship" | "media" | "committee";
+  title: string;
+  body: string | null;
+  link_url: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
 };

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
+import { getGroupPosts } from "@/lib/groups/dal";
+import { GroupSharesPanel } from "@/components/groups/GroupSharesPanel";
 import { getMembers } from "@/lib/members/dal";
 import { getCommitteeMembers } from "@/lib/committee/dal";
 import { CommitteeManager } from "@/components/committee/CommitteeManager";
@@ -25,12 +27,16 @@ export default async function CommitteePage() {
     .filter((member) => member.status !== "pending")
     .map((member) => ({ id: member.id, first_name: member.first_name, last_name: member.last_name, phone: member.phone }));
 
+  const groupPosts = await getGroupPosts(membership.organization.id, "committee");
+
   return (
     <div className="space-y-8">
       <div>
         <h1 className="font-heading text-3xl font-bold tracking-tight">Committee</h1>
         <p className="mt-1 text-muted-foreground">Members serving on {membership.organization.name}&apos;s committees.</p>
       </div>
+
+      <GroupSharesPanel groupKey="committee" posts={groupPosts} canWrite={membership.tabAccess.committee.write} canDelete={membership.tabAccess.committee.delete} pagePath="/dashboard/committee" />
 
       <CommitteeManager
         organizationId={organizationId}

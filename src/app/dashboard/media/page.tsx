@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
+import { getGroupPosts } from "@/lib/groups/dal";
+import { GroupSharesPanel } from "@/components/groups/GroupSharesPanel";
 import { getMembers } from "@/lib/members/dal";
 import { getMediaTeamMembers, getMediaEquipment, getMediaSocialAccounts, getMediaDocuments } from "@/lib/media/dal";
 import { createClient } from "@/lib/supabase/server";
@@ -39,6 +41,8 @@ export default async function MediaPage() {
     .filter((member) => member.status !== "pending")
     .map((member) => ({ id: member.id, first_name: member.first_name, last_name: member.last_name }));
 
+  const groupPosts = await getGroupPosts(membership.organization.id, "media");
+
   return (
     <div className="space-y-8">
       <div>
@@ -47,6 +51,8 @@ export default async function MediaPage() {
           The team, equipment, and social accounts behind {membership.organization.name}&apos;s media ministry.
         </p>
       </div>
+
+      <GroupSharesPanel groupKey="media" posts={groupPosts} canWrite={membership.tabAccess.media.write} canDelete={membership.tabAccess.media.delete} pagePath="/dashboard/media" note="Media team members also see the documents in your media library there." />
 
       <MediaManager
         organizationId={organizationId}

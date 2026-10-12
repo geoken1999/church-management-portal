@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { sendBroadcastAction } from "@/lib/push/broadcast-actions";
+import { BUTTON_PRESETS } from "@/lib/push/button-presets";
 import { GROUP_KEYS, GROUP_LABELS, type GroupKey } from "@/lib/groups/shares";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -179,7 +180,16 @@ export function PushBroadcastPanel({ recipients, history, branches }: { recipien
                   Button text (optional)
                 </Label>
                 <Input id="push-button" value={buttonLabel} onChange={(e) => setButtonLabel(e.target.value)} maxLength={24} placeholder="Join" />
-                <p className="text-xs text-muted-foreground">With a button, the app shows the message with this button, and the button opens the link.</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {BUTTON_PRESETS.map((preset) => (
+                    <Button key={preset} type="button" size="xs" variant={buttonLabel === preset ? "secondary" : "outline"} onClick={() => setButtonLabel(preset)}>
+                      {preset}
+                    </Button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  The button sits on the notification and opens the link. Android shows your text; iPhones show the matching standard button above (or &quot;Open&quot;).
+                </p>
               </div>
             )}
             <Button type="submit" disabled={pending}>

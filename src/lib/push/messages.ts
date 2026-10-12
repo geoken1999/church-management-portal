@@ -7,6 +7,8 @@
 // button with custom text, so they still get the normal notification, and the
 // button appears when it is tapped.
 
+import { iosCategoryFor } from "@/lib/push/button-presets";
+
 export interface PushTokenRow {
   token: string;
   platform: string;
@@ -24,6 +26,7 @@ export interface PushBatch {
     notification?: { title: string; body: string };
     data?: Record<string, string>;
     android?: { priority: "high" };
+    apns?: { payload: { aps: { category: string } } };
   };
 }
 
@@ -38,7 +41,18 @@ export function buildPushBatches(rows: PushTokenRow[], payload: PushMessageInput
 
   const batches: PushBatch[] = [];
   if (standardTokens.length > 0) {
-    batches.push({ tokens: standardTokens, message: { notification: { title: payload.title, body: payload.body }, data: payload.data } });
+    batches.push({
+      tokens: standardTokens,
+      message: {
+        notification: { title: payload.title, body: payload.body },
+        // iPhones: the category makes the system show the button, and the payload
+        // is what the app reads back when the button is tapped.
+        data: action
+          ? { ...payload.data, payload: JSON.stringify({ title: payload.title, body: payload.body, data: { link: payload.data?.link, buttonLabel: payload.data?.buttonLabel } }) }
+          : payload.data,
+        ...(action ? { apns: { payload: { aps: { category: iosCategoryFor(payload.data?.buttonLabel ?? "") } } } } : {}),
+      },
+    });
   }
   if (androidTokens.length > 0) {
     batches.push({

@@ -20,6 +20,13 @@ describe("buildPushBatches", () => {
     expect(batches[1].tokens).toEqual(["a1"]);
     expect(batches[1].message.notification).toBeUndefined();
     expect(batches[1].message.data).toMatchObject({ title: "T", body: "B", buttonLabel: "Join", link: "https://x.com" });
+    // The iPhone gets a notification with the Join button category.
+    expect(batches[0].message.apns?.payload.aps.category).toBe("btn_join");
+    expect(batches[0].message.data?.payload).toContain("https://x.com");
+  });
+  it("falls back to the Open button for a label the iPhone doesn't know", () => {
+    const batches = buildPushBatches([{ token: "i1", platform: "ios" }], { title: "T", body: "B", data: { link: "https://x.com", buttonLabel: "Come along" } });
+    expect(batches[0].message.apns?.payload.aps.category).toBe("btn_open");
   });
   it("needs a link as well as a button label", () => {
     expect(buildPushBatches(rows, { title: "T", body: "B", data: { buttonLabel: "Join" } })).toHaveLength(1);

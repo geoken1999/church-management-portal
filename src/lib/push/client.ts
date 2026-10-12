@@ -4,6 +4,7 @@ import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPushEnv, isPushConfigured } from "@/lib/push/env";
+import { buildPushBatches } from "@/lib/push/messages";
 
 export type PushCategory = "event_new" | "todo_assigned" | "todo_due_soon" | "prayer_request" | "account_deletion" | "church_announcement" | "group_post" | "special_day" | "team_alert" | "event_update";
 
@@ -68,43 +69,44 @@ export async function sendPushToUsers(authUserIds: string[], category: PushCateg
   const recipients = authUserIds.filter((id) => !optedOut.has(id));
   if (recipients.length === 0) return { skipped: "opted_out", devices: 0, delivered: 0, failed: 0 };
 
-  const { data: tokenRows } = await admin.from("device_push_tokens").select("token").in("auth_user_id", recipients);
-  const tokens = (tokenRows ?? []).map((row) => row.token);
-  if (tokens.length === 0) return { skipped: "no_devices", devices: 0, delivered: 0, failed: 0 };
+  const { data: tokenRows } = await admin.from("device_push_tokens").select("token, platform").in("auth_user_id", recipients);
+  const batches = buildPushBatches(tokenRows ?? [], payload);
+  const allTokens = (tokenRows ?? []).map((row) => row.token);
+  if (allTokens.length === 0) return { skipped: "no_devices", devices: 0, delivered: 0, failed: 0 };
 
-  let response;
+  const responses: { error?: { code: string; message: string } }[] = [];
+  const staleTokens: string[] = [];
+  let delivered = 0;
+  let failed = 0;
   try {
-    response = await getMessaging(getFirebaseApp()).sendEachForMulticast({
-      tokens,
-      notification: { title: payload.title, body: payload.body },
-      data: payload.data,
-    });
+    for (const batch of batches) {
+      const response = await getMessaging(getFirebaseApp()).sendEachForMulticast({ tokens: batch.tokens, ...batch.message });
+      delivered += response.successCount;
+      failed += response.failureCount;
+      response.responses.forEach((result, index) => {
+        responses.push(result);
+        // A token stops being valid when the app is uninstalled or the user
+        // signs out of Firebase on that device — clean those up now rather
+        // than paying for the same failed lookup on every future send.
+        const code = result.error?.code;
+        if (code === "messaging/registration-token-not-registered" || code === "messaging/invalid-registration-token") staleTokens.push(batch.tokens[index]);
+      });
+    }
   } catch (error) {
     console.error("sendPushToUsers: FCM send failed", error);
-    return { skipped: "send_failed", devices: tokens.length, delivered: 0, failed: tokens.length, error: error instanceof Error ? error.message : String(error) };
+    return { skipped: "send_failed", devices: allTokens.length, delivered, failed: allTokens.length - delivered, error: error instanceof Error ? error.message : String(error) };
   }
-
-  // A token stops being valid when the app is uninstalled or the user
-  // signs out of Firebase on that device — clean those up now rather than
-  // paying for the same failed lookup on every future send.
-  const staleTokens = response.responses
-    .map((result, index) => ({ result, token: tokens[index] }))
-    .filter(({ result }) => {
-      const code = result.error?.code;
-      return code === "messaging/registration-token-not-registered" || code === "messaging/invalid-registration-token";
-    })
-    .map(({ token }) => token);
 
   if (staleTokens.length > 0) {
     await admin.from("device_push_tokens").delete().in("token", staleTokens);
   }
 
-  const firstError = response.responses.find((result) => result.error)?.error;
+  const firstError = responses.find((result) => result.error)?.error;
   if (firstError) console.error("sendPushToUsers: FCM rejected a message", firstError.code, firstError.message);
   return {
-    devices: tokens.length,
-    delivered: response.successCount,
-    failed: response.failureCount,
+    devices: allTokens.length,
+    delivered,
+    failed,
     error: firstError ? `${firstError.code}: ${firstError.message}` : undefined,
   };
 }

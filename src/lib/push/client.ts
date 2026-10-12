@@ -5,7 +5,7 @@ import { getMessaging } from "firebase-admin/messaging";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPushEnv, isPushConfigured } from "@/lib/push/env";
 
-export type PushCategory = "event_new" | "todo_assigned" | "todo_due_soon" | "prayer_request";
+export type PushCategory = "event_new" | "todo_assigned" | "todo_due_soon" | "prayer_request" | "account_deletion";
 
 let app: App | null = null;
 
@@ -49,8 +49,10 @@ export async function sendPushToUsers(authUserIds: string[], category: PushCateg
     .select("auth_user_id, event_new, todo_assigned, todo_due_soon, prayer_request")
     .in("auth_user_id", authUserIds);
 
+  // "account_deletion" is an alert to church admins with no preference of its
+  // own, so nobody is opted out of it.
   const optedOut = new Set(
-    (preferences ?? []).filter((row) => row[category] === false).map((row) => row.auth_user_id),
+    category === "account_deletion" ? [] : (preferences ?? []).filter((row) => row[category] === false).map((row) => row.auth_user_id),
   );
   const recipients = authUserIds.filter((id) => !optedOut.has(id));
   if (recipients.length === 0) return;

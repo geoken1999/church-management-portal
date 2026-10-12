@@ -16,6 +16,7 @@ import { downloadMemberTemplate, bulkImportMembers } from "@/lib/members/bulk-ac
 import { PublicJoinLinkCard } from "@/components/members/PublicJoinLinkCard";
 import { JoinFormLanguages } from "@/components/members/JoinFormLanguages";
 import { YouthAgeRuleCard } from "@/components/members/YouthAgeRuleCard";
+import { DeletionRequestsList, type DeletionRequestView } from "@/components/account-deletion/DeletionRequestsList";
 import type { BilingualConfig } from "@/lib/bilingual/config";
 import type { Branch, Member, MemberFieldDefinition, MemberProfileUpdateRequest, MemberStatus } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -890,6 +891,7 @@ export function MembersManager({
   profileUpdateRequests,
   joinBilingual,
   youthAgeRule,
+  deletionRequests,
   canManage,
 }: {
   organizationId: string;
@@ -902,6 +904,7 @@ export function MembersManager({
   profileUpdateRequests: ProfileUpdateRequestWithMember[];
   joinBilingual: BilingualConfig | null;
   youthAgeRule: { from: number | null; to: number | null };
+  deletionRequests: DeletionRequestView[];
   canManage: boolean;
 }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -937,6 +940,16 @@ export function MembersManager({
       {canManage && <PublicJoinLinkCard orgSlug={orgSlug} orgName={orgName} siteUrl={siteUrl} />}
       {canManage && <JoinFormLanguages initial={joinBilingual} />}
       {canManage && <YouthAgeRuleCard initialFrom={youthAgeRule.from} initialTo={youthAgeRule.to} />}
+
+      {canManage && deletionRequests.some((r) => r.status === "pending") && (
+        <div className="space-y-3">
+          <div>
+            <h2 className="font-heading text-lg font-bold">Account deletion requests ({deletionRequests.filter((r) => r.status === "pending").length})</h2>
+            <p className="text-sm text-muted-foreground">People who asked, from the mobile app, to delete their account. Nothing is deleted until you process the request.</p>
+          </div>
+          <DeletionRequestsList requests={deletionRequests} emptyText="No account deletion requests." />
+        </div>
+      )}
 
       {canManage && pendingMembers.length > 0 && (
         <div className="space-y-3">

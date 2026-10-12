@@ -3829,6 +3829,8 @@ export type PushBroadcast = {
   member_id: string | null;
   title: string;
   body: string;
+  link_url: string | null;
+  button_label: string | null;
   recipient_count: number;
   created_by: string | null;
   created_at: string;

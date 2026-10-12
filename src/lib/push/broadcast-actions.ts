@@ -16,12 +16,14 @@ export async function sendBroadcastAction(
   title: string,
   body: string,
   branchId = "",
+  linkUrl = "",
+  buttonLabel = "",
 ): Promise<BroadcastResult> {
   const user = await requireUser();
   const membership = await requireOrganization();
   if (membership.role !== "owner" && membership.role !== "admin") return { error: "Only an owner or admin can send notifications." };
 
-  const result = await sendBroadcast({ organizationId: membership.organization.id, userId: user.id, audienceType, groupKey, memberId, branchId, title, body });
+  const result = await sendBroadcast({ organizationId: membership.organization.id, userId: user.id, audienceType, groupKey, memberId, branchId, title, body, linkUrl, buttonLabel });
   if (result.success) revalidatePath("/dashboard/mobile/notifications");
   return result;
 }

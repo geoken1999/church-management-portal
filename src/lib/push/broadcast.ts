@@ -5,6 +5,7 @@ import { isGroupKey } from "@/lib/groups/shares";
 import { sendPushToUsers } from "@/lib/push/client";
 import { isPushConfigured } from "@/lib/push/env";
 import { resolveAudienceAuthIds, type PushAudience } from "@/lib/push/audience";
+import { validatePushAction } from "@/lib/push/link";
 
 export interface BroadcastResult {
   error?: string;
@@ -24,11 +25,16 @@ export async function sendBroadcast(input: {
   branchId?: string;
   title: string;
   body: string;
+  linkUrl?: string;
+  buttonLabel?: string;
 }): Promise<BroadcastResult> {
   const cleanTitle = input.title.trim();
   const cleanBody = input.body.trim();
   if (cleanTitle.length < 2 || cleanTitle.length > 60) return { error: "Title must be 2 to 60 characters." };
   if (cleanBody.length < 2 || cleanBody.length > 240) return { error: "Message must be 2 to 240 characters." };
+
+  const action = validatePushAction({ linkUrl: input.linkUrl ?? "", buttonLabel: input.buttonLabel ?? "" });
+  if ("error" in action) return { error: action.error };
 
   let audience: PushAudience;
   if (input.audienceType === "church") audience = { type: "church" };
@@ -56,7 +62,11 @@ export async function sendBroadcast(input: {
   const result = await sendPushToUsers(recipients, "church_announcement", {
     title: cleanTitle,
     body: cleanBody,
-    data: { type: "church_announcement" },
+    data: {
+      type: "church_announcement",
+      ...(action.linkUrl ? { link: action.linkUrl } : {}),
+      ...(action.buttonLabel ? { buttonLabel: action.buttonLabel } : {}),
+    },
   });
   if (result.delivered === 0) {
     if (result.skipped === "no_devices") return { error: "Those members haven't allowed notifications on a device yet." };
@@ -72,6 +82,8 @@ export async function sendBroadcast(input: {
     branch_id: audience.type === "branch" ? audience.branchId : null,
     title: cleanTitle,
     body: cleanBody,
+    link_url: action.linkUrl,
+    button_label: action.buttonLabel,
     recipient_count: result.delivered,
     created_by: input.userId,
   });

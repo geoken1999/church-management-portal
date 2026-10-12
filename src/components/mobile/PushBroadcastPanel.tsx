@@ -35,6 +35,8 @@ function audienceLabel(row: BroadcastHistoryRow): string {
 export function PushBroadcastPanel({ recipients, history, branches }: { recipients: RecipientOption[]; history: BroadcastHistoryRow[]; branches: { id: string; name: string }[] }) {
   const [audience, setAudience] = useState<"church" | "branch" | "group" | "member">("church");
   const [branchId, setBranchId] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
+  const [buttonLabel, setButtonLabel] = useState("");
   const [groupKey, setGroupKey] = useState<GroupKey>("youth");
   const [memberId, setMemberId] = useState("");
   const [search, setSearch] = useState("");
@@ -51,7 +53,7 @@ export function PushBroadcastPanel({ recipients, history, branches }: { recipien
     setError(null);
     setNotice(null);
     startTransition(async () => {
-      const result = await sendBroadcastAction(audience, groupKey, memberId, title, body, branchId);
+      const result = await sendBroadcastAction(audience, groupKey, memberId, title, body, branchId, linkUrl, buttonLabel);
       if (result.error) {
         setError(result.error);
         return;
@@ -59,6 +61,8 @@ export function PushBroadcastPanel({ recipients, history, branches }: { recipien
       setNotice(`Sent to ${result.sent} ${result.sent === 1 ? "person" : "people"}.`);
       setTitle("");
       setBody("");
+      setLinkUrl("");
+      setButtonLabel("");
     });
   }
 
@@ -162,6 +166,22 @@ export function PushBroadcastPanel({ recipients, history, branches }: { recipien
               </Label>
               <Textarea id="push-body" value={body} onChange={(e) => setBody(e.target.value)} rows={3} maxLength={240} />
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="push-link" className="text-xs">
+                Link (optional, https://…)
+              </Label>
+              <Input id="push-link" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://meet.example.com/service" />
+              <p className="text-xs text-muted-foreground">Tapping the notification opens this link on the member&apos;s phone.</p>
+            </div>
+            {linkUrl.trim() && (
+              <div className="space-y-1.5">
+                <Label htmlFor="push-button" className="text-xs">
+                  Button text (optional)
+                </Label>
+                <Input id="push-button" value={buttonLabel} onChange={(e) => setButtonLabel(e.target.value)} maxLength={24} placeholder="Join" />
+                <p className="text-xs text-muted-foreground">With a button, the app shows the message with this button, and the button opens the link.</p>
+              </div>
+            )}
             <Button type="submit" disabled={pending}>
               {pending ? "Sending..." : "Send notification"}
             </Button>

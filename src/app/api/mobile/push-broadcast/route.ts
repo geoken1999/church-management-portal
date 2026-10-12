@@ -25,6 +25,8 @@ export async function POST(request: Request) {
     branchId: text("branchId"),
     title: text("title"),
     body: text("message"),
+    linkUrl: text("linkUrl"),
+    buttonLabel: text("buttonLabel"),
   });
   if (result.error) return NextResponse.json({ ok: false, error: result.error });
   return NextResponse.json({ ok: true, sent: result.sent });

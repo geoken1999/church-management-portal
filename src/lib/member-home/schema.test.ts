@@ -84,4 +84,17 @@ describe("hidden sections", () => {
     expect(sanitizeLayout({ blocks: [{ ...newBlock("banner"), hidden: true }] }).error).toBeUndefined();
     expect(sanitizeLayout({ blocks: [newBlock("announcement")] }).error).toBeDefined();
   });
+
+  it("keeps only the video id, accepts a pasted link, and rejects non-YouTube links", () => {
+    const videos = { ...newBlock("videos"), videos: [{ videoId: "dQw4w9WgXcQ", title: " Sunday " }, { url: "https://youtu.be/abcdefghijk" }, ] };
+    const ok = sanitizeLayout({ version: 1, blocks: [videos] });
+    expect(ok.layout?.blocks[0]).toMatchObject({ type: "videos", videos: [{ videoId: "dQw4w9WgXcQ", title: "Sunday" }, { videoId: "abcdefghijk", title: "" }] });
+    const bad = { ...newBlock("videos"), videos: [{ url: "https://vimeo.com/1" }] };
+    expect(sanitizeLayout({ version: 1, blocks: [bad] }).error).toBeTruthy();
+  });
+
+  it("needs a video unless the section is hidden", () => {
+    expect(sanitizeLayout({ version: 1, blocks: [newBlock("videos")] }).error).toBeTruthy();
+    expect(sanitizeLayout({ version: 1, blocks: [{ ...newBlock("videos"), hidden: true }] }).error).toBeUndefined();
+  });
 });

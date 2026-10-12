@@ -3,9 +3,12 @@
 // editor, the server actions and the tests all share it; the mobile app
 // mirrors these shapes in lib/data/member_home_repository.dart.
 
+import { youtubeVideoId } from "@/lib/member-home/youtube";
+
 export const LAYOUT_VERSION = 1;
 export const MAX_BLOCKS = 20;
 export const MAX_QUICK_LINKS = 8;
+export const MAX_VIDEOS = 12;
 
 // Banner images are always exactly this size (2:1): the editor crops to it
 // in the browser, the server rejects anything else, and the phone shows it
@@ -23,7 +26,7 @@ export interface BannerSlide {
   linkUrl: string;
 }
 
-export type BlockType = "banner" | "welcome" | "announcement" | "quick_links" | "upcoming_events";
+export type BlockType = "banner" | "welcome" | "announcement" | "quick_links" | "upcoming_events" | "videos";
 
 export const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   banner: "Banner",
@@ -31,6 +34,7 @@ export const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   announcement: "Announcement",
   quick_links: "Quick links",
   upcoming_events: "Upcoming events",
+  videos: "Videos",
 };
 
 // Destinations a quick link can open that exist in the member app today.
@@ -52,12 +56,19 @@ export interface QuickLink {
   url?: string;
 }
 
+export interface VideoItem {
+  /** YouTube's 11-character video id; the thumbnail and watch link come from it. */
+  videoId: string;
+  title: string;
+}
+
 export type HomeBlock =
   | { id: string; hidden?: boolean; type: "banner"; slides: BannerSlide[]; autoplaySeconds: number }
   | { id: string; hidden?: boolean; type: "welcome"; title: string; subtitle: string }
   | { id: string; hidden?: boolean; type: "announcement"; title: string; body: string; imageUrl: string; buttonLabel: string; buttonUrl: string }
   | { id: string; hidden?: boolean; type: "quick_links"; title: string; links: QuickLink[] }
-  | { id: string; hidden?: boolean; type: "upcoming_events"; title: string; count: number };
+  | { id: string; hidden?: boolean; type: "upcoming_events"; title: string; count: number }
+  | { id: string; hidden?: boolean; type: "videos"; title: string; videos: VideoItem[] };
 
 export interface HomeLayout {
   version: number;
@@ -82,6 +93,8 @@ export function newBlock(type: BlockType): HomeBlock {
       return { id, type, title: "Quick links", links: [{ label: "My Membership", icon: "qr", target: "membership" }] };
     case "upcoming_events":
       return { id, type, title: "Upcoming events", count: 3 };
+    case "videos":
+      return { id, type, title: "Videos", videos: [] };
   }
 }
 
@@ -192,6 +205,21 @@ export function sanitizeLayout(input: unknown, organizationId?: string): { layou
       case "upcoming_events": {
         const count = Math.min(10, Math.max(1, Math.round(Number(block.count) || 3)));
         blocks.push({ id, ...(hidden && { hidden }), type: "upcoming_events", title: str(block.title, 60), count });
+        break;
+      }
+      case "videos": {
+        const rawVideos = Array.isArray(block.videos) ? (block.videos as unknown[]) : [];
+        if (rawVideos.length === 0 && !hidden) return { error: "Videos needs at least one video." };
+        if (rawVideos.length > MAX_VIDEOS) return { error: `Videos can have at most ${MAX_VIDEOS} videos.` };
+        const videos: VideoItem[] = [];
+        for (const rawVideo of rawVideos) {
+          const video = (rawVideo ?? {}) as Record<string, unknown>;
+          // Accept a stored id, or a pasted link, but only ever keep the id.
+          const videoId = typeof video.videoId === "string" && /^[A-Za-z0-9_-]{11}$/.test(video.videoId) ? video.videoId : youtubeVideoId(str(video.url, 500));
+          if (!videoId) return { error: "One of the videos isn't a valid YouTube link." };
+          videos.push({ videoId, title: str(video.title, 100) });
+        }
+        blocks.push({ id, ...(hidden && { hidden }), type: "videos", title: str(block.title, 60), videos });
         break;
       }
       default:

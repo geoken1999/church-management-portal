@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { checkStorageQuota } from "@/lib/plans/dal";
 import { readJpegSize } from "@/lib/member-home/image";
+import { youtubeVideoId, youtubeWatchUrl } from "@/lib/member-home/youtube";
 import { BANNER_HEIGHT, BANNER_WIDTH, HOME_IMAGES_BUCKET, MAX_BANNER_BYTES, bannerImageUrl, sanitizeLayout, type HomeLayout } from "@/lib/member-home/schema";
 
 const STUDIO_PATH = "/dashboard/mobile/design-studio";
@@ -155,4 +156,35 @@ export async function uploadBannerImageAction(formData: FormData): Promise<Uploa
 
   const { data } = admin.storage.from(HOME_IMAGES_BUCKET).getPublicUrl(imagePath);
   return { imagePath, url: data.publicUrl ?? bannerImageUrl(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "", imagePath) };
+}
+
+export interface YoutubeVideoLookup {
+  error?: string;
+  videoId?: string;
+  title?: string;
+}
+
+// Checks a pasted YouTube link and, where YouTube will say, fetches the video's
+// title so the church doesn't have to type it. The title is a convenience: if
+// YouTube can't be reached (or the video is private) the video is still added,
+// just without one.
+export async function lookupYoutubeVideoAction(link: string): Promise<YoutubeVideoLookup> {
+  const admin = await requireOrgAdmin();
+  if (!admin) return { error: NOT_ALLOWED.error };
+
+  const videoId = youtubeVideoId(link);
+  if (!videoId) return { error: "That isn't a YouTube video link. Paste a link like https://www.youtube.com/watch?v=..." };
+
+  try {
+    const response = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(youtubeWatchUrl(videoId))}&format=json`, {
+      signal: AbortSignal.timeout(4000),
+    });
+    if (response.ok) {
+      const body = (await response.json()) as { title?: string };
+      return { videoId, title: typeof body.title === "string" ? body.title.slice(0, 100) : "" };
+    }
+  } catch {
+    // Fall through: no title.
+  }
+  return { videoId, title: "" };
 }

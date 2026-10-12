@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { ArrowDown, ArrowUp, Eye, EyeOff, Plus, Trash2, CalendarDays, Link2, Megaphone, Sparkles, ImageIcon } from "lucide-react";
-import { saveHomeDraftAction, publishHomeLayoutAction, discardHomeDraftAction, uploadBannerImageAction } from "@/lib/member-home/actions";
+import { ArrowDown, ArrowUp, Eye, EyeOff, Plus, Trash2, CalendarDays, Link2, Megaphone, Sparkles, ImageIcon, PlayCircle } from "lucide-react";
+import { saveHomeDraftAction, publishHomeLayoutAction, discardHomeDraftAction, uploadBannerImageAction, lookupYoutubeVideoAction } from "@/lib/member-home/actions";
+import { youtubeThumbnailUrl } from "@/lib/member-home/youtube";
 import { BannerCropDialog } from "@/components/mobile/BannerCropDialog";
 import {
   BANNER_AUTOPLAY_OPTIONS,
@@ -14,6 +15,7 @@ import {
   DEFAULT_LAYOUT,
   MAX_BLOCKS,
   MAX_QUICK_LINKS,
+  MAX_VIDEOS,
   QUICK_LINK_ICONS,
   QUICK_LINK_TARGETS,
   newBlock,
@@ -39,6 +41,7 @@ const BLOCK_ICONS: Record<BlockType, typeof Sparkles> = {
   announcement: Megaphone,
   quick_links: Link2,
   upcoming_events: CalendarDays,
+  videos: PlayCircle,
 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -245,6 +248,8 @@ function BlockEditor({ block, onChange }: { block: HomeBlock; onChange: (next: H
           <p className="text-xs text-muted-foreground sm:col-span-2">Pulled automatically from your Events calendar, soonest first.</p>
         </div>
       );
+    case "videos":
+      return <VideosEditor block={block} onChange={onChange} />;
     case "quick_links": {
       const setLink = (index: number, patch: Partial<QuickLink>) =>
         onChange({ ...block, links: block.links.map((link, i) => (i === index ? { ...link, ...patch } : link)) });
@@ -301,6 +306,80 @@ function BlockEditor({ block, onChange }: { block: HomeBlock; onChange: (next: H
   }
 }
 
+function VideosEditor({ block, onChange }: { block: Extract<HomeBlock, { type: "videos" }>; onChange: (next: HomeBlock) => void }) {
+  const [link, setLink] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [adding, startAdding] = useTransition();
+
+  function handleAdd() {
+    setError(null);
+    startAdding(async () => {
+      const result = await lookupYoutubeVideoAction(link);
+      if (result.error || !result.videoId) {
+        setError(result.error ?? "Couldn't add that video.");
+        return;
+      }
+      if (block.videos.some((video) => video.videoId === result.videoId)) {
+        setError("That video is already in the list.");
+        return;
+      }
+      onChange({ ...block, videos: [...block.videos, { videoId: result.videoId, title: result.title ?? "" }] });
+      setLink("");
+    });
+  }
+
+  const move = (index: number, delta: number) => {
+    const target = index + delta;
+    if (target < 0 || target >= block.videos.length) return;
+    const videos = [...block.videos];
+    [videos[index], videos[target]] = [videos[target], videos[index]];
+    onChange({ ...block, videos });
+  };
+
+  return (
+    <div className="space-y-3">
+      <Field label="Heading (optional)">
+        <Input value={block.title} maxLength={60} onChange={(e) => onChange({ ...block, title: e.target.value })} />
+      </Field>
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      {block.videos.map((video, index) => (
+        <div key={video.videoId} className="flex items-center gap-3 rounded-md border border-border p-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={youtubeThumbnailUrl(video.videoId)} alt="" className="aspect-video w-28 shrink-0 rounded object-cover" />
+          <Input
+            value={video.title}
+            maxLength={100}
+            placeholder="Title (optional)"
+            onChange={(e) => onChange({ ...block, videos: block.videos.map((v, i) => (i === index ? { ...v, title: e.target.value } : v)) })}
+          />
+          <Button type="button" variant="ghost" size="icon" disabled={index === 0} onClick={() => move(index, -1)} aria-label="Move earlier">
+            <ArrowUp className="size-4" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" disabled={index === block.videos.length - 1} onClick={() => move(index, 1)} aria-label="Move later">
+            <ArrowDown className="size-4" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" onClick={() => onChange({ ...block, videos: block.videos.filter((_, i) => i !== index) })} aria-label="Remove video">
+            <Trash2 className="size-4" />
+          </Button>
+        </div>
+      ))}
+      {block.videos.length < MAX_VIDEOS && (
+        <div className="flex gap-2">
+          <Input value={link} placeholder="Paste a YouTube video link" onChange={(e) => setLink(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAdd())} />
+          <Button type="button" variant="outline" disabled={adding || !link.trim()} onClick={handleAdd}>
+            <Plus className="size-4" /> {adding ? "Adding..." : "Add video"}
+          </Button>
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground">Members see the videos in a row they can swipe through, with each video&apos;s YouTube thumbnail. Tapping one opens it in YouTube.</p>
+    </div>
+  );
+}
+
 // A rough picture of the phone's Home tab, not pixel-exact: it shows the
 // content and order members will see.
 function PhonePreview({ layout, organizationName, logoUrl }: { layout: HomeLayout; organizationName: string; logoUrl: string | null }) {
@@ -348,6 +427,24 @@ function PhonePreview({ layout, organizationName, logoUrl }: { layout: HomeLayou
                       <div key={i} className="flex flex-col items-center gap-1 rounded-lg bg-muted p-2 text-center">
                         <div className="size-7 rounded-full bg-primary/20" />
                         <span className="text-[10px] leading-tight">{link.label || "Link"}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            case "videos":
+              return (
+                <div key={block.id} className="space-y-2">
+                  {block.title && <p className="text-sm font-semibold">{block.title}</p>}
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {block.videos.map((video) => (
+                      <div key={video.videoId} className="w-36 shrink-0">
+                        <div className="relative">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={youtubeThumbnailUrl(video.videoId)} alt="" className="aspect-video w-full rounded-lg object-cover" />
+                          <PlayCircle className="absolute top-1/2 left-1/2 size-7 -translate-x-1/2 -translate-y-1/2 text-white drop-shadow" />
+                        </div>
+                        {video.title && <p className="mt-1 line-clamp-2 text-[10px] leading-tight">{video.title}</p>}
                       </div>
                     ))}
                   </div>

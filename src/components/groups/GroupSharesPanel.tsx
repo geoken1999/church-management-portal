@@ -40,6 +40,7 @@ export function GroupSharesPanel({
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
+  const [notify, setNotify] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -47,7 +48,7 @@ export function GroupSharesPanel({
     e.preventDefault();
     setError(null);
     startTransition(async () => {
-      const result = await createGroupPostAction(groupKey, title, body, linkUrl, pagePath);
+      const result = await createGroupPostAction(groupKey, title, body, linkUrl, pagePath, notify);
       if (result.error) {
         setError(result.error);
         return;
@@ -98,6 +99,10 @@ export function GroupSharesPanel({
               </Label>
               <Input id={`share-link-${groupKey}`} value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://" />
             </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
+              Send a push notification to the group
+            </label>
             <Button type="submit" size="sm" disabled={pending}>
               {pending ? "Sharing..." : "Share with the group"}
             </Button>

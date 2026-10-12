@@ -13,6 +13,10 @@
       "schedule": "45 2 * * *"
     },
     {
+      "path": "/api/cron/special-days",
+      "schedule": "30 2 * * *"
+    },
+    {
       "path": "/api/cron/todo-reminders",
       "schedule": "15 3 * * *"
     },

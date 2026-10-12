@@ -1,0 +1,179 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { sendBroadcastAction } from "@/lib/push/broadcast-actions";
+import { GROUP_KEYS, GROUP_LABELS, type GroupKey } from "@/lib/groups/shares";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+
+export interface RecipientOption {
+  id: string;
+  name: string;
+}
+
+export interface BroadcastHistoryRow {
+  id: string;
+  audience: "church" | "group" | "member";
+  group_key: GroupKey | null;
+  title: string;
+  body: string;
+  recipient_count: number;
+  created_at: string;
+}
+
+function audienceLabel(row: BroadcastHistoryRow): string {
+  if (row.audience === "church") return "Whole church";
+  if (row.audience === "group" && row.group_key) return GROUP_LABELS[row.group_key];
+  return "One member";
+}
+
+export function PushBroadcastPanel({ recipients, history }: { recipients: RecipientOption[]; history: BroadcastHistoryRow[] }) {
+  const [audience, setAudience] = useState<"church" | "group" | "member">("church");
+  const [groupKey, setGroupKey] = useState<GroupKey>("youth");
+  const [memberId, setMemberId] = useState("");
+  const [search, setSearch] = useState("");
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const matches = search.trim() ? recipients.filter((r) => r.name.toLowerCase().includes(search.trim().toLowerCase())).slice(0, 8) : [];
+
+  function handleSend(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setNotice(null);
+    startTransition(async () => {
+      const result = await sendBroadcastAction(audience, groupKey, memberId, title, body);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setNotice(`Sent to ${result.sent} ${result.sent === 1 ? "person" : "people"}.`);
+      setTitle("");
+      setBody("");
+    });
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardContent>
+          <form onSubmit={handleSend} className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            {notice && (
+              <Alert>
+                <AlertDescription>{notice}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Send to</Label>
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    ["church", "Whole church"],
+                    ["group", "A group"],
+                    ["member", "One member"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <Button key={value} type="button" size="sm" variant={audience === value ? "default" : "outline"} onClick={() => setAudience(value)}>
+                    {label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {audience === "group" && (
+              <div className="flex flex-wrap gap-2">
+                {GROUP_KEYS.map((key) => (
+                  <Button key={key} type="button" size="sm" variant={groupKey === key ? "secondary" : "outline"} onClick={() => setGroupKey(key)}>
+                    {GROUP_LABELS[key]}
+                  </Button>
+                ))}
+              </div>
+            )}
+
+            {audience === "member" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="push-member-search" className="text-xs">
+                  Member (only people who use the app)
+                </Label>
+                <Input
+                  id="push-member-search"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setMemberId("");
+                  }}
+                  placeholder="Search by name"
+                />
+                {matches.length > 0 && !memberId && (
+                  <div className="rounded-md border border-border">
+                    {matches.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        className="block w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                        onClick={() => {
+                          setMemberId(m.id);
+                          setSearch(m.name);
+                        }}
+                      >
+                        {m.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="push-title" className="text-xs">
+                Title
+              </Label>
+              <Input id="push-title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={60} placeholder="Sunday service moved to 9 AM" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="push-body" className="text-xs">
+                Message
+              </Label>
+              <Textarea id="push-body" value={body} onChange={(e) => setBody(e.target.value)} rows={3} maxLength={240} />
+            </div>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Sending..." : "Send notification"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <div className="space-y-2">
+        <p className="font-medium">Recently sent</p>
+        {history.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nothing sent yet.</p>
+        ) : (
+          <div className="divide-y divide-border rounded-md border border-border">
+            {history.map((row) => (
+              <div key={row.id} className="px-3 py-2">
+                <p className="text-sm font-medium">{row.title}</p>
+                <p className="text-sm text-muted-foreground">{row.body}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {audienceLabel(row)} · {row.recipient_count} {row.recipient_count === 1 ? "person" : "people"} · {new Date(row.created_at).toLocaleString()}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

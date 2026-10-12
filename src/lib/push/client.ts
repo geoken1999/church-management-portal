@@ -5,7 +5,7 @@ import { getMessaging } from "firebase-admin/messaging";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPushEnv, isPushConfigured } from "@/lib/push/env";
 
-export type PushCategory = "event_new" | "todo_assigned" | "todo_due_soon" | "prayer_request" | "account_deletion";
+export type PushCategory = "event_new" | "todo_assigned" | "todo_due_soon" | "prayer_request" | "account_deletion" | "church_announcement" | "group_post" | "special_day";
 
 let app: App | null = null;
 
@@ -46,7 +46,7 @@ export async function sendPushToUsers(authUserIds: string[], category: PushCateg
 
   const { data: preferences } = await admin
     .from("notification_preferences")
-    .select("auth_user_id, event_new, todo_assigned, todo_due_soon, prayer_request")
+    .select("auth_user_id, event_new, todo_assigned, todo_due_soon, prayer_request, church_announcement, group_post, special_day")
     .in("auth_user_id", authUserIds);
 
   // "account_deletion" is an alert to church admins with no preference of its

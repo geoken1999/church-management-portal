@@ -91,6 +91,10 @@ function TodoFormFields({
   onDueAtChange,
   assignedTo,
   onAssignedToChange,
+  remindDayBefore,
+  onRemindDayBeforeChange,
+  remindDueDay,
+  onRemindDueDayChange,
   errors,
 }: {
   members: TeamMemberOption[];
@@ -105,6 +109,10 @@ function TodoFormFields({
   onDueAtChange: (value: string) => void;
   assignedTo: string;
   onAssignedToChange: (value: string) => void;
+  remindDayBefore: boolean;
+  onRemindDayBeforeChange: (value: boolean) => void;
+  remindDueDay: boolean;
+  onRemindDueDayChange: (value: boolean) => void;
   errors?: { title?: string; dueAt?: string };
 }) {
   return (
@@ -190,6 +198,24 @@ function TodoFormFields({
           <input type="hidden" name="assignedTo" value={assignedTo} />
         </div>
       </div>
+      <input type="hidden" name="remindDayBefore" value={remindDayBefore ? "on" : ""} />
+      <input type="hidden" name="remindDueDay" value={remindDueDay ? "on" : ""} />
+      {dueAt && (
+        <div className="space-y-2">
+          <Label>Reminders</Label>
+          <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={remindDayBefore} onChange={(e) => onRemindDayBeforeChange(e.target.checked)} />
+              The day before
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={remindDueDay} onChange={(e) => onRemindDueDayChange(e.target.checked)} />
+              On the due day, and if it&apos;s overdue
+            </label>
+          </div>
+          <p className="text-xs text-muted-foreground">Sent as a notification to whoever it&apos;s assigned to (or to you, if it isn&apos;t assigned), around 8:45 AM.</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -208,6 +234,8 @@ function CreateTodoDialog({ members, events, defaultEventId }: { members: TeamMe
   const [description, setDescription] = useState("");
   const [dueAt, setDueAt] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
+  const [remindDayBefore, setRemindDayBefore] = useState(false);
+  const [remindDueDay, setRemindDueDay] = useState(true);
   const [eventId, setEventId] = useState(defaultEventId);
 
   function reset() {
@@ -271,6 +299,10 @@ function CreateTodoDialog({ members, events, defaultEventId }: { members: TeamMe
             onDueAtChange={setDueAt}
             assignedTo={assignedTo}
             onAssignedToChange={setAssignedTo}
+            remindDayBefore={remindDayBefore}
+            onRemindDayBeforeChange={setRemindDayBefore}
+            remindDueDay={remindDueDay}
+            onRemindDueDayChange={setRemindDueDay}
             errors={state.fieldErrors}
           />
           <DialogFooter>
@@ -296,6 +328,8 @@ function EditTodoDialog({ todo, members, events, timezone }: { todo: TodoRow; me
   const [description, setDescription] = useState(todo.description ?? "");
   const [dueAt, setDueAt] = useState(toDatetimeLocal(todo.due_at, timezone));
   const [assignedTo, setAssignedTo] = useState(assigneeValue(todo.assigned_to, todo.assigned_member_id));
+  const [remindDayBefore, setRemindDayBefore] = useState(todo.remind_day_before);
+  const [remindDueDay, setRemindDueDay] = useState(todo.remind_due_day);
   const [eventId, setEventId] = useState(todo.todo_event_id ?? "");
 
   function handleSubmit(formData: FormData) {
@@ -348,6 +382,10 @@ function EditTodoDialog({ todo, members, events, timezone }: { todo: TodoRow; me
             onDueAtChange={setDueAt}
             assignedTo={assignedTo}
             onAssignedToChange={setAssignedTo}
+            remindDayBefore={remindDayBefore}
+            onRemindDayBeforeChange={setRemindDayBefore}
+            remindDueDay={remindDueDay}
+            onRemindDueDayChange={setRemindDueDay}
             errors={state.fieldErrors}
           />
           <DialogFooter>

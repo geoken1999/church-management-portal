@@ -21,6 +21,8 @@ function readTodoFields(formData: FormData) {
     dueAt: String(formData.get("dueAt") ?? "").trim(),
     assignedTo: String(formData.get("assignedTo") ?? "").trim(),
     eventId: String(formData.get("eventId") ?? "").trim(),
+    remindDayBefore: formData.get("remindDayBefore") === "on",
+    remindDueDay: formData.get("remindDueDay") === "on",
   };
 }
 
@@ -120,6 +122,8 @@ export async function createTodo(_prevState: TodoFormState, formData: FormData):
     assigned_to: assignee.assigned_to,
     assigned_member_id: assignee.assigned_member_id,
     todo_event_id: fields.eventId || null,
+    remind_day_before: fields.remindDayBefore,
+    remind_due_day: fields.remindDueDay,
     created_by: user.id,
   });
 
@@ -184,6 +188,11 @@ export async function updateTodo(_prevState: TodoFormState, formData: FormData):
       assigned_to: assignee.assigned_to,
       assigned_member_id: assignee.assigned_member_id,
       todo_event_id: fields.eventId || null,
+      remind_day_before: fields.remindDayBefore,
+      remind_due_day: fields.remindDueDay,
+      // A new due date starts the reminders afresh.
+      day_before_sent_at: null,
+      last_reminder_sent_at: null,
     })
     .eq("id", id);
 

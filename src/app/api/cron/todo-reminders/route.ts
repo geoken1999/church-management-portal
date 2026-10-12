@@ -3,19 +3,17 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPushToUsers } from "@/lib/push/client";
 import { dateKeyInTimezone, DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 import { withCronLogging } from "@/lib/cron/run-logger";
+import { reminderFor, reminderText } from "@/lib/todos/reminders";
 
-// A generous upper bound covering any timezone's "end of today," so the
-// SQL filter below only needs to exclude todos nowhere near due yet — the
-// precise per-org "due today or overdue" check happens in JS once each
-// row's own org timezone is known (every org previously assumed
-// Asia/Kolkata here).
-const LOOKAHEAD_MS = 36 * 60 * 60 * 1000;
+// Looks far enough ahead to cover "due tomorrow" in any timezone; the precise
+// per-church date checks happen in reminderFor.
+const LOOKAHEAD_MS = 60 * 60 * 60 * 1000;
 
-// Vercel Cron on the Hobby plan only allows daily (not sub-daily)
-// schedules — see the long comment in event-reminders/route.ts. A once-a-
-// day digest is a good fit for "due today or overdue" (unlike "1 hour
-// before", there's no finer moment to aim for), sent once per to-do per
-// org-local calendar day via last_reminder_sent_at.
+// Once a day (see vercel.json): each pending to-do with a due date can send a
+// reminder the day before and/or on the due day (and each day it stays
+// overdue), as the person who made it chose. It goes to whoever it's assigned
+// to (a team login, or a leader with the app), or to its creator when nobody is.
+// The sent-on dates keep it to once a day per kind.
 async function run(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
@@ -27,12 +25,14 @@ async function run(request: Request) {
 
   const admin = createAdminClient();
   const now = new Date();
+  const dayLater = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
   const { data: todos } = await admin
     .from("todos")
-    .select("id, title, due_at, assigned_to, assigned_member_id, last_reminder_sent_at, organization_id, organizations(timezone)")
+    .select(
+      "id, title, due_at, assigned_to, assigned_member_id, created_by, remind_day_before, remind_due_day, last_reminder_sent_at, day_before_sent_at, organization_id, organizations(timezone)",
+    )
     .eq("status", "pending")
-    .or("assigned_to.not.is.null,assigned_member_id.not.is.null")
     .not("due_at", "is", null)
     .lte("due_at", new Date(now.getTime() + LOOKAHEAD_MS).toISOString());
 
@@ -43,29 +43,43 @@ async function run(request: Request) {
     if (!todo.due_at) continue;
     todosChecked += 1;
 
-    const organizationTimezone = (todo.organizations as { timezone: string } | null)?.timezone || DEFAULT_TIMEZONE;
-    const todayKey = dateKeyInTimezone(now, organizationTimezone);
-    const dueKey = dateKeyInTimezone(new Date(todo.due_at), organizationTimezone);
-    const overdue = new Date(todo.due_at) < now;
-    if (!overdue && dueKey !== todayKey) continue;
+    const timeZone = (todo.organizations as { timezone: string } | null)?.timezone || DEFAULT_TIMEZONE;
+    const todayKey = dateKeyInTimezone(now, timeZone);
+    const tomorrowKey = dateKeyInTimezone(dayLater, timeZone);
 
-    if (todo.last_reminder_sent_at && dateKeyInTimezone(new Date(todo.last_reminder_sent_at), organizationTimezone) === todayKey) continue;
+    const kind = reminderFor(
+      {
+        dueKey: dateKeyInTimezone(new Date(todo.due_at), timeZone),
+        overdue: new Date(todo.due_at) < now,
+        remindDayBefore: todo.remind_day_before,
+        remindDueDay: todo.remind_due_day,
+        lastDueReminderKey: todo.last_reminder_sent_at ? dateKeyInTimezone(new Date(todo.last_reminder_sent_at), timeZone) : null,
+        lastDayBeforeKey: todo.day_before_sent_at ? dateKeyInTimezone(new Date(todo.day_before_sent_at), timeZone) : null,
+      },
+      todayKey,
+      tomorrowKey,
+    );
+    if (!kind) continue;
 
-    // A to-do goes to a team login, or to a leader's own app account.
+    // A team login, a leader's own app login, or (nobody assigned) whoever made it.
     let recipient = todo.assigned_to;
     if (!recipient && todo.assigned_member_id) {
       const { data: leader } = await admin.from("members").select("auth_user_id").eq("id", todo.assigned_member_id).maybeSingle();
       recipient = leader?.auth_user_id ?? null;
     }
+    if (!recipient && !todo.assigned_to && !todo.assigned_member_id) recipient = todo.created_by;
     if (!recipient) continue;
 
     await sendPushToUsers([recipient], "todo_due_soon", {
-      title: overdue ? "To-do overdue" : "To-do due today",
+      title: reminderText(kind),
       body: todo.title,
       data: { type: "todo_due_soon" },
     });
 
-    await admin.from("todos").update({ last_reminder_sent_at: now.toISOString() }).eq("id", todo.id);
+    await admin
+      .from("todos")
+      .update(kind === "day_before" ? { day_before_sent_at: now.toISOString() } : { last_reminder_sent_at: now.toISOString() })
+      .eq("id", todo.id);
     remindersSent += 1;
   }
 

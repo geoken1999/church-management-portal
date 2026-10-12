@@ -885,6 +885,10 @@ export type Todo = {
   // Set by the daily /api/cron/todo-reminders digest after it notifies an
   // assignee — dedupes so the same to-do isn't re-notified on the same day.
   last_reminder_sent_at: string | null;
+  // Reminder choices (migration 0158): the day before the due date, and on it.
+  remind_day_before: boolean;
+  remind_due_day: boolean;
+  day_before_sent_at: string | null;
   created_at: string;
   updated_at: string;
 };

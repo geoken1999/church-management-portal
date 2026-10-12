@@ -17,6 +17,8 @@ export interface TodoInput {
   dueAt: string; // "YYYY-MM-DDTHH:mm" in the church's own time, or ""
   assignee: string; // "u:<auth user id>", "m:<leader member id>", or ""
   eventId: string;
+  remindDayBefore: boolean;
+  remindDueDay: boolean;
 }
 
 export type ServiceResult = { ok: true } | { ok: false; error: string };
@@ -91,6 +93,8 @@ export async function createTodoForMobile(organizationId: string, userId: string
     assigned_to: assignee.assigned_to,
     assigned_member_id: assignee.assigned_member_id,
     todo_event_id: input.eventId || null,
+    remind_day_before: input.remindDayBefore,
+    remind_due_day: input.remindDueDay,
     created_by: userId,
   });
   if (error) return { ok: false, error: "Couldn't add that to-do. Please try again." };
@@ -131,6 +135,10 @@ export async function updateTodoForMobile(organizationId: string, userId: string
       assigned_to: assignee.assigned_to,
       assigned_member_id: assignee.assigned_member_id,
       todo_event_id: input.eventId || null,
+      remind_day_before: input.remindDayBefore,
+      remind_due_day: input.remindDueDay,
+      day_before_sent_at: null,
+      last_reminder_sent_at: null,
     })
     .eq("id", id)
     .eq("organization_id", organizationId);

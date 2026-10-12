@@ -33,6 +33,8 @@ export async function POST(request: Request) {
     dueAt: text("dueAt"),
     assignee: text("assignee"),
     eventId: text("eventId"),
+    remindDayBefore: body.remindDayBefore === true,
+    remindDueDay: body.remindDueDay !== false,
   };
 
   if (action === "create") {

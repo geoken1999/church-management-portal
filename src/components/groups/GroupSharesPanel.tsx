@@ -66,7 +66,7 @@ export function GroupSharesPanel({
             <Megaphone className="size-5 text-primary" />
           </div>
           <div>
-            <p className="font-medium">Shared with the {GROUP_LABELS[groupKey]}</p>
+            <p className="font-medium">Announcement board: {GROUP_LABELS[groupKey]}</p>
             <p className="text-sm text-muted-foreground">
               Notes and links for everyone in this group. Members who use the mobile app see them under this group in their Space tab. {note}
             </p>
@@ -105,7 +105,7 @@ export function GroupSharesPanel({
         )}
 
         {posts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nothing shared with this group yet.</p>
+          <p className="text-sm text-muted-foreground">No announcements for this group yet.</p>
         ) : (
           <div className="divide-y divide-border">
             {posts.map((post) => (

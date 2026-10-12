@@ -6,7 +6,7 @@ import { KmeetGuestJoin } from "@/components/kmeet/KmeetGuestJoin";
 export async function generateMetadata({ params }: { params: Promise<{ meetingId: string }> }): Promise<Metadata> {
   const { meetingId } = await params;
   const meeting = await getPublicKmeetMeeting(meetingId, "audio");
-  return { title: meeting ? `${meeting.title} | K-Audio` : "Call not found | K-Audio" };
+  return { title: meeting ? `${meeting.title} | K-Connect` : "Call not found | K-Connect" };
 }
 
 // Public — anyone with the link can join, no KingdomFlow account needed

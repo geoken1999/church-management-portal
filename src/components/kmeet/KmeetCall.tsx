@@ -574,7 +574,7 @@ function CallView({
           <AlertDescription>Couldn&apos;t connect to the call: {connectionError}</AlertDescription>
         </Alert>
         <Button type="button" variant="outline" onClick={onLeft}>
-          Back to {audioOnly ? "K-Audio" : "K-Meet"}
+          Back to K-Connect
         </Button>
       </div>
     );

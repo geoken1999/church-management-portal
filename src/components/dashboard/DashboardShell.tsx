@@ -40,7 +40,6 @@ import {
   House,
   Compass,
   Webcam,
-  Headphones,
   ShieldCheck,
   Smartphone,
   ClipboardList,
@@ -124,8 +123,7 @@ const NAV_GROUPS = [
     groupKey: "tools" as const,
     items: [
       { href: "/dashboard/planner", itemKey: "planner" as const, icon: ClipboardList, tab: "planner" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/kmeet", itemKey: "kmeet" as const, icon: Webcam, tab: "kmeet" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/kaudio", itemKey: "kaudio" as const, icon: Headphones, tab: "kaudio" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/kconnect", itemKey: "kconnect" as const, icon: Webcam, tab: "kmeet" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/forms", itemKey: "forms" as const, icon: FileText, tab: "forms" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/folder", itemKey: "folder" as const, icon: FolderOpen, tab: "folder" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/attendance", itemKey: "attendance" as const, icon: ClipboardCheck, tab: "attendance" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
@@ -296,6 +294,9 @@ function DashboardShellInner({
     ...group,
     items: group.items.filter((item) => {
       if (item.managerOnly && !canManage) return false;
+      // K-Connect covers both video (kmeet) and audio (kaudio) calls: it shows if
+      // the person can read either.
+      if (item.href === "/dashboard/kconnect") return tabAccess.kmeet?.read || tabAccess.kaudio?.read;
       return !item.tab || tabAccess[item.tab]?.read;
     }),
   })).filter((group) => group.items.length > 0);
@@ -325,7 +326,8 @@ function DashboardShellInner({
         <div key={group.groupKey} className="flex flex-col gap-1">
           <p className="px-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{t.nav.groups[group.groupKey]}</p>
           {group.items.map((item) => {
-            const active = pathname === item.href;
+            // A call's own page (/dashboard/kmeet/<id>, /dashboard/kaudio/<id>) belongs to K-Connect too.
+            const active = pathname === item.href || (item.href === "/dashboard/kconnect" && (pathname.startsWith("/dashboard/kmeet") || pathname.startsWith("/dashboard/kaudio")));
             // A plan-gated item still links through to its page — that's
             // where the actual "upgrade to unlock" content lives — this
             // just signals it's locked rather than hiding it outright.

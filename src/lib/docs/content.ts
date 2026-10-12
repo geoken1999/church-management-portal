@@ -158,12 +158,12 @@ export const DOC_CATEGORIES: DocCategory[] = [
         ],
       },
       {
-        id: "kmeet-kaudio",
-        title: "K-Meet and K-Audio calls",
+        id: "kconnect",
+        title: "K-Connect calls",
         body: [
-          "K-Meet is a video call and K-Audio is an audio-only call. Both are started from their own pages in the dashboard, and you can invite people with a link, including people who aren't members.",
+          "K-Connect has video calls and audio-only calls, switched at the top of one page in the dashboard. You start or schedule either kind there, and you can invite people with a link, including people who aren't members.",
           "When someone is speaking, their call tile gets a border that blinks, so you can see who is talking at a glance. If your device has reduced motion turned on, the border stays steady instead of blinking.",
-          "Call length depends on your plan. On Starter, K-Meet calls end after 20 minutes and K-Audio calls after 30. On Growth, they end after 40 and 50 minutes. On Pro, calls have no time limit.",
+          "Call length depends on your plan. On Starter, video calls end after 20 minutes and audio calls after 30. On Growth, they end after 40 and 50 minutes. On Pro, calls have no time limit.",
         ],
       },
     ],

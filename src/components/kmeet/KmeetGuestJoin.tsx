@@ -42,7 +42,7 @@ export function KmeetGuestJoin({
             {title}
           </CardTitle>
           <CardDescription>
-            You&apos;ve been invited to a {mode === "audio" ? "K-Audio audio-only" : "K-Meet video"} call.
+            You&apos;ve been invited to a {mode === "audio" ? "K-Connect audio-only" : "K-Connect video"} call.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -9,7 +9,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createVideoSdkRoom } from "@/lib/kmeet/client";
 import { generateParticipantToken } from "@/lib/kmeet/token";
 import { isVideoSdkConfigured } from "@/lib/kmeet/env";
-import { tabKeyForMode, dashboardBasePathForMode } from "@/lib/kmeet/mode";
+import { tabKeyForMode, dashboardBasePathForMode, KCONNECT_PATH } from "@/lib/kmeet/mode";
 import { getPlanLimits } from "@/lib/plans/dal";
 import { kaudioMaxDurationMinutes, type PlanLimits } from "@/lib/plans/config";
 import { getSiteUrl } from "@/lib/site-url";
@@ -114,6 +114,7 @@ export async function scheduleMeetingAction(_prevState: KmeetFormState, formData
   }
 
   revalidatePath(dashboardBasePathForMode(mode));
+  revalidatePath(KCONNECT_PATH);
   revalidatePath("/dashboard/events");
   return { meetingId: meeting.id };
 }
@@ -160,6 +161,7 @@ export async function startInstantMeetingAction(title: string, requireAdmission:
   if (error || !data) return { error: "Couldn't start that meeting. Please try again." };
 
   revalidatePath(dashboardBasePathForMode(mode));
+  revalidatePath(KCONNECT_PATH);
   return { meetingId: data.id };
 }
 
@@ -333,6 +335,7 @@ export async function endMeetingAction(meetingId: string): Promise<void> {
     .eq("id", meetingId);
 
   revalidatePath(dashboardBasePathForMode(mode));
+  revalidatePath(KCONNECT_PATH);
 }
 
 export async function cancelMeetingAction(meetingId: string): Promise<void> {
@@ -349,4 +352,5 @@ export async function cancelMeetingAction(meetingId: string): Promise<void> {
   await supabase.from("kmeet_meetings").delete().eq("organization_id", organizationId).eq("id", meetingId);
 
   revalidatePath(dashboardBasePathForMode(mode));
+  revalidatePath(KCONNECT_PATH);
 }

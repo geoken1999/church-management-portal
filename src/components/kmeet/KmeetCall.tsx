@@ -401,7 +401,6 @@ function CallControls({
   useEffect(() => {
     chatOpenRef.current = chatOpen;
     localIdRef.current = localParticipant?.id;
-    if (chatOpen) setUnreadChat(0);
   }, [chatOpen, localParticipant?.id]);
   usePubSub("CHAT", {
     onMessageReceived: (message: { senderId?: string }) => {
@@ -436,7 +435,7 @@ function CallControls({
         {localScreenShareOn ? <ScreenShareOff className="size-4" /> : <ScreenShare className="size-4" />}
       </Button>
       <ReactionBar />
-      <Button type="button" variant={chatOpen ? "default" : "outline"} size="icon" onClick={onToggleChat} title={unreadChat > 0 ? `Chat (${unreadChat} new)` : "Chat"} className="relative">
+      <Button type="button" variant={chatOpen ? "default" : "outline"} size="icon" onClick={() => { setUnreadChat(0); onToggleChat(); }} title={unreadChat > 0 ? `Chat (${unreadChat} new)` : "Chat"} className="relative">
         <MessageSquare className="size-4" />
         {unreadChat > 0 && (
           <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-medium text-white">

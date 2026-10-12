@@ -36,6 +36,12 @@ describe("parseModuleInput", () => {
   it("rejects a bad id for a reference field", () => {
     expect(parseModuleInput(MODULES.ministries, { title: "Kids", managedBy: "nope" }, "create", today)).toEqual({ error: "Managed by isn't valid." });
   });
+  it("records an expense and keeps a category's type fixed once created", () => {
+    const input = { categoryId: id, amount: "250", expenseDate: today, paymentMethod: "cash", payee: "Sound Co" };
+    expect(parseModuleInput(MODULES.expenses, input, "create", today)).toMatchObject({ row: { amount: 250, payee: "Sound Co", category_id: id } });
+    expect(parseModuleInput(MODULES.accounting_categories, { name: "Rent", type: "expense" }, "update", today)).toEqual({ row: { name: "Rent" } });
+    expect(parseModuleInput(MODULES.accounting_categories, { name: "Rent", type: "other" }, "create", today)).toEqual({ error: "Type isn't valid." });
+  });
   it("knows its modules", () => {
     expect(isModuleKey("offerings")).toBe(true);
     expect(isModuleKey("users")).toBe(false);

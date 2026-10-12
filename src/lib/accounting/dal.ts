@@ -1,7 +1,9 @@
 import "server-only";
 
 import { cache } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/types/database";
 import { buildAccountingBuckets, bucketGranularityForRange, type DateRange } from "@/lib/accounting/period";
 
 export const getAccountingCategories = cache(async (organizationId: string) => {
@@ -85,8 +87,10 @@ export async function getAccountingSummary(
   organizationId: string,
   range: DateRange,
   branchId?: string,
+  // A client signed in as the person, for callers without a browser session (the staff app's API).
+  client?: SupabaseClient<Database>,
 ): Promise<AccountingSummary> {
-  const supabase = await createClient();
+  const supabase = client ?? (await createClient());
   const { gte, lte } = inRangeIso(range);
 
   let offeringsQuery = supabase
@@ -175,8 +179,8 @@ export interface LedgerResult {
   closingBalance: number;
 }
 
-async function fetchIncomeExpenseTotal(organizationId: string, before: string, branchId?: string): Promise<number> {
-  const supabase = await createClient();
+async function fetchIncomeExpenseTotal(organizationId: string, before: string, branchId?: string, client?: SupabaseClient<Database>): Promise<number> {
+  const supabase = client ?? (await createClient());
 
   let offeringsQuery = supabase.from("offerings").select("amount").eq("organization_id", organizationId).lt("collected_on", before);
   if (branchId) offeringsQuery = offeringsQuery.eq("branch_id", branchId);
@@ -193,8 +197,8 @@ async function fetchIncomeExpenseTotal(organizationId: string, before: string, b
   return income - expense;
 }
 
-export async function getLedgerEntries(organizationId: string, range: DateRange, branchId?: string): Promise<LedgerResult> {
-  const supabase = await createClient();
+export async function getLedgerEntries(organizationId: string, range: DateRange, branchId?: string, client?: SupabaseClient<Database>): Promise<LedgerResult> {
+  const supabase = client ?? (await createClient());
   const { gte, lte } = inRangeIso(range);
 
   let offeringsQuery = supabase
@@ -224,7 +228,7 @@ export async function getLedgerEntries(organizationId: string, range: DateRange,
     offeringsQuery,
     donationsQuery,
     expensesQuery,
-    fetchIncomeExpenseTotal(organizationId, range.start, branchId),
+    fetchIncomeExpenseTotal(organizationId, range.start, branchId, client),
   ]);
 
   const rows: Omit<LedgerEntry, "balance">[] = [

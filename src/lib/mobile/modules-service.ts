@@ -27,6 +27,9 @@ async function referencesBelong(spec: ModuleSpec, organizationId: string, row: R
     } else if (field.type === "branch") {
       const { data } = await admin.from("branches").select("id").eq("id", value).eq("organization_id", organizationId).maybeSingle();
       if (!data) return `${field.label} could not be found.`;
+    } else if (field.type === "category") {
+      const { data } = await admin.from("accounting_categories").select("id").eq("id", value).eq("organization_id", organizationId).maybeSingle();
+      if (!data) return `${field.label} could not be found.`;
     } else if (field.type === "fundraiser") {
       const { data } = await admin.from("fundraisers").select("id").eq("id", value).eq("organization_id", organizationId).maybeSingle();
       if (!data) return `${field.label} could not be found.`;

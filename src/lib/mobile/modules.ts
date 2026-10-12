@@ -5,7 +5,7 @@ import type { TabKey } from "@/lib/permissions/tabs";
 // permissions and rules as its web page. Pure (no database), so the rules are
 // testable; the mobile app mirrors the field lists in lib/data/module_specs.dart.
 
-export type FieldType = "text" | "longtext" | "date" | "amount" | "select" | "member" | "leader" | "branch" | "fundraiser";
+export type FieldType = "text" | "longtext" | "date" | "amount" | "select" | "member" | "leader" | "branch" | "fundraiser" | "category";
 
 export interface FieldSpec {
   key: string;
@@ -35,12 +35,38 @@ export interface ModuleSpec {
   crossCheck?: (row: Record<string, unknown>) => string | null;
 }
 
-export type ModuleKey = "ministries" | "worship" | "media" | "offerings" | "donations" | "fundraisers";
+export type ModuleKey = "ministries" | "worship" | "media" | "offerings" | "donations" | "fundraisers" | "expenses" | "accounting_categories";
 
 const DONATION_METHODS = ["cash", "check", "bank_transfer", "online", "other"];
 const FUNDRAISER_STATUSES = ["active", "completed", "cancelled"];
 
 export const MODULES: Record<ModuleKey, ModuleSpec> = {
+  expenses: {
+    key: "expenses",
+    tab: "accounting",
+    table: "expenses",
+    finance: true,
+    createdBy: "recorded_by",
+    fields: [
+      { key: "categoryId", column: "category_id", label: "Category", type: "category" },
+      { key: "branchId", column: "branch_id", label: "Branch", type: "branch" },
+      { key: "amount", column: "amount", label: "Amount", type: "amount", required: true },
+      { key: "payee", column: "payee", label: "Payee", type: "text", maxLength: 120 },
+      { key: "expenseDate", column: "expense_date", label: "Date", type: "date", required: true, noFuture: true },
+      { key: "paymentMethod", column: "payment_method", label: "Payment method", type: "select", options: DONATION_METHODS },
+      { key: "notes", column: "notes", label: "Notes", type: "longtext" },
+    ],
+  },
+  accounting_categories: {
+    key: "accounting_categories",
+    tab: "accounting",
+    table: "accounting_categories",
+    finance: true,
+    fields: [
+      { key: "name", column: "name", label: "Name", type: "text", required: true, minLength: 2, maxLength: 80 },
+      { key: "type", column: "type", label: "Type", type: "select", required: true, createOnly: true, options: ["income", "expense"] },
+    ],
+  },
   ministries: {
     key: "ministries",
     tab: "ministries",

@@ -966,6 +966,8 @@ export type NotificationPreferences = {
   church_announcement: boolean;
   group_post: boolean;
   special_day: boolean;
+  team_alert: boolean;
+  event_update: boolean;
   updated_at: string;
 };
 

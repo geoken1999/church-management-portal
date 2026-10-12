@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { pushToTeam } from "@/lib/push/team";
 import { validateMemberBasics, validateMemberDetails } from "@/lib/members/validation";
 
 export interface PublicJoinFormState {
@@ -111,6 +112,11 @@ export async function submitMemberRequest(
   // Their WhatsApp choice goes on the request just created (the join RPC
   // doesn't carry it). Best-effort: the request is already submitted.
   await recordJoinWhatsAppChoice(orgSlug, phone, formData.get("whatsappOptIn") === "on");
+
+  const { data: organization } = await createAdminClient().from("organizations").select("id").eq("slug", orgSlug).maybeSingle();
+  if (organization) {
+    await pushToTeam({ organizationId: organization.id, tab: "members", title: "New membership request", body: `${firstName.trim()} ${lastName.trim()} asked to join.`, link: "/dashboard/members" });
+  }
 
   return { success: true };
 }

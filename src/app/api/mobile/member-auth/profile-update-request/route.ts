@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { validateProposedChanges } from "@/lib/members/profile-update-requests";
 import type { MemberProposedChanges } from "@/types/database";
+import { pushToTeam } from "@/lib/push/team";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 
 // Called from the mobile app's My Details screen, once a member has
@@ -72,6 +73,14 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ ok: false, error: "Couldn't submit that change. Please try again." }, { status: 500 });
   }
+
+  await pushToTeam({
+    organizationId: member.organization_id,
+    tab: "members",
+    title: "Profile change to review",
+    body: `${member.first_name} ${member.last_name ?? ""}`.trim() + " asked to change their details.",
+    link: "/dashboard/members",
+  });
 
   return NextResponse.json({ ok: true });
 }

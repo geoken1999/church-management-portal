@@ -8,6 +8,8 @@ import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { validateEvent, type EventFieldErrors } from "@/lib/events/validation";
 import { sendPushToUsers } from "@/lib/push/client";
+import { notifyEventRegistrants } from "@/lib/push/event-registrants";
+import { describeEventChange, type EventSnapshot } from "@/lib/events/change-summary";
 import { zonedTimeToUtc, DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 import type { EventMeetingMode, EventRecurrenceFrequency, EventStatus } from "@/types/database";
 
@@ -112,15 +114,16 @@ export async function createEvent(_prevState: EventFormState, formData: FormData
     return { error: "Couldn't add that event. Please try again." };
   }
 
-  void notifyOrgOfNewEvent(organizationId, user.id, created.title);
+  await notifyOrgOfNewEvent(organizationId, user.id, created.title);
 
   revalidatePath(EVENTS_PATH);
   return { success: true };
 }
 
-// Fire-and-forget (the `void` at the call site) — a push failure shouldn't
-// turn a successful event creation into an error response for the admin
-// who just created it.
+// Awaited at the call site (a serverless function can be stopped once it has
+// responded, which would silently drop an un-awaited push). Sending is
+// best-effort and never throws, so a push failure can't turn a successful
+// event creation into an error for the admin who just created it.
 async function notifyOrgOfNewEvent(organizationId: string, creatorAuthUserId: string, eventTitle: string) {
   const admin = createAdminClient();
   const { data: members } = await admin
@@ -160,6 +163,8 @@ export async function updateEvent(_prevState: EventFormState, formData: FormData
   const organizationTimezone = await organizationTimezoneFor(organizationId);
 
   const supabase = await createClient();
+  const snapshotColumns = "title, start_at, end_at, venue, meeting_link, status";
+  const { data: before } = await supabase.from("events").select(snapshotColumns).eq("id", id).maybeSingle<EventSnapshot>();
   const { error } = await supabase
     .from("events")
     .update({
@@ -186,6 +191,13 @@ export async function updateEvent(_prevState: EventFormState, formData: FormData
     return { error: "Couldn't save those changes. Please try again." };
   }
 
+  // Registrants who use the app hear about a time/venue change or a cancellation.
+  if (before) {
+    const { data: after } = await supabase.from("events").select(snapshotColumns).eq("id", id).maybeSingle<EventSnapshot>();
+    const change = after ? describeEventChange(before, after) : null;
+    if (change) await notifyEventRegistrants(id, change.headline, change.detail);
+  }
+
   revalidatePath(EVENTS_PATH);
   return { success: true };
 }
@@ -204,6 +216,9 @@ export async function deleteEvent(formData: FormData) {
   // "member" role granted delete via the tab permissions matrix can still
   // perform it.
   const admin = createAdminClient();
+  // Registrants are removed with the event, so tell them first.
+  const { data: doomed } = await admin.from("events").select("title").eq("id", id).maybeSingle();
+  if (doomed) await notifyEventRegistrants(id, "Event cancelled", `${doomed.title} has been cancelled.`);
   await admin.from("events").delete().eq("id", id);
 
   revalidatePath(EVENTS_PATH);

@@ -42,8 +42,12 @@ async function run(request: Request) {
     for (const { member, kind } of findSpecialDays(members ?? [], todayKey)) {
       // Claim it first; the primary key rejects a second send for the year.
       const { error } = await admin.from("special_day_pushes").insert({ member_id: member.id, kind, year });
-      if (error) continue;
       matches += 1;
+      if (error) {
+        // Most often 23505: this member was already sent this one this year.
+        problems.push(`${member.first_name}: ${error.code === "23505" ? `already sent (${kind} ${year})` : `could not record send (${error.message})`}`);
+        continue;
+      }
 
       const message = specialDayMessage(kind, member.first_name, organization.name);
       const result = await sendPushToUsers([member.auth_user_id as string], "special_day", { ...message, data: { type: "special_day", kind } });

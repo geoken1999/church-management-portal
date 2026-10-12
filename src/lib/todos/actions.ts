@@ -128,7 +128,7 @@ export async function createTodo(_prevState: TodoFormState, formData: FormData):
   }
 
   if (assignee.pushTarget && assignee.pushTarget !== user.id) {
-    void sendPushToUsers([assignee.pushTarget], "todo_assigned", {
+    await sendPushToUsers([assignee.pushTarget], "todo_assigned", {
       title: event ? `New to-do for ${event.title}` : "New to-do assigned to you",
       body: fields.title,
       data: { type: "todo_assigned" },
@@ -192,7 +192,7 @@ export async function updateTodo(_prevState: TodoFormState, formData: FormData):
   }
 
   if (assignee.pushTarget && !unchangedAssignee && assignee.pushTarget !== user.id) {
-    void sendPushToUsers([assignee.pushTarget], "todo_assigned", {
+    await sendPushToUsers([assignee.pushTarget], "todo_assigned", {
       title: event ? `New to-do for ${event.title}` : "New to-do assigned to you",
       body: fields.title,
       data: { type: "todo_assigned" },

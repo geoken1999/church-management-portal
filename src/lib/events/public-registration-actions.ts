@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { pushToTeam } from "@/lib/push/team";
 import { sendRegistrationPassEmail } from "@/lib/events/registration-pass";
 import { sendPassWhatsAppForRegistration } from "@/lib/events/pass-whatsapp";
 import { eventVenueLabel, eventJoinLink } from "@/lib/events/location";
@@ -150,9 +151,14 @@ export async function registerForEvent(
   const admin = createAdminClient();
   const { data: event } = await admin
     .from("events")
-    .select("payment_required, payment_gateway, payment_amount, external_payment_url, payment_timing")
+    .select("id, title, organization_id, payment_required, payment_gateway, payment_amount, external_payment_url, payment_timing")
     .eq("registration_share_token", token)
     .maybeSingle();
+
+  if (event) {
+    const registrant = typeof answers.name === "string" && answers.name ? answers.name : "Someone";
+    await pushToTeam({ organizationId: event.organization_id, tab: "events", title: "New event registration", body: `${registrant} registered for ${event.title}.`, link: "/dashboard/events" });
+  }
 
   const paymentPending =
     Boolean(event?.payment_required) &&

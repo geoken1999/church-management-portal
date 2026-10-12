@@ -30,9 +30,9 @@ async function run(request: Request) {
 
   const { data: todos } = await admin
     .from("todos")
-    .select("id, title, due_at, assigned_to, last_reminder_sent_at, organization_id, organizations(timezone)")
+    .select("id, title, due_at, assigned_to, assigned_member_id, last_reminder_sent_at, organization_id, organizations(timezone)")
     .eq("status", "pending")
-    .not("assigned_to", "is", null)
+    .or("assigned_to.not.is.null,assigned_member_id.not.is.null")
     .not("due_at", "is", null)
     .lte("due_at", new Date(now.getTime() + LOOKAHEAD_MS).toISOString());
 
@@ -40,7 +40,7 @@ async function run(request: Request) {
   let todosChecked = 0;
 
   for (const todo of todos ?? []) {
-    if (!todo.assigned_to || !todo.due_at) continue;
+    if (!todo.due_at) continue;
     todosChecked += 1;
 
     const organizationTimezone = (todo.organizations as { timezone: string } | null)?.timezone || DEFAULT_TIMEZONE;
@@ -51,7 +51,15 @@ async function run(request: Request) {
 
     if (todo.last_reminder_sent_at && dateKeyInTimezone(new Date(todo.last_reminder_sent_at), organizationTimezone) === todayKey) continue;
 
-    await sendPushToUsers([todo.assigned_to], "todo_due_soon", {
+    // A to-do goes to a team login, or to a leader's own app account.
+    let recipient = todo.assigned_to;
+    if (!recipient && todo.assigned_member_id) {
+      const { data: leader } = await admin.from("members").select("auth_user_id").eq("id", todo.assigned_member_id).maybeSingle();
+      recipient = leader?.auth_user_id ?? null;
+    }
+    if (!recipient) continue;
+
+    await sendPushToUsers([recipient], "todo_due_soon", {
       title: overdue ? "To-do overdue" : "To-do due today",
       body: todo.title,
       data: { type: "todo_due_soon" },

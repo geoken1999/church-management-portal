@@ -72,3 +72,26 @@ export async function requireMobileTabAccess(
   }
   return { userId: userData.user.id };
 }
+
+// For routes any signed-in team member may use (like Support): verifies the
+// bearer session and that the person belongs to [organizationId], with no tab
+// permission involved (the web's Support page has none either).
+export async function requireMobileTeamMember(request: Request, organizationId: string): Promise<{ userId: string; token: string } | NextResponse> {
+  const authHeader = request.headers.get("authorization") ?? "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : null;
+  if (!token) return NextResponse.json({ ok: false, error: "Missing session." }, { status: 401 });
+  if (!organizationId) return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
+
+  const admin = createAdminClient();
+  const { data: userData, error } = await admin.auth.getUser(token);
+  if (error || !userData.user) return NextResponse.json({ ok: false, error: "That session could not be verified." }, { status: 401 });
+
+  const { data: staff } = await admin
+    .from("organization_members")
+    .select("auth_user_id")
+    .eq("organization_id", organizationId)
+    .eq("auth_user_id", userData.user.id)
+    .maybeSingle();
+  if (!staff) return NextResponse.json({ ok: false, error: "You don't have access to this organization." }, { status: 403 });
+  return { userId: userData.user.id, token };
+}

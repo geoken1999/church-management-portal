@@ -3,10 +3,12 @@ import "server-only";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { endIdleMeetings } from "@/lib/kmeet/idle";
 import { getEvents } from "@/lib/events/dal";
 import type { KmeetMode } from "@/types/database";
 
 export const getKmeetMeetings = cache(async (organizationId: string, mode: KmeetMode) => {
+  await endIdleMeetings(organizationId);
   const supabase = await createClient();
   const { data } = await supabase
     .from("kmeet_meetings")

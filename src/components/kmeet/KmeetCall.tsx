@@ -23,7 +23,7 @@ import {
   X,
   Headphones,
 } from "lucide-react";
-import { joinMeetingAction, joinMeetingAsGuestAction, endMeetingAction, toggleAdmissionModeAction } from "@/lib/kmeet/actions";
+import { joinMeetingAction, joinMeetingAsGuestAction, endMeetingAction, toggleAdmissionModeAction, kmeetHeartbeatAction } from "@/lib/kmeet/actions";
 import { publicBasePathForMode } from "@/lib/kmeet/mode";
 import type { KmeetMode } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -937,6 +937,16 @@ export function KmeetCall({ meetingId, mode = "video", title, alreadyEnded, canE
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meetingId, alreadyEnded]);
+
+  // Tell the server someone is here, so the call isn't ended as idle. Starts as
+  // soon as joining succeeds (the pre-join screen counts) and stops on leaving.
+  useEffect(() => {
+    if (!joinInfo || left) return;
+    const interval = setInterval(() => {
+      kmeetHeartbeatAction(meetingId).catch(() => {});
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [joinInfo, left, meetingId]);
 
   function handleLeft() {
     setLeft(true);

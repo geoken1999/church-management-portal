@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { endIdleMeetings } from "@/lib/kmeet/idle";
 import { getSiteUrl } from "@/lib/site-url";
 
 // The member app's "Live calls" card: the K-Connect calls (video and audio) that
@@ -22,6 +23,7 @@ export async function GET(request: Request) {
     .maybeSingle();
   if (!member || member.status !== "active") return NextResponse.json({ ok: true, calls: [] });
 
+  await endIdleMeetings(member.organization_id);
   const { data: meetings } = await admin
     .from("kmeet_meetings")
     .select("id, title, mode, started_at")

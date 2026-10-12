@@ -954,6 +954,9 @@ export type KmeetMeeting = {
   created_at: string;
   updated_at: string;
   ended_at: string | null;
+  // Last time anyone connected to the call reported in; a live call silent for
+  // 3 minutes is ended (migration 0161, kmeet/idle.ts).
+  last_active_at: string;
 };
 
 export type DevicePlatform = "ios" | "android";

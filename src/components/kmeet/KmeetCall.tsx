@@ -543,13 +543,17 @@ function CallView({
     if (micId) changeMic(micId).catch(() => {});
   }, [joined, cameraId, micId, changeWebcam, changeMic]);
 
+  // Requests already answered: a check still in flight may list them again before the
+  // answer has been saved, and they must not pop up a second time.
+  const answeredRef = useRef<Set<string>>(new Set());
+
   // People joining from the mobile app wait in our own waiting room (not the call
   // provider's), so hosts pick those requests up here.
   useEffect(() => {
     if (!isModerator) return;
     let cancelled = false;
     async function poll() {
-      const requests = await listEntryRequestsAction(meetingId).catch(() => []);
+      const requests = (await listEntryRequestsAction(meetingId).catch(() => [])).filter((r) => !answeredRef.current.has(r.id));
       if (cancelled) return;
       setPendingRequests((prev) => [
         ...prev.filter((r) => !r.participantId.startsWith("app:")),
@@ -557,10 +561,12 @@ function CallView({
           participantId: `app:${r.id}`,
           name: r.name,
           allow: () => {
+            answeredRef.current.add(r.id);
             answerEntryRequestAction(meetingId, r.id, true);
             setPendingRequests((p) => p.filter((x) => x.participantId !== `app:${r.id}`));
           },
           deny: () => {
+            answeredRef.current.add(r.id);
             answerEntryRequestAction(meetingId, r.id, false);
             setPendingRequests((p) => p.filter((x) => x.participantId !== `app:${r.id}`));
           },
@@ -568,7 +574,7 @@ function CallView({
       ]);
     }
     poll();
-    const interval = setInterval(poll, 3000);
+    const interval = setInterval(poll, 2000);
     return () => {
       cancelled = true;
       clearInterval(interval);

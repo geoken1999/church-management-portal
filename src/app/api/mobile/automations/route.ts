@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       const d = (body.destination ?? {}) as Record<string, unknown>;
       result = await upsertDestination(organizationId, {
         automationId: typeof d.automationId === "string" ? d.automationId : "",
-        kind: d.kind === "member_direct" ? "member_direct" : "staff_digest",
+        kind: d.kind === "direct_member" ? "direct_member" : "staff_digest",
         isActive: d.isActive !== false,
         recipientLeaderIds: Array.isArray(d.recipientLeaderIds) ? d.recipientLeaderIds.filter((x): x is string => typeof x === "string") : [],
         digestTemplateId: typeof d.digestTemplateId === "string" && d.digestTemplateId ? d.digestTemplateId : null,

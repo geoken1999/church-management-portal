@@ -3,13 +3,16 @@ import { requireMobileTabAccess } from "@/lib/mobile/staff-auth";
 import type { TabKey } from "@/lib/permissions/tabs";
 import {
   addFamilyMemberForMobile,
+  createCommitteeForMobile,
   createFamilyForMobile,
   createLeaderForMobile,
   createYouthForMobile,
+  deleteCommitteeForMobile,
   deleteFamilyForMobile,
   deleteLeaderForMobile,
   deleteYouthForMobile,
   removeFamilyMemberForMobile,
+  updateCommitteeForMobile,
   updateFamilyForMobile,
   updateFamilyMemberForMobile,
   updateLeaderForMobile,
@@ -19,7 +22,7 @@ import {
 
 // The staff mobile app's Leaders, Youth and Families changes. The same
 // permissions (per tab) and rules as the web pages.
-const TAB_FOR_KIND: Record<string, TabKey> = { leader: "leaders", youth: "youth", family: "families", family_member: "families" };
+const TAB_FOR_KIND: Record<string, TabKey> = { leader: "leaders", youth: "youth", family: "families", family_member: "families", committee: "committee" };
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -80,6 +83,15 @@ export async function POST(request: Request) {
       break;
     case "family_member:delete":
       result = await removeFamilyMemberForMobile(organizationId, id);
+      break;
+    case "committee:create":
+      result = await createCommitteeForMobile(organizationId, body);
+      break;
+    case "committee:update":
+      result = await updateCommitteeForMobile(organizationId, id, body);
+      break;
+    case "committee:delete":
+      result = await deleteCommitteeForMobile(organizationId, id);
       break;
   }
   return NextResponse.json(result.ok ? { ok: true, id: result.id } : { ok: false, error: result.error });

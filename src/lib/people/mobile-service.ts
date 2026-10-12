@@ -5,6 +5,7 @@ import { getOrgFeatureState } from "@/lib/plans/dal";
 import { validateLeader } from "@/lib/leaders/validation";
 import { validateYouth } from "@/lib/youth/validation";
 import { validateFamily, validateFamilyMember } from "@/lib/families/validation";
+import { validateCommitteeMember } from "@/lib/committee/validation";
 
 // The staff mobile app's Leaders, Youth and Families changes. The same rules as
 // the web's server actions (src/lib/{leaders,youth,families}/actions.ts), for a
@@ -23,7 +24,7 @@ async function memberBelongs(organizationId: string, memberId: string): Promise<
   return Boolean(data);
 }
 
-async function underCap(organizationId: string, tab: "leaders" | "youth" | "families", table: string): Promise<string | null> {
+async function underCap(organizationId: string, tab: "leaders" | "youth" | "families" | "committee", table: string): Promise<string | null> {
   const { featureCaps } = await getOrgFeatureState(organizationId);
   const cap = featureCaps[tab] ?? null;
   if (cap === null) return null;
@@ -161,4 +162,47 @@ export async function removeFamilyMemberForMobile(organizationId: string, id: st
   const admin = createAdminClient();
   const { error } = await admin.from("family_members").delete().eq("id", id).eq("organization_id", organizationId);
   return error ? fail("Couldn't remove that family member.") : { ok: true };
+}
+
+// --- Committee ---------------------------------------------------------------
+
+export async function createCommitteeForMobile(organizationId: string, f: Record<string, unknown>): Promise<PeopleResult> {
+  const memberId = clean(f.memberId);
+  const committeeName = clean(f.committeeName);
+  const role = clean(f.role);
+  const errors = validateCommitteeMember({ memberId, committeeName, role });
+  const firstError = errors.memberId ?? errors.committeeName ?? errors.role;
+  if (firstError) return fail(firstError);
+  if (!(await memberBelongs(organizationId, memberId))) return fail("That member could not be found.");
+  const capError = await underCap(organizationId, "committee", "committee_members");
+  if (capError) return fail(capError);
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("committee_members")
+    .insert({ organization_id: organizationId, member_id: memberId, committee_name: committeeName, role, notes: orNull(clean(f.notes)) });
+  return error ? fail("Couldn't add that committee member. Please try again.") : { ok: true };
+}
+
+// The person stays the same; their committee, role and notes can change.
+export async function updateCommitteeForMobile(organizationId: string, id: string, f: Record<string, unknown>): Promise<PeopleResult> {
+  const committeeName = clean(f.committeeName);
+  const role = clean(f.role);
+  const errors = validateCommitteeMember({ memberId: "x", committeeName, role });
+  const firstError = errors.committeeName ?? errors.role;
+  if (firstError) return fail(firstError);
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("committee_members")
+    .update({ committee_name: committeeName, role, notes: orNull(clean(f.notes)) })
+    .eq("id", id)
+    .eq("organization_id", organizationId);
+  return error ? fail("Couldn't save those changes. Please try again.") : { ok: true };
+}
+
+export async function deleteCommitteeForMobile(organizationId: string, id: string): Promise<PeopleResult> {
+  const admin = createAdminClient();
+  const { error } = await admin.from("committee_members").delete().eq("id", id).eq("organization_id", organizationId);
+  return error ? fail("Couldn't remove that committee member.") : { ok: true };
 }

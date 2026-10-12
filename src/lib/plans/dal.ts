@@ -3,6 +3,11 @@ import "server-only";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+// The plan and usage reads below use the admin client, scoped to the
+// organization id the caller already authorized. They used to read through the
+// request's cookie session, which the staff mobile app's bearer-token routes
+// don't have: the organization looked empty, so every church was treated as
+// being on the Basic plan with no add-ons or custom limits.
 import {
   isPlanId,
   resolvePlanLimits,
@@ -44,7 +49,7 @@ export interface PlanAccess {
 // subscription lapses), trial_ends_at decides whether the org still gets
 // Basic-tier access for free or has to subscribe.
 export const getPlanAccess = cache(async (organizationId: string): Promise<PlanAccess> => {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   // organization_subscriptions' RLS only allows admins to read it (see
   // migration 0043) — deliberately, so plain members can't see billing
   // details via the API. But *whether* the org has an active subscription
@@ -149,7 +154,7 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
     addonStorageBytes,
     addonAiCredits,
   } = await getPlanAccess(organizationId);
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
@@ -195,7 +200,7 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
       .gte("created_at", startOfMonth.toISOString()),
-    supabase.rpc("get_organization_storage_bytes", { target_org_id: organizationId }),
+    (await createClient()).rpc("get_organization_storage_bytes", { target_org_id: organizationId }),
     // The owner's own seat doesn't count against either added-members
     // limit — split by role so an exhausted admin cap can't be worked
     // around by adding more staff instead (see checkTeamMemberQuota).
@@ -399,7 +404,7 @@ export async function checkStorageQuota(organizationId: string, additionalBytes:
 export async function checkBranchQuota(organizationId: string): Promise<string | null> {
   const { plan } = await getPlanUsage(organizationId);
   if (plan.branchLimit === null) return null;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { count } = await supabase.from("branches").select("id", { count: "exact", head: true }).eq("organization_id", organizationId);
   if ((count ?? 0) >= plan.branchLimit) {
     return `Your ${plan.name} plan allows up to ${plan.branchLimit} branches. Remove one or upgrade your plan to add more.`;
@@ -410,7 +415,7 @@ export async function checkBranchQuota(organizationId: string): Promise<string |
 export async function checkMemberQuota(organizationId: string): Promise<string | null> {
   const { plan } = await getPlanUsage(organizationId);
   if (plan.memberLimit === null) return null;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { count } = await supabase.from("members").select("id", { count: "exact", head: true }).eq("organization_id", organizationId);
   if ((count ?? 0) >= plan.memberLimit) {
     return `Your ${plan.name} plan allows up to ${plan.memberLimit.toLocaleString()} members. Upgrade your plan to add more.`;
@@ -421,7 +426,7 @@ export async function checkMemberQuota(organizationId: string): Promise<string |
 export async function checkFormsQuota(organizationId: string): Promise<string | null> {
   const { plan } = await getPlanUsage(organizationId);
   if (plan.formsLimit === null) return null;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { count } = await supabase.from("forms").select("id", { count: "exact", head: true }).eq("organization_id", organizationId);
   if ((count ?? 0) >= plan.formsLimit) {
     return `Your ${plan.name} plan allows up to ${plan.formsLimit} forms. Remove one or upgrade your plan to add more.`;
@@ -435,7 +440,7 @@ export async function checkFormsQuota(organizationId: string): Promise<string | 
 export async function checkAutomationQuota(organizationId: string): Promise<string | null> {
   const { plan } = await getPlanUsage(organizationId);
   if (plan.automationLimit === null) return null;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { count } = await supabase
     .from("automations")
     .select("id", { count: "exact", head: true })
@@ -625,7 +630,7 @@ export async function recordAiReplyUsageForWebhook(
 // (every server action) and the nav. Cached per request like getPlanAccess.
 export const getOrgFeatureState = cache(
   async (organizationId: string): Promise<{ tabs: Record<TabKey, boolean>; featureCaps: Partial<Record<CappableTab, number | null>> }> => {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { data: org } = await supabase
       .from("organizations")
       .select("plan, custom_plan_limits")
@@ -645,7 +650,7 @@ export async function checkFeatureCap(organizationId: string, tab: CappableTab, 
   const { featureCaps } = await getOrgFeatureState(organizationId);
   const cap = featureCaps[tab] ?? null;
   if (cap === null) return null;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { count } = await supabase.from(table).select("id", { count: "exact", head: true }).eq("organization_id", organizationId);
   if ((count ?? 0) >= cap) {
     return `This church's plan allows up to ${cap} ${tab} entries. Remove one or contact us to raise the limit.`;

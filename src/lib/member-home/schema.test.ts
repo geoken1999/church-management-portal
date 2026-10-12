@@ -98,3 +98,13 @@ describe("hidden sections", () => {
     expect(sanitizeLayout({ version: 1, blocks: [{ ...newBlock("videos"), hidden: true }] }).error).toBeUndefined();
   });
 });
+
+describe("text cleaning", () => {
+  it("never leaves half an emoji at the end of a cut title", () => {
+    const title = "a".repeat(79) + "😀😀";
+    const result = sanitizeLayout({ version: 1, blocks: [{ ...newBlock("welcome"), title }] });
+    const stored = (result.layout?.blocks[0] as { title: string }).title;
+    expect(stored).toBe("a".repeat(79));
+    expect(() => JSON.parse(JSON.stringify(stored))).not.toThrow();
+  });
+});

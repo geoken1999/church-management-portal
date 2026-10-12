@@ -65,7 +65,11 @@ export async function saveHomeDraftAction(layout: HomeLayout): Promise<DesignStu
     { organization_id: actor.organizationId, status: "draft", layout: parsed.layout as unknown as Record<string, unknown>, updated_by: actor.userId, updated_at: new Date().toISOString() },
     { onConflict: "organization_id,status" },
   );
-  if (error) return { error: "Couldn't save your draft." };
+  if (error) {
+    console.error("member_home_layouts draft save failed:", error.message);
+    await logPlatformEvent({ level: "error", source: "platform_admin", message: `Member home draft save failed: ${error.message}`, organizationId: actor.organizationId });
+    return { error: `Couldn't save your draft (${error.message}).` };
+  }
 
   await removeUnusedBannerImages(actor.organizationId);
   revalidatePath(STUDIO_PATH);
@@ -92,7 +96,11 @@ export async function publishHomeLayoutAction(layout: HomeLayout): Promise<Desig
     ],
     { onConflict: "organization_id,status" },
   );
-  if (error) return { error: "Couldn't publish. Try again." };
+  if (error) {
+    console.error("member_home_layouts publish failed:", error.message);
+    await logPlatformEvent({ level: "error", source: "platform_admin", message: `Member home publish failed: ${error.message}`, organizationId: actor.organizationId });
+    return { error: `Couldn't publish (${error.message}). Try again.` };
+  }
 
   await logPlatformEvent({
     level: "info",

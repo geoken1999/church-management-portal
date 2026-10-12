@@ -106,8 +106,15 @@ function isHttpsUrl(value: string): boolean {
   }
 }
 
+// Trimmed and length-capped. Text is never cut in the middle of an emoji (a
+// half emoji is invalid text the database refuses to store), and control
+// characters are dropped.
 function str(value: unknown, max: number): string {
-  return typeof value === "string" ? value.trim().slice(0, max) : "";
+  if (typeof value !== "string") return "";
+  let text = value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "").trim().slice(0, max);
+  const last = text.charCodeAt(text.length - 1);
+  if (last >= 0xd800 && last <= 0xdbff) text = text.slice(0, -1);
+  return text.trim();
 }
 
 // Turns untrusted JSON into a clean layout, or says what's wrong. Unknown

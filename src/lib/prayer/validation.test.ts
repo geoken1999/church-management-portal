@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parsePrayerRequestInput, prayerNotificationBody, MAX_PRAYER_LENGTH } from "./validation";
+import { parsePrayerRequestInput, prayerNotificationBody, prayerWallNotice, MAX_PRAYER_LENGTH } from "./validation";
 
 describe("parsePrayerRequestInput", () => {
   it("accepts a normal request and trims it", () => {
@@ -28,5 +28,13 @@ describe("prayerNotificationBody", () => {
   it("names the member and never includes the request text", () => {
     expect(prayerNotificationBody("Ann Lee", "private")).toBe("Ann Lee shared a prayer request with the church team.");
     expect(prayerNotificationBody("Ann Lee", "shared")).toContain("with the church.");
+  });
+});
+
+describe("prayerWallNotice", () => {
+  it("names the person unless they are anonymous", () => {
+    expect(prayerWallNotice("Asha", false).body).toContain("Asha");
+    expect(prayerWallNotice("Asha", true).body).not.toContain("Asha");
+    expect(prayerWallNotice("", false).body).toBe("Someone shared a prayer request. Join in prayer.");
   });
 });

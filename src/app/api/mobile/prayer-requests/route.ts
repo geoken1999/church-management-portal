@@ -3,7 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createNotificationForWebhook } from "@/lib/notifications/create";
 import { sendPushToUsers } from "@/lib/push/client";
 import { normalizeTabPermissions } from "@/lib/permissions/tabs";
-import { MAX_PRAYER_REQUESTS_PER_DAY, parsePrayerRequestInput, prayerNotificationBody } from "@/lib/prayer/validation";
+import { MAX_PRAYER_REQUESTS_PER_DAY, parsePrayerRequestInput, prayerNotificationBody, prayerWallNotice } from "@/lib/prayer/validation";
+import { resolveAudienceAuthIds } from "@/lib/push/audience";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 
 // A member raising a prayer request from the mobile app. Goes through the
@@ -85,6 +86,16 @@ export async function POST(request: Request) {
       body: notificationBody,
       data: { type: "prayer_request", link: "/dashboard/prayer" },
     });
+
+    // A request shared with the whole church lands on the prayer wall, so every
+    // member with the app hears about it too (not the person who wrote it, and
+    // not the team again). A private one goes to the team only.
+    if (input.visibility === "shared") {
+      const alreadyNotified = new Set([...recipients, userData.user.id]);
+      const everyone = (await resolveAudienceAuthIds(member.organization_id, { type: "church" })).filter((id) => !alreadyNotified.has(id));
+      const notice = prayerWallNotice(member.first_name, input.isAnonymous);
+      await sendPushToUsers(everyone, "prayer_request", { ...notice, data: { type: "prayer_wall" } });
+    }
   } catch (err) {
     await logPlatformEvent({
       level: "warning",

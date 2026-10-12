@@ -31,6 +31,16 @@ export function parsePrayerRequestInput(raw: unknown): { input: PrayerRequestInp
 
 // The short line shown in the team's notification: the request itself would
 // be too long (and is sensitive), so just who and how it was shared.
+// The push every church member gets when a request is shared with the whole
+// church (it appears on the prayer wall). Never includes the request itself,
+// and never the name when the person chose to stay anonymous.
+export function prayerWallNotice(firstName: string, isAnonymous: boolean): { title: string; body: string } {
+  return {
+    title: "New prayer request",
+    body: isAnonymous || !firstName.trim() ? "Someone shared a prayer request. Join in prayer." : `${firstName.trim()} shared a prayer request. Join in prayer.`,
+  };
+}
+
 export function prayerNotificationBody(memberName: string, visibility: PrayerRequestVisibility): string {
   return `${memberName} shared a prayer request${visibility === "shared" ? " with the church" : " with the church team"}.`;
 }

@@ -6,6 +6,7 @@ import { validateLeader } from "@/lib/leaders/validation";
 import { validateYouth } from "@/lib/youth/validation";
 import { validateFamily, validateFamilyMember } from "@/lib/families/validation";
 import { validateCommitteeMember } from "@/lib/committee/validation";
+import { parseVolunteerStatus, validateVolunteer } from "@/lib/volunteers/validation";
 
 // The staff mobile app's Leaders, Youth and Families changes. The same rules as
 // the web's server actions (src/lib/{leaders,youth,families}/actions.ts), for a
@@ -24,7 +25,7 @@ async function memberBelongs(organizationId: string, memberId: string): Promise<
   return Boolean(data);
 }
 
-async function underCap(organizationId: string, tab: "leaders" | "youth" | "families" | "committee", table: string): Promise<string | null> {
+async function underCap(organizationId: string, tab: "leaders" | "youth" | "families" | "committee" | "volunteers", table: string): Promise<string | null> {
   const { featureCaps } = await getOrgFeatureState(organizationId);
   const cap = featureCaps[tab] ?? null;
   if (cap === null) return null;
@@ -205,4 +206,50 @@ export async function deleteCommitteeForMobile(organizationId: string, id: strin
   const admin = createAdminClient();
   const { error } = await admin.from("committee_members").delete().eq("id", id).eq("organization_id", organizationId);
   return error ? fail("Couldn't remove that committee member.") : { ok: true };
+}
+
+// --- Volunteers --------------------------------------------------------------
+
+export async function createVolunteerForMobile(organizationId: string, f: Record<string, unknown>): Promise<PeopleResult> {
+  const memberId = clean(f.memberId);
+  const input = { memberId, role: clean(f.role), team: clean(f.team), joinedOn: clean(f.joinedOn), status: clean(f.status) };
+  const errors = validateVolunteer(input);
+  const firstError = errors.memberId ?? errors.role ?? errors.joinedOn;
+  if (firstError) return fail(firstError);
+  if (!(await memberBelongs(organizationId, memberId))) return fail("That member could not be found.");
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("volunteers").insert({
+    organization_id: organizationId,
+    member_id: memberId,
+    role: input.role,
+    team: orNull(input.team),
+    joined_on: input.joinedOn || undefined,
+    status: parseVolunteerStatus(input.status),
+    notes: orNull(clean(f.notes)),
+  });
+  if (error) return fail(error.code === "23505" ? "That member is already a volunteer." : "Couldn't add that volunteer. Please try again.");
+  return { ok: true };
+}
+
+// The person stays the same; what they volunteer as, their team, status and notes can change.
+export async function updateVolunteerForMobile(organizationId: string, id: string, f: Record<string, unknown>): Promise<PeopleResult> {
+  const input = { memberId: "x", role: clean(f.role), team: clean(f.team), joinedOn: clean(f.joinedOn), status: clean(f.status) };
+  const errors = validateVolunteer(input);
+  const firstError = errors.role ?? errors.joinedOn;
+  if (firstError) return fail(firstError);
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("volunteers")
+    .update({ role: input.role, team: orNull(input.team), joined_on: input.joinedOn || undefined, status: parseVolunteerStatus(input.status), notes: orNull(clean(f.notes)) })
+    .eq("id", id)
+    .eq("organization_id", organizationId);
+  return error ? fail("Couldn't save those changes. Please try again.") : { ok: true };
+}
+
+export async function deleteVolunteerForMobile(organizationId: string, id: string): Promise<PeopleResult> {
+  const admin = createAdminClient();
+  const { error } = await admin.from("volunteers").delete().eq("id", id).eq("organization_id", organizationId);
+  return error ? fail("Couldn't remove that volunteer.") : { ok: true };
 }

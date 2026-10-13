@@ -13,6 +13,9 @@ import {
   deleteYouthForMobile,
   removeFamilyMemberForMobile,
   updateCommitteeForMobile,
+  createVolunteerForMobile,
+  deleteVolunteerForMobile,
+  updateVolunteerForMobile,
   updateFamilyForMobile,
   updateFamilyMemberForMobile,
   updateLeaderForMobile,
@@ -22,7 +25,7 @@ import {
 
 // The staff mobile app's Leaders, Youth and Families changes. The same
 // permissions (per tab) and rules as the web pages.
-const TAB_FOR_KIND: Record<string, TabKey> = { leader: "leaders", youth: "youth", family: "families", family_member: "families", committee: "committee" };
+const TAB_FOR_KIND: Record<string, TabKey> = { leader: "leaders", youth: "youth", family: "families", family_member: "families", committee: "committee", volunteer: "volunteers" };
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -92,6 +95,15 @@ export async function POST(request: Request) {
       break;
     case "committee:delete":
       result = await deleteCommitteeForMobile(organizationId, id);
+      break;
+    case "volunteer:create":
+      result = await createVolunteerForMobile(organizationId, body);
+      break;
+    case "volunteer:update":
+      result = await updateVolunteerForMobile(organizationId, id, body);
+      break;
+    case "volunteer:delete":
+      result = await deleteVolunteerForMobile(organizationId, id);
       break;
   }
   return NextResponse.json(result.ok ? { ok: true, id: result.id } : { ok: false, error: result.error });

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { AlignmentType, Document, HeadingLevel, ImageRun, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from "docx";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getMonthlyReport } from "@/lib/reports/monthly-dal";
-import { reportLabels, type MonthlyReportData, type MonthlySectionKey } from "@/lib/reports/monthly";
+import { fullDateIn, reportLabels, type MonthlyReportData, type MonthlySectionKey } from "@/lib/reports/monthly";
 
 const rupees = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 
@@ -49,7 +49,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   for (const line of [head?.address, [head?.phone, head?.email, head?.website].filter(Boolean).join("  ·  ")]) if (line) body.push(para(line, { size: 20, color: "666666", center: true }));
 
   body.push(new Paragraph({ heading: HeadingLevel.TITLE, spacing: { before: 300 }, children: [text(`${annual ? t.titleAnnual : t.titleMonthly}: ${data.label}`, { bold: true, size: 44 })] }));
-  body.push(para(`${data.branchName ? `${t.branch}: ${data.branchName}` : t.wholeChurch} · ${t.madeOn} ${new Date(data.generatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}`, { size: 20, color: "666666" }));
+  body.push(para(`${data.branchName ? `${t.branch}: ${data.branchName}` : t.wholeChurch} · ${t.madeOn} ${fullDateIn(data.generatedAt, data.language ?? "en")}`, { size: 20, color: "666666" }));
 
   if (data.narrative) {
     body.push(heading(t.summary));

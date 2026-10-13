@@ -145,6 +145,11 @@ export function dateLabelIn(iso: string, language: ReportLanguage): string {
   return new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString(localeOf(language), { day: "numeric", month: "short", timeZone: "UTC" });
 }
 
+// A full date (13 October 2026) in the report's language.
+export function fullDateIn(iso: string, language: ReportLanguage): string {
+  return new Date(iso).toLocaleDateString(localeOf(language), { day: "numeric", month: "long", year: "numeric" });
+}
+
 export function monthShortIn(period: string, language: ReportLanguage): string {
   const [year, month] = period.split("-").map(Number);
   return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString(localeOf(language), { month: "short", timeZone: "UTC" });

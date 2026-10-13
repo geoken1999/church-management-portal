@@ -5,7 +5,7 @@ import { getSupabaseEnv } from "./env";
 
 const PUBLIC_ROUTES = ["/login", "/signup"];
 const PUBLIC_PREFIXES = ["/auth"];
-const PROTECTED_PREFIXES = ["/dashboard", "/onboarding"];
+const PROTECTED_PREFIXES = ["/dashboard", "/onboarding", "/broadcast"];
 
 function isPublicRoute(pathname: string) {
   return (

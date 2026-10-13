@@ -84,3 +84,12 @@ describe("templates", () => {
     }
   });
 });
+
+describe("fullDateIn", () => {
+  it("writes the date in the report's language", async () => {
+    const { fullDateIn } = await import("@/lib/reports/monthly");
+    expect(fullDateIn("2026-10-13T08:00:00Z", "en")).toContain("October");
+    expect(fullDateIn("2026-10-13T08:00:00Z", "ta")).not.toContain("October");
+    expect(fullDateIn("2026-10-13T08:00:00Z", "hi")).not.toContain("October");
+  });
+});

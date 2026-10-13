@@ -1,5 +1,5 @@
 import type { MonthlyReportData } from "@/lib/reports/monthly";
-import { reportLabels } from "@/lib/reports/monthly";
+import { fullDateIn, reportLabels } from "@/lib/reports/monthly";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const rupees = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
@@ -48,7 +48,7 @@ export function MonthlyReportView({ data, note, photoUrl }: { data: MonthlyRepor
         <p className="text-sm text-muted-foreground">{annual ? t.titleAnnual : t.titleMonthly}</p>
         <h1 className="font-heading text-3xl font-bold tracking-tight">{data.label}</h1>
         <p className="text-xs text-muted-foreground">
-          {data.branchName ? `${t.branch}: ${data.branchName}` : t.wholeChurch} · {t.madeOn} {new Date(data.generatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+          {data.branchName ? `${t.branch}: ${data.branchName}` : t.wholeChurch} · {t.madeOn} {fullDateIn(data.generatedAt, data.language ?? "en")}
         </p>
       </div>
 

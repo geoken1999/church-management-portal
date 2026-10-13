@@ -56,6 +56,7 @@ export const hi: Dictionary = {
       todos: "कार्य सूची",
       planner: "योजनाकार",
       kconnect: "K-Connect",
+      livestream: "लाइव स्ट्रीम",
       askAura: "Ask Aura",
       aiRules: "AI नियम",
       automations: "ऑटोमेशन",

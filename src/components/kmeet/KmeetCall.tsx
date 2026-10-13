@@ -26,6 +26,7 @@ import {
 import { joinMeetingAction, joinMeetingAsGuestAction, endMeetingAction, toggleAdmissionModeAction, kmeetHeartbeatAction, listEntryRequestsAction, answerEntryRequestAction } from "@/lib/kmeet/actions";
 import { publicBasePathForMode } from "@/lib/kmeet/mode";
 import type { KmeetMode } from "@/types/database";
+import { GoLiveButton } from "@/components/livestream/GoLiveButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -381,6 +382,7 @@ function CallControls({
   chatOpen,
   onToggleChat,
   onLeft,
+  liveStreamId,
 }: {
   meetingId: string;
   audioOnly: boolean;
@@ -391,6 +393,7 @@ function CallControls({
   chatOpen: boolean;
   onToggleChat: () => void;
   onLeft: () => void;
+  liveStreamId?: string;
 }) {
   const { leave, end, toggleMic, toggleWebcam, toggleScreenShare, localMicOn, localWebcamOn, localScreenShareOn, localParticipant } = useMeeting();
 
@@ -443,7 +446,7 @@ function CallControls({
           </span>
         )}
       </Button>
-      <CopyInviteLinkButton meetingId={meetingId} audioOnly={audioOnly} />
+      {liveStreamId ? <GoLiveButton streamId={liveStreamId} /> : <CopyInviteLinkButton meetingId={meetingId} audioOnly={audioOnly} />}
       {isModerator && (
         <Button type="button" variant="outline" size="sm" onClick={onToggleAdmission} title="Toggle whether new joiners need to be admitted">
           {requireAdmission ? <ShieldAlert className="size-3.5" /> : <ShieldCheck className="size-3.5" />}
@@ -474,6 +477,7 @@ function CallView({
   cameraId,
   micId,
   onLeft,
+  liveStreamId,
 }: {
   meetingId: string;
   audioOnly: boolean;
@@ -485,6 +489,7 @@ function CallView({
   cameraId: string;
   micId: string;
   onLeft: () => void;
+  liveStreamId?: string;
 }) {
   const [joined, setJoined] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -700,6 +705,7 @@ function CallView({
           onToggleAdmission={handleToggleAdmission}
           chatOpen={chatOpen}
           onToggleChat={() => setChatOpen((v) => !v)}
+          liveStreamId={isModerator ? liveStreamId : undefined}
           onLeft={onLeft}
         />
       </div>
@@ -955,6 +961,8 @@ export interface KmeetCallProps {
   // call itself is identical either way.
   guestName?: string;
   backHref: string;
+  // Set when this room is the broadcast room of a live stream: the team sees Go live here.
+  liveStreamId?: string;
 }
 
 interface JoinInfo {
@@ -967,7 +975,7 @@ interface JoinInfo {
   maxDurationMinutes: number | null;
 }
 
-export function KmeetCall({ meetingId, mode = "video", title, alreadyEnded, canEnd, guestName, backHref }: KmeetCallProps) {
+export function KmeetCall({ meetingId, mode = "video", title, alreadyEnded, canEnd, guestName, backHref, liveStreamId }: KmeetCallProps) {
   const audioOnly = mode === "audio";
   const router = useRouter();
   const [joinInfo, setJoinInfo] = useState<JoinInfo | null>(null);
@@ -1063,6 +1071,7 @@ export function KmeetCall({ meetingId, mode = "video", title, alreadyEnded, canE
           cameraId={lobbyChoice.cameraId}
           micId={lobbyChoice.micId}
           onLeft={handleLeft}
+          liveStreamId={liveStreamId}
         />
       </MeetingProvider>
     </div>

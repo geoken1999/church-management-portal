@@ -181,6 +181,16 @@ export const DOC_CATEGORIES: DocCategory[] = [
           "In the KingdomFlow app, K-Connect calls run entirely inside the app — for your team, for members (a Live calls card can appear on their Home screen), and for guests who open an invite link. See \"Mobile Apps\" for how the app handles calls.",
         ],
       },
+      {
+        id: "livestream",
+        title: "Live stream",
+        body: [
+          "Tools → Live stream lets your church broadcast a service. Create a stream with a title, then choose how it looks: the layout (grid, spotlight or sidebar), quality (standard, HD or Full HD), wide or tall screen, and a dark or light look. You can also turn on recording, audio-only, live chat, and a notification to your members when you go live.",
+          "Open the broadcast room from the stream page, join with your camera and mic (anyone you let into the room is part of the broadcast), then press Go live. Members watch inside the KingdomFlow app, not in a browser, and can chat while they watch. You see how many are watching right now and the peak, and you can reply in the chat from the stream page.",
+          "To also stream to YouTube or Facebook, add the stream address and key from that platform when you create the stream. Press End stream when you finish; the stream also ends when the room has been empty for 3 minutes. If you turned recording on, the stream page can fetch the recording afterwards.",
+          "For members to see a Watch card on their Home screen, add the Live stream card in Mobile App → Design Studio. Live stream has its own Read, Write and Delete permission on the Team page.",
+        ],
+      },
     ],
   },
   {

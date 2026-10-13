@@ -1002,6 +1002,45 @@ export type Volunteer = {
   updated_at: string;
 };
 
+// A live broadcast from a K-Connect room that members watch in the app (migration 0170).
+export type LiveStreamStatus = "ready" | "live" | "ended";
+export type LiveStreamOutput = { name: string; url: string; streamKey: string };
+export type LiveStream = {
+  id: string;
+  organization_id: string;
+  meeting_id: string;
+  title: string;
+  description: string | null;
+  status: LiveStreamStatus;
+  layout: "GRID" | "SPOTLIGHT" | "SIDEBAR";
+  layout_priority: "SPEAKER" | "PIN";
+  orientation: "landscape" | "portrait";
+  theme: "DARK" | "LIGHT" | "DEFAULT";
+  quality: "low" | "med" | "high";
+  audio_only: boolean;
+  record: boolean;
+  rtmp_outputs: LiveStreamOutput[];
+  notify_members: boolean;
+  chat_enabled: boolean;
+  playback_url: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  peak_viewers: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+export type LiveStreamViewer = { stream_id: string; viewer_id: string; last_seen: string };
+export type LiveStreamMessage = {
+  id: string;
+  stream_id: string;
+  organization_id: string;
+  author_name: string;
+  author_kind: "member" | "host";
+  body: string;
+  created_at: string;
+};
+
 // Churches whose access has ended and are counting down to deletion (migration 0165).
 export type OrganizationRetention = {
   organization_id: string;
@@ -3116,6 +3155,24 @@ export type Database = {
         Row: MemberNotification;
         Insert: Partial<MemberNotification> & Pick<MemberNotification, "auth_user_id" | "category" | "title">;
         Update: Partial<MemberNotification>;
+        Relationships: [];
+      };
+      live_streams: {
+        Row: LiveStream;
+        Insert: Partial<LiveStream> & Pick<LiveStream, "organization_id" | "meeting_id" | "title">;
+        Update: Partial<LiveStream>;
+        Relationships: [];
+      };
+      live_stream_viewers: {
+        Row: LiveStreamViewer;
+        Insert: Partial<LiveStreamViewer> & Pick<LiveStreamViewer, "stream_id" | "viewer_id">;
+        Update: Partial<LiveStreamViewer>;
+        Relationships: [];
+      };
+      live_stream_messages: {
+        Row: LiveStreamMessage;
+        Insert: Partial<LiveStreamMessage> & Pick<LiveStreamMessage, "stream_id" | "organization_id" | "author_name" | "body">;
+        Update: Partial<LiveStreamMessage>;
         Relationships: [];
       };
       kmeet_entry_requests: {

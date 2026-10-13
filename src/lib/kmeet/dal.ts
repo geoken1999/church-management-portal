@@ -18,7 +18,10 @@ export const getKmeetMeetings = cache(async (organizationId: string, mode: Kmeet
     .order("scheduled_at", { ascending: true, nullsFirst: true })
     .order("created_at", { ascending: false });
 
-  return data ?? [];
+  // A live stream's own room is run from the Live stream page, not listed here.
+  const { data: streams } = await createAdminClient().from("live_streams").select("meeting_id").eq("organization_id", organizationId);
+  const streamRooms = new Set((streams ?? []).map((s) => s.meeting_id));
+  return (data ?? []).filter((m) => !streamRooms.has(m.id));
 });
 
 // Candidates for the "link to an event" picker when scheduling a meeting

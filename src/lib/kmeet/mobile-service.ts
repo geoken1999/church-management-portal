@@ -1,5 +1,6 @@
 import "server-only";
 
+import { endStreamsForMeetings } from "@/lib/livestream/service";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createVideoSdkRoom } from "@/lib/kmeet/client";
 import { isVideoSdkConfigured } from "@/lib/kmeet/env";
@@ -116,7 +117,8 @@ export async function startInstantMeeting(organizationId: string, userId: string
 
 export async function endMeeting(organizationId: string, id: string): Promise<MeetingResult> {
   const admin = createAdminClient();
-  const { error } = await admin.from("kmeet_meetings").update({ status: "ended", ended_at: new Date().toISOString() }).eq("organization_id", organizationId).eq("id", id);
+  const { data: ended, error } = await admin.from("kmeet_meetings").update({ status: "ended", ended_at: new Date().toISOString() }).eq("organization_id", organizationId).eq("id", id).select("id, room_id").maybeSingle();
+  if (ended) await endStreamsForMeetings([ended]);
   return error ? fail("Couldn't end that meeting.") : { ok: true };
 }
 

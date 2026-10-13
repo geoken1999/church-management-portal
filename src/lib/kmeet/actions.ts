@@ -9,6 +9,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createVideoSdkRoom } from "@/lib/kmeet/client";
 import { generateParticipantToken } from "@/lib/kmeet/token";
 import { isVideoSdkConfigured } from "@/lib/kmeet/env";
+import { endStreamsForMeetings } from "@/lib/livestream/service";
 import { answerEntry, listPendingEntries } from "@/lib/kmeet/entry";
 import { maxDurationMinutesForMode, participantPermissionsFor, resolveMeetingRoom } from "@/lib/kmeet/join";
 import { tabKeyForMode, dashboardBasePathForMode, KCONNECT_PATH } from "@/lib/kmeet/mode";
@@ -179,7 +180,9 @@ export async function joinMeetingAction(meetingId: string): Promise<JoinMeetingR
     .maybeSingle();
   if (!meeting) return { error: "That meeting could not be found." };
 
-  const tabKey = tabKeyForMode(meeting.mode);
+  // A live stream's broadcast room follows the Live stream permission.
+  const { data: stream } = await admin.from("live_streams").select("id").eq("meeting_id", meetingId).maybeSingle();
+  const tabKey = stream ? "livestream" : tabKeyForMode(meeting.mode);
   const access = await checkTabAccess(organizationId, tabKey, "read");
   if (!access.ok) return { error: access.message };
 
@@ -266,6 +269,8 @@ export async function endMeetingAction(meetingId: string): Promise<void> {
     .update({ status: "ended", ended_at: new Date().toISOString() })
     .eq("organization_id", organizationId)
     .eq("id", meetingId);
+  const { data: room } = await createAdminClient().from("kmeet_meetings").select("room_id").eq("id", meetingId).maybeSingle();
+  await endStreamsForMeetings([{ id: meetingId, room_id: room?.room_id ?? null }]);
 
   revalidatePath(dashboardBasePathForMode(mode));
   revalidatePath(KCONNECT_PATH);

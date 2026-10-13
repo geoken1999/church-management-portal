@@ -47,6 +47,7 @@ import {
   HandHeart,
   HandHelping,
   Wallet,
+  Radio,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { YouTubeIcon } from "@/components/icons/YouTubeIcon";
@@ -126,6 +127,7 @@ const NAV_GROUPS = [
     items: [
       { href: "/dashboard/planner", itemKey: "planner" as const, icon: ClipboardList, tab: "planner" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/kconnect", itemKey: "kconnect" as const, icon: Webcam, tab: "kmeet" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/livestream", itemKey: "livestream" as const, icon: Radio, tab: "livestream" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/forms", itemKey: "forms" as const, icon: FileText, tab: "forms" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/folder", itemKey: "folder" as const, icon: FolderOpen, tab: "folder" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/attendance", itemKey: "attendance" as const, icon: ClipboardCheck, tab: "attendance" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },

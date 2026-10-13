@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { ArrowDown, ArrowUp, Eye, EyeOff, Plus, Trash2, CalendarDays, Link2, Megaphone, Sparkles, ImageIcon, PlayCircle, Webcam } from "lucide-react";
+import { ArrowDown, ArrowUp, Eye, EyeOff, Plus, Trash2, CalendarDays, Link2, Megaphone, Sparkles, ImageIcon, PlayCircle, Webcam, Radio } from "lucide-react";
 import { saveHomeDraftAction, publishHomeLayoutAction, discardHomeDraftAction, uploadBannerImageAction, lookupYoutubeVideoAction } from "@/lib/member-home/actions";
 import { youtubeThumbnailUrl } from "@/lib/member-home/youtube";
 import { BannerCropDialog } from "@/components/mobile/BannerCropDialog";
@@ -43,6 +43,7 @@ const BLOCK_ICONS: Record<BlockType, typeof Sparkles> = {
   upcoming_events: CalendarDays,
   videos: PlayCircle,
   live_calls: Webcam,
+  live_stream: Radio,
 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -245,6 +246,17 @@ function BlockEditor({ block, onChange }: { block: HomeBlock; onChange: (next: H
           </Field>
           <p className="text-xs text-muted-foreground">
             A card appears here whenever a K-Connect video or audio call is live, with a Join button that opens the call inside the app. It stays out of the way when nothing is live.
+          </p>
+        </div>
+      );
+    case "live_stream":
+      return (
+        <div className="grid gap-3">
+          <Field label="Heading">
+            <Input value={block.title} maxLength={60} onChange={(e) => onChange({ ...block, title: e.target.value })} />
+          </Field>
+          <p className="text-xs text-muted-foreground">
+            A card appears here whenever your church goes live from Tools → Live stream, with a Watch button that plays the stream inside the app, with chat. It stays out of the way when nothing is live.
           </p>
         </div>
       );
@@ -472,6 +484,21 @@ function PhonePreview({ layout, organizationName, logoUrl }: { layout: HomeLayou
                       <p className="text-[10px] text-muted-foreground">Video call · live now</p>
                     </div>
                     <span className="rounded-md bg-primary px-2 py-1 text-[10px] font-medium text-primary-foreground">Join</span>
+                  </div>
+                </div>
+              );
+            case "live_stream":
+              return (
+                <div key={block.id} className="space-y-2">
+                  {block.title && <p className="text-sm font-semibold">{block.title}</p>}
+                  <div className="flex items-center justify-between rounded-lg border border-border p-2.5">
+                    <div>
+                      <p className="text-xs font-medium">Sunday service</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        <span className="font-semibold text-destructive">● LIVE</span> · 42 watching
+                      </p>
+                    </div>
+                    <span className="rounded-md bg-primary px-2 py-1 text-[10px] font-medium text-primary-foreground">Watch</span>
                   </div>
                 </div>
               );

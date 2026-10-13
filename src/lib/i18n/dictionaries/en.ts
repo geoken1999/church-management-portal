@@ -58,6 +58,7 @@ export const en = {
       todos: "To Do",
       planner: "Planner",
       kconnect: "K-Connect",
+      livestream: "Live stream",
       askAura: "Ask Aura",
       aiRules: "AI Rules",
       automations: "Automation",

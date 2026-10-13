@@ -56,6 +56,7 @@ export const ta: Dictionary = {
       todos: "செய்ய வேண்டியவை",
       planner: "திட்டமிடுபவர்",
       kconnect: "K-Connect",
+      livestream: "நேரலை",
       askAura: "Ask Aura",
       aiRules: "AI விதிகள்",
       automations: "ஆட்டோமேஷன்",

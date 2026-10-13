@@ -26,7 +26,7 @@ export interface BannerSlide {
   linkUrl: string;
 }
 
-export type BlockType = "banner" | "welcome" | "announcement" | "quick_links" | "upcoming_events" | "videos" | "live_calls";
+export type BlockType = "banner" | "welcome" | "announcement" | "quick_links" | "upcoming_events" | "videos" | "live_calls" | "live_stream";
 
 export const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   banner: "Banner",
@@ -36,6 +36,7 @@ export const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   upcoming_events: "Upcoming events",
   videos: "Videos",
   live_calls: "Live calls",
+  live_stream: "Live stream",
 };
 
 // Destinations a quick link can open that exist in the member app today.
@@ -70,7 +71,8 @@ export type HomeBlock =
   | { id: string; hidden?: boolean; type: "quick_links"; title: string; links: QuickLink[] }
   | { id: string; hidden?: boolean; type: "upcoming_events"; title: string; count: number }
   | { id: string; hidden?: boolean; type: "videos"; title: string; videos: VideoItem[] }
-  | { id: string; hidden?: boolean; type: "live_calls"; title: string };
+  | { id: string; hidden?: boolean; type: "live_calls"; title: string }
+  | { id: string; hidden?: boolean; type: "live_stream"; title: string };
 
 export interface HomeLayout {
   version: number;
@@ -99,6 +101,8 @@ export function newBlock(type: BlockType): HomeBlock {
       return { id, type, title: "Videos", videos: [] };
     case "live_calls":
       return { id, type, title: "Live now" };
+    case "live_stream":
+      return { id, type, title: "Live stream" };
   }
 }
 
@@ -235,6 +239,9 @@ export function sanitizeLayout(input: unknown, organizationId?: string): { layou
       }
       case "live_calls":
         blocks.push({ id, ...(hidden && { hidden }), type: "live_calls", title: str(block.title, 60) });
+        break;
+      case "live_stream":
+        blocks.push({ id, ...(hidden && { hidden }), type: "live_stream", title: str(block.title, 60) });
         break;
       default:
         return { error: "That layout isn't valid." };

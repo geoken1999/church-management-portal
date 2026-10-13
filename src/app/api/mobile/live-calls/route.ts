@@ -32,11 +32,15 @@ export async function GET(request: Request) {
     .order("started_at", { ascending: false })
     .limit(5);
 
+  // A live stream's own room isn't a call members join; they watch it as a stream.
+  const { data: streams } = await admin.from("live_streams").select("meeting_id").eq("organization_id", member.organization_id);
+  const streamRooms = new Set((streams ?? []).map((s) => s.meeting_id));
+
   const name = `${member.first_name} ${member.last_name}`.trim();
   const base = getSiteUrl();
   return NextResponse.json({
     ok: true,
-    calls: (meetings ?? []).map((m) => ({
+    calls: (meetings ?? []).filter((m) => !streamRooms.has(m.id)).map((m) => ({
       id: m.id,
       title: m.title,
       mode: m.mode,

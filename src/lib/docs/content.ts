@@ -443,6 +443,15 @@ export const DOC_CATEGORIES: DocCategory[] = [
         ],
       },
       {
+        id: "scheduled-campaigns",
+        title: "Scheduling an email, SMS or WhatsApp campaign",
+        body: [
+          "On the Email, SMS and WhatsApp pages, tick Send later above the Send button, pick a date and time, and the button becomes Schedule. The time is your church's own time zone (set in Church Profile). The campaign is saved exactly as you wrote it, with its recipients and, for email, its attachments.",
+          "Scheduled campaigns are listed on the same page under Scheduled, with their time and recipient count. Cancel one any time until it starts going out. It goes out within about 5 minutes of the chosen time, and you get a notification when it has been sent, or if it couldn't be.",
+          "Checks that depend on the moment of sending are made then, not when you schedule: your plan's monthly allowance, an approved WhatsApp template, and WhatsApp's limits on messages to a person. A campaign can only be sent if the person who scheduled it still has permission to send on that channel. Recipients are fixed when you schedule, so a member who joins later isn't included.",
+        ],
+      },
+      {
         id: "whatsapp",
         title: "WhatsApp campaigns and chat",
         body: [

@@ -7,6 +7,7 @@ import { MemberGroupsProvider } from "@/components/members/MemberGroups";
 import { getEmailCampaigns, getEmailSmtpSummary, isEmailAvailable, getLatestEmailSetupRequest } from "@/lib/email/dal";
 import { getPlanUsage } from "@/lib/plans/dal";
 import { EmailManager } from "@/components/email/EmailManager";
+import { getScheduledCampaigns } from "@/lib/scheduler/dal";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
 export const metadata: Metadata = {
@@ -58,6 +59,8 @@ export default async function EmailPage() {
 
       <MemberGroupsProvider groups={memberGroups}>
         <EmailManager
+          scheduled={await getScheduledCampaigns(organizationId, "email")}
+          timezone={membership.organization.timezone}
           canManage={canManage}
           canSend={membership.tabAccess.email.write}
           customSmtpEnabled={planUsage.plan.customSmtpEnabled}

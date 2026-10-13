@@ -4,7 +4,12 @@ import { ALL_GROUPS, GroupFilterSelect, inGroup, useMemberGroups } from "@/compo
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { MessageSquareText, Search, Send, TriangleAlert } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { sendBulkSmsAction } from "@/lib/sms/actions";
+import { scheduleCampaignAction } from "@/lib/scheduler/actions";
+import { SchedulePicker } from "@/components/scheduler/SchedulePicker";
+import { ScheduledCampaigns } from "@/components/scheduler/ScheduledCampaigns";
+import type { ScheduledCampaign } from "@/types/database";
 import { getSmsSegmentInfo, normalizePhoneNumber } from "@/lib/sms/validation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -210,6 +215,8 @@ function Composer({
   const [body, setBody] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [extraNumbers, setExtraNumbers] = useState("");
+  const [scheduleAt, setScheduleAt] = useState<string | null>(null);
+  const router = useRouter();
   const [result, setResult] = useState<{ error?: string; success?: string } | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -264,17 +271,25 @@ function Composer({
     formData.set("body", body);
     formData.set("recipients", JSON.stringify(recipients));
 
+    if (scheduleAt) {
+      formData.set("channel", "sms");
+      formData.set("scheduledAt", scheduleAt);
+    }
+
     startTransition(async () => {
-      const response = await sendBulkSmsAction(formData);
+      const response = scheduleAt ? await scheduleCampaignAction(formData) : await sendBulkSmsAction(formData);
       if (response.error) {
         setResult({ error: response.error });
         return;
       }
       setResult({
-        success: `Sent to ${response.sentCount} recipient${response.sentCount === 1 ? "" : "s"}${
-          response.failedCount ? ` (${response.failedCount} failed)` : ""
-        }.`,
+        success:
+          "scheduledLabel" in response
+            ? `Scheduled for ${response.scheduledLabel}.`
+            : `Sent to ${response.sentCount} recipient${response.sentCount === 1 ? "" : "s"}${response.failedCount ? ` (${response.failedCount} failed)` : ""}.`,
       });
+      setScheduleAt(null);
+      router.refresh();
       setBody("");
       setSelectedIds(new Set());
       setExtraNumbers("");
@@ -372,13 +387,15 @@ function Composer({
           />
         </div>
 
+        <SchedulePicker value={scheduleAt} onChange={setScheduleAt} disabled={disabled} />
+
         <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
           <p className="text-sm text-muted-foreground">
             {totalRecipients} recipient{totalRecipients === 1 ? "" : "s"} selected
           </p>
           <Button type="button" onClick={handleSend} disabled={!canSend || pending}>
             <Send className="size-4" />
-            {pending ? "Sending..." : "Send"}
+            {pending ? (scheduleAt ? "Scheduling..." : "Sending...") : scheduleAt ? "Schedule" : "Send"}
           </Button>
         </div>
       </CardContent>
@@ -440,6 +457,8 @@ export function SmsManager({
   branches,
   campaigns,
   orgCountryCode,
+  scheduled,
+  timezone,
 }: {
   canSend: boolean;
   smsAvailable: boolean;
@@ -448,6 +467,8 @@ export function SmsManager({
   branches: SmsBranchOption[];
   campaigns: SmsCampaignRow[];
   orgCountryCode: string | null;
+  scheduled: ScheduledCampaign[];
+  timezone: string;
 }) {
   return (
     <div className="space-y-6">
@@ -466,6 +487,7 @@ export function SmsManager({
           </CardContent>
         </Card>
       )}
+      <ScheduledCampaigns items={scheduled} timezone={timezone} />
       <SmsHistory campaigns={campaigns} />
     </div>
   );

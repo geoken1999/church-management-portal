@@ -4,6 +4,10 @@ import { CampaignFallbackButtons } from "@/components/whatsapp/CampaignFallbackB
 import { ALL_GROUPS, GroupFilterSelect, inGroup, useMemberGroups } from "@/components/members/MemberGroups";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { scheduleCampaignAction } from "@/lib/scheduler/actions";
+import { SchedulePicker } from "@/components/scheduler/SchedulePicker";
+import { ScheduledCampaigns } from "@/components/scheduler/ScheduledCampaigns";
+import type { ScheduledCampaign } from "@/types/database";
 import { MessageCircle, Search, Send, Sparkles, TriangleAlert, FileText, RefreshCw, Trash2, User } from "lucide-react";
 import {
   sendBulkWhatsAppAction,
@@ -16,7 +20,6 @@ import {
   refreshWhatsAppTemplateStatusAction,
   deleteWhatsAppTemplateAction,
   generateWhatsAppTemplateBodyAction,
-  type SendWhatsAppState,
   type TemplateFormState,
 } from "@/lib/whatsapp/actions";
 import { normalizePhoneNumber, countTemplateVariables, validateWhatsAppTemplatePlaceholders } from "@/lib/whatsapp/validation";
@@ -685,6 +688,8 @@ function Composer({
   const [placeholders, setPlaceholders] = useState<PlaceholderDraft[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [extraNumbers, setExtraNumbers] = useState("");
+  const [scheduleAt, setScheduleAt] = useState<string | null>(null);
+  const composerRouter = useRouter();
   const [result, setResult] = useState<{ error?: string; success?: string } | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -752,10 +757,23 @@ function Composer({
     formData.set("placeholderSpecs", JSON.stringify(placeholders.map(toPlaceholderSpec)));
     formData.set("recipients", JSON.stringify(recipients));
 
+    if (scheduleAt) {
+      formData.set("channel", "whatsapp");
+      formData.set("scheduledAt", scheduleAt);
+    }
+
     startTransition(async () => {
-      const response: SendWhatsAppState = await sendBulkWhatsAppAction(formData);
+      const response = scheduleAt ? await scheduleCampaignAction(formData) : await sendBulkWhatsAppAction(formData);
       if (response.error) {
         setResult({ error: response.error });
+        return;
+      }
+      if ("scheduledLabel" in response) {
+        setResult({ success: `Scheduled for ${response.scheduledLabel}.` });
+        setScheduleAt(null);
+        setSelectedIds(new Set());
+        setExtraNumbers("");
+        composerRouter.refresh();
         return;
       }
       setResult({ success: `Sent to ${response.sentCount} recipient${response.sentCount === 1 ? "" : "s"}${response.failedCount ? ` (${response.failedCount} failed)` : ""}${response.skippedCount ? `. ${response.skippedCount} skipped because WhatsApp is limiting marketing messages to them right now` : ""}.` });
@@ -880,11 +898,13 @@ function Composer({
           <RecipientPicker members={members} branches={branches} selectedIds={selectedIds} onToggle={toggle} disabled={disabled} onSelectAll={selectAll} extraNumbers={extraNumbers} onExtraNumbersChange={setExtraNumbers} orgCountryCode={orgCountryCode} />
         </div>
 
+        <SchedulePicker value={scheduleAt} onChange={setScheduleAt} disabled={!available} />
+
         <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
           <p className="text-sm text-muted-foreground">{totalRecipients} recipient{totalRecipients === 1 ? "" : "s"} selected</p>
           <Button type="button" onClick={handleSend} disabled={!canSend || pending}>
             <Send className="size-4" />
-            {pending ? "Sending..." : "Send"}
+            {pending ? (scheduleAt ? "Scheduling..." : "Sending...") : scheduleAt ? "Schedule" : "Send"}
           </Button>
         </div>
       </CardContent>
@@ -1187,6 +1207,8 @@ export function WhatsAppManager({
   campaigns,
   conversations,
   orgCountryCode,
+  scheduled,
+  timezone,
 }: {
   organizationId: string;
   canSend: boolean;
@@ -1199,6 +1221,8 @@ export function WhatsAppManager({
   campaigns: WhatsAppCampaignRow[];
   conversations: WhatsAppConversationRow[];
   orgCountryCode: string | null;
+  scheduled: ScheduledCampaign[];
+  timezone: string;
 }) {
   const approvedTemplates = templates.filter((t) => t.status === "approved");
 
@@ -1247,6 +1271,7 @@ export function WhatsAppManager({
                 </CardContent>
               </Card>
             )}
+            <ScheduledCampaigns items={scheduled} timezone={timezone} />
             <WhatsAppHistory campaigns={campaigns} canSend={canSend} />
           </div>
         </TabsPanel>

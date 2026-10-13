@@ -8,6 +8,7 @@ import { getSmsCampaigns, isSmsAvailable } from "@/lib/sms/dal";
 import { getPlanUsage } from "@/lib/plans/dal";
 import { resolvePhoneCountry } from "@/lib/sms/validation";
 import { SmsManager } from "@/components/sms/SmsManager";
+import { getScheduledCampaigns } from "@/lib/scheduler/dal";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
 export const metadata: Metadata = {
@@ -62,6 +63,8 @@ export default async function SmsPage() {
 
       <MemberGroupsProvider groups={memberGroups}>
         <SmsManager
+          scheduled={await getScheduledCampaigns(organizationId, "sms")}
+          timezone={membership.organization.timezone}
           canSend={membership.tabAccess.sms.write}
           smsAvailable={smsAvailable}
           smsRemaining={planUsage.smsRemaining}

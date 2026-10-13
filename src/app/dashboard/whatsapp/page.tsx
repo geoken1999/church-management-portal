@@ -14,6 +14,7 @@ import { WhatsAppFallbackCard } from "@/components/whatsapp/WhatsAppFallbackCard
 import { WhatsAppConnectionCard } from "@/components/whatsapp/WhatsAppConnectionCard";
 import { getSiteUrl } from "@/lib/site-url";
 import { WhatsAppManager } from "@/components/whatsapp/WhatsAppManager";
+import { getScheduledCampaigns } from "@/lib/scheduler/dal";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
 export const metadata: Metadata = {
@@ -86,6 +87,8 @@ export default async function WhatsAppPage() {
 
       <MemberGroupsProvider groups={memberGroups}>
         <WhatsAppManager
+          scheduled={await getScheduledCampaigns(organizationId, "whatsapp")}
+          timezone={membership.organization.timezone}
           organizationId={organizationId}
           canSend={membership.tabAccess.whatsapp.write}
           isOrgAdmin={isOrgAdmin}

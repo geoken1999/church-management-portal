@@ -1051,6 +1051,27 @@ export type LiveStreamAccess = {
   note: string | null;
   updated_at: string;
 };
+// A campaign saved to go out later (migration 0178).
+export type ScheduledCampaignChannel = "email" | "sms" | "whatsapp";
+export type ScheduledCampaignStatus = "scheduled" | "sending" | "sent" | "failed" | "cancelled";
+export type ScheduledAttachment = { path: string; filename: string; contentType: string | null; size: number };
+export type ScheduledCampaign = {
+  id: string;
+  organization_id: string;
+  channel: ScheduledCampaignChannel;
+  scheduled_at: string;
+  status: ScheduledCampaignStatus;
+  payload: Record<string, unknown>;
+  attachments: ScheduledAttachment[];
+  summary: string;
+  recipient_count: number;
+  result: { sentCount?: number; failedCount?: number; skippedCount?: number; error?: string } | null;
+  created_by: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+};
+
 // A WhatsApp message the system sent on its own, for idempotency and plan usage (migration 0175).
 export type WhatsAppNoticeKind = "fee_request" | "fee_reminder" | "followup_member" | "followup_leader";
 export type WhatsAppNotice = {
@@ -3215,6 +3236,12 @@ export type Database = {
         Row: LiveStreamAccess;
         Insert: Partial<LiveStreamAccess> & Pick<LiveStreamAccess, "organization_id">;
         Update: Partial<LiveStreamAccess>;
+        Relationships: [];
+      };
+      scheduled_campaigns: {
+        Row: ScheduledCampaign;
+        Insert: Partial<ScheduledCampaign> & Pick<ScheduledCampaign, "organization_id" | "channel" | "scheduled_at" | "payload">;
+        Update: Partial<ScheduledCampaign>;
         Relationships: [];
       };
       whatsapp_notice_log: {

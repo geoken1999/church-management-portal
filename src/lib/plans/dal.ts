@@ -143,6 +143,17 @@ export interface PlanUsage {
 // cache()-wrapped so the several call sites in one request (dashboard
 // usage card, email/sms availability checks, quota checks before
 // send/upload) share one set of queries instead of re-fetching per call.
+// Storage in use, which the database only reveals to a signed-in team member. Jobs that run on
+// their own (scheduled campaigns) have no one signed in; storage isn't part of what they check.
+async function storageBytesRpc(organizationId: string): Promise<{ data: number | null; error: unknown }> {
+  try {
+    const result = await (await createClient()).rpc("get_organization_storage_bytes", { target_org_id: organizationId });
+    return { data: result.data as number | null, error: result.error };
+  } catch {
+    return { data: 0, error: null };
+  }
+}
+
 export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUsage> => {
   const {
     plan,
@@ -200,7 +211,7 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
       .gte("created_at", startOfMonth.toISOString()),
-    (await createClient()).rpc("get_organization_storage_bytes", { target_org_id: organizationId }),
+    storageBytesRpc(organizationId),
     // The owner's own seat doesn't count against either added-members
     // limit — split by role so an exhausted admin cap can't be worked
     // around by adding more staff instead (see checkTeamMemberQuota).

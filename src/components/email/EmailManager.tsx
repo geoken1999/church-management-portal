@@ -3,6 +3,10 @@
 import { ALL_GROUPS, GroupFilterSelect, inGroup, useMemberGroups } from "@/components/members/MemberGroups";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { scheduleCampaignAction } from "@/lib/scheduler/actions";
+import { SchedulePicker } from "@/components/scheduler/SchedulePicker";
+import { ScheduledCampaigns } from "@/components/scheduler/ScheduledCampaigns";
+import type { ScheduledCampaign } from "@/types/database";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
@@ -504,6 +508,8 @@ function Composer({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [extraEmails, setExtraEmails] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [scheduleAt, setScheduleAt] = useState<string | null>(null);
+  const router = useRouter();
   const [attachmentError, setAttachmentError] = useState<string | undefined>();
   const [result, setResult] = useState<{ error?: string; success?: string } | null>(null);
   const [pending, startTransition] = useTransition();
@@ -605,17 +611,25 @@ function Composer({
     formData.set("recipients", JSON.stringify(recipientEmails));
     for (const file of attachments) formData.append("attachments", file);
 
+    if (scheduleAt) {
+      formData.set("channel", "email");
+      formData.set("scheduledAt", scheduleAt);
+    }
+
     startTransition(async () => {
-      const response = await sendBulkEmailAction(formData);
+      const response = scheduleAt ? await scheduleCampaignAction(formData) : await sendBulkEmailAction(formData);
       if (response.error) {
         setResult({ error: response.error });
         return;
       }
       setResult({
-        success: `Sent to ${response.sentCount} recipient${response.sentCount === 1 ? "" : "s"}${
-          response.failedCount ? ` (${response.failedCount} failed)` : ""
-        }.`,
+        success:
+          "scheduledLabel" in response
+            ? `Scheduled for ${response.scheduledLabel}.`
+            : `Sent to ${response.sentCount} recipient${response.sentCount === 1 ? "" : "s"}${response.failedCount ? ` (${response.failedCount} failed)` : ""}.`,
       });
+      setScheduleAt(null);
+      router.refresh();
       setSubject("");
       setSelectedIds(new Set());
       setExtraEmails("");
@@ -757,13 +771,15 @@ function Composer({
           <p className="text-xs text-muted-foreground">Up to {MAX_ATTACHMENTS} files, 5MB each.</p>
         </div>
 
+        <SchedulePicker value={scheduleAt} onChange={setScheduleAt} disabled={disabled} />
+
         <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
           <p className="text-sm text-muted-foreground">
             {totalRecipients} recipient{totalRecipients === 1 ? "" : "s"} selected
           </p>
           <Button type="button" onClick={handleSend} disabled={!canSend || pending}>
             <Send className="size-4" />
-            {pending ? "Sending..." : "Send"}
+            {pending ? (scheduleAt ? "Scheduling..." : "Sending...") : scheduleAt ? "Schedule" : "Send"}
           </Button>
         </div>
       </CardContent>
@@ -1120,6 +1136,8 @@ export function EmailManager({
   members,
   branches,
   campaigns,
+  scheduled,
+  timezone,
 }: {
   canManage: boolean;
   canSend: boolean;
@@ -1133,6 +1151,8 @@ export function EmailManager({
   members: EmailRecipientOption[];
   branches: EmailBranchOption[];
   campaigns: EmailCampaignRow[];
+  scheduled: ScheduledCampaign[];
+  timezone: string;
 }) {
   const router = useRouter();
   const refresh = () => router.refresh();
@@ -1178,6 +1198,8 @@ export function EmailManager({
           </CardContent>
         </Card>
       )}
+
+      <ScheduledCampaigns items={scheduled} timezone={timezone} />
 
       <EmailHistory campaigns={campaigns} />
     </div>

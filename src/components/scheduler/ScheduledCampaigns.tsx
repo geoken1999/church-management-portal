@@ -67,6 +67,9 @@ export function ScheduledCampaigns({ items, timezone }: { items: ScheduledCampai
                     {item.result.skippedCount ? `, ${item.result.skippedCount} skipped` : ""}.
                   </p>
                 )}
+                {item.status === "scheduled" && Date.parse(item.scheduled_at) < Date.now() - 15 * 60_000 && (
+                  <p className="text-xs text-amber-600">This is overdue. It will be sent as soon as the sender catches up. If it stays here, contact support.</p>
+                )}
                 {item.status === "failed" && item.result?.error && <p className="text-xs text-destructive">{item.result.error}</p>}
               </div>
               {item.status === "scheduled" && (

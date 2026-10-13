@@ -1700,6 +1700,8 @@ export type SupportTicket = {
   category: SupportTicketCategory;
   urgency: SupportTicketUrgency;
   status: SupportTicketStatus;
+  // Screenshots attached to the ticket (migration 0179): { path, name, size }.
+  attachments: { path: string; name: string; size: number }[];
   created_at: string;
   updated_at: string;
 };
@@ -1713,6 +1715,7 @@ export type SupportTicketMessage = {
   author_type: SupportTicketMessageAuthorType;
   author_id: string | null;
   body: string;
+  attachments: { path: string; name: string; size: number }[];
   created_at: string;
 };
 

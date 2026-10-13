@@ -3,6 +3,7 @@ import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
 import { getAllSupportTickets } from "@/lib/platform-admin/dal";
 import { TICKET_CATEGORY_LABELS, TICKET_URGENCY_LABELS } from "@/lib/support/validation";
 import { SupportTicketActions } from "@/components/platform-admin/SupportTicketActions";
+import { SupportAttachments } from "@/components/support/SupportImages";
 import { SupportTicketThread } from "@/components/platform-admin/SupportTicketThread";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -66,6 +67,7 @@ export default async function PlatformAdminSupportPage() {
                   <SupportTicketActions ticketId={ticket.id} status={ticket.status} />
                 </div>
                 <p className="text-sm text-muted-foreground">{ticket.description}</p>
+                <SupportAttachments items={ticket.attachments} />
                 <SupportTicketThread ticketId={ticket.id} messages={ticket.messages} />
               </CardContent>
             </Card>

@@ -15,6 +15,7 @@ import { WhatsAppConnectionCard } from "@/components/whatsapp/WhatsAppConnection
 import { getSiteUrl } from "@/lib/site-url";
 import { WhatsAppManager } from "@/components/whatsapp/WhatsAppManager";
 import { getScheduledCampaigns } from "@/lib/scheduler/dal";
+import { sendOverdueCampaignsInBackground } from "@/lib/scheduler/backstop";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
 export const metadata: Metadata = {
@@ -67,6 +68,8 @@ export default async function WhatsAppPage() {
     }));
 
   const branchOptions = branches.map((branch) => ({ id: branch.id, name: branch.name }));
+
+  await sendOverdueCampaignsInBackground(organizationId);
 
   return (
     <div className="space-y-8">

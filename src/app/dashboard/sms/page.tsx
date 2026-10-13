@@ -9,6 +9,7 @@ import { getPlanUsage } from "@/lib/plans/dal";
 import { resolvePhoneCountry } from "@/lib/sms/validation";
 import { SmsManager } from "@/components/sms/SmsManager";
 import { getScheduledCampaigns } from "@/lib/scheduler/dal";
+import { sendOverdueCampaignsInBackground } from "@/lib/scheduler/backstop";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
 export const metadata: Metadata = {
@@ -53,6 +54,8 @@ export default async function SmsPage() {
     }));
 
   const branchOptions = branches.map((branch) => ({ id: branch.id, name: branch.name }));
+
+  await sendOverdueCampaignsInBackground(organizationId);
 
   return (
     <div className="space-y-8">

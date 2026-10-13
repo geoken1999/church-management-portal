@@ -1,5 +1,7 @@
 import "server-only";
 
+import { withSignedUrls } from "@/lib/support/attachments";
+import type { SupportAttachment } from "@/lib/support/images";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sharedServiceNetAmount } from "@/lib/finance/fees";
 import { PLANS, isPlanId, resolvePlanLimits, type CustomPlanOverrides, type PlanLimits } from "@/lib/plans/config";
@@ -490,6 +492,7 @@ export interface SupportTicketMessageRow {
   authorType: "org" | "admin";
   authorName: string | null;
   body: string;
+  attachments: SupportAttachment[];
   createdAt: string;
 }
 
@@ -505,6 +508,7 @@ export interface SupportTicketRow {
   createdByName: string | null;
   createdByEmail: string | null;
   createdAt: string;
+  attachments: SupportAttachment[];
   messages: SupportTicketMessageRow[];
 }
 
@@ -521,8 +525,11 @@ export async function getAllSupportTickets(): Promise<SupportTicketRow[]> {
       .order("created_at", { ascending: true }),
   ]);
 
+  const signedTickets = await withSignedUrls(tickets ?? []);
+  const signedMessages = await withSignedUrls(messages ?? []);
+
   const messagesByTicket = new Map<string, SupportTicketMessageRow[]>();
-  for (const message of messages ?? []) {
+  for (const message of signedMessages) {
     const profile = message.profiles as { first_name: string; last_name: string } | null;
     const list = messagesByTicket.get(message.ticket_id) ?? [];
     list.push({
@@ -530,12 +537,13 @@ export async function getAllSupportTickets(): Promise<SupportTicketRow[]> {
       authorType: message.author_type,
       authorName: message.author_type === "admin" ? "KingdomFlow Support" : profile ? `${profile.first_name} ${profile.last_name}`.trim() : null,
       body: message.body,
+      attachments: message.attachments,
       createdAt: message.created_at,
     });
     messagesByTicket.set(message.ticket_id, list);
   }
 
-  return (tickets ?? []).map((ticket) => {
+  return signedTickets.map((ticket) => {
     const org = ticket.organizations as { name: string } | null;
     const profile = ticket.profiles as { first_name: string; last_name: string; email: string } | null;
     return {
@@ -550,6 +558,7 @@ export async function getAllSupportTickets(): Promise<SupportTicketRow[]> {
       createdByName: profile ? `${profile.first_name} ${profile.last_name}`.trim() : null,
       createdByEmail: profile?.email ?? null,
       createdAt: ticket.created_at,
+      attachments: ticket.attachments,
       messages: messagesByTicket.get(ticket.id) ?? [],
     };
   });

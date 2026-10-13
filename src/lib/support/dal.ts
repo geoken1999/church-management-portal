@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { withSignedUrls } from "@/lib/support/attachments";
 
 // Two queries grouped in JS rather than a nested select — same shape as
 // getForms/getFormResponses (src/lib/forms/dal.ts) — so each ticket's
@@ -21,14 +22,17 @@ export const getSupportTickets = cache(async (organizationId: string) => {
       .order("created_at", { ascending: true }),
   ]);
 
-  const messagesByTicket = new Map<string, NonNullable<typeof messages>>();
-  for (const message of messages ?? []) {
+  const signedTickets = await withSignedUrls(tickets ?? []);
+  const signedMessages = await withSignedUrls(messages ?? []);
+
+  const messagesByTicket = new Map<string, typeof signedMessages>();
+  for (const message of signedMessages) {
     const list = messagesByTicket.get(message.ticket_id) ?? [];
     list.push(message);
     messagesByTicket.set(message.ticket_id, list);
   }
 
-  return (tickets ?? []).map((ticket) => ({
+  return signedTickets.map((ticket) => ({
     ...ticket,
     messages: messagesByTicket.get(ticket.id) ?? [],
   }));

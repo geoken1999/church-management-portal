@@ -69,21 +69,22 @@ const CHANNEL_NAMES = { email: "email", sms: "SMS", whatsapp: "WhatsApp message"
 
 // Sends every scheduled campaign that has come due. Safe to run again and again: a campaign
 // is claimed (marked sending) before it goes out, so two overlapping runs never send it twice.
-export async function runDueCampaigns(admin: Admin, now: Date = new Date()): Promise<ScheduledRunResult> {
+export async function runDueCampaigns(admin: Admin, now: Date = new Date(), organizationId?: string): Promise<ScheduledRunResult> {
   const result: ScheduledRunResult = { due: 0, sent: 0, failed: 0, stuck: 0 };
 
   // One that has been "sending" far too long lost its run midway. It is not sent again (some
   // recipients may already have it), but marked failed so the church knows to check.
   const stuckCutoff = new Date(now.getTime() - STUCK_SENDING_MINUTES * 60_000).toISOString();
-  const { data: stuck } = await admin
+  const stuckQuery = admin
     .from("scheduled_campaigns")
     .update({ status: "failed", finished_at: now.toISOString(), result: { error: "The send was interrupted partway. Check the campaign history to see who received it." } })
     .eq("status", "sending")
-    .lt("started_at", stuckCutoff)
-    .select("id");
+    .lt("started_at", stuckCutoff);
+  const { data: stuck } = await (organizationId ? stuckQuery.eq("organization_id", organizationId) : stuckQuery).select("id");
   result.stuck = stuck?.length ?? 0;
 
-  const { data: due } = await admin.from("scheduled_campaigns").select("*").eq("status", "scheduled").lte("scheduled_at", now.toISOString()).order("scheduled_at", { ascending: true }).limit(BATCH);
+  const dueQuery = admin.from("scheduled_campaigns").select("*").eq("status", "scheduled").lte("scheduled_at", now.toISOString());
+  const { data: due } = await (organizationId ? dueQuery.eq("organization_id", organizationId) : dueQuery).order("scheduled_at", { ascending: true }).limit(BATCH);
   for (const candidate of (due ?? []) as ScheduledCampaign[]) {
     // Claim it: only one run wins this update.
     const { data: claimed } = await admin.from("scheduled_campaigns").update({ status: "sending", started_at: now.toISOString() }).eq("id", candidate.id).eq("status", "scheduled").select("*").maybeSingle();

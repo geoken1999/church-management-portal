@@ -8,6 +8,7 @@ import { getEmailCampaigns, getEmailSmtpSummary, isEmailAvailable, getLatestEmai
 import { getPlanUsage } from "@/lib/plans/dal";
 import { EmailManager } from "@/components/email/EmailManager";
 import { getScheduledCampaigns } from "@/lib/scheduler/dal";
+import { sendOverdueCampaignsInBackground } from "@/lib/scheduler/backstop";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
 export const metadata: Metadata = {
@@ -49,6 +50,8 @@ export default async function EmailPage() {
     }));
 
   const branchOptions = branches.map((branch) => ({ id: branch.id, name: branch.name }));
+
+  await sendOverdueCampaignsInBackground(organizationId);
 
   return (
     <div className="space-y-8">

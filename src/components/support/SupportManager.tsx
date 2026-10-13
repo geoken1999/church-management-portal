@@ -36,9 +36,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ErrorToast } from "@/components/ui/error-toast";
+import { imagesFromPaste, SupportAttachments, SupportImagePicker } from "@/components/support/SupportImages";
+import type { SupportAttachment } from "@/lib/support/images";
 
-type MessageRow = SupportTicketMessage & { profiles: { first_name: string; last_name: string } | null };
-type TicketRow = SupportTicket & { profiles: { first_name: string; last_name: string } | null; messages: MessageRow[] };
+type MessageRow = Omit<SupportTicketMessage, "attachments"> & { attachments: SupportAttachment[]; profiles: { first_name: string; last_name: string } | null };
+type TicketRow = Omit<SupportTicket, "attachments"> & { attachments: SupportAttachment[]; profiles: { first_name: string; last_name: string } | null; messages: MessageRow[] };
 
 const initialState: SupportTicketFormState = {};
 const messageInitialState: SupportTicketMessageState = {};
@@ -82,6 +84,7 @@ function MessageThread({ messages }: { messages: MessageRow[] }) {
             <span>{formatDateTime(message.created_at)}</span>
           </div>
           <p className="whitespace-pre-wrap">{message.body}</p>
+          <SupportAttachments items={message.attachments} />
         </div>
       ))}
     </div>
@@ -93,13 +96,17 @@ function ReplyForm({ ticketId, organizationId }: { ticketId: string; organizatio
   const [state, setState] = useState<SupportTicketMessageState>(messageInitialState);
   const [pending, startTransition] = useTransition();
   const [body, setBody] = useState("");
+  const [images, setImages] = useState<File[]>([]);
 
   function handleSubmit(formData: FormData) {
+    formData.delete("images");
+    for (const file of images) formData.append("images", file);
     startTransition(async () => {
       const result = await addSupportTicketMessage(state, formData);
       setState(result);
       if (result.success) {
         setBody("");
+        setImages([]);
         router.refresh();
       }
     });
@@ -116,9 +123,14 @@ function ReplyForm({ ticketId, organizationId }: { ticketId: string; organizatio
         onChange={(e) => setBody(e.target.value)}
         placeholder="Add a reply..."
         rows={2}
+        onPaste={(e) => {
+          const pasted = imagesFromPaste(e);
+          if (pasted.length > 0) setImages((prev) => [...prev, ...pasted].slice(0, 4));
+        }}
       />
+      <SupportImagePicker files={images} onChange={setImages} disabled={pending} />
       <div className="flex justify-end">
-        <Button type="submit" size="sm" disabled={pending || !body.trim()}>
+        <Button type="submit" size="sm" disabled={pending || (!body.trim() && images.length === 0)}>
           {pending ? "Sending..." : "Reply"}
           {!pending && <Send className="size-3.5" />}
         </Button>
@@ -133,14 +145,18 @@ function RaiseTicketDialog({ organizationId }: { organizationId: string }) {
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState<SupportTicketCategory>("technical");
   const [urgency, setUrgency] = useState<SupportTicketUrgency>("medium");
+  const [images, setImages] = useState<File[]>([]);
 
   function reset() {
     setState(initialState);
     setCategory("technical");
     setUrgency("medium");
+    setImages([]);
   }
 
   function handleSubmit(formData: FormData) {
+    formData.delete("images");
+    for (const file of images) formData.append("images", file);
     startTransition(async () => {
       const result = await createSupportTicket(state, formData);
       setState(result);
@@ -222,9 +238,14 @@ function RaiseTicketDialog({ organizationId }: { organizationId: string }) {
               rows={4}
               placeholder="What's happening, and what did you expect instead?"
               aria-invalid={Boolean(state.fieldErrors?.description)}
+              onPaste={(e) => {
+                const pasted = imagesFromPaste(e);
+                if (pasted.length > 0) setImages((prev) => [...prev, ...pasted].slice(0, 4));
+              }}
             />
             <FieldError id="description-error" message={state.fieldErrors?.description} />
           </div>
+          <SupportImagePicker files={images} onChange={setImages} disabled={pending} />
           <DialogFooter>
             <Button type="submit" disabled={pending}>
               {pending ? "Submitting..." : "Submit ticket"}
@@ -308,6 +329,7 @@ function TicketCard({ ticket, canDelete }: { ticket: TicketRow; canDelete: boole
           </div>
         </div>
         <p className="text-sm text-muted-foreground">{ticket.description}</p>
+        <SupportAttachments items={ticket.attachments} />
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <UserRound className="size-3.5" />

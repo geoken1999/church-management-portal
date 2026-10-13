@@ -2,7 +2,8 @@
 -- This works on any Vercel plan (Vercel's free plan can only run a job once a day).
 --
 -- Before running it, in the Supabase SQL editor:
---   1. Replace YOUR_SITE with the address of your live site, e.g. https://www.kingdomflow.in
+--   1. Replace YOUR_SITE with the exact address of your live site, with the www: https://www.kingdomflow.in
+--      (without www the site answers with a redirect, which this job does not follow, so nothing would send)
 --   2. Replace YOUR_CRON_SECRET with the value of CRON_SECRET from your Vercel environment variables.
 -- Keep this file's edited copy out of git: it holds a secret.
 

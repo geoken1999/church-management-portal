@@ -522,6 +522,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
         title: "Raising and replying to support tickets",
         body: [
           "Support → \"Raise a ticket\" if you run into a problem or have a question — set a category and urgency so it's easy to triage, and it's visible to your whole team, not just you.",
+          "Add a screenshot to a ticket or a reply with Add screenshot (up to 4 images, 5 MB each, JPEG, PNG, WebP or GIF), or copy a screenshot and paste it straight into the message box. It helps us see exactly what you see. Only your church's team and KingdomFlow support can view the images.",
           "Once raised, the conversation continues right on the ticket: reply to add more detail, and any reply from KingdomFlow support shows up in the same thread — you'll also get a notification (bell icon) and an email to your org's owner/admins when support replies.",
           "You (the ticket's creator) or an org admin can close a ticket once it's resolved, or reopen a closed one — support itself moves a ticket through \"In progress\" and \"Resolved\" as they work on it.",
         ],

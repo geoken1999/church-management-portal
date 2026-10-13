@@ -6,6 +6,8 @@ import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { validateSupportTicket, TICKET_URGENCIES } from "@/lib/support/validation";
 import { notifyPlatformAdmins } from "@/lib/platform-admin/notify";
+import { imageFilesFrom, removeSupportFiles, saveSupportImages } from "@/lib/support/attachments";
+import type { SupportAttachment } from "@/lib/support/images";
 import type { SupportTicketCategory, SupportTicketUrgency, SupportTicketStatus } from "@/types/database";
 
 const SUPPORT_PATH = "/dashboard/support";
@@ -37,6 +39,16 @@ export async function createSupportTicket(
     return { fieldErrors };
   }
 
+  // Screenshots, if any, are saved first so the ticket and its pictures stay together.
+  const membership = await requireOrganization();
+  let attachments: SupportAttachment[] = [];
+  const images = imageFilesFrom(formData);
+  if (images.length > 0) {
+    const saved = await saveSupportImages(membership.organization.id, images);
+    if ("error" in saved) return { error: saved.error };
+    attachments = saved.attachments.map(({ path, name, size }) => ({ path, name, size }));
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.from("support_tickets").insert({
     organization_id: organizationId,
@@ -45,16 +57,17 @@ export async function createSupportTicket(
     description: description.trim(),
     category: category as SupportTicketCategory,
     urgency,
+    attachments,
   });
 
   if (error) {
+    await removeSupportFiles(attachments.map((a) => a.path));
     return { error: "Couldn't raise that ticket. Please try again." };
   }
 
-  const membership = await requireOrganization();
   await notifyPlatformAdmins(
     `New support ticket: ${subject.trim()}`,
-    `<p><strong>${membership.organization.name}</strong> raised a new ${category} ticket (${urgency} urgency).</p><p>${description.trim()}</p>`,
+    `<p><strong>${membership.organization.name}</strong> raised a new ${category} ticket (${urgency} urgency).</p><p>${description.trim()}</p>${attachments.length > 0 ? `<p>${attachments.length} screenshot${attachments.length === 1 ? "" : "s"} attached. Open Super Admin → Support to see ${attachments.length === 1 ? "it" : "them"}.</p>` : ""}`,
   );
 
   revalidatePath(SUPPORT_PATH);
@@ -66,9 +79,16 @@ export async function deleteSupportTicket(formData: FormData) {
   const ticketId = String(formData.get("ticketId") ?? "");
 
   const supabase = await createClient();
+  // The screenshots on the ticket and its replies go with it (read before deleting; RLS limits what is readable).
+  const [{ data: ticket }, { data: replies }] = await Promise.all([
+    supabase.from("support_tickets").select("attachments").eq("id", ticketId).maybeSingle(),
+    supabase.from("support_ticket_messages").select("attachments").eq("ticket_id", ticketId),
+  ]);
+  const files = [...(ticket?.attachments ?? []), ...(replies ?? []).flatMap((r) => r.attachments ?? [])].map((a) => a.path);
   // RLS restricts this to the ticket's creator or an admin — a request
   // from anyone else simply deletes nothing rather than erroring.
-  await supabase.from("support_tickets").delete().eq("id", ticketId);
+  const { error } = await supabase.from("support_tickets").delete().eq("id", ticketId);
+  if (!error) await removeSupportFiles(files);
 
   revalidatePath(SUPPORT_PATH);
 }
@@ -103,10 +123,21 @@ export async function addSupportTicketMessage(
   const user = await requireUser();
   const ticketId = String(formData.get("ticketId") ?? "");
   const organizationId = String(formData.get("organizationId") ?? "");
-  const body = String(formData.get("body") ?? "").trim();
+  const images = imageFilesFrom(formData);
+  const typed = String(formData.get("body") ?? "").trim();
 
-  if (!body) {
-    return { error: "Write a message before sending." };
+  if (!typed && images.length === 0) {
+    return { error: "Write a message or add a screenshot before sending." };
+  }
+  // A reply that is only a picture still needs some text in the thread.
+  const body = typed || (images.length === 1 ? "(Screenshot attached)" : `(${images.length} screenshots attached)`);
+
+  const membership = await requireOrganization();
+  let attachments: SupportAttachment[] = [];
+  if (images.length > 0) {
+    const saved = await saveSupportImages(membership.organization.id, images);
+    if ("error" in saved) return { error: saved.error };
+    attachments = saved.attachments.map(({ path, name, size }) => ({ path, name, size }));
   }
 
   const supabase = await createClient();
@@ -116,16 +147,17 @@ export async function addSupportTicketMessage(
     author_type: "org",
     author_id: user.id,
     body,
+    attachments,
   });
 
   if (error) {
+    await removeSupportFiles(attachments.map((a) => a.path));
     return { error: "Couldn't send that reply. Please try again." };
   }
 
-  const membership = await requireOrganization();
   await notifyPlatformAdmins(
     `New reply on a support ticket from ${membership.organization.name}`,
-    `<p>${body}</p>`,
+    `<p>${body}</p>${attachments.length > 0 ? `<p>${attachments.length} screenshot${attachments.length === 1 ? "" : "s"} attached. Open Super Admin → Support to see ${attachments.length === 1 ? "it" : "them"}.</p>` : ""}`,
   );
 
   revalidatePath(SUPPORT_PATH);

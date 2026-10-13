@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { SupportTicketMessageRow } from "@/lib/platform-admin/dal";
 import { formatPlatformDateTime } from "@/lib/platform-admin/format";
 import { ErrorToast } from "@/components/ui/error-toast";
+import { SupportAttachments } from "@/components/support/SupportImages";
 
 const initialState: AddPlatformSupportReplyState = {};
 
@@ -44,6 +45,7 @@ export function SupportTicketThread({ ticketId, messages }: { ticketId: string; 
                 <span>{formatDateTime(message.createdAt)}</span>
               </div>
               <p className="whitespace-pre-wrap">{message.body}</p>
+              <SupportAttachments items={message.attachments} />
             </div>
           ))}
         </div>

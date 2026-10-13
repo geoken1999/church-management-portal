@@ -959,6 +959,19 @@ export type KmeetMeeting = {
   last_active_at: string;
 };
 
+// A notification in a person's own inbox in the app (migration 0163).
+export type MemberNotification = {
+  id: string;
+  auth_user_id: string;
+  category: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  button_label: string | null;
+  read_at: string | null;
+  created_at: string;
+};
+
 // Someone from the mobile app waiting to be let into a call (migration 0162).
 export type KmeetEntryRequest = {
   id: string;
@@ -2939,6 +2952,12 @@ export type Database = {
             referencedColumns: ["auth_user_id"];
           },
         ];
+      };
+      member_notifications: {
+        Row: MemberNotification;
+        Insert: Partial<MemberNotification> & Pick<MemberNotification, "auth_user_id" | "category" | "title">;
+        Update: Partial<MemberNotification>;
+        Relationships: [];
       };
       kmeet_entry_requests: {
         Row: KmeetEntryRequest;

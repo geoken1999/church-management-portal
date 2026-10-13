@@ -52,7 +52,6 @@ export interface PushResult {
 
 export async function sendPushToUsers(authUserIds: string[], category: PushCategory, payload: PushPayload): Promise<PushResult> {
   if (authUserIds.length === 0) return { skipped: "no_recipients", devices: 0, delivered: 0, failed: 0 };
-  if (!isPushConfigured()) return { skipped: "not_configured", devices: 0, delivered: 0, failed: 0 };
 
   const admin = createAdminClient();
 
@@ -68,6 +67,12 @@ export async function sendPushToUsers(authUserIds: string[], category: PushCateg
   );
   const recipients = authUserIds.filter((id) => !optedOut.has(id));
   if (recipients.length === 0) return { skipped: "opted_out", devices: 0, delivered: 0, failed: 0 };
+
+  // Everyone who is sent a notification also gets it in their in-app inbox
+  // (notification center), whether or not push is set up or the phone received it.
+  await saveToInboxes(recipients, category, payload);
+
+  if (!isPushConfigured()) return { skipped: "not_configured", devices: 0, delivered: 0, failed: 0 };
 
   const { data: tokenRows } = await admin.from("device_push_tokens").select("token, platform").in("auth_user_id", recipients);
   const batches = buildPushBatches(tokenRows ?? [], payload);
@@ -109,4 +114,18 @@ export async function sendPushToUsers(authUserIds: string[], category: PushCateg
     failed,
     error: firstError ? `${firstError.code}: ${firstError.message}` : undefined,
   };
+}
+
+// Best-effort: a failure to save to the inbox never stops the push itself.
+async function saveToInboxes(recipients: string[], category: PushCategory, payload: PushPayload): Promise<void> {
+  try {
+    const admin = createAdminClient();
+    const link = typeof payload.data?.link === "string" && payload.data.link ? payload.data.link : null;
+    const buttonLabel = typeof payload.data?.buttonLabel === "string" && payload.data.buttonLabel ? payload.data.buttonLabel : null;
+    await admin.from("member_notifications").insert(
+      recipients.map((authUserId) => ({ auth_user_id: authUserId, category, title: payload.title, body: payload.body, link, button_label: buttonLabel })),
+    );
+  } catch (error) {
+    console.error("saveToInboxes failed", error);
+  }
 }

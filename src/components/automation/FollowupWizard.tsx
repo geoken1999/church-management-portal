@@ -42,6 +42,8 @@ const DEFAULTS: FollowupFormInput = {
   assigneeUserId: "",
   dueWorkingDays: 2,
   priority: "normal",
+  whatsappMember: true,
+  whatsappLeader: true,
 };
 
 export function FollowupWizard({ automationId, initial, branches, assignees, timezone }: FollowupWizardProps) {
@@ -289,9 +291,23 @@ export function FollowupWizard({ automationId, initial, branches, assignees, tim
                   </select>
                 </div>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Nothing is sent to the member. The assignee gets a To Do task and a notification that doesn&apos;t name anyone.
-              </p>
+              <div className="space-y-2">
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="checkbox" className="mt-1 size-4" checked={form.whatsappLeader ?? false} onChange={(e) => update("whatsappLeader", e.target.checked)} />
+                  <span>
+                    WhatsApp the assignee when new tasks are waiting
+                    <span className="block text-xs text-muted-foreground">Their phone number comes from their profile. The message says how many tasks, and doesn&apos;t name anyone.</span>
+                  </span>
+                </label>
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="checkbox" className="mt-1 size-4" checked={form.whatsappMember ?? false} onChange={(e) => update("whatsappMember", e.target.checked)} />
+                  <span>
+                    Send the member a caring &quot;we missed you&quot; message on WhatsApp
+                    <span className="block text-xs text-muted-foreground">Sent once, when their task is created. Members who opted out of WhatsApp are skipped. Needs the WhatsApp template to be approved for your church.</span>
+                  </span>
+                </label>
+              </div>
+              <p className="text-sm text-muted-foreground">The assignee always gets a To Do task and an in-app notification that doesn&apos;t name anyone.</p>
             </>
           )}
 
@@ -304,7 +320,7 @@ export function FollowupWizard({ automationId, initial, branches, assignees, tim
               <Summary label="Assigned to" value={assigneeName} />
               <Summary label="Due" value={`${form.dueWorkingDays} working day${form.dueWorkingDays === 1 ? "" : "s"} after the task is created`} />
               <Summary label="Priority" value={form.priority} />
-              <Summary label="Member messages" value="None. Tasks only." />
+              <Summary label="WhatsApp" value={[form.whatsappMember ? "the member" : null, form.whatsappLeader ? "the assignee" : null].filter(Boolean).join(" and ") || "None. Tasks only."} />
             </dl>
           )}
 

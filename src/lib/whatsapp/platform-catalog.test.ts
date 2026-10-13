@@ -33,3 +33,23 @@ describe("WhatsApp placement rules", () => {
     }
   });
 });
+
+describe("the new fee and follow-up templates", () => {
+  const keys = ["membership_fee_request", "membership_fee_reminder", "followup_member", "followup_leader"];
+  for (const key of keys) {
+    const t = PLATFORM_TEMPLATE_CATALOG.find((x) => x.key === key);
+    it(`${key} is well formed for WhatsApp`, () => {
+      expect(t).toBeDefined();
+      if (!t) return;
+      expect(variableCountOf(t.body)).toBe(t.examples.length);
+      // WhatsApp refuses a body that starts or ends with a variable.
+      expect(/^\s*\{\{/.test(t.body)).toBe(false);
+      expect(/\}\}\s*$/.test(t.body)).toBe(false);
+      expect(t.name).toMatch(/^kf_[a-z_]+$/);
+    });
+  }
+  it("has unique names", () => {
+    const names = PLATFORM_TEMPLATE_CATALOG.map((t) => t.name);
+    expect(new Set(names).size).toBe(names.length);
+  });
+});

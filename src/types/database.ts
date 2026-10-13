@@ -1048,6 +1048,19 @@ export type LiveStreamAccess = {
   note: string | null;
   updated_at: string;
 };
+// A WhatsApp message the system sent on its own, for idempotency and plan usage (migration 0175).
+export type WhatsAppNoticeKind = "fee_request" | "fee_reminder" | "followup_member" | "followup_leader";
+export type WhatsAppNotice = {
+  id: string;
+  organization_id: string;
+  kind: WhatsAppNoticeKind;
+  ref_id: string;
+  recipient: string;
+  status: "sent" | "failed" | "skipped";
+  wamid: string | null;
+  error: string | null;
+  created_at: string;
+};
 export type LiveStreamViewer = { stream_id: string; viewer_id: string; last_seen: string };
 export type LiveStreamMessage = {
   id: string;
@@ -3185,6 +3198,12 @@ export type Database = {
         Row: LiveStreamAccess;
         Insert: Partial<LiveStreamAccess> & Pick<LiveStreamAccess, "organization_id">;
         Update: Partial<LiveStreamAccess>;
+        Relationships: [];
+      };
+      whatsapp_notice_log: {
+        Row: WhatsAppNotice;
+        Insert: Partial<WhatsAppNotice> & Pick<WhatsAppNotice, "organization_id" | "kind" | "ref_id" | "recipient">;
+        Update: Partial<WhatsAppNotice>;
         Relationships: [];
       };
       live_stream_viewers: {

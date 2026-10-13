@@ -20,6 +20,10 @@ export interface FollowupConfig {
   // Working days (Mon-Fri) from task creation to its due date.
   dueWorkingDays: number;
   priority: TodoPriority;
+  // Also send a WhatsApp "we missed you" to each member a task is made for, and a WhatsApp
+  // to the assignee that new tasks are waiting. Both off unless switched on.
+  whatsappMember: boolean;
+  whatsappLeader: boolean;
 }
 
 export interface FollowupConfigErrors {
@@ -44,6 +48,8 @@ export function readFollowupConfig(raw: Record<string, unknown>): FollowupConfig
     assigneeUserId: raw.assigneeUserId,
     dueWorkingDays: raw.dueWorkingDays,
     priority,
+    whatsappMember: raw.whatsappMember === true,
+    whatsappLeader: raw.whatsappLeader === true,
   };
 }
 

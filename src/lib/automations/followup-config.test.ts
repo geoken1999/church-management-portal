@@ -55,7 +55,7 @@ describe("readFollowupConfig", () => {
   };
 
   it("reads a stored config", () => {
-    expect(readFollowupConfig(STORED)).toEqual(STORED);
+    expect(readFollowupConfig(STORED)).toEqual({ ...STORED, whatsappMember: false, whatsappLeader: false });
   });
 
   it("returns null when a required field is missing", () => {
@@ -71,5 +71,16 @@ describe("readFollowupConfig", () => {
 
   it("keeps a valid list of branch ids", () => {
     expect(readFollowupConfig({ ...STORED, branchIds: ["a", "b"] })?.branchIds).toEqual(["a", "b"]);
+  });
+});
+
+describe("readFollowupConfig WhatsApp options", () => {
+  const base = { requiredConsecutive: 3, runWeekday: 1, assigneeUserId: "u", dueWorkingDays: 2, priority: "normal" };
+  it("keeps older automations off WhatsApp", () => {
+    expect(readFollowupConfig(base)).toMatchObject({ whatsappMember: false, whatsappLeader: false });
+  });
+  it("reads the switches", () => {
+    expect(readFollowupConfig({ ...base, whatsappMember: true, whatsappLeader: true })).toMatchObject({ whatsappMember: true, whatsappLeader: true });
+    expect(readFollowupConfig({ ...base, whatsappMember: "yes" })).toMatchObject({ whatsappMember: false });
   });
 });

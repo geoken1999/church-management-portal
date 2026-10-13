@@ -237,7 +237,14 @@ export const getPlanUsage = cache(async (organizationId: string): Promise<PlanUs
     (membershipRemindersSent ?? 0) +
     (membershipReceiptsSent ?? 0);
   const smsSentThisMonth = (smsCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0);
-  const whatsappSentThisMonth = (whatsappCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0);
+  // Fee requests and follow-up messages sent on WhatsApp on their own count like campaign messages.
+  const { count: whatsappNoticesSent } = await supabase
+    .from("whatsapp_notice_log")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("status", "sent")
+    .gte("created_at", startOfMonth.toISOString());
+  const whatsappSentThisMonth = (whatsappCampaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0) + (whatsappNoticesSent ?? 0);
   const aiRepliesSentThisMonth = aiRepliesCount ?? 0;
   const storageBytesUsed = storageBytes ?? 0;
   const additionalAdmins = adminCount ?? 0;

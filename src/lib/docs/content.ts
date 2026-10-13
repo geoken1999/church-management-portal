@@ -281,9 +281,10 @@ export const DOC_CATEGORIES: DocCategory[] = [
         id: "automation-member-followup",
         title: "Member follow-up: tasks for members who have stopped coming",
         body: [
-          "Member follow-up creates a To Do task for a leader when a member has been absent for a set number of Sundays in a row (2 to 12, default 3). Nothing is sent to the member. The task is assigned to the person you choose, and it's due in the number of working days you set.",
+          "Member follow-up creates a To Do task for a leader when a member has been absent for a set number of Sundays in a row (2 to 12, default 3). The task is assigned to the person you choose, and it's due in the number of working days you set.",
           "A Sunday only counts if its register was marked complete. On the attendance session, use Mark register complete once the register is final. Sundays that aren't marked complete are skipped, not counted as absences.",
           "Each member has at most one open task per automation. When that task is completed, the next missed run can create a new one. The assignee is notified without the member's name.",
+          "On the Action step you can also use WhatsApp, with two separate switches. WhatsApp the assignee sends them a short message that new follow-up tasks are waiting (how many, never who), using the phone number on their profile. Send the member a caring \"we missed you\" message sends each member a WhatsApp once, when their task is created; members who opted out of WhatsApp are skipped. Both need the WhatsApp templates \"We missed you\" and \"Follow-up tasks for a leader\" to be approved for your church, and they count towards your monthly WhatsApp allowance. Automations made before this started with both off.",
           "You choose the branches and the weekday the check runs on. Activate it from the automation page, and pause it there at any time.",
         ],
       },
@@ -408,7 +409,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
         title: "Monthly membership fees",
         body: [
           "Membership fees ask each active member for a fixed monthly amount, by email, with a payment link. Set it up from Donation, then Membership fees: turn it on, enter the monthly amount, and choose the day of the month the requests go out (1 to 28) and how many days later a reminder is sent to anyone still unpaid.",
-          "On that day, every active member with an email address on file gets their own payment link. Members pay through Razorpay's secure checkout, and get a receipt by email as soon as the payment goes through. Members without an email address can't be sent a link, and are listed as \"No email on file\" in the report.",
+          "On that day, every active member with an email address on file gets their own payment link. Members pay through Razorpay's secure checkout, and get a receipt by email as soon as the payment goes through. Members without an email address can't be sent a link, and are listed as \"No email on file\" in the report. The request and the reminder also go out on WhatsApp, to every member with a phone number, with the same payment link, as long as the WhatsApp templates \"Membership fee request\" and \"Membership fee reminder\" are approved for your church. Each WhatsApp message counts towards your monthly WhatsApp allowance. Members with only a phone number get the WhatsApp message alone.",
           "Payments go through KingdomFlow's shared Razorpay account, so a 2.5% transaction fee applies, the same as for shared-service Fund Raisers. Members who join after the request day are billed from the following month.",
           "The monthly report shows what was expected, collected and is still outstanding, with each member's status and when their request was sent. Export it to CSV from the same page.",
           "The collected amount, less the fee, is paid out to you on request. Save your UPI or bank details in your organization settings first, then use Request payout on the Membership fees page. Payouts are processed manually on our end, so they aren't instant.",

@@ -23,6 +23,8 @@ export interface FollowupFormInput {
   assigneeUserId: string;
   dueWorkingDays: number;
   priority: string;
+  whatsappMember?: boolean;
+  whatsappLeader?: boolean;
 }
 
 export type FollowupFieldErrors = FollowupConfigErrors & { name?: string; branchIds?: string };
@@ -76,6 +78,8 @@ function toConfig(input: FollowupFormInput) {
     assigneeUserId: input.assigneeUserId,
     dueWorkingDays: input.dueWorkingDays,
     priority: input.priority,
+    whatsappMember: input.whatsappMember === true,
+    whatsappLeader: input.whatsappLeader === true,
   };
 }
 

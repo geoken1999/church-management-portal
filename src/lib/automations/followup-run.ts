@@ -7,6 +7,7 @@ import { readFollowupConfig, type FollowupConfig } from "@/lib/automations/follo
 import { partsInTimezone, zonedTimeToUtc, DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 import { sendPushToUsers } from "@/lib/push/client";
 import { logPlatformEvent } from "@/lib/platform-events/log";
+import { sendCatalogNotice } from "@/lib/whatsapp/catalog-send";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -137,6 +138,7 @@ async function runEvaluation(
   timeZone: string,
 ): Promise<void> {
   const organizationId = automation.organization_id;
+  const { data: org } = await admin.from("organizations").select("name, country").eq("id", organizationId).maybeSingle();
 
   // The assignee must still belong to the organization. A removed staff
   // member stops the run with a clear error instead of creating orphan tasks.
@@ -197,7 +199,7 @@ async function runEvaluation(
   while (true) {
     let memberQuery = admin
       .from("members")
-      .select("id, branch_id")
+      .select("id, branch_id, first_name, phone")
       .eq("organization_id", organizationId)
       .eq("status", "active")
       .order("id", { ascending: true })
@@ -209,6 +211,7 @@ async function runEvaluation(
 
     lastMemberId = members[members.length - 1].id;
     const memberBranch = new Map(members.map((m) => [m.id, m.branch_id]));
+    const memberInfo = new Map(members.map((m) => [m.id, m]));
     const memberIds = members.map((m) => m.id);
     counts.evaluated += memberIds.length;
 
@@ -287,11 +290,44 @@ async function runEvaluation(
 
       counts.tasksCreated += 1;
       createdByAssignee.count += 1;
+
+      // A caring WhatsApp to the member, once, when their task is made.
+      const info = memberInfo.get(memberId);
+      if (config.whatsappMember && info?.phone) {
+        const branchCountry = info.branch_id ? await countryOfBranch(admin, info.branch_id) : null;
+        await sendCatalogNotice({
+          organizationId,
+          catalogKey: "followup_member",
+          kind: "followup_member",
+          refId: todo.id,
+          rawPhone: info.phone,
+          branchCountry,
+          orgCountry: org?.country,
+          memberId,
+          bodyParams: [info.first_name, org?.name ?? "your church"],
+        });
+      }
       items.push({ run_id: runId, organization_id: organizationId, member_id: memberId, outcome: "task_created", todo_id: todo.id });
     }
 
     if (items.length > 0) {
       await admin.from("automation_run_items").upsert(items, { onConflict: "run_id,member_id" });
+    }
+  }
+
+  // A WhatsApp to the assignee that tasks are waiting: how many, and no names.
+  if (createdByAssignee.count > 0 && config.whatsappLeader) {
+    const assignee = await assigneeContact(admin, config.assigneeUserId);
+    if (assignee?.phone) {
+      await sendCatalogNotice({
+        organizationId,
+        catalogKey: "followup_leader",
+        kind: "followup_leader",
+        refId: runId,
+        rawPhone: assignee.phone,
+        orgCountry: org?.country,
+        bodyParams: [assignee.firstName, String(createdByAssignee.count), org?.name ?? "your church"],
+      });
     }
   }
 
@@ -307,6 +343,23 @@ async function runEvaluation(
   }
 
   await finishRun(admin, runId, automation.id, "completed", counts, {});
+}
+
+const branchCountryCache = new Map<string, string | null>();
+async function countryOfBranch(admin: AdminClient, branchId: string): Promise<string | null> {
+  if (branchCountryCache.has(branchId)) return branchCountryCache.get(branchId) ?? null;
+  const { data } = await admin.from("branches").select("country").eq("id", branchId).maybeSingle();
+  branchCountryCache.set(branchId, data?.country ?? null);
+  return data?.country ?? null;
+}
+
+// The assignee's first name and phone: from their profile, else from their member record.
+async function assigneeContact(admin: AdminClient, authUserId: string): Promise<{ firstName: string; phone: string | null } | null> {
+  const { data: profile } = await admin.from("profiles").select("first_name, phone").eq("auth_user_id", authUserId).maybeSingle();
+  if (!profile) return null;
+  if (profile.phone) return { firstName: profile.first_name, phone: profile.phone };
+  const { data: member } = await admin.from("members").select("phone").eq("auth_user_id", authUserId).maybeSingle();
+  return { firstName: profile.first_name, phone: member?.phone ?? null };
 }
 
 async function finishRun(

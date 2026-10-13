@@ -5,6 +5,7 @@ import { getSiteUrl } from "@/lib/site-url";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { financeEnabledForBackground, getSharedEmailRemainingForBackground } from "@/lib/plans/dal";
 import { sendMembershipEmail } from "@/lib/membership-fees/email";
+import { sendCatalogNotice } from "@/lib/whatsapp/catalog-send";
 import { sendMembershipReceipt } from "@/lib/membership-fees/receipt";
 import { isMembershipDueDay, membershipPaymentPath, membershipPeriodFor, membershipPeriodLabel } from "@/lib/membership-fees/config";
 
@@ -20,6 +21,8 @@ export interface MembershipFeeCycleResult {
   membersBilled: number;
   requestsSent: number;
   remindersSent: number;
+  // Requests and reminders also sent on WhatsApp.
+  whatsappSent: number;
   failed: number;
 }
 
@@ -47,7 +50,7 @@ export async function runMembershipFeeCycle(
   now: Date,
   options: MembershipRunOptions = {},
 ): Promise<MembershipFeeCycleResult> {
-  const result: MembershipFeeCycleResult = { orgsChecked: 0, membersBilled: 0, requestsSent: 0, remindersSent: 0, failed: 0 };
+  const result: MembershipFeeCycleResult = { orgsChecked: 0, membersBilled: 0, requestsSent: 0, remindersSent: 0, whatsappSent: 0, failed: 0 };
 
   let settingsQuery = admin
     .from("membership_fee_settings")
@@ -75,6 +78,8 @@ export async function runMembershipFeeCycle(
       const sent = await sendRequests(admin, org, period, budget, result);
       result.requestsSent += sent;
       result.remindersSent += await sendReminders(admin, org, period, Number(settings.reminder_after_days), now, budget, result);
+      // The same requests and reminders also go out on WhatsApp, to members with a phone number.
+      result.whatsappSent += await sendFeeWhatsApp(admin, org, period, Number(settings.reminder_after_days), now);
       await retryReceipts(admin, org.id, result);
     } catch (err) {
       result.failed++;
@@ -189,6 +194,84 @@ async function sendReminders(
     } else {
       result.failed++;
     }
+  }
+  return sent;
+}
+
+// WhatsApp copies of the month's fee request and reminder. Members with a phone number get
+// the request once, and the reminder once after the same wait as the email. Nothing is sent
+// until the church has the approved WhatsApp templates; it then starts on the next run.
+async function sendFeeWhatsApp(
+  admin: Admin,
+  org: { id: string; name: string },
+  period: string,
+  reminderAfterDays: number,
+  now: Date,
+): Promise<number> {
+  const { data: approved } = await admin
+    .from("whatsapp_templates")
+    .select("name")
+    .eq("organization_id", org.id)
+    .eq("status", "approved")
+    .in("name", ["kf_membership_fee_request", "kf_membership_fee_reminder"]);
+  const names = new Set((approved ?? []).map((t) => t.name));
+  const canRequest = names.has("kf_membership_fee_request");
+  const canRemind = names.has("kf_membership_fee_reminder");
+  if (!canRequest && !canRemind) return 0;
+
+  const [{ data: invoices }, { data: orgRow }] = await Promise.all([
+    admin
+      .from("membership_fee_invoices")
+      .select("id, amount, public_token, members!inner(id, first_name, phone, branch_id)")
+      .eq("organization_id", org.id)
+      .eq("period", period)
+      .eq("status", "due")
+      .not("members.phone", "is", null)
+      .limit(1000),
+    admin.from("organizations").select("country").eq("id", org.id).maybeSingle(),
+  ]);
+  type Row = { id: string; amount: number; public_token: string; members: { id: string; first_name: string; phone: string | null; branch_id: string | null } | { id: string; first_name: string; phone: string | null; branch_id: string | null }[] };
+  const rows = (invoices ?? []) as unknown as Row[];
+  if (rows.length === 0) return 0;
+
+  const ids = rows.map((r) => r.id);
+  const { data: logs } = await admin.from("whatsapp_notice_log").select("ref_id, kind, status, created_at").in("ref_id", ids).in("kind", ["fee_request", "fee_reminder"]);
+  const requestLog = new Map<string, string>();
+  const reminded = new Set<string>();
+  for (const log of logs ?? []) {
+    if (log.kind === "fee_request") {
+      if (log.status === "sent") requestLog.set(log.ref_id, log.created_at);
+    }
+    else reminded.add(log.ref_id);
+  }
+
+  const branchIds = [...new Set(rows.map((r) => (Array.isArray(r.members) ? r.members[0] : r.members)?.branch_id).filter((id): id is string => Boolean(id)))];
+  const { data: branches } = branchIds.length ? await admin.from("branches").select("id, country").in("id", branchIds) : { data: [] };
+  const branchCountry = new Map((branches ?? []).map((b) => [b.id, b.country]));
+
+  const cutoff = now.getTime() - reminderAfterDays * 24 * 60 * 60 * 1000;
+  const periodLabel = membershipPeriodLabel(period);
+  let sent = 0;
+  for (const row of rows) {
+    if (sent >= SEND_LIMIT_PER_ORG_PER_RUN) break;
+    const member = Array.isArray(row.members) ? row.members[0] : row.members;
+    if (!member?.phone) continue;
+    const askedAt = requestLog.get(row.id);
+    const kind = !askedAt ? "fee_request" : !reminded.has(row.id) && new Date(askedAt).getTime() <= cutoff ? "fee_reminder" : null;
+    if (!kind || (kind === "fee_request" && !canRequest) || (kind === "fee_reminder" && !canRemind)) continue;
+
+    const outcome = await sendCatalogNotice({
+      organizationId: org.id,
+      catalogKey: kind === "fee_request" ? "membership_fee_request" : "membership_fee_reminder",
+      kind,
+      refId: row.id,
+      rawPhone: member.phone,
+      branchCountry: member.branch_id ? branchCountry.get(member.branch_id) : null,
+      orgCountry: orgRow?.country,
+      memberId: member.id,
+      bodyParams: [member.first_name, `₹${Number(row.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, periodLabel, `${getSiteUrl()}${membershipPaymentPath(row.public_token)}`, org.name],
+    });
+    if (outcome.status === "sent") sent++;
   }
   return sent;
 }

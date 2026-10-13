@@ -98,3 +98,20 @@ export async function deleteVolunteer(formData: FormData) {
   await createAdminClient().from("volunteers").delete().eq("id", id);
   revalidatePath(VOLUNTEERS_PATH);
 }
+
+// An admin verifies a volunteer (after checking their ID card), or removes the mark.
+export async function setVolunteerVerified(formData: FormData) {
+  const user = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const verified = String(formData.get("verified") ?? "") === "true";
+  const organizationId = await organizationIdForVolunteer(id);
+  if (!organizationId) return;
+  const access = await checkTabAccess(organizationId, "volunteers", "write");
+  if (!access.ok) return;
+
+  await createAdminClient()
+    .from("volunteers")
+    .update(verified ? { verified: true, verified_at: new Date().toISOString(), verified_by: user.id } : { verified: false, verified_at: null, verified_by: null })
+    .eq("id", id);
+  revalidatePath(VOLUNTEERS_PATH);
+}

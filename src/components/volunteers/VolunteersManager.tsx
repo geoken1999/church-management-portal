@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Pencil, Trash2, UserRound, StickyNote, HandHelping, CalendarDays } from "lucide-react";
-import { createVolunteer, updateVolunteer, deleteVolunteer, type VolunteerFormState } from "@/lib/volunteers/actions";
+import { Plus, Pencil, Trash2, UserRound, StickyNote, HandHelping, CalendarDays, BadgeCheck } from "lucide-react";
+import { createVolunteer, updateVolunteer, deleteVolunteer, setVolunteerVerified, type VolunteerFormState } from "@/lib/volunteers/actions";
 import type { Volunteer, Member } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -228,6 +228,12 @@ function VolunteerCard({ entry, canWrite, canDelete }: { entry: VolunteerRow; ca
             <h3 className="font-heading text-base font-bold">{personName(entry.members)}</h3>
             <Badge variant="outline">{entry.volunteer_no}</Badge>
             {entry.status === "inactive" && <Badge variant="destructive">Inactive</Badge>}
+            {entry.verified && (
+              <Badge className="gap-1">
+                <BadgeCheck className="size-3" />
+                Verified
+              </Badge>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary">{entry.role}</Badge>
@@ -246,6 +252,16 @@ function VolunteerCard({ entry, canWrite, canDelete }: { entry: VolunteerRow; ca
         </div>
         {(canWrite || canDelete) && (
           <div className="flex shrink-0 items-center gap-1">
+            {canWrite && (
+              <form action={setVolunteerVerified}>
+                <input type="hidden" name="id" value={entry.id} />
+                <input type="hidden" name="verified" value={entry.verified ? "false" : "true"} />
+                <Button type="submit" variant="ghost" size="sm">
+                  <BadgeCheck className="size-3.5" />
+                  {entry.verified ? "Remove verified" : "Verify"}
+                </Button>
+              </form>
+            )}
             {canWrite && <EditVolunteerDialog entry={entry} />}
             {canDelete && (
               <form action={deleteVolunteer}>

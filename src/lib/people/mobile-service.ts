@@ -14,7 +14,7 @@ import { parseVolunteerStatus, validateVolunteer } from "@/lib/volunteers/valida
 // tables is admin-only to write under RLS by default, so the writes use the
 // service role, and every id is first checked to belong to this church.
 
-export type PeopleResult = { ok: true; id?: string } | { ok: false; error: string };
+export type PeopleResult = { ok: true; id?: string; data?: Record<string, unknown> } | { ok: false; error: string };
 
 const fail = (error: string): PeopleResult => ({ ok: false, error });
 
@@ -252,4 +252,50 @@ export async function deleteVolunteerForMobile(organizationId: string, id: strin
   const admin = createAdminClient();
   const { error } = await admin.from("volunteers").delete().eq("id", id).eq("organization_id", organizationId);
   return error ? fail("Couldn't remove that volunteer.") : { ok: true };
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// A scanned ID card: the volunteer it belongs to, if they volunteer at this church.
+export async function lookupVolunteerForMobile(organizationId: string, token: string): Promise<PeopleResult> {
+  if (!UUID.test(token)) return fail("That isn't a volunteer ID code.");
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("volunteers")
+    .select("id, volunteer_no, role, team, joined_on, status, verified, verified_at, organization_id, members(first_name, last_name, phone, email, membership_code)")
+    .eq("verify_token", token)
+    .maybeSingle();
+  if (!data) return fail("That code doesn't match any volunteer.");
+  if (data.organization_id !== organizationId) return fail("That volunteer belongs to a different church.");
+  const { data: church } = await admin.from("organizations").select("name").eq("id", organizationId).maybeSingle();
+  const member = data.members as { first_name: string; last_name: string; phone: string | null; email: string | null; membership_code: string | null } | null;
+  return {
+    ok: true,
+    id: data.id,
+    data: {
+      volunteerNo: data.volunteer_no,
+      name: `${member?.first_name ?? ""} ${member?.last_name ?? ""}`.trim(),
+      phone: member?.phone ?? null,
+      email: member?.email ?? null,
+      role: data.role,
+      team: data.team,
+      joinedOn: data.joined_on,
+      active: data.status === "active",
+      verified: data.verified,
+      verifiedAt: data.verified_at,
+      church: church?.name ?? "",
+    },
+  };
+}
+
+// An admin marks a volunteer verified, or takes the mark away.
+export async function setVolunteerVerifiedForMobile(organizationId: string, id: string, userId: string, verified: boolean): Promise<PeopleResult> {
+  const { data, error } = await createAdminClient()
+    .from("volunteers")
+    .update(verified ? { verified: true, verified_at: new Date().toISOString(), verified_by: userId } : { verified: false, verified_at: null, verified_by: null })
+    .eq("id", id)
+    .eq("organization_id", organizationId)
+    .select("id")
+    .maybeSingle();
+  return error || !data ? fail("Couldn't change that. Please try again.") : { ok: true };
 }

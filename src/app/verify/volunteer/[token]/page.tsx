@@ -16,7 +16,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // role; it is open to anyone who scans the card.
 export default async function VerifyVolunteerPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  let volunteer: { volunteer_no: string; first_name: string; last_name: string; role: string; team: string | null; status: string; organization_name: string; logo_url: string | null } | null = null;
+  let volunteer: { volunteer_no: string; first_name: string; last_name: string; role: string; team: string | null; status: string; organization_name: string; logo_url: string | null; verified: boolean } | null = null;
   if (UUID.test(token)) {
     const supabase = await createClient();
     const { data } = await supabase.rpc("verify_volunteer", { token });
@@ -40,7 +40,13 @@ export default async function VerifyVolunteerPage({ params }: { params: Promise<
           ) : (
             <>
               {active ? <BadgeCheck className="mx-auto size-12 text-emerald-600" /> : <ShieldAlert className="mx-auto size-12 text-amber-600" />}
-              <h1 className="font-heading text-xl font-bold">{active ? "Verified volunteer" : "No longer an active volunteer"}</h1>
+              <h1 className="font-heading text-xl font-bold">{active ? "Volunteer" : "No longer an active volunteer"}</h1>
+              {volunteer.verified && active && (
+                <p className="mx-auto inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+                  <BadgeCheck className="size-4" />
+                  Verified by {volunteer.organization_name}
+                </p>
+              )}
               <div className="space-y-1">
                 <p className="text-lg font-semibold">
                   {volunteer.first_name} {volunteer.last_name}

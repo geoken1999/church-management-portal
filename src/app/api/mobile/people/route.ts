@@ -14,6 +14,8 @@ import {
   removeFamilyMemberForMobile,
   updateCommitteeForMobile,
   createVolunteerForMobile,
+  lookupVolunteerForMobile,
+  setVolunteerVerifiedForMobile,
   deleteVolunteerForMobile,
   updateVolunteerForMobile,
   updateFamilyForMobile,
@@ -42,7 +44,8 @@ export async function POST(request: Request) {
 
   const tab = TAB_FOR_KIND[kind];
   if (!tab) return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
-  const level = action === "delete" ? "delete" : "write";
+  // Looking up a scanned ID card only needs to see volunteers; verifying changes one.
+  const level = action === "delete" ? "delete" : action === "lookup" ? "read" : "write";
   const auth = await requireMobileTabAccess(request, organizationId, tab, level);
   if (auth instanceof NextResponse) return auth;
 
@@ -102,9 +105,16 @@ export async function POST(request: Request) {
     case "volunteer:update":
       result = await updateVolunteerForMobile(organizationId, id, body);
       break;
+    case "volunteer:lookup":
+      result = await lookupVolunteerForMobile(organizationId, text("token"));
+      break;
+    case "volunteer:verify":
+    case "volunteer:unverify":
+      result = id ? await setVolunteerVerifiedForMobile(organizationId, id, auth.userId, action === "verify") : result;
+      break;
     case "volunteer:delete":
       result = await deleteVolunteerForMobile(organizationId, id);
       break;
   }
-  return NextResponse.json(result.ok ? { ok: true, id: result.id } : { ok: false, error: result.error });
+  return NextResponse.json(result.ok ? { ok: true, id: result.id, data: result.data } : { ok: false, error: result.error });
 }

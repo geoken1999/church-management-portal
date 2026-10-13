@@ -998,6 +998,10 @@ export type Volunteer = {
   status: "active" | "inactive";
   notes: string | null;
   verify_token: string;
+  // Verified by an admin who scanned the ID card (migration 0173).
+  verified: boolean;
+  verified_at: string | null;
+  verified_by: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -3836,6 +3840,7 @@ export type Database = {
           status: string;
           organization_name: string;
           logo_url: string | null;
+          verified: boolean;
         }[];
       };
       get_shared_document: {

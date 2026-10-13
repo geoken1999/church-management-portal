@@ -97,7 +97,7 @@ export function LiveStudio({ stream, canWrite }: { stream: LiveStream; canWrite:
               Join the room with your camera and mic, then press <strong>Go live</strong> there or here. Everyone in the room is part of the broadcast; viewers only watch.
             </p>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" nativeButton={false} render={<a href={`/dashboard/kmeet/${stream.meeting_id}`} target="_blank" rel="noreferrer" />}>
+              <Button type="button" variant="outline" nativeButton={false} render={<a href={`/broadcast/${stream.id}`} target="_blank" rel="noreferrer" />}>
                 <ExternalLink className="size-4" />
                 Open broadcast room
               </Button>

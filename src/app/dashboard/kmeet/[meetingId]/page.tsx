@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getKmeetMeeting } from "@/lib/kmeet/dal";
 import { getLiveStreamForMeeting } from "@/lib/livestream/dal";
@@ -19,9 +19,10 @@ export default async function KmeetCallPage({ params }: { params: Promise<{ meet
   if (!meeting) notFound();
   // A live stream's broadcast room is run by whoever may run live streams.
   const stream = await getLiveStreamForMeeting(organizationId, meeting.id);
-  const access = stream ? membership.tabAccess.livestream : membership.tabAccess.kmeet;
+  if (stream) redirect(`/broadcast/${stream.id}`);
+  const access = membership.tabAccess.kmeet;
   if (!access.read) {
-    return <AccessRestricted label={stream ? "Live stream" : "K-Connect"} />;
+    return <AccessRestricted label="K-Connect" />;
   }
 
   return (
@@ -31,8 +32,7 @@ export default async function KmeetCallPage({ params }: { params: Promise<{ meet
       title={meeting.title}
       alreadyEnded={meeting.status === "ended"}
       canEnd={access.write}
-      backHref={stream ? `/dashboard/livestream/${stream.id}` : "/dashboard/kconnect?mode=video"}
-      liveStreamId={stream?.id}
+      backHref="/dashboard/kconnect?mode=video"
     />
   );
 }

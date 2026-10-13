@@ -963,6 +963,8 @@ export interface KmeetCallProps {
   backHref: string;
   // Set when this room is the broadcast room of a live stream: the team sees Go live here.
   liveStreamId?: string;
+  // The call fills its whole window (a page without the dashboard around it).
+  fullScreen?: boolean;
 }
 
 interface JoinInfo {
@@ -975,7 +977,7 @@ interface JoinInfo {
   maxDurationMinutes: number | null;
 }
 
-export function KmeetCall({ meetingId, mode = "video", title, alreadyEnded, canEnd, guestName, backHref, liveStreamId }: KmeetCallProps) {
+export function KmeetCall({ meetingId, mode = "video", title, alreadyEnded, canEnd, guestName, backHref, liveStreamId, fullScreen }: KmeetCallProps) {
   const audioOnly = mode === "audio";
   const router = useRouter();
   const [joinInfo, setJoinInfo] = useState<JoinInfo | null>(null);
@@ -1049,7 +1051,7 @@ export function KmeetCall({ meetingId, mode = "video", title, alreadyEnded, canE
   }
 
   return (
-    <div className="flex h-[calc(100vh-6rem)] flex-col overflow-hidden rounded-lg border border-border">
+    <div className={fullScreen ? "flex h-[calc(100vh-1rem)] flex-col overflow-hidden rounded-lg border border-border sm:h-[calc(100vh-1.5rem)]" : "flex h-[calc(100vh-6rem)] flex-col overflow-hidden rounded-lg border border-border"}>
       <MeetingProvider
         config={{
           meetingId: joinInfo.roomId,

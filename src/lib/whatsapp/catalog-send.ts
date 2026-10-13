@@ -69,12 +69,17 @@ export async function sendCatalogNotice(input: {
   }
 
   // Reserve first: the unique key is what stops a second send for the same thing.
-  const { data: reserved } = await admin
+  const { data: reserved, error: reserveError } = await admin
     .from("whatsapp_notice_log")
     .insert({ organization_id: organizationId, kind: input.kind, ref_id: input.refId, recipient: phone, status: "sent" })
     .select("id")
     .single();
-  if (!reserved) return { status: "skipped", reason: "Already sent." };
+  if (reserveError || !reserved) {
+    // 23505 is the unique key: this exact message was already sent. Anything else is a real problem.
+    if (reserveError?.code === "23505") return { status: "skipped", reason: "Already sent." };
+    await logPlatformEvent({ level: "error", source: "whatsapp_send", message: `WhatsApp ${input.kind} couldn't be recorded, so it wasn't sent: ${reserveError?.message ?? "no row"}`, organizationId });
+    return { status: "failed", reason: "Couldn't record the message, so it wasn't sent." };
+  }
 
   const quotaError = await checkWhatsAppQuota(organizationId, 1);
   if (quotaError) {

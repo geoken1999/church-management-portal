@@ -46,7 +46,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     icon: CreditCard,
     title: "Billing & Help",
-    description: "Your trial and plan live under Billing. If you get stuck, Documentation and Support are both one click away under Help.",
+    description: "Your trial and plan live under Billing, in the Organization section near the bottom of the sidebar; your own Profile is the person icon in the top bar, next to Log out. If you get stuck, Documentation and Support are both one click away under Help.",
   },
 ];
 

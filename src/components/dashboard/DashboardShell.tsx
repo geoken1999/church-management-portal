@@ -90,17 +90,6 @@ const NAV_GROUPS = [
     ],
   },
   {
-    groupKey: "organization" as const,
-    items: [
-      { href: "/dashboard/profile", itemKey: "profile" as const, icon: UserRound, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/team", itemKey: "team" as const, icon: Users, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/billing", itemKey: "billing" as const, icon: CreditCard, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: true },
-      { href: "/dashboard/payouts", itemKey: "payouts" as const, icon: Wallet, tab: "donations" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },
-      { href: "/dashboard/branches", itemKey: "branches" as const, icon: MapPin, tab: "branches" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
-      { href: "/dashboard/mobile", itemKey: "mobileFeatures" as const, icon: Smartphone, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: true },
-    ],
-  },
-  {
     groupKey: "people" as const,
     items: [
       { href: "/dashboard/members", itemKey: "members" as const, icon: Contact, tab: "members" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
@@ -166,6 +155,16 @@ const NAV_GROUPS = [
       { href: "/dashboard/ask-aura", itemKey: "askAura" as const, icon: Sparkles, tab: "aitools" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/ai-rules", itemKey: "aiRules" as const, icon: ShieldCheck, tab: "airules" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/automation", itemKey: "automations" as const, icon: Workflow, tab: "automations" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+    ],
+  },
+  {
+    groupKey: "organization" as const,
+    items: [
+      { href: "/dashboard/team", itemKey: "team" as const, icon: Users, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/billing", itemKey: "billing" as const, icon: CreditCard, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: true },
+      { href: "/dashboard/payouts", itemKey: "payouts" as const, icon: Wallet, tab: "donations" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },
+      { href: "/dashboard/branches", itemKey: "branches" as const, icon: MapPin, tab: "branches" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/mobile", itemKey: "mobileFeatures" as const, icon: Smartphone, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: true },
     ],
   },
   {
@@ -431,6 +430,15 @@ function DashboardShellInner({
               <ThemeToggle />
               <LanguageSwitcher />
               <NotificationBell organizationId={organization.id} initialNotifications={notifications} />
+              <Link
+                href="/dashboard/profile"
+                data-tour-target="/dashboard/profile"
+                title={t.nav.items.profile}
+                aria-label={t.nav.items.profile}
+                className={`inline-flex size-8 items-center justify-center rounded-lg transition-colors hover:bg-accent hover:text-accent-foreground ${pathname === "/dashboard/profile" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`}
+              >
+                <UserRound className="size-4" />
+              </Link>
               <LogoutButton />
             </div>
           </div>

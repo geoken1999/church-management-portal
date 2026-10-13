@@ -116,9 +116,9 @@ export async function generateMonthlyReportAction(input: GenerateInput): Promise
     }
   }
 
-  // The same church, period and branch is one report: making it again replaces its figures
-  // but keeps its photos.
-  let existingQuery = admin.from("monthly_reports").select("id, data").eq("organization_id", organizationId).eq("period", input.period);
+  // The same church, period, branch and language is one report: making it again replaces its
+  // figures but keeps its photos. Another language is a new copy.
+  let existingQuery = admin.from("monthly_reports").select("id, data").eq("organization_id", organizationId).eq("period", input.period).eq("language", language);
   existingQuery = branchId ? existingQuery.eq("branch_id", branchId) : existingQuery.is("branch_id", null);
   const { data: existing } = await existingQuery.maybeSingle();
   if (existing) data.photos = (existing.data as MonthlyReportData | null)?.photos ?? [];

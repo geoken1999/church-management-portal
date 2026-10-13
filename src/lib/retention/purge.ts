@@ -15,6 +15,7 @@ const BUCKETS = [
   "member-home-images",
   "instagram-post-uploads",
   "whatsapp-template-headers",
+  "report-images",
 ];
 
 /** How much a church is still owed by KingdomFlow (fundraisers, paid events, membership fees). */

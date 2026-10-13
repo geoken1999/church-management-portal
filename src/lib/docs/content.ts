@@ -334,11 +334,16 @@ export const DOC_CATEGORIES: DocCategory[] = [
       },
       {
         id: "monthly-report",
-        title: "Monthly church report",
+        title: "Monthly and annual church reports",
         body: [
-          "Reports → Advanced: monthly report makes a summary of how the whole church did in one finished month, from your own records: members, attendance, events, giving, expenses and balance, volunteers and prayer requests. You choose which sections to include, and can add a note of your own (thanks, praise reports, what is coming next).",
-          "It shows totals only — never who gave what or who attended. You can include only the sections you have access to, and a report is saved as it was made, so its numbers don't change later. Making a report for a month that already has one replaces it.",
-          "An owner or admin can Publish a report to the app. Published reports are listed for every member under Explore → Reports, and for the team under Reports in the team app. An unpublished report is seen only by your team. You can print any report, or save it as a PDF, from the report's page.",
+          "Reports → Advanced: church reports makes a summary of how the church did in one finished month or one finished year, from your own records: members, attendance, events, giving, expenses and balance, volunteers and prayer requests. An annual report also shows giving and expenses month by month. Choose which sections to include, and add a note of your own.",
+          "A report can be for the whole church or for one branch. A branch report covers that branch's members, attendance, events, offerings, expenses, volunteers and prayer requests. Donations aren't recorded per branch, so a branch report counts offerings only, and says so.",
+          "Choose the language, English, Tamil or Hindi. The headings, month names and the AI summary are all written in it.",
+          "Turn on Write the summary with AI and a short summary is written at the top of the report, in the tone you pick (warm, formal or brief). The AI is given only the totals, and told to use no number that isn't in them; it never sees names. It uses 1 AI credit, and if your church has none left the report is still made, without the summary.",
+          "The report starts with your church's letterhead: your logo, church name, address, phone, email and website. Fill in the details when you make a report; they are remembered for next time. After a report is made you can add photos to it from its page, for example from an event or service (JPEG, PNG or WebP, up to 3 MB each and 12 per report; they count towards your storage).",
+          "Start from a template to save time: pick a ready-made one (full report, leadership report, report for members, figures only) or one of your own, which fills in the sections, language, AI summary, tone, note and letterhead. Save the current settings as a template with Save as template.",
+          "It shows totals only, never who gave what or who attended. You can include only the sections you have access to, and a report is saved as it was made, so its numbers don't change later. Making a report for a period that already has one replaces its figures but keeps its photos.",
+          "An owner or admin can Publish a report to the app. Published reports are listed for members under Explore → Reports (a branch report only to that branch's members), and for the team under Reports in the team app. An unpublished report is seen only by your team. You can print any report, or save it as a PDF, from its page.",
         ],
       },
       {

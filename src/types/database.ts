@@ -592,7 +592,7 @@ export type AiReplyUsage = {
   // 'instagram'/'whatsapp' (DM auto-replies) or 'ask_aura' (internal chat
   // tool) — all three draw from the same shared monthly quota/addon pool,
   // tagged here purely for observability.
-  source: "instagram" | "ask_aura" | "whatsapp";
+  source: "instagram" | "ask_aura" | "whatsapp" | "report";
   created_at: string;
 };
 
@@ -959,10 +959,23 @@ export type KmeetMeeting = {
   last_active_at: string;
 };
 
-// A saved monthly church report (migration 0167); `data` is a MonthlyReportData.
+// A church's saved report template (migration 0168); `config` is a ReportTemplateConfig.
+export type ReportTemplate = {
+  id: string;
+  organization_id: string;
+  name: string;
+  config: unknown;
+  created_by: string | null;
+  created_at: string;
+};
+
+// A saved monthly or annual church report (migrations 0167 and 0168); `data` is a MonthlyReportData.
 export type MonthlyReport = {
   id: string;
   organization_id: string;
+  kind: "monthly" | "annual";
+  branch_id: string | null;
+  language: "en" | "ta" | "hi";
   period: string;
   title: string;
   note: string | null;
@@ -3042,6 +3055,12 @@ export type Database = {
             referencedColumns: ["auth_user_id"];
           },
         ];
+      };
+      report_templates: {
+        Row: ReportTemplate;
+        Insert: Partial<ReportTemplate> & Pick<ReportTemplate, "organization_id" | "name">;
+        Update: Partial<ReportTemplate>;
+        Relationships: [];
       };
       monthly_reports: {
         Row: MonthlyReport;

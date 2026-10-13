@@ -4,7 +4,7 @@ import { Logo } from "@/components/Logo";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 export const metadata: Metadata = {
-  title: "Please use a larger screen | KingdomFlow",
+  title: "Use the KingdomFlow app | KingdomFlow",
 };
 
 // Landed on by the middleware (src/lib/supabase/middleware.ts) whenever a
@@ -29,16 +29,16 @@ export default function MobileRestrictedPage() {
 
         <Card size="lg" className="rounded-2xl text-left shadow-lg">
           <CardHeader>
-            <CardTitle className="text-center font-heading text-xl">Please use a larger screen</CardTitle>
+            <CardTitle className="text-center font-heading text-xl">Use the KingdomFlow app</CardTitle>
             <CardDescription className="text-center text-base">
-              KingdomFlow isn&apos;t available on phones yet — please open it on a desktop, laptop, or tablet
-              (including iPad) instead.
+              The KingdomFlow website is made for a desktop, laptop or tablet. On your phone, please use the
+              KingdomFlow app.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              We&apos;re building a dedicated mobile app so the phone experience is done right, rather than a
-              cramped version of the desktop site. Thanks for your patience in the meantime.
+              Just reset your password? Open the app and sign in with your new password. Don&apos;t have the app
+              yet? Ask your church for the link, or open KingdomFlow on a larger screen.
             </p>
           </CardContent>
         </Card>

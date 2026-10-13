@@ -25,7 +25,7 @@ async function memberBelongs(organizationId: string, memberId: string): Promise<
   return Boolean(data);
 }
 
-async function underCap(organizationId: string, tab: "leaders" | "youth" | "families" | "committee" | "volunteers", table: string): Promise<string | null> {
+async function underCap(organizationId: string, tab: "leaders" | "youth" | "families" | "committee", table: string): Promise<string | null> {
   const { featureCaps } = await getOrgFeatureState(organizationId);
   const cap = featureCaps[tab] ?? null;
   if (cap === null) return null;

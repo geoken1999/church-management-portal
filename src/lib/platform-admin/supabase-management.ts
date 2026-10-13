@@ -12,13 +12,31 @@ function getProjectRef(): string | null {
   return match ? match[1] : null;
 }
 
+// What went wrong, in words an admin can act on. A refused token is by far the most common cause.
+export class ManagementApiError extends Error {
+  constructor(public status: number) {
+    super(`Supabase Management API responded ${status}`);
+  }
+}
+
+export function describeManagementFailure(reason: unknown): string {
+  if (reason instanceof ManagementApiError) {
+    if (reason.status === 401 || reason.status === 403) {
+      return `Supabase refused the access token (${reason.status}). It is invalid or has expired: create a new one in Supabase under Account → Access Tokens, then update SUPABASE_MANAGEMENT_API_TOKEN and redeploy.`;
+    }
+    if (reason.status === 429) return "Supabase is rate limiting these checks (429). Try again in a minute.";
+    return `The Supabase Management API answered with an error (${reason.status}).`;
+  }
+  return "Couldn't reach the Supabase Management API (a network problem).";
+}
+
 async function callManagementApi(path: string, token: string): Promise<unknown> {
   const response = await fetch(`https://api.supabase.com/v1/projects/${path}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });
   if (!response.ok) {
-    throw new Error(`Supabase Management API responded ${response.status}`);
+    throw new ManagementApiError(response.status);
   }
   return response.json();
 }
@@ -83,11 +101,13 @@ export async function getSupabaseProjectStatus(): Promise<SupabaseProjectStatus>
       });
     }
 
-    const fetchError = diskResult.status === "rejected" && healthResult.status === "rejected" ? "Couldn't reach the Supabase Management API." : null;
+    const fetchError =
+      diskResult.status === "rejected" && healthResult.status === "rejected" ? describeManagementFailure(diskResult.reason) : null;
+    if (fetchError) await logPlatformEvent({ level: "warning", source: "platform_admin", message: `Supabase Management API fetch failed: ${fetchError}` });
 
     return { configured: true, disk, services, fetchError };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Couldn't reach the Supabase Management API.";
+    const message = describeManagementFailure(err);
     await logPlatformEvent({ level: "warning", source: "platform_admin", message: `Supabase Management API fetch failed: ${message}` });
     return { configured: true, disk: null, services: null, fetchError: message };
   }

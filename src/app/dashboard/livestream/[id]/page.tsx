@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { redirect } from "next/navigation";
+import { isLiveStreamEnabled } from "@/lib/livestream/access";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getLiveStream } from "@/lib/livestream/dal";
 import { getSiteUrl } from "@/lib/site-url";
@@ -16,6 +18,7 @@ export default async function LiveStreamStudioPage({ params }: { params: Promise
   const { id } = await params;
   const membership = await requireOrganization();
   if (!membership.tabAccess.livestream.read) return <AccessRestricted label="Live stream" />;
+  if (!(await isLiveStreamEnabled(membership.organization.id))) redirect("/dashboard/livestream");
   const stream = await getLiveStream(membership.organization.id, id);
   if (!stream) notFound();
 

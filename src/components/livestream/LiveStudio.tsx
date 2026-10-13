@@ -41,6 +41,7 @@ export function LiveStudio({ stream, canWrite, whipUrl }: { stream: LiveStream; 
   }, [state.messages?.length]);
 
   const status = state.status ?? stream.status;
+  const obsConnected = state.ingestActive ?? stream.ingest_active;
 
   function run(fn: () => Promise<{ error?: string; warning?: string }>) {
     setNotice(null);
@@ -98,10 +99,11 @@ export function LiveStudio({ stream, canWrite, whipUrl }: { stream: LiveStream; 
               Join the broadcast room with your camera and mic, or send from OBS (below), then press <strong>Go live</strong>. Everyone in the room is part of the broadcast; viewers only watch.
             </p>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={() => window.open(`/broadcast/${stream.id}`, "_blank")}>
+              <Button type="button" variant="outline" disabled={obsConnected} title={obsConnected ? "OBS is sending the picture, so the broadcast room isn't needed" : undefined} onClick={() => window.open(`/broadcast/${stream.id}`, "_blank")}>
                 <ExternalLink className="size-4" />
                 Open broadcast room
               </Button>
+              {obsConnected && <span className="self-center text-xs text-muted-foreground">OBS is connected, so the room isn&apos;t needed.</span>}
               {status === "ready" && (
                 <Button type="button" disabled={pending} onClick={() => run(() => goLiveAction(stream.id))}>
                   <Radio className="size-4" />
@@ -122,7 +124,7 @@ export function LiveStudio({ stream, canWrite, whipUrl }: { stream: LiveStream; 
         </Card>
       )}
 
-      {canWrite && stream.ingest_key && status !== "ended" && <ObsPanel streamId={stream.id} whipUrl={whipUrl} initialKey={stream.ingest_key} connected={state.ingestActive ?? stream.ingest_active} />}
+      {canWrite && stream.ingest_key && status !== "ended" && <ObsPanel streamId={stream.id} whipUrl={whipUrl} initialKey={stream.ingest_key} connected={obsConnected} />}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
         <Card>

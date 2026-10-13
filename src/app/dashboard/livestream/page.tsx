@@ -3,6 +3,8 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { getLiveStreams } from "@/lib/livestream/dal";
 import { isVideoSdkConfigured } from "@/lib/kmeet/env";
 import { endIdleMeetings } from "@/lib/kmeet/idle";
+import { getLiveStreamAccess } from "@/lib/livestream/access";
+import { LiveStreamLocked } from "@/components/livestream/LiveStreamLocked";
 import { LiveStreamManager } from "@/components/livestream/LiveStreamManager";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
@@ -14,6 +16,16 @@ export default async function LiveStreamPage() {
   const membership = await requireOrganization();
   const access = membership.tabAccess.livestream;
   if (!access.read) return <AccessRestricted label="Live stream" />;
+
+  const live = await getLiveStreamAccess(membership.organization.id);
+  if (!live.enabled) {
+    return (
+      <div className="space-y-6">
+        <h1 className="font-heading text-3xl font-bold tracking-tight">Live stream</h1>
+        <LiveStreamLocked requestedAt={live.requestedAt} canRequest={membership.role === "owner" || membership.role === "admin"} />
+      </div>
+    );
+  }
 
   await endIdleMeetings(membership.organization.id);
   const streams = await getLiveStreams(membership.organization.id);

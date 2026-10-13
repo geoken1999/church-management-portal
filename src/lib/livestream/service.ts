@@ -5,6 +5,7 @@ import { createVideoSdkRoom } from "@/lib/kmeet/client";
 import { isVideoSdkConfigured } from "@/lib/kmeet/env";
 import { getPlanLimits } from "@/lib/plans/dal";
 import { maxDurationMinutesForMode } from "@/lib/kmeet/join";
+import { isLiveStreamEnabled, LIVE_STREAM_NOT_ENABLED } from "@/lib/livestream/access";
 import { sendPushToUsers } from "@/lib/push/client";
 import { resolveAudienceAuthIds } from "@/lib/push/audience";
 import { startHls, startRtmp, stopHls, stopRtmp, whipEnd } from "@/lib/livestream/videosdk";
@@ -13,6 +14,7 @@ import type { LiveStream, LiveStreamOutput } from "@/types/database";
 
 // Makes the K-Connect room a stream is broadcast from, and the stream itself.
 export async function createLiveStream(input: { organizationId: string; userId: string; title: string; description: string | null; settings: StreamSettings; outputs: LiveStreamOutput[] }): Promise<{ id: string; meetingId: string } | { error: string }> {
+  if (!(await isLiveStreamEnabled(input.organizationId))) return { error: LIVE_STREAM_NOT_ENABLED };
   if (!isVideoSdkConfigured()) return { error: "Video isn't configured yet. Ask your developer to set it up." };
   const admin = createAdminClient();
 
@@ -70,6 +72,7 @@ export async function goLive(organizationId: string, streamId: string): Promise<
   const loaded = await loadStream(organizationId, streamId);
   if (!loaded) return { error: "That live stream could not be found." };
   const { stream, roomId, meetingStatus } = loaded;
+  if (!(await isLiveStreamEnabled(organizationId))) return { error: LIVE_STREAM_NOT_ENABLED };
   if (stream.status === "live") return {};
   if (stream.status === "ended" || meetingStatus === "ended" || !roomId) return { error: "This stream has ended. Start a new one." };
 

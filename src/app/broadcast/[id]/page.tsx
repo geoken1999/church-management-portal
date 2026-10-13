@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
+import { isLiveStreamEnabled } from "@/lib/livestream/access";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getLiveStream } from "@/lib/livestream/dal";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
@@ -23,6 +25,7 @@ export default async function BroadcastRoomPage({ params }: { params: Promise<{ 
     );
   }
 
+  if (!(await isLiveStreamEnabled(membership.organization.id))) redirect("/dashboard/livestream");
   const stream = await getLiveStream(membership.organization.id, id);
   if (!stream) notFound();
 

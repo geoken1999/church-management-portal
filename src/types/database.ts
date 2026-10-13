@@ -1034,6 +1034,16 @@ export type LiveStream = {
   created_at: string;
   updated_at: string;
 };
+// Whether a church may use live streaming (migration 0172); the team switches it on after a request.
+export type LiveStreamAccess = {
+  organization_id: string;
+  enabled: boolean;
+  requested_at: string | null;
+  requested_by: string | null;
+  enabled_at: string | null;
+  note: string | null;
+  updated_at: string;
+};
 export type LiveStreamViewer = { stream_id: string; viewer_id: string; last_seen: string };
 export type LiveStreamMessage = {
   id: string;
@@ -3165,6 +3175,12 @@ export type Database = {
         Row: LiveStream;
         Insert: Partial<LiveStream> & Pick<LiveStream, "organization_id" | "meeting_id" | "title">;
         Update: Partial<LiveStream>;
+        Relationships: [];
+      };
+      live_stream_access: {
+        Row: LiveStreamAccess;
+        Insert: Partial<LiveStreamAccess> & Pick<LiveStreamAccess, "organization_id">;
+        Update: Partial<LiveStreamAccess>;
         Relationships: [];
       };
       live_stream_viewers: {

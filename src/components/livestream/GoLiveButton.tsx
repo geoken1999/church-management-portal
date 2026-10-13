@@ -1,22 +1,30 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Radio, Square } from "lucide-react";
-import { endLiveStreamAction, getLiveStateAction, goLiveAction } from "@/lib/livestream/actions";
+import { endStreamAndRoomAction, getLiveStateAction, goLiveAction } from "@/lib/livestream/actions";
 import { Button } from "@/components/ui/button";
 
 // The Go live / End stream button inside the broadcast room's controls.
-export function GoLiveButton({ streamId }: { streamId: string }) {
+export function GoLiveButton({ streamId, onEnded }: { streamId: string; onEnded?: () => void }) {
   const [status, setStatus] = useState<"ready" | "live" | "ended" | null>(null);
   const [viewers, setViewers] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const seen = useRef<string | null>(null);
+  const onEndedRef = useRef(onEnded);
+  useEffect(() => {
+    onEndedRef.current = onEnded;
+  }, [onEnded]);
 
   useEffect(() => {
     let stopped = false;
     const load = () =>
       getLiveStateAction(streamId).then((s) => {
         if (stopped || s.error) return;
+        // Ended from somewhere else (the studio page, the app): this room is done too.
+        if (s.status === "ended" && seen.current && seen.current !== "ended") onEndedRef.current?.();
+        seen.current = s.status ?? null;
         setStatus(s.status ?? null);
         setViewers(s.viewers ?? 0);
       });
@@ -35,8 +43,15 @@ export function GoLiveButton({ streamId }: { streamId: string }) {
     startTransition(async () => {
       if (status === "live") {
         if (!window.confirm("End the live stream for everyone watching?")) return;
-        await endLiveStreamAction(streamId);
+        // Ending the stream closes its room too.
+        const ended = await endStreamAndRoomAction(streamId);
+        if (ended.error) {
+          setMessage(ended.error);
+          return;
+        }
+        seen.current = "ended";
         setStatus("ended");
+        onEnded?.();
         return;
       }
       const result = await goLiveAction(streamId);

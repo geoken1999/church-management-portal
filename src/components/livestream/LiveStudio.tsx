@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Radio, Square, ExternalLink, Send, Users, Film } from "lucide-react";
-import { endLiveStreamAction, endStreamAndRoomAction, getLiveStateAction, getRecordingsAction, goLiveAction, sendHostChatAction, type LiveState } from "@/lib/livestream/actions";
+import { endStreamAndRoomAction, getLiveStateAction, getRecordingsAction, goLiveAction, sendHostChatAction, type LiveState } from "@/lib/livestream/actions";
 import type { LiveStream } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,7 +98,7 @@ export function LiveStudio({ stream, canWrite, whipUrl }: { stream: LiveStream; 
               Join the broadcast room with your camera and mic, or send from OBS (below), then press <strong>Go live</strong>. Everyone in the room is part of the broadcast; viewers only watch.
             </p>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" nativeButton={false} render={<a href={`/broadcast/${stream.id}`} target="_blank" rel="noreferrer" />}>
+              <Button type="button" variant="outline" onClick={() => window.open(`/broadcast/${stream.id}`, "_blank")}>
                 <ExternalLink className="size-4" />
                 Open broadcast room
               </Button>
@@ -109,7 +109,7 @@ export function LiveStudio({ stream, canWrite, whipUrl }: { stream: LiveStream; 
                 </Button>
               )}
               {status === "live" && (
-                <Button type="button" variant="destructive" disabled={pending} onClick={() => window.confirm("End the live stream for everyone watching?") && run(() => endLiveStreamAction(stream.id))}>
+                <Button type="button" variant="destructive" disabled={pending} onClick={() => window.confirm("End the live stream for everyone watching? This also closes the broadcast room.") && run(() => endStreamAndRoomAction(stream.id))}>
                   <Square className="size-4" />
                   End stream
                 </Button>

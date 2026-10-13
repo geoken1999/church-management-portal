@@ -18,11 +18,18 @@ export function StreamControls({ streamId, chatOpen, onToggleChat, onLeft }: { s
     onLeft();
   }
 
+  // The stream and room are over: close this tab (it can only close itself when the
+  // dashboard opened it), otherwise go back to the stream page.
+  function closeRoom() {
+    end();
+    window.close();
+    setTimeout(onLeft, 400);
+  }
+
   async function handleEnd() {
     if (!window.confirm("End the live stream and close the room for everyone?")) return;
     await endStreamAndRoomAction(streamId);
-    end();
-    onLeft();
+    closeRoom();
   }
 
   return (
@@ -39,7 +46,7 @@ export function StreamControls({ streamId, chatOpen, onToggleChat, onLeft }: { s
       <Button type="button" variant={chatOpen ? "default" : "outline"} size="icon" onClick={onToggleChat} title="Audience chat">
         <MessageSquare className="size-4" />
       </Button>
-      <GoLiveButton streamId={streamId} />
+      <GoLiveButton streamId={streamId} onEnded={closeRoom} />
       <Button type="button" variant="outline" onClick={handleLeave} title="Leave the room; a stream sent from OBS keeps going">
         <LogOut className="size-4" />
         Leave room

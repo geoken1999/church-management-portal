@@ -95,6 +95,14 @@ export const DOC_CATEGORIES: DocCategory[] = [
         ],
       },
       {
+        id: "church-settings",
+        title: "Church settings: everything set up once, in one place",
+        body: [
+          "Organization → Church settings (owners and admins) gathers the settings that apply to the whole church. The sections are: Church & app (profile, branches, mobile app, online giving, website widget, team, plan and billing), Payments & payouts (your payout details, your own payment gateway account, and the monthly membership fee), Email (your own mail server and your email templates), WhatsApp (your own WhatsApp number, the backup channel when WhatsApp can't deliver, and your message templates), Automations & AI (automation message templates, member follow-up and AI rules), and Connected accounts (Instagram, YouTube and Facebook).",
+          "Where a setting used to be on its own page (for example your mail server on the Email page, or payout details on Billing), that page now has a short note with a button that takes you to the right section. Your Profile, with your own name and password, is the person icon in the top bar.",
+        ],
+      },
+      {
         id: "volunteers",
         title: "Volunteers and digital ID cards",
         body: [

@@ -526,7 +526,7 @@ function TemplateRow({ template, canManage }: { template: WhatsAppTemplateRow; c
   );
 }
 
-function TemplatesManager({ organizationId, templates, canManage }: { organizationId: string; templates: WhatsAppTemplateRow[]; canManage: boolean }) {
+export function TemplatesManager({ organizationId, templates, canManage }: { organizationId: string; templates: WhatsAppTemplateRow[]; canManage: boolean }) {
   return (
     <Card>
       <CardHeader>
@@ -791,7 +791,7 @@ function Composer({
       <CardContent className="space-y-4">
         {templates.length === 0 && (
           <Alert variant="destructive">
-            <AlertDescription>No approved templates yet — create one in the Templates tab and wait for WhatsApp to approve it before sending a campaign.</AlertDescription>
+            <AlertDescription>No approved templates yet — create one in Church settings → WhatsApp and wait for WhatsApp to approve it before sending a campaign.</AlertDescription>
           </Alert>
         )}
         {!available && templates.length > 0 && (
@@ -1183,7 +1183,6 @@ function ChatInbox({ organizationId, conversations }: { organizationId: string; 
 export function WhatsAppManager({
   organizationId,
   canSend,
-  isOrgAdmin,
   available,
   whatsappRemaining,
   members,
@@ -1234,7 +1233,6 @@ export function WhatsAppManager({
         <TabsList>
           <TabsIndicator />
           <TabsTab value="campaigns">Campaigns</TabsTab>
-          <TabsTab value="templates">Templates</TabsTab>
           <TabsTab value="chat">Chat</TabsTab>
         </TabsList>
         <TabsPanel value="campaigns">
@@ -1259,9 +1257,6 @@ export function WhatsAppManager({
             <ScheduledCampaigns items={scheduled} timezone={timezone} />
             <WhatsAppHistory campaigns={campaigns} canSend={canSend} />
           </div>
-        </TabsPanel>
-        <TabsPanel value="templates">
-          <TemplatesManager organizationId={organizationId} templates={templates} canManage={isOrgAdmin} />
         </TabsPanel>
         <TabsPanel value="chat">
           <ChatInbox organizationId={organizationId} conversations={conversations} />

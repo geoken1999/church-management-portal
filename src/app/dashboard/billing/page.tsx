@@ -5,10 +5,9 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { getPlanUsage } from "@/lib/plans/dal";
 import { getOrganizationSubscription } from "@/lib/billing/dal";
 import { isPayUConfigured } from "@/lib/payu/env";
-import { getOrganizationPayoutDetails } from "@/lib/organizations/payout-details-dal";
 import { BillingManager } from "@/components/billing/BillingManager";
 import { AddonsManager } from "@/components/billing/AddonsManager";
-import { PayoutDetailsCard } from "@/components/billing/PayoutDetailsCard";
+import { MovedToSettings } from "@/components/settings/MovedToSettings";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export const metadata: Metadata = {
@@ -28,10 +27,9 @@ export default async function BillingPage({
     redirect("/dashboard");
   }
 
-  const [planUsage, subscription, payoutDetails] = await Promise.all([
+  const [planUsage, subscription] = await Promise.all([
     getPlanUsage(membership.organization.id),
     getOrganizationSubscription(membership.organization.id),
-    getOrganizationPayoutDetails(membership.organization.id),
   ]);
 
   return (
@@ -102,7 +100,7 @@ export default async function BillingPage({
         }}
       />
 
-      <PayoutDetailsCard organizationId={membership.organization.id} defaultValues={payoutDetails} />
+      <MovedToSettings what="Payout details" section="payments" label="Payment settings" />
     </div>
   );
 }

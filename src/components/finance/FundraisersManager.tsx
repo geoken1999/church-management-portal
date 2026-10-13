@@ -14,7 +14,7 @@ import {
   type PayoutRequestState,
 } from "@/lib/finance/actions";
 import { FUNDRAISER_STATUSES } from "@/lib/finance/validation";
-import { GatewayAccountsCard } from "@/components/finance/GatewayAccountsCard";
+import { MovedToSettings } from "@/components/settings/MovedToSettings";
 import type { Gateway } from "@/lib/payments/gateways";
 import { SHARED_SERVICE_FEE_RATE, sharedServiceFee, sharedServiceNetAmount } from "@/lib/finance/fees";
 import {
@@ -745,8 +745,6 @@ export function FundraisersManager({
   isOrgAdmin,
   ownPaymentGatewayEnabled,
   hasOwnAccount,
-  connectedGateways,
-  ownGateway,
   canWrite,
   canDelete,
   savedPayoutDetails,
@@ -767,7 +765,7 @@ export function FundraisersManager({
 }) {
   return (
     <div className="space-y-4">
-      {isOrgAdmin && ownPaymentGatewayEnabled && <GatewayAccountsCard connected={connectedGateways} active={ownGateway} />}
+      {isOrgAdmin && ownPaymentGatewayEnabled && <MovedToSettings what="Your payment gateway accounts" section="payments" label="Payment settings" />}
 
       {canWrite && (
         <div className="flex flex-wrap items-center justify-end gap-2">

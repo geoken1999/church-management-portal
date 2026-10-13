@@ -8,7 +8,7 @@ import { PAYOUT_STREAMS, STREAM_LABEL, getOrganizationPayoutLedger, type PayoutS
 import { formatInTimezone } from "@/lib/organizations/timezone";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 import { UpgradeRequired } from "@/components/dashboard/UpgradeRequired";
-import { PayoutDetailsCard } from "@/components/billing/PayoutDetailsCard";
+import { MovedToSettings } from "@/components/settings/MovedToSettings";
 import { RequestAllPayoutsButton } from "@/components/payouts/RequestAllPayoutsButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -243,7 +243,7 @@ export default async function PayoutsPage() {
       <section className="space-y-3">
         <h2 className="font-heading text-xl font-bold">Payout details</h2>
         <p className="text-sm text-muted-foreground">Where payouts are sent. Only an owner or admin can change these.</p>
-        <PayoutDetailsCard organizationId={organizationId} defaultValues={details} />
+        <MovedToSettings what="Payout details" section="payments" label="Payment settings" />
       </section>
     </div>
   );

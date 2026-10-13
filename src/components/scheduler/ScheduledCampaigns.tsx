@@ -24,6 +24,8 @@ export function ScheduledCampaigns({ items, timezone }: { items: ScheduledCampai
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // Read once when the list appears: "overdue" only needs to be roughly right.
+  const [loadedAt] = useState(() => Date.now());
   if (items.length === 0) return null;
 
   function cancel(id: string) {
@@ -67,7 +69,7 @@ export function ScheduledCampaigns({ items, timezone }: { items: ScheduledCampai
                     {item.result.skippedCount ? `, ${item.result.skippedCount} skipped` : ""}.
                   </p>
                 )}
-                {item.status === "scheduled" && Date.parse(item.scheduled_at) < Date.now() - 15 * 60_000 && (
+                {item.status === "scheduled" && Date.parse(item.scheduled_at) < loadedAt - 15 * 60_000 && (
                   <p className="text-xs text-amber-600">This is overdue. It will be sent as soon as the sender catches up. If it stays here, contact support.</p>
                 )}
                 {item.status === "failed" && item.result?.error && <p className="text-xs text-destructive">{item.result.error}</p>}

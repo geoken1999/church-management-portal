@@ -38,6 +38,7 @@ export const hi: Dictionary = {
     items: {
       dashboard: "डैशबोर्ड",
       profile: "प्रोफ़ाइल",
+      settings: "चर्च सेटिंग्स",
       team: "टीम",
       billing: "बिलिंग",
       branches: "शाखाएं",

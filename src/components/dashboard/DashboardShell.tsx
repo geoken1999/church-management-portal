@@ -415,6 +415,7 @@ function DashboardShellInner({
       <div className="flex min-h-screen flex-1 flex-col lg:h-screen lg:min-h-0 lg:overflow-hidden">
         <header className="border-b border-border bg-card print:hidden">
           <div className="flex items-center justify-between px-4 py-4 sm:px-6">
+            <div className="flex items-center gap-2">
             <Button
               type="button"
               variant="ghost"
@@ -425,11 +426,6 @@ function DashboardShellInner({
             >
               <Menu className="size-5" />
             </Button>
-            <div className="ml-auto flex items-center gap-2">
-              <CreditBalances sms={creditBalances.sms} ai={creditBalances.ai} email={creditBalances.email} />
-              <ThemeToggle />
-              <LanguageSwitcher />
-              <NotificationBell organizationId={organization.id} initialNotifications={notifications} />
               <Link
                 href="/dashboard/profile"
                 data-tour-target="/dashboard/profile"
@@ -439,6 +435,12 @@ function DashboardShellInner({
               >
                 <UserRound className="size-4" />
               </Link>
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              <CreditBalances sms={creditBalances.sms} ai={creditBalances.ai} email={creditBalances.email} />
+              <ThemeToggle />
+              <LanguageSwitcher />
+              <NotificationBell organizationId={organization.id} initialNotifications={notifications} />
               <LogoutButton />
             </div>
           </div>

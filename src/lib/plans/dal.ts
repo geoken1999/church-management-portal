@@ -565,6 +565,21 @@ export async function getSharedEmailRemainingForBackground(organizationId: strin
   return Math.max(0, plan.emailsPerMonth - used);
 }
 
+// Background-job version of the WhatsApp allowance (fee requests and follow-up messages
+// sent by the daily jobs). Counts campaigns and these automatic messages; add-on credits
+// are not drawn on from background sends.
+export async function getWhatsAppRemainingForBackground(organizationId: string): Promise<number> {
+  const admin = createAdminClient();
+  const start = startOfCurrentMonthIso();
+  const plan = await resolveEffectivePlanForWebhook(organizationId);
+  const [{ data: campaigns }, { count: notices }] = await Promise.all([
+    admin.from("whatsapp_campaigns").select("sent_count").eq("organization_id", organizationId).gte("created_at", start),
+    admin.from("whatsapp_notice_log").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).eq("status", "sent").gte("created_at", start),
+  ]);
+  const used = (campaigns ?? []).reduce((sum, row) => sum + row.sent_count, 0) + (notices ?? 0);
+  return Math.max(0, plan.whatsappPerMonth - used);
+}
+
 // Background-job check for the finance plan (membership fees are a finance
 // feature). Same plan resolution as the webhook paths.
 export async function financeEnabledForBackground(organizationId: string): Promise<boolean> {

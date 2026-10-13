@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { checkWhatsAppQuota } from "@/lib/plans/dal";
+import { getWhatsAppRemainingForBackground } from "@/lib/plans/dal";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { friendlyDeliveryReason, isMarketingCategory } from "@/lib/whatsapp/contact-health";
 import { getWhatsAppCredentials } from "@/lib/whatsapp/credentials";
@@ -81,8 +81,9 @@ export async function sendCatalogNotice(input: {
     return { status: "failed", reason: "Couldn't record the message, so it wasn't sent." };
   }
 
-  const quotaError = await checkWhatsAppQuota(organizationId, 1);
-  if (quotaError) {
+  // The daily jobs have no signed-in user, so the allowance is read without one. The reserved
+  // row above isn't counted yet, so one left means this message may go.
+  if ((await getWhatsAppRemainingForBackground(organizationId)) < 1) {
     await admin.from("whatsapp_notice_log").delete().eq("id", reserved.id);
     return { status: "skipped", reason: "The church's WhatsApp allowance for this month is used up." };
   }

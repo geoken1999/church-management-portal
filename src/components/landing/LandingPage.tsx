@@ -32,6 +32,8 @@ import {
   Wallet,
   HandHeart,
   ClipboardList,
+  Radio,
+  BadgeCheck,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -89,6 +91,11 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
         description: "A full congregation roster with a dedicated Leaders list and a separate Youth roster with guardian details, plus a public join link for self-signup.",
       },
       {
+        icon: BadgeCheck,
+        title: "Volunteers with digital ID cards",
+        description: "Keep a list of the members who serve, each with a volunteer ID. They get a digital ID card in the app, and an admin can scan its QR code to check the details and mark them verified, or remove it again.",
+      },
+      {
         icon: Users,
         title: "Family households",
         description: "Create a family and add existing members to it with their relationship — spouse, child, guardian — so households are tracked, not just individuals.",
@@ -130,6 +137,11 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
         description: "Host church meetings and prayer calls right from the dashboard or the app — a waiting room to admit people one by one, in-call chat and reactions, invite links for guests, and calls that close themselves when everyone has left.",
       },
       {
+        icon: Radio,
+        title: "Live stream",
+        description: "Broadcast your service and let members watch live inside the app, with chat and a viewer count. Go live from a camera or from OBS with a stream key, send to YouTube and Facebook too, and record it. Set up for your church on request.",
+      },
+      {
         icon: HandHeart,
         title: "Prayer requests",
         description: "Members send prayer requests from the app and your team is notified straight away, with every request kept in one place.",
@@ -158,7 +170,7 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
       {
         icon: FileBarChart,
         title: "Reports",
-        description: "Filter Members, Attendance, Events, Offerings, and Donations data by date or branch, then export straight to Excel or PDF.",
+        description: "Filter Members, Attendance, Events, Offerings, and Donations data by date or branch, then export to Excel or PDF. Or make a monthly or annual church report, for the whole church or one branch, in English, Tamil or Hindi, with an AI-written summary and a paragraph for each section, your letterhead and photos, and download it as PDF or Word.",
       },
       {
         icon: FileText,
@@ -285,6 +297,14 @@ const FAQS = [
   {
     question: "Can we hold video and audio calls without another tool?",
     answer: "Yes. K-Connect has video and audio calls built in, on the web and in the app. Hosts can admit people one by one, guests can join from an invite link without an account, and call length depends on your plan.",
+  },
+  {
+    question: "Can we live stream our service to members?",
+    answer: "Yes. Live streaming plays inside the app, with live chat and a viewer count, and you can go live from a camera or from OBS using a stream key, and also send it to YouTube or Facebook. It isn't switched on by default: use Contact us to enable on the Live stream page and we will set it up with you.",
+  },
+  {
+    question: "Can we make a report for our church board in Tamil or Hindi?",
+    answer: "Yes. Reports → Advanced: church reports makes a monthly or annual report for the whole church or one branch in English, Tamil or Hindi. AI can write a summary and a paragraph for each section, and you download the result as a PDF or a Word document, with your letterhead and photos.",
   },
   {
     question: "Which plan includes Finance and Social Media?",

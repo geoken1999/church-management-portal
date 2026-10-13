@@ -959,6 +959,38 @@ export type KmeetMeeting = {
   last_active_at: string;
 };
 
+// The mobile app's health reporting (migration 0164).
+export type MobileAppDevice = {
+  device_id: string;
+  platform: "android" | "ios";
+  app_version: string;
+  build_number: string;
+  os_version: string;
+  device_model: string;
+  role: "team" | "member" | "guest" | null;
+  auth_user_id: string | null;
+  organization_id: string | null;
+  first_seen_at: string;
+  last_seen_at: string;
+};
+
+export type MobileAppEvent = {
+  id: string;
+  device_id: string;
+  kind: "session" | "error" | "crash_suspected";
+  platform: string;
+  app_version: string;
+  os_version: string;
+  device_model: string;
+  screen: string;
+  message: string;
+  stack: string;
+  fingerprint: string;
+  auth_user_id: string | null;
+  organization_id: string | null;
+  created_at: string;
+};
+
 // A notification in a person's own inbox in the app (migration 0163).
 export type MemberNotification = {
   id: string;
@@ -2952,6 +2984,18 @@ export type Database = {
             referencedColumns: ["auth_user_id"];
           },
         ];
+      };
+      mobile_app_devices: {
+        Row: MobileAppDevice;
+        Insert: Partial<MobileAppDevice> & Pick<MobileAppDevice, "device_id" | "platform">;
+        Update: Partial<MobileAppDevice>;
+        Relationships: [];
+      };
+      mobile_app_events: {
+        Row: MobileAppEvent;
+        Insert: Partial<MobileAppEvent> & Pick<MobileAppEvent, "device_id" | "kind">;
+        Update: Partial<MobileAppEvent>;
+        Relationships: [];
       };
       member_notifications: {
         Row: MemberNotification;

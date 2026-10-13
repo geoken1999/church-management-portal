@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { FileBarChart, Eye, Trash2, Smartphone, Sparkles, LayoutTemplate } from "lucide-react";
+import { FileBarChart, Eye, Download, Trash2, Smartphone, Sparkles, LayoutTemplate } from "lucide-react";
 import { deleteMonthlyReportAction, deleteReportTemplateAction, generateMonthlyReportAction, saveReportTemplateAction, setMonthlyReportPublishedAction } from "@/lib/reports/monthly-actions";
 import {
   BUILT_IN_TEMPLATES,
@@ -330,6 +330,10 @@ function ReportRow({ report, canDelete, canPublish }: { report: SavedMonthlyRepo
           <Button type="button" size="sm" variant="outline" nativeButton={false} render={<Link href={`/dashboard/reports/monthly/${report.id}`} />}>
             <Eye className="size-3.5" />
             View
+          </Button>
+          <Button type="button" size="sm" variant="outline" nativeButton={false} render={<Link href={`/dashboard/reports/monthly/${report.id}?pdf=1`} />}>
+            <Download className="size-3.5" />
+            PDF
           </Button>
           {canPublish && (
             <Button

@@ -13,10 +13,12 @@ export const metadata: Metadata = {
   title: "Church report | KingdomFlow",
 };
 
-const photoUrl = (path: string) => `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/report-images/${path}`;
+const photoBase = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/report-images/`;
+const photoUrl = (path: string) => `${photoBase}${path}`;
 
-export default async function MonthlyReportPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function MonthlyReportPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ pdf?: string }> }) {
   const { id } = await params;
+  const { pdf } = await searchParams;
   const membership = await requireOrganization();
   if (!membership.tabAccess.reports.read) return <AccessRestricted label="Reports" />;
 
@@ -30,10 +32,10 @@ export default async function MonthlyReportPage({ params }: { params: Promise<{ 
           <ArrowLeft className="size-4" />
           All reports
         </Link>
-        <PrintButton />
+        <PrintButton autoStart={pdf === "1"} fileName={`${report.data.letterhead?.churchName ?? "Church"} report ${report.period}`} />
       </div>
       <MonthlyReportView data={report.data} note={report.note} photoUrl={photoUrl} />
-      {membership.tabAccess.reports.write && <ReportPhotosEditor reportId={report.id} photos={report.data.photos ?? []} photoUrl={photoUrl} eventTitles={report.data.events?.list.map((e) => e.title) ?? []} />}
+      {membership.tabAccess.reports.write && <ReportPhotosEditor reportId={report.id} photos={report.data.photos ?? []} photoBase={photoBase} eventTitles={report.data.events?.list.map((e) => e.title) ?? []} />}
     </div>
   );
 }

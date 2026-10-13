@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 
 // Add photos to a report (for example from an event), or take them off again. Shown to
 // people who can edit reports, and not when the report is printed.
-export function ReportPhotosEditor({ reportId, photos, photoUrl, eventTitles }: { reportId: string; photos: ReportPhoto[]; photoUrl: (path: string) => string; eventTitles: string[] }) {
+export function ReportPhotosEditor({ reportId, photos, photoBase, eventTitles }: { reportId: string; photos: ReportPhoto[]; photoBase: string; eventTitles: string[] }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -72,7 +72,7 @@ export function ReportPhotosEditor({ reportId, photos, photoUrl, eventTitles }: 
             {photos.map((photo) => (
               <div key={photo.path} className="space-y-1">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photoUrl(photo.path)} alt={photo.caption} className="aspect-[4/3] w-full rounded-lg object-cover" />
+                <img src={`${photoBase}${photo.path}`} alt={photo.caption} className="aspect-[4/3] w-full rounded-lg object-cover" />
                 <div className="flex items-start justify-between gap-1">
                   <span className="text-xs text-muted-foreground">{photo.caption}</span>
                   <Button

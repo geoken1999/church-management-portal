@@ -16,7 +16,8 @@ const QUALITY_NAMES = { low: "Standard", med: "HD", high: "Full HD" } as const;
 
 export function LiveStudio({ stream, canWrite, whipUrl }: { stream: LiveStream; canWrite: boolean; whipUrl: string }) {
   const [state, setState] = useState<LiveState>({ status: stream.status, viewers: 0, peak: stream.peak_viewers, messages: [] });
-  const [pending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
+  const [busy, setBusy] = useState<"go" | "end" | null>(null);
   const [notice, setNotice] = useState<{ kind: "error" | "info"; text: string } | null>(null);
   const [draft, setDraft] = useState("");
   const [recordings, setRecordings] = useState<{ url: string; start: string | null }[] | null>(null);
@@ -43,12 +44,20 @@ export function LiveStudio({ stream, canWrite, whipUrl }: { stream: LiveStream; 
   const status = state.status ?? stream.status;
   const obsConnected = state.ingestActive ?? stream.ingest_active;
 
-  function run(fn: () => Promise<{ error?: string; warning?: string }>) {
+  // Going live and ending are tracked apart, so one never greys out the other.
+  function run(kind: "go" | "end", fn: () => Promise<{ error?: string; warning?: string }>) {
     setNotice(null);
+    setBusy(kind);
     startTransition(async () => {
-      const result = await fn();
-      if (result.error) setNotice({ kind: "error", text: result.error });
-      else if (result.warning) setNotice({ kind: "info", text: result.warning });
+      try {
+        const result = await fn();
+        if (result.error) setNotice({ kind: "error", text: result.error });
+        else if (result.warning) setNotice({ kind: "info", text: result.warning });
+      } catch {
+        setNotice({ kind: "error", text: "Something went wrong. Please try again." });
+      } finally {
+        setBusy(null);
+      }
       await refresh();
     });
   }
@@ -105,19 +114,19 @@ export function LiveStudio({ stream, canWrite, whipUrl }: { stream: LiveStream; 
               </Button>
               {obsConnected && <span className="self-center text-xs text-muted-foreground">OBS is connected, so the room isn&apos;t needed.</span>}
               {status === "ready" && (
-                <Button type="button" disabled={pending} onClick={() => run(() => goLiveAction(stream.id))}>
+                <Button type="button" disabled={busy === "go"} onClick={() => run("go", () => goLiveAction(stream.id))}>
                   <Radio className="size-4" />
-                  {pending ? "Starting…" : "Go live"}
+                  {busy === "go" ? "Starting…" : "Go live"}
                 </Button>
               )}
-              {status === "live" && (
-                <Button type="button" variant="destructive" disabled={pending} onClick={() => window.confirm("End the live stream for everyone watching? This also closes the broadcast room.") && run(() => endStreamAndRoomAction(stream.id))}>
-                  <Square className="size-4" />
-                  End stream
-                </Button>
-              )}
-              <Button type="button" variant="ghost" disabled={pending} onClick={() => window.confirm("End the stream and close the room?") && run(() => endStreamAndRoomAction(stream.id))}>
-                End stream and room
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={busy === "end"}
+                onClick={() => window.confirm("End the stream? Viewers stop watching, OBS is disconnected and the broadcast room closes.") && run("end", () => endStreamAndRoomAction(stream.id))}
+              >
+                <Square className="size-4" />
+                {busy === "end" ? "Ending…" : "End stream"}
               </Button>
             </div>
           </CardContent>

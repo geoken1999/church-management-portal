@@ -1,11 +1,11 @@
 import Image from "next/image";
 
-// True intrinsic size of public/logo.png. Passed as-is (rather than a
+// True intrinsic size of public/logo_brand.png. Passed as-is (rather than a
 // pre-scaled width) so Next's rendered-vs-attribute size check doesn't flag
 // a sub-pixel mismatch — display size is controlled entirely via the
 // `style` height below, with width left to scale automatically.
-const LOGO_INTRINSIC_WIDTH = 1334;
-const LOGO_INTRINSIC_HEIGHT = 335;
+const LOGO_INTRINSIC_WIDTH = 1343;
+const LOGO_INTRINSIC_HEIGHT = 329;
 
 interface LogoProps {
   /** "full" is the mark + wordmark; "icon" is the square mark alone, for tight spaces like the dashboard header. */
@@ -31,7 +31,7 @@ export function Logo({ variant = "full", size = "default" }: LogoProps) {
 
   return (
     <Image
-      src="/logo.png"
+      src="/logo_brand.png"
       alt="KingdomFlow"
       width={LOGO_INTRINSIC_WIDTH}
       height={LOGO_INTRINSIC_HEIGHT}

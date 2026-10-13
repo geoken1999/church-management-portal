@@ -959,6 +959,20 @@ export type KmeetMeeting = {
   last_active_at: string;
 };
 
+// A saved monthly church report (migration 0167); `data` is a MonthlyReportData.
+export type MonthlyReport = {
+  id: string;
+  organization_id: string;
+  period: string;
+  title: string;
+  note: string | null;
+  data: unknown;
+  published: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // Members who volunteer, with a volunteer ID and a digital ID card (migration 0166).
 export type Volunteer = {
   id: string;
@@ -3028,6 +3042,12 @@ export type Database = {
             referencedColumns: ["auth_user_id"];
           },
         ];
+      };
+      monthly_reports: {
+        Row: MonthlyReport;
+        Insert: Partial<MonthlyReport> & Pick<MonthlyReport, "organization_id" | "period" | "title">;
+        Update: Partial<MonthlyReport>;
+        Relationships: [];
       };
       volunteers: {
         Row: Volunteer;

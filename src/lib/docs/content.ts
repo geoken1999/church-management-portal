@@ -333,6 +333,15 @@ export const DOC_CATEGORIES: DocCategory[] = [
         ],
       },
       {
+        id: "monthly-report",
+        title: "Monthly church report",
+        body: [
+          "Reports → Advanced: monthly report makes a summary of how the whole church did in one finished month, from your own records: members, attendance, events, giving, expenses and balance, volunteers and prayer requests. You choose which sections to include, and can add a note of your own (thanks, praise reports, what is coming next).",
+          "It shows totals only — never who gave what or who attended. You can include only the sections you have access to, and a report is saved as it was made, so its numbers don't change later. Making a report for a month that already has one replaces it.",
+          "An owner or admin can Publish a report to the app. Published reports are listed for every member under Explore → Reports, and for the team under Reports in the team app. An unpublished report is seen only by your team. You can print any report, or save it as a PDF, from the report's page.",
+        ],
+      },
+      {
         id: "widget",
         title: "Widget — an embeddable form for your website",
         body: [

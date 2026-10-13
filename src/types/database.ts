@@ -959,6 +959,34 @@ export type KmeetMeeting = {
   last_active_at: string;
 };
 
+// Churches whose access has ended and are counting down to deletion (migration 0165).
+export type OrganizationRetention = {
+  organization_id: string;
+  expired_since: string;
+  reminders_sent: number;
+  last_reminder_at: string | null;
+  final_warning_sent_at: string | null;
+  exempt: boolean;
+  blocked_reason: string | null;
+  updated_at: string;
+};
+
+export type PlatformSetting = {
+  key: string;
+  value: unknown;
+  updated_at: string;
+};
+
+export type DeletedOrganization = {
+  id: string;
+  organization_id: string;
+  name: string;
+  owner_email: string | null;
+  expired_since: string | null;
+  deleted_at: string;
+  summary: Record<string, unknown>;
+};
+
 // The mobile app's health reporting (migration 0164).
 export type MobileAppDevice = {
   device_id: string;
@@ -2984,6 +3012,24 @@ export type Database = {
             referencedColumns: ["auth_user_id"];
           },
         ];
+      };
+      organization_retention: {
+        Row: OrganizationRetention;
+        Insert: Partial<OrganizationRetention> & Pick<OrganizationRetention, "organization_id">;
+        Update: Partial<OrganizationRetention>;
+        Relationships: [];
+      };
+      platform_settings: {
+        Row: PlatformSetting;
+        Insert: Partial<PlatformSetting> & Pick<PlatformSetting, "key">;
+        Update: Partial<PlatformSetting>;
+        Relationships: [];
+      };
+      deleted_organizations: {
+        Row: DeletedOrganization;
+        Insert: Partial<DeletedOrganization> & Pick<DeletedOrganization, "organization_id" | "name">;
+        Update: Partial<DeletedOrganization>;
+        Relationships: [];
       };
       mobile_app_devices: {
         Row: MobileAppDevice;

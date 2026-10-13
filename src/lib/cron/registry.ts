@@ -39,6 +39,11 @@ const JOB_DEFINITIONS: Record<string, { label: string; description: string; load
     description: "Renews and charges organization subscriptions.",
     load: () => import("@/app/api/cron/subscription-billing/route"),
   },
+  "subscription-retention": {
+    label: "Lapsed churches",
+    description: "Reminds churches whose access has ended to resubscribe, warns them the day before, and deletes them after 30 days while automatic deletion is on.",
+    load: () => import("@/app/api/cron/subscription-retention/route"),
+  },
   "daily-health-report": {
     label: "Daily health report",
     description: "Emails the platform health summary.",

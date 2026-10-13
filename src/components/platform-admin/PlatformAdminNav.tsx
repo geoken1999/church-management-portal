@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Building2, LifeBuoy, HeartPulse, ScrollText, HandCoins, BookOpen, Radio, ToggleLeft, Wallet, Receipt, BarChart3, Timer, MessageSquareText, Activity, UserX, Smartphone } from "lucide-react";
+import { LayoutDashboard, Building2, LifeBuoy, HeartPulse, ScrollText, HandCoins, BookOpen, Radio, ToggleLeft, Wallet, Receipt, BarChart3, Timer, MessageSquareText, Activity, UserX, Smartphone, Hourglass } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/platform-admin", label: "Overview", icon: LayoutDashboard, exact: true },
@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { href: "/platform-admin/cron", label: "Cron Jobs", icon: Timer, exact: false },
   { href: "/platform-admin/whatsapp-templates", label: "WA Templates", icon: MessageSquareText, exact: false },
   { href: "/platform-admin/whatsapp-health", label: "WA Health", icon: Activity, exact: false },
+  { href: "/platform-admin/retention", label: "Lapsed", icon: Hourglass, exact: false },
   { href: "/platform-admin/deletion-requests", label: "Deletions", icon: UserX, exact: false },
   { href: "/platform-admin/mobile-health", label: "App Health", icon: Smartphone, exact: false },
   { href: "/platform-admin/health", label: "Health", icon: HeartPulse, exact: false },

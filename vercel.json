@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/youth-sync",
       "schedule": "20 19 * * *"
+    },
+    {
+      "path": "/api/cron/subscription-retention",
+      "schedule": "10 5 * * *"
     }
   ]
 }

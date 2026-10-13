@@ -26,6 +26,12 @@ import {
   Calculator,
   QrCode,
   Palette,
+  Smartphone,
+  Video,
+  BellRing,
+  Wallet,
+  HandHeart,
+  ClipboardList,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -36,10 +42,10 @@ import { DashboardPreview } from "@/components/landing/DashboardPreview";
 import { AiAutomationSection } from "@/components/landing/AiAutomationSection";
 
 const STATS = [
-  { value: "25+", label: "built-in modules" },
+  { value: "30+", label: "built-in modules" },
+  { value: "iOS & Android", label: "apps for your team and members" },
   { value: "14-day", label: "free trial, no card" },
   { value: "Multi-branch", label: "ready from day one" },
-  { value: "Row-level", label: "security by Supabase" },
 ];
 
 const STEPS = [
@@ -119,6 +125,16 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
         description: "One-off and recurring events, online or in-person, each with an optional public sign-up page — capacity limits, custom fields, and rules that close registration automatically.",
       },
       {
+        icon: Video,
+        title: "K-Connect video & audio calls",
+        description: "Host church meetings and prayer calls right from the dashboard or the app — a waiting room to admit people one by one, in-call chat and reactions, invite links for guests, and calls that close themselves when everyone has left.",
+      },
+      {
+        icon: HandHeart,
+        title: "Prayer requests",
+        description: "Members send prayer requests from the app and your team is notified straight away, with every request kept in one place.",
+      },
+      {
         icon: ListTodo,
         title: "To Do",
         description: "A shared task list for your team, with due dates and a calendar export so nothing falls through the cracks.",
@@ -129,6 +145,11 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
     title: "Tools",
     blurb: "Documents, forms, and reporting that stay out of the way.",
     items: [
+      {
+        icon: ClipboardList,
+        title: "Planner",
+        description: "Keep a named initiative — a service, a building project, an outreach — in one place with its notes and tasks, instead of scattered across chats.",
+      },
       {
         icon: FolderOpen,
         title: "Folder",
@@ -166,6 +187,11 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
         description: "Run campaigns toward a goal and accept online giving by card or UPI through a shareable payment link — the raised total updates automatically as gifts come in, online or logged by hand.",
       },
       {
+        icon: Wallet,
+        title: "Membership fees & payouts",
+        description: "Ask members for a monthly fee by email with a secure payment link, watch what is collected and outstanding, and request payouts for fundraisers, paid events and fees from one Payouts page.",
+      },
+      {
         icon: Calculator,
         title: "Accounting",
         description: "Track income and expenses by category, a printable ledger, and line-itemed invoices — with a chart comparing income vs. expense over time.",
@@ -187,10 +213,40 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
         description: "Send WhatsApp broadcasts through our shared service, or connect your own number for two-way chat with congregants, threaded right in your dashboard.",
       },
       {
+        icon: BellRing,
+        title: "Push notifications",
+        description: "Send a notification to your whole church, a branch, a group or one member, with a link and a button — and members choose which kinds they want to receive.",
+      },
+      {
         icon: Share2,
         title: "Social media hub",
         description: "Manage Instagram, YouTube, and Facebook without leaving your dashboard — connect and switch between multiple YouTube channels from one place.",
       },
+    ],
+  },
+];
+
+const APP_CARDS = [
+  {
+    icon: ShieldCheck,
+    title: "For your team",
+    description: "The dashboard's modules in your hand, with exactly the same permissions and plan rules.",
+    points: [
+      "Members, attendance, events, giving, accounting, reports and messaging — managed from your phone, with changes showing up everywhere in real time.",
+      "Start and host video and audio calls inside the app, admit people from the waiting room, and end calls for everyone.",
+      "A notification center that matches the dashboard bell, plus approvals, payouts, team logins and support tickets.",
+      "Choose which features your team sees, and everyone only sees what their permissions allow.",
+    ],
+  },
+  {
+    icon: Users,
+    title: "For your members",
+    description: "A home screen designed by you, with everything a member needs.",
+    points: [
+      "Design the Home screen in the Design Studio: banners, announcements, quick links, videos, upcoming events and a card that appears when a call is live.",
+      "Register for events in one tap and keep the pass, check attendance, send prayer requests and show a membership QR code.",
+      "Give online from the app, join live calls with one tap, and open documents shared with their group right inside the app.",
+      "Push notifications from the church, with a switch for every kind.",
     ],
   },
 ];
@@ -221,6 +277,14 @@ const FAQS = [
   {
     question: "Can I cancel anytime?",
     answer: "Yes, from the Billing page. Cancellation takes effect immediately rather than at the end of your paid period, so there's no partial refund for the unused remainder.",
+  },
+  {
+    question: "Is there a mobile app?",
+    answer: "Yes — one KingdomFlow app for iPhone and Android. Your team signs in with their dashboard login to manage the church, and members sign in with their phone number to see the Home screen you design, register for events, give, pray and join calls.",
+  },
+  {
+    question: "Can we hold video and audio calls without another tool?",
+    answer: "Yes. K-Connect has video and audio calls built in, on the web and in the app. Hosts can admit people one by one, guests can join from an invite link without an account, and call length depends on your plan.",
   },
   {
     question: "Which plan includes Finance and Social Media?",
@@ -464,6 +528,42 @@ export function LandingPage() {
                   </div>
                 </CardContent>
               </Card>
+            </div>
+          </div>
+        </section>
+
+        <section id="apps" className="px-4 py-20 sm:px-6">
+          <div className="mx-auto max-w-6xl">
+            <div className="mx-auto max-w-2xl text-center">
+              <Badge variant="secondary" className="mb-4">
+                <Smartphone className="size-3" />
+                Mobile apps
+              </Badge>
+              <h2 className="font-heading text-3xl font-bold tracking-tight text-balance">Your church in everyone&apos;s pocket</h2>
+              <p className="mt-3 text-muted-foreground">One app for your team to run the church, and the same app for members to belong to it.</p>
+            </div>
+            <div className="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-2">
+              {APP_CARDS.map((card) => (
+                <Card key={card.title} size="lg">
+                  <CardHeader>
+                    <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+                      <card.icon className="size-6" />
+                    </div>
+                    <CardTitle className="mt-3 text-xl">{card.title}</CardTitle>
+                    <CardDescription>{card.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-3">
+                      {card.points.map((point) => (
+                        <li key={point} className="flex items-start gap-3">
+                          <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-primary" />
+                          <span className="text-sm text-muted-foreground">{point}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </div>
         </section>

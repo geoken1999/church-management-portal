@@ -49,8 +49,9 @@ export const DOC_CATEGORIES: DocCategory[] = [
         id: "mobile-app",
         title: "Choosing your mobile app features",
         body: [
-          "Organization → Mobile App lets an owner or admin pick up to 15 of the dashboard's features to make available in KingdomFlow's dedicated mobile app — the same set for your whole team, not a per-person choice.",
-          "Uncheck a feature to free up a slot for a different one once you've picked 15; there's no separate save per feature, just one Save for the whole selection.",
+          "Organization → Mobile App lets an owner or admin pick up to 15 features to make available to your team in the KingdomFlow mobile app — the same set for your whole team, not a per-person choice. The Dashboard is always in the app, and Social Media (Instagram, YouTube, Facebook) and Documentation are web-only, so none of the three is on the list.",
+          "Uncheck a feature to free up a slot for a different one once you've picked 15; there's no separate save per feature, just one Save for the whole selection. A few features (Prayer, K-Connect, Ask Aura, AI Rules and Automation) aren't limited by this list — they appear in the app for anyone whose role and plan allow them.",
+          "The Mobile App area also holds the Design Studio, Giving and Notifications tabs for the member app — see \"Mobile Apps\" for all of it.",
         ],
       },
       {
@@ -161,9 +162,75 @@ export const DOC_CATEGORIES: DocCategory[] = [
         id: "kconnect",
         title: "K-Connect calls",
         body: [
-          "K-Connect has video calls and audio-only calls, switched at the top of one page in the dashboard. You start or schedule either kind there, and you can invite people with a link, including people who aren't members.",
-          "When someone is speaking, their call tile gets a border that blinks, so you can see who is talking at a glance. If your device has reduced motion turned on, the border stays steady instead of blinking.",
+          "K-Connect has video calls and audio-only calls, switched at the top of one page in the dashboard. You start or schedule either kind there, and you can invite people with a link, including people who aren't members. Video and audio keep separate permissions, so you can let someone host video calls but not audio, or the other way round.",
+          "In a call you can mute, turn your camera on and off, chat, and send quick reactions. Hosts (anyone with Write access to that call type) can also mute or remove people, turn someone's camera off, switch \"admit one by one\" on or off, and end the call for everyone. New chat messages show a badge on the chat button while the chat is closed.",
+          "When someone is speaking, their call tile gets a border that blinks, so you can see who is talking at a glance. If your device has reduced motion turned on, the border stays steady instead of blinking. Every camera is shown whole inside its tile, never cropped.",
+          "With \"admit one by one\" on, people wait until a host lets them in. Hosts see who is waiting at the top of the call, on the web or in the app, and can Admit or Deny.",
+          "A call that has had nobody in it for 3 minutes is ended automatically, so unused calls never stay open. Calls scheduled for later are not affected until someone starts them.",
           "Call length depends on your plan. On Starter, video calls end after 20 minutes and audio calls after 30. On Growth, they end after 40 and 50 minutes. On Pro, calls have no time limit.",
+          "In the KingdomFlow app, K-Connect calls run entirely inside the app — for your team, for members (a Live calls card can appear on their Home screen), and for guests who open an invite link. See \"Mobile Apps\" for how the app handles calls.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "mobile-apps",
+    title: "Mobile Apps",
+    articles: [
+      {
+        id: "staff-app",
+        title: "The KingdomFlow app for your team",
+        body: [
+          "Owners, admins and team members sign in to the KingdomFlow app with the same email and password they use on the web. The Services tab is organised the same way as the dashboard's menu — Organization, People, Ministry, Tools, AI Tools, Finance, Messaging and Help — and shows the features your church switched on at Organization → Mobile App.",
+          "The rules are the same as on the web: a person only sees and changes what their tab permissions allow, the church's plan limits apply, and anything an owner or admin has turned off stays off. Changes made on the web show up in the app on their own, and the other way round.",
+          "In the app you can manage Members, Leaders, Youth, Committee, Families, Branches, Ministries, Worship, Media, Events, To Do, the Planner, Prayer requests (view only), Attendance, Forms, Folder documents, Reports (with Excel and PDF export), Accounting (summary, ledger, invoices and expenses), Fund Raisers, Offerings, Donations, Membership fees and Payouts. You can send Email, SMS and WhatsApp campaigns, work with Automation, Ask Aura and AI Rules, manage K-Connect calls, check the website Widget's messages, manage Team logins and permissions, view Billing, edit the Church profile and raise Support tickets.",
+          "The bell at the top right opens the notification center — the same notifications as the dashboard bell. Swipe one to remove it, or mark everything read.",
+          "Some things stay on the web: connecting Instagram, YouTube and Facebook, the Documentation, creating WhatsApp message templates, follow-up automations, email attachments and rich formatting, printing invoices, changing your church's name and logo, and paying for plans or add-ons.",
+        ],
+      },
+      {
+        id: "member-app",
+        title: "The KingdomFlow app for members",
+        body: [
+          "Members sign in to the app with their phone number and a one-time code. The number has to match the one saved on their profile in Members, and the member has to be active.",
+          "The Home screen is whatever your church designs in the Design Studio. Members can also see upcoming events (and register for them in one tap, then keep their pass in the app), see their own attendance, send prayer requests, give online, show their membership QR code, and update their details — changes to their details go to your team as a request to approve.",
+          "Members who are part of a group (Leaders, Youth, Worship team, Media team or Committee) see that group's announcements, links and — for the Worship and Media teams — shared documents. Pictures and PDFs open right inside the app; other files can be handed to another app.",
+          "Members get notifications from the church on their phone, and can switch each kind on or off in Settings. They can also change the app's colour theme.",
+        ],
+      },
+      {
+        id: "design-studio",
+        title: "Design Studio — design your members' Home screen",
+        body: [
+          "Organization → Mobile App → Design Studio is where an owner or admin builds the Home screen members see. Add sections, put them in order, hide the ones you don't want yet, and see a preview before you publish. Members see only what you have published; your draft saves as you go.",
+          "Sections you can add: a Banner (up to 6 images, with optional links and autoplay), a Welcome message, an Announcement (with an optional image and button), Quick links (membership QR code, My details or any web link), Upcoming events, Videos (YouTube links, shown as a row of thumbnails) and Live calls.",
+          "A Live calls section shows a card whenever a K-Connect video or audio call is live at your church, with a Join button that opens the call inside the app. When nothing is live it stays out of the way. Leave it out of your design if you don't want members to see it.",
+        ],
+      },
+      {
+        id: "app-notifications",
+        title: "Push notifications to your members",
+        body: [
+          "Organization → Mobile App → Notifications lets an owner or admin send a notification to your whole church, one branch, one group (for example Youth) or a single member. Add a link and a button label (for example \"Join\") and the notification opens that link when tapped. A link to a K-Connect call opens the call inside the app.",
+          "Members can switch off each kind of notification (announcements, events, prayer requests, tasks and so on) in the app's Settings, and a member who has switched a kind off isn't sent it.",
+          "Your team also gets notifications for things that need them — such as a new prayer request, an event registration or a reply from support — and the same list appears in the notification center, on the web and in the app.",
+        ],
+      },
+      {
+        id: "app-giving",
+        title: "Giving from the app",
+        body: [
+          "Organization → Mobile App → Giving sets up how members give from the app, using your church's own payment accounts. Members tap Give in the app and pay on a secure page that opens inside the app; UPI and other payment apps take over when needed and bring the member back.",
+          "Gifts appear in your Donations like any other online gift.",
+        ],
+      },
+      {
+        id: "app-calls",
+        title: "K-Connect calls in the app",
+        body: [
+          "Starting, scheduling and joining K-Connect calls all happen inside the app, for video and audio. Hosts get the same controls as on the web: admit or deny people who are waiting, switch \"admit one by one\", mute or remove people, and end the call for everyone. Everyone can chat, send reactions, mute and turn their camera on or off, and flip between the front and back camera. The screen stays awake while you're in a call.",
+          "A call invite link opens in the app when the app is installed: someone signed in goes straight into the call, and someone who isn't signed in is asked for their name and joins as a guest. If the link opens in the browser instead, tap \"Open in the KingdomFlow app\" on the invite page. (Opening plain web links directly in the app needs a one-time setup by KingdomFlow's team — if it doesn't happen on your phone, the button above always works.)",
+          "Screen sharing isn't available in the app yet; join from a computer to share your screen.",
         ],
       },
     ],
@@ -311,6 +378,15 @@ export const DOC_CATEGORIES: DocCategory[] = [
           "- Payments can only be taken through KingdomFlow's shared account. Payments you collect yourself, such as cash or your own payment link, aren't recorded here.",
         ],
       },
+      {
+        id: "payouts",
+        title: "Payouts — what KingdomFlow owes your church",
+        body: [
+          "Payouts (under Organization) brings together everything collected for you through KingdomFlow's shared account: Fund Raisers, paid Events and monthly membership fees. Each has its own balance, with the 2.5% fee already taken out.",
+          "Owners and admins save where to send the money — a UPI ID or bank account — once, then use Request payout. One request is created for every balance that is owed. A balance that already has a request waiting is skipped until that one is paid.",
+          "You see a Payouts page only for the parts you can use: each part follows the permission of its own tab (Fund Raisers, Events, Donation). Payouts are processed manually on our end, so they aren't instant. The same page is in the mobile app, under Finance.",
+        ],
+      },
     ],
   },
   {
@@ -423,6 +499,10 @@ export const DOC_CATEGORIES: DocCategory[] = [
           "- Trial length is fixed at 14 days and isn't extendable from within the app.",
           "- Membership fee payments count only when made through KingdomFlow's shared account. Cash and your own payment links aren't recorded.",
           "- Member follow-up depends on each Sunday's register being marked complete. Unmarked Sundays are skipped, not treated as absences.",
+          "- The mobile app doesn't cover Social Media, Documentation, WhatsApp template creation, follow-up automations, email attachments, invoice printing, or changing your church's name and logo — use the web for those.",
+          "- Screen sharing can be started from a computer but not from the mobile app.",
+          "- Documents shared with groups exist only for the Worship team and Media team today; Leaders, Youth and Committee groups share announcements and links.",
+          "- Someone who joins an \"admit one by one\" K-Connect call from the app is admitted within a few seconds of the host's answer, not instantly.",
         ],
       },
     ],

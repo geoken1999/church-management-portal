@@ -26,7 +26,7 @@ import {
 import { joinMeetingAction, joinMeetingAsGuestAction, endMeetingAction, toggleAdmissionModeAction, kmeetHeartbeatAction, listEntryRequestsAction, answerEntryRequestAction } from "@/lib/kmeet/actions";
 import { publicBasePathForMode } from "@/lib/kmeet/mode";
 import type { KmeetMode } from "@/types/database";
-import { GoLiveButton } from "@/components/livestream/GoLiveButton";
+import { AudiencePanel, StreamControls } from "@/components/livestream/StreamControls";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -382,7 +382,6 @@ function CallControls({
   chatOpen,
   onToggleChat,
   onLeft,
-  liveStreamId,
 }: {
   meetingId: string;
   audioOnly: boolean;
@@ -393,7 +392,6 @@ function CallControls({
   chatOpen: boolean;
   onToggleChat: () => void;
   onLeft: () => void;
-  liveStreamId?: string;
 }) {
   const { leave, end, toggleMic, toggleWebcam, toggleScreenShare, localMicOn, localWebcamOn, localScreenShareOn, localParticipant } = useMeeting();
 
@@ -446,7 +444,7 @@ function CallControls({
           </span>
         )}
       </Button>
-      {liveStreamId ? <GoLiveButton streamId={liveStreamId} /> : <CopyInviteLinkButton meetingId={meetingId} audioOnly={audioOnly} />}
+      <CopyInviteLinkButton meetingId={meetingId} audioOnly={audioOnly} />
       {isModerator && (
         <Button type="button" variant="outline" size="sm" onClick={onToggleAdmission} title="Toggle whether new joiners need to be admitted">
           {requireAdmission ? <ShieldAlert className="size-3.5" /> : <ShieldCheck className="size-3.5" />}
@@ -675,7 +673,8 @@ function CallView({
             ))}
           </div>
         )}
-        <div className="flex items-center justify-end gap-3 border-b border-border px-3 py-1.5">
+        <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-1.5">
+          <span className="text-xs font-medium text-muted-foreground">{liveStreamId ? "Broadcast room: everyone here is part of the stream" : ""}</span>
           <CallTimer startedAt={startedAt} maxDurationMinutes={maxDurationMinutes} onExpire={handleExpire} />
         </div>
         <div className="relative flex min-h-0 flex-1">
@@ -692,10 +691,13 @@ function CallView({
                 ))}
               </div>
             )}
-            <FloatingReactions />
+            {!liveStreamId && <FloatingReactions />}
           </div>
-          {chatOpen && <ChatPanel onClose={() => setChatOpen(false)} />}
+          {chatOpen && (liveStreamId ? <AudiencePanel streamId={liveStreamId} onClose={() => setChatOpen(false)} /> : <ChatPanel onClose={() => setChatOpen(false)} />)}
         </div>
+        {liveStreamId ? (
+          <StreamControls streamId={liveStreamId} chatOpen={chatOpen} onToggleChat={() => setChatOpen((v) => !v)} onLeft={onLeft} />
+        ) : (
         <CallControls
           meetingId={meetingId}
           audioOnly={audioOnly}
@@ -705,9 +707,9 @@ function CallView({
           onToggleAdmission={handleToggleAdmission}
           chatOpen={chatOpen}
           onToggleChat={() => setChatOpen((v) => !v)}
-          liveStreamId={isModerator ? liveStreamId : undefined}
           onLeft={onLeft}
         />
+        )}
       </div>
     </EntryRequestListener>
   );

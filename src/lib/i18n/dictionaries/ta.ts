@@ -38,7 +38,6 @@ export const ta: Dictionary = {
     items: {
       dashboard: "டாஷ்போர்டு",
       profile: "சுயவிவரம்",
-      settings: "தேவாலய அமைப்புகள்",
       team: "குழு",
       billing: "பில்லிங்",
       branches: "கிளைகள்",

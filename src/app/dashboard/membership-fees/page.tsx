@@ -6,7 +6,7 @@ import { getPlanUsage } from "@/lib/plans/dal";
 import { getOrganizationPayoutDetails } from "@/lib/organizations/payout-details-dal";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 import { UpgradeRequired } from "@/components/dashboard/UpgradeRequired";
-import { MovedToSettings } from "@/components/settings/MovedToSettings";
+import { MembershipFeeSettingsForm } from "@/components/membership/MembershipFeeSettingsForm";
 import { RequestMembershipPayoutButton } from "@/components/membership/RequestMembershipPayoutButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -96,7 +96,7 @@ export default async function MembershipFeesPage({ searchParams }: { searchParam
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <MovedToSettings what="The fee amount, due day and reminder timing" section="payments" label="Fee settings" />
+          <MembershipFeeSettingsForm settings={settings} canWrite={canWrite} />
         </CardContent>
       </Card>
 

@@ -6,8 +6,13 @@ import { getMemberGroups } from "@/lib/members/groups";
 import { MemberGroupsProvider } from "@/components/members/MemberGroups";
 import { getWhatsAppCampaigns, getWhatsAppSendAvailability, getWhatsAppTemplates, getWhatsAppConversations, getWhatsAppConversationMessages } from "@/lib/whatsapp/dal";
 import { resolvePhoneCountry } from "@/lib/whatsapp/validation";
+import { getWhatsAppConnectionSummary } from "@/lib/whatsapp/credentials";
 import { syncPlatformTemplatesForOrg } from "@/lib/whatsapp/platform-templates";
-import { MovedToSettings } from "@/components/settings/MovedToSettings";
+import { PlatformTemplatesCard } from "@/components/whatsapp/PlatformTemplatesCard";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { WhatsAppFallbackCard } from "@/components/whatsapp/WhatsAppFallbackCard";
+import { WhatsAppConnectionCard } from "@/components/whatsapp/WhatsAppConnectionCard";
+import { getSiteUrl } from "@/lib/site-url";
 import { WhatsAppManager } from "@/components/whatsapp/WhatsAppManager";
 import { getScheduledCampaigns } from "@/lib/scheduler/dal";
 import { sendOverdueCampaignsInBackground } from "@/lib/scheduler/backstop";
@@ -31,7 +36,7 @@ export default async function WhatsAppPage() {
   // number before the list is read.
   await syncPlatformTemplatesForOrg(organizationId);
 
-  const [members, branches, memberGroups, campaigns, templates, conversations, availability] = await Promise.all([
+  const [members, branches, memberGroups, campaigns, templates, conversations, availability, connection] = await Promise.all([
     getMembers(organizationId),
     getBranches(organizationId),
     getMemberGroups(organizationId),
@@ -39,6 +44,7 @@ export default async function WhatsAppPage() {
     getWhatsAppTemplates(organizationId),
     getWhatsAppConversations(organizationId),
     getWhatsAppSendAvailability(organizationId),
+    getWhatsAppConnectionSummary(organizationId, isOrgAdmin),
   ]);
 
   const conversationsWithMessages = await Promise.all(
@@ -72,7 +78,15 @@ export default async function WhatsAppPage() {
         <p className="mt-1 text-muted-foreground">Send campaigns and reply to congregation queries over WhatsApp.</p>
       </div>
 
-      {isOrgAdmin && <MovedToSettings what="Your WhatsApp number, the backup channel and message templates" section="whatsapp" label="WhatsApp settings" />}
+      <WhatsAppConnectionCard connection={connection} isOrgAdmin={isOrgAdmin} webhookUrl={`${getSiteUrl()}/api/whatsapp/webhook`} />
+
+      {isOrgAdmin && <WhatsAppFallbackCard initial={membership.organization.whatsapp_fallback ?? "none"} />}
+
+      {connection && isOrgAdmin && (
+        <PlatformTemplatesCard
+          templates={await getPlatformTemplatesForOwnNumber(templates.map((t) => t.name))}
+        />
+      )}
 
       <MemberGroupsProvider groups={memberGroups}>
         <WhatsAppManager
@@ -93,4 +107,12 @@ export default async function WhatsAppPage() {
       </MemberGroupsProvider>
     </div>
   );
+}
+
+// For a church with its own number: the platform templates it hasn't added
+// to its own account yet.
+async function getPlatformTemplatesForOwnNumber(ownNames: string[]) {
+  const admin = createAdminClient();
+  const { data } = await admin.from("platform_whatsapp_templates").select("id, name, body_text").eq("status", "approved");
+  return (data ?? []).filter((t) => !ownNames.includes(t.name)).map((t) => ({ id: t.id, name: t.name, body: t.body_text }));
 }

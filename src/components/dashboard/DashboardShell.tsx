@@ -48,7 +48,6 @@ import {
   HandHelping,
   Wallet,
   Radio,
-  Settings,
   ChevronDown,
   ChevronsDownUp,
   ChevronsUpDown,
@@ -165,7 +164,6 @@ const NAV_GROUPS = [
   {
     groupKey: "organization" as const,
     items: [
-      { href: "/dashboard/settings", itemKey: "settings" as const, icon: Settings, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: true },
       { href: "/dashboard/team", itemKey: "team" as const, icon: Users, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/billing", itemKey: "billing" as const, icon: CreditCard, tab: NO_TAB, planFeature: NO_PLAN_FEATURE, managerOnly: true },
       { href: "/dashboard/payouts", itemKey: "payouts" as const, icon: Wallet, tab: "donations" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },

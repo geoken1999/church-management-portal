@@ -4,7 +4,6 @@ import { ALL_GROUPS, GroupFilterSelect, inGroup, useMemberGroups } from "@/compo
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { scheduleCampaignAction } from "@/lib/scheduler/actions";
-import { MovedToSettings } from "@/components/settings/MovedToSettings";
 import { EmailTemplatePicker } from "@/components/email/EmailTemplatePicker";
 import { SchedulePicker } from "@/components/scheduler/SchedulePicker";
 import { ScheduledCampaigns } from "@/components/scheduler/ScheduledCampaigns";
@@ -1081,7 +1080,7 @@ function RemoveSmtpDialog({ onRemoved }: { onRemoved: () => void }) {
   );
 }
 
-export function SmtpSettingsCard({
+function SmtpSettingsCard({
   summary,
   emailAvailable,
   onChanged,
@@ -1126,6 +1125,8 @@ export function SmtpSettingsCard({
 export function EmailManager({
   canManage,
   canSend,
+  customSmtpEnabled,
+  planName,
   emailAvailable,
   quotaExhausted,
   emailsRemaining,
@@ -1161,7 +1162,19 @@ export function EmailManager({
 
   return (
     <div className="space-y-6">
-      {canManage && <MovedToSettings what="Your own mail server (SMTP) and email templates" section="email" label="Email settings" />}
+      {canManage &&
+        (customSmtpEnabled ? (
+          <SmtpSettingsCard summary={smtpSummary} emailAvailable={emailAvailable} onChanged={refresh} />
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Your own SMTP</CardTitle>
+              <CardDescription>
+                Sending from your own mail server isn&apos;t included on the {planName} plan — upgrade to unlock it.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        ))}
 
       {canSend ? (
         <Composer

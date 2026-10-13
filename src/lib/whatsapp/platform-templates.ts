@@ -183,10 +183,3 @@ export async function addPlatformTemplateToOwnAccount(organizationId: string, pl
     return { error: describeWhatsAppError(err).message };
   }
 }
-
-// For a church with its own number: the platform templates it hasn't added to its own account yet.
-export async function getPlatformTemplatesForOwnNumber(ownNames: string[]): Promise<{ id: string; name: string; body: string }[]> {
-  const admin = createAdminClient();
-  const { data } = await admin.from("platform_whatsapp_templates").select("id, name, body_text").eq("status", "approved");
-  return (data ?? []).filter((t) => !ownNames.includes(t.name)).map((t) => ({ id: t.id, name: t.name, body: t.body_text }));
-}

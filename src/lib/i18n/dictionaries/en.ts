@@ -40,7 +40,6 @@ export const en = {
     items: {
       dashboard: "Dashboard",
       profile: "Profile",
-      settings: "Church settings",
       team: "Team",
       billing: "Billing",
       branches: "Branches",

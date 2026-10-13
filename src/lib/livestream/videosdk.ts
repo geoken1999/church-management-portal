@@ -85,3 +85,30 @@ export async function roomRecordings(roomId: string): Promise<{ url: string; sta
     })
     .filter((x): x is { url: string; start: string | null; end: string | null } => x !== null);
 }
+
+// OBS and other WHIP encoders: hands the encoder's offer to VideoSDK, which puts the
+// encoder in the room as a participant. Returns the answer to give back to the encoder.
+export async function whipOffer(roomId: string, participantId: string, sdpOffer: string): Promise<{ answer: string; sessionId: string | null } | { error: string; status: number }> {
+  const res = await fetch(`${API}/whip?roomId=${encodeURIComponent(roomId)}&participantId=${encodeURIComponent(participantId)}`, {
+    method: "POST",
+    headers: { Authorization: generateServerToken(), "Content-Type": "application/sdp" },
+    body: sdpOffer,
+  });
+  const text = await res.text().catch(() => "");
+  if (!res.ok) {
+    let message = text.slice(0, 200);
+    try {
+      message = (JSON.parse(text) as { message?: string }).message ?? message;
+    } catch {
+      // Not JSON; the raw text will do.
+    }
+    return { error: message || `VideoSDK answered ${res.status}`, status: res.status };
+  }
+  const location = res.headers.get("location") ?? "";
+  const sessionId = location.split("/").filter(Boolean).pop() ?? null;
+  return { answer: text, sessionId };
+}
+
+export async function whipEnd(sessionId: string): Promise<void> {
+  await fetch(`${API}/whip/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE", headers: { Authorization: generateServerToken() } }).catch(() => {});
+}

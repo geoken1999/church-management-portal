@@ -9,11 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ObsPanel } from "@/components/livestream/ObsPanel";
 
 const LAYOUT_NAMES = { GRID: "Grid", SPOTLIGHT: "Spotlight", SIDEBAR: "Sidebar" } as const;
 const QUALITY_NAMES = { low: "Standard", med: "HD", high: "Full HD" } as const;
 
-export function LiveStudio({ stream, canWrite }: { stream: LiveStream; canWrite: boolean }) {
+export function LiveStudio({ stream, canWrite, whipUrl }: { stream: LiveStream; canWrite: boolean; whipUrl: string }) {
   const [state, setState] = useState<LiveState>({ status: stream.status, viewers: 0, peak: stream.peak_viewers, messages: [] });
   const [pending, startTransition] = useTransition();
   const [notice, setNotice] = useState<{ kind: "error" | "info"; text: string } | null>(null);
@@ -90,11 +91,11 @@ export function LiveStudio({ stream, canWrite }: { stream: LiveStream; canWrite:
       {status !== "ended" && canWrite && (
         <Card>
           <CardHeader>
-            <CardTitle>1. Open the broadcast room · 2. Go live</CardTitle>
+            <CardTitle>Go live</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Join the room with your camera and mic, then press <strong>Go live</strong> there or here. Everyone in the room is part of the broadcast; viewers only watch.
+              Join the broadcast room with your camera and mic, or send from OBS (below), then press <strong>Go live</strong>. Everyone in the room is part of the broadcast; viewers only watch.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" nativeButton={false} render={<a href={`/broadcast/${stream.id}`} target="_blank" rel="noreferrer" />}>
@@ -120,6 +121,8 @@ export function LiveStudio({ stream, canWrite }: { stream: LiveStream; canWrite:
           </CardContent>
         </Card>
       )}
+
+      {canWrite && stream.ingest_key && status !== "ended" && <ObsPanel streamId={stream.id} whipUrl={whipUrl} initialKey={stream.ingest_key} connected={state.ingestActive ?? stream.ingest_active} />}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
         <Card>

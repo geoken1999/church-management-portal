@@ -24,7 +24,7 @@ export default async function LiveStreamPage() {
         <h1 className="font-heading text-3xl font-bold tracking-tight">Live stream</h1>
         <p className="mt-1 text-muted-foreground">Broadcast your service. Members watch live inside the app, with chat, and you can also send it to YouTube or Facebook.</p>
       </div>
-      <LiveStreamManager streams={streams.map((s) => ({ ...s, rtmp_outputs: s.rtmp_outputs.map((o) => ({ ...o, streamKey: "" })) }))} canWrite={access.write} canDelete={access.delete} available={isVideoSdkConfigured()} />
+      <LiveStreamManager streams={streams.map((s) => ({ ...s, rtmp_outputs: s.rtmp_outputs.map((o) => ({ ...o, streamKey: "" })), ingest_key: "" }))} canWrite={access.write} canDelete={access.delete} available={isVideoSdkConfigured()} />
     </div>
   );
 }

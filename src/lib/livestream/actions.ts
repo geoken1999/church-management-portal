@@ -100,6 +100,7 @@ export async function deleteLiveStreamAction(streamId: string): Promise<StreamRe
 
 export interface LiveState {
   status?: "ready" | "live" | "ended";
+  ingestActive?: boolean;
   viewers?: number;
   peak?: number;
   messages?: LiveStreamMessage[];
@@ -114,10 +115,10 @@ export async function getLiveStateAction(streamId: string): Promise<LiveState> {
   const access = await checkTabAccess(organizationId, "livestream", "read");
   if (!access.ok) return { error: access.message };
   const admin = createAdminClient();
-  const { data: stream } = await admin.from("live_streams").select("status, peak_viewers").eq("id", streamId).eq("organization_id", organizationId).maybeSingle();
+  const { data: stream } = await admin.from("live_streams").select("status, peak_viewers, ingest_active").eq("id", streamId).eq("organization_id", organizationId).maybeSingle();
   if (!stream) return { error: "That live stream could not be found." };
   const { data: messages } = await admin.from("live_stream_messages").select("*").eq("stream_id", streamId).order("created_at", { ascending: false }).limit(60);
-  return { status: stream.status, viewers: await countViewers(streamId), peak: stream.peak_viewers, messages: (messages ?? []).reverse() };
+  return { status: stream.status, ingestActive: stream.ingest_active, viewers: await countViewers(streamId), peak: stream.peak_viewers, messages: (messages ?? []).reverse() };
 }
 
 export async function sendHostChatAction(streamId: string, body: string): Promise<StreamResult> {
@@ -148,4 +149,17 @@ export async function getRecordingsAction(streamId: string): Promise<{ error?: s
   const { data: meeting } = await admin.from("kmeet_meetings").select("room_id").eq("id", stream.meeting_id).maybeSingle();
   if (!meeting?.room_id) return { recordings: [] };
   return { recordings: await roomRecordings(meeting.room_id) };
+}
+
+// A new OBS key: the old one stops working at once. For when a key was shared by mistake.
+export async function regenerateIngestKeyAction(streamId: string): Promise<{ error?: string; key?: string }> {
+  await requireUser();
+  const membership = await requireOrganization();
+  const organizationId = membership.organization.id;
+  const access = await checkTabAccess(organizationId, "livestream", "write");
+  if (!access.ok) return { error: access.message };
+  const key = `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, "");
+  const { data, error } = await createAdminClient().from("live_streams").update({ ingest_key: key, ingest_active: false, ingest_session: null }).eq("id", streamId).eq("organization_id", organizationId).select("id").maybeSingle();
+  if (error || !data) return { error: "Couldn't make a new key." };
+  return { key };
 }

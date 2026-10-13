@@ -1023,6 +1023,10 @@ export type LiveStream = {
   notify_members: boolean;
   chat_enabled: boolean;
   playback_url: string | null;
+  // OBS / WHIP encoder sign-in (migration 0171): the private key, whether an encoder is sending now, and its session.
+  ingest_key: string;
+  ingest_active: boolean;
+  ingest_session: string | null;
   started_at: string | null;
   ended_at: string | null;
   peak_viewers: number;

@@ -7,7 +7,7 @@ import { getPlanLimits } from "@/lib/plans/dal";
 import { maxDurationMinutesForMode } from "@/lib/kmeet/join";
 import { sendPushToUsers } from "@/lib/push/client";
 import { resolveAudienceAuthIds } from "@/lib/push/audience";
-import { startHls, startRtmp, stopHls, stopRtmp } from "@/lib/livestream/videosdk";
+import { startHls, startRtmp, stopHls, stopRtmp, whipEnd } from "@/lib/livestream/videosdk";
 import { VIEWER_WINDOW_SECONDS, type StreamSettings } from "@/lib/livestream/validation";
 import type { LiveStream, LiveStreamOutput } from "@/types/database";
 
@@ -75,7 +75,7 @@ export async function goLive(organizationId: string, streamId: string): Promise<
 
   const hls = await startHls(roomId, stream);
   if ("error" in hls) {
-    return { error: `Couldn't go live: ${hls.error}. Make sure you have joined the room with your camera or mic on, then try again.` };
+    return { error: `Couldn't go live: ${hls.error}. Make sure the broadcast room has your camera or mic on, or that OBS is connected, then try again.` };
   }
 
   let warning: string | undefined;
@@ -109,20 +109,22 @@ export async function endLiveStream(organizationId: string, streamId: string): P
   if (loaded.roomId && loaded.stream.status === "live") {
     await Promise.allSettled([stopHls(loaded.roomId), loaded.stream.rtmp_outputs.length > 0 ? stopRtmp(loaded.roomId) : Promise.resolve()]);
   }
-  await createAdminClient().from("live_streams").update({ status: "ended", ended_at: new Date().toISOString() }).eq("id", streamId);
+  if (loaded.stream.ingest_session) await whipEnd(loaded.stream.ingest_session);
+  await createAdminClient().from("live_streams").update({ status: "ended", ended_at: new Date().toISOString(), ingest_active: false, ingest_session: null }).eq("id", streamId);
 }
 
 // Called when K-Connect rooms end (by the host or for being empty): their streams end too.
 export async function endStreamsForMeetings(meetings: { id: string; room_id: string | null }[]): Promise<void> {
   if (meetings.length === 0) return;
   const admin = createAdminClient();
-  const { data: streams } = await admin.from("live_streams").select("id, meeting_id, status, rtmp_outputs").in("meeting_id", meetings.map((m) => m.id)).neq("status", "ended");
+  const { data: streams } = await admin.from("live_streams").select("id, meeting_id, status, rtmp_outputs, ingest_session").in("meeting_id", meetings.map((m) => m.id)).neq("status", "ended");
   for (const stream of streams ?? []) {
     const room = meetings.find((m) => m.id === stream.meeting_id)?.room_id;
     if (room && stream.status === "live") {
       await Promise.allSettled([stopHls(room), (stream.rtmp_outputs as LiveStreamOutput[]).length > 0 ? stopRtmp(room) : Promise.resolve()]);
     }
-    await admin.from("live_streams").update({ status: "ended", ended_at: new Date().toISOString() }).eq("id", stream.id);
+    if (stream.ingest_session) await whipEnd(stream.ingest_session);
+    await admin.from("live_streams").update({ status: "ended", ended_at: new Date().toISOString(), ingest_active: false, ingest_session: null }).eq("id", stream.id);
   }
 }
 

@@ -150,3 +150,47 @@ export async function getMobileHealth(): Promise<MobileHealth> {
     })),
   };
 }
+
+export interface VersionRow {
+  platform: "android" | "ios";
+  version: string;
+  build: string;
+  devices: number;
+  activeLast7d: number;
+  firstSeen: string;
+  lastSeen: string;
+}
+
+export interface MobileVersions {
+  rows: VersionRow[];
+  // Newest version seen per platform, and how many devices are on something older.
+  newest: Record<"android" | "ios", { version: string; build: string } | null>;
+  behind: Record<"android" | "ios", number>;
+  totals: Record<"android" | "ios", number>;
+}
+
+// Which app versions are out there: every device that has reported in, grouped by version.
+export async function getMobileVersions(): Promise<MobileVersions> {
+  const { compareVersions } = await import("@/lib/version");
+  const { data } = await createAdminClient().from("mobile_app_devices").select("platform, app_version, build_number, first_seen_at, last_seen_at").limit(20000);
+  const weekAgo = Date.now() - 7 * 24 * 3600_000;
+  const map = new Map<string, VersionRow>();
+  for (const d of data ?? []) {
+    const key = `${d.platform}|${d.app_version}|${d.build_number}`;
+    const row = map.get(key) ?? { platform: d.platform, version: d.app_version, build: d.build_number, devices: 0, activeLast7d: 0, firstSeen: d.first_seen_at, lastSeen: d.last_seen_at };
+    row.devices++;
+    if (new Date(d.last_seen_at).getTime() >= weekAgo) row.activeLast7d++;
+    if (d.first_seen_at < row.firstSeen) row.firstSeen = d.first_seen_at;
+    if (d.last_seen_at > row.lastSeen) row.lastSeen = d.last_seen_at;
+    map.set(key, row);
+  }
+  const rows = [...map.values()].sort((a, b) => a.platform.localeCompare(b.platform) || compareVersions(b.version, a.version, b.build, a.build));
+  const result: MobileVersions = { rows, newest: { android: null, ios: null }, behind: { android: 0, ios: 0 }, totals: { android: 0, ios: 0 } };
+  for (const platform of ["android", "ios"] as const) {
+    const list = rows.filter((r) => r.platform === platform);
+    result.newest[platform] = list[0] ? { version: list[0].version, build: list[0].build } : null;
+    result.totals[platform] = list.reduce((sum, r) => sum + r.devices, 0);
+    result.behind[platform] = list.slice(1).reduce((sum, r) => sum + r.devices, 0);
+  }
+  return result;
+}

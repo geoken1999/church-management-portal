@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Building2, LifeBuoy, HeartPulse, ScrollText, HandCoins, BookOpen, Radio, ToggleLeft, Wallet, Receipt, BarChart3, Timer, MessageSquareText, Activity, UserX, Smartphone, Hourglass } from "lucide-react";
+import { LayoutDashboard, Building2, LifeBuoy, HeartPulse, ScrollText, HandCoins, BookOpen, Radio, ToggleLeft, Wallet, Receipt, BarChart3, Timer, MessageSquareText, Activity, UserX, Smartphone, Hourglass, Tag } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/platform-admin", label: "Overview", icon: LayoutDashboard, exact: true },
@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { href: "/platform-admin/retention", label: "Lapsed", icon: Hourglass, exact: false },
   { href: "/platform-admin/deletion-requests", label: "Deletions", icon: UserX, exact: false },
   { href: "/platform-admin/mobile-health", label: "App Health", icon: Smartphone, exact: false },
+  { href: "/platform-admin/versions", label: "Versions", icon: Tag, exact: false },
   { href: "/platform-admin/health", label: "Health", icon: HeartPulse, exact: false },
   { href: "/platform-admin/logs", label: "Logs", icon: ScrollText, exact: false },
   { href: "/platform-admin/docs", label: "Docs", icon: BookOpen, exact: false },

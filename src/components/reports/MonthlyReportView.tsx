@@ -14,6 +14,11 @@ function Figure({ label, value, hint }: { label: string; value: string; hint?: s
   );
 }
 
+// The AI's paragraph about one section, in words rather than numbers.
+function Para({ text }: { text?: string }) {
+  return text ? <p className="col-span-full text-sm leading-relaxed whitespace-pre-wrap">{text}</p> : null;
+}
+
 // A saved monthly or annual church report, as the team sees it on the web (and prints):
 // the church's letterhead on top, an AI-written summary if there is one, then the
 // figures and photos, all in the language the report was made in.
@@ -85,6 +90,7 @@ export function MonthlyReportView({ data, note, photoUrl }: { data: MonthlyRepor
             <CardContent className="grid grid-cols-2 gap-4">
               <Figure label={t.onRecord} value={String(data.members.total)} />
               <Figure label={annual ? t.joinedYear : t.joinedMonth} value={String(data.members.joined)} />
+            <Para text={data.narrative?.sections?.members} />
             </CardContent>
           </Card>
         )}
@@ -99,6 +105,7 @@ export function MonthlyReportView({ data, note, photoUrl }: { data: MonthlyRepor
               <Figure label={t.average} value={String(data.attendance.average)} />
               <Figure label={t.totalAttendance} value={String(data.attendance.total)} />
               {data.attendance.best && <Figure label={t.best} value={String(data.attendance.best.count)} hint={`${data.attendance.best.title}, ${data.attendance.best.dateLabel ?? data.attendance.best.date}`} />}
+            <Para text={data.narrative?.sections?.attendance} />
             </CardContent>
           </Card>
         )}
@@ -130,6 +137,7 @@ export function MonthlyReportView({ data, note, photoUrl }: { data: MonthlyRepor
                   ))}
                 </ul>
               )}
+            <Para text={data.narrative?.sections?.giving} />
             </CardContent>
           </Card>
         )}
@@ -143,6 +151,7 @@ export function MonthlyReportView({ data, note, photoUrl }: { data: MonthlyRepor
               <Figure label={t.givingReceived} value={rupees(data.expenses.income)} />
               <Figure label={t.expenses} value={rupees(data.expenses.expenses)} />
               <Figure label={t.leftOver} value={rupees(data.expenses.balance)} />
+            <Para text={data.narrative?.sections?.expenses} />
             </CardContent>
           </Card>
         )}
@@ -195,6 +204,7 @@ export function MonthlyReportView({ data, note, photoUrl }: { data: MonthlyRepor
                   ))}
                 </ul>
               )}
+            <Para text={data.narrative?.sections?.events} />
             </CardContent>
           </Card>
         )}
@@ -207,6 +217,7 @@ export function MonthlyReportView({ data, note, photoUrl }: { data: MonthlyRepor
             <CardContent className="grid grid-cols-2 gap-4">
               <Figure label={t.active} value={String(data.volunteers.active)} />
               <Figure label={annual ? t.joinedYear : t.joinedMonth} value={String(data.volunteers.joined)} />
+            <Para text={data.narrative?.sections?.volunteers} />
             </CardContent>
           </Card>
         )}
@@ -219,6 +230,7 @@ export function MonthlyReportView({ data, note, photoUrl }: { data: MonthlyRepor
             <CardContent className="grid grid-cols-2 gap-4">
               <Figure label={t.received} value={String(data.prayer.received)} />
               <Figure label={t.answered} value={String(data.prayer.answered)} />
+            <Para text={data.narrative?.sections?.prayer} />
             </CardContent>
           </Card>
         )}

@@ -32,7 +32,7 @@ export default async function MonthlyReportPage({ params, searchParams }: { para
           <ArrowLeft className="size-4" />
           All reports
         </Link>
-        <PrintButton autoStart={pdf === "1"} fileName={`${report.data.letterhead?.churchName ?? "Church"} report ${report.period}`} />
+        <PrintButton wordHref={`/dashboard/reports/monthly/${report.id}/word`} autoStart={pdf === "1"} fileName={`${report.data.letterhead?.churchName ?? "Church"} report ${report.period}`} />
       </div>
       <MonthlyReportView data={report.data} note={report.note} photoUrl={photoUrl} />
       {membership.tabAccess.reports.write && <ReportPhotosEditor reportId={report.id} photos={report.data.photos ?? []} photoBase={photoBase} eventTitles={report.data.events?.list.map((e) => e.title) ?? []} />}

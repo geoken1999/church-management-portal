@@ -99,7 +99,7 @@ export interface MonthlyReportData {
   letterhead?: Letterhead;
   logoUrl?: string | null;
   // An AI-written summary of the figures, in the report's language.
-  narrative?: { text: string; highlights: string[] } | null;
+  narrative?: { text: string; highlights: string[]; sections?: Partial<Record<MonthlySectionKey, string>> } | null;
   photos?: ReportPhoto[];
   // Annual reports: giving and expenses month by month.
   byMonth?: { month: string; giving: number; expenses: number }[];

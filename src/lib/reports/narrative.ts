@@ -1,7 +1,7 @@
 import "server-only";
 
 import { generateJsonCompletion } from "@/lib/ai/openai";
-import type { MonthlyReportData, ReportLanguage, ReportTone } from "@/lib/reports/monthly";
+import type { MonthlyReportData, MonthlySectionKey, ReportLanguage, ReportTone } from "@/lib/reports/monthly";
 
 const LANGUAGE_NAMES: Record<ReportLanguage, string> = { en: "English", ta: "Tamil (தமிழ்)", hi: "Hindi (हिन्दी)" };
 const TONES: Record<ReportTone, string> = {
@@ -18,7 +18,7 @@ const cut = (value: unknown, max: number) => (typeof value === "string" ? value.
  * and its answer is checked and trimmed before it is kept. Returns null if the AI
  * isn't set up or gives nothing usable; the report is then made without a summary.
  */
-export async function writeReportNarrative(params: { data: MonthlyReportData; churchName: string; language: ReportLanguage; tone: ReportTone }): Promise<{ text: string; highlights: string[] } | null> {
+export async function writeReportNarrative(params: { data: MonthlyReportData; churchName: string; language: ReportLanguage; tone: ReportTone }): Promise<{ text: string; highlights: string[]; sections: Partial<Record<MonthlySectionKey, string>> } | null> {
   const { data, churchName, language, tone } = params;
   if (!process.env.OPENAI_API_KEY) return null;
 
@@ -43,22 +43,29 @@ export async function writeReportNarrative(params: { data: MonthlyReportData; ch
     `Write in ${LANGUAGE_NAMES[language]}. Tone: ${TONES[tone]}.`,
     "Use ONLY the figures in the JSON you are given. Never invent or estimate a number, name, event or fact, and never mention any individual person. Money is in Indian rupees: write amounts with the ₹ sign.",
     "If a section is missing from the JSON, say nothing about it. If a figure is zero, say little or nothing about it.",
-    'Reply with a JSON object only: {"narrative": string, "highlights": string[]}. "narrative" is 2 to 4 short paragraphs separated by a blank line. "highlights" is 3 to 5 short bullet points, each a single sentence about one figure.',
+    'Reply with a JSON object only: {"narrative": string, "highlights": string[], "sections": {"members"?: string, "attendance"?: string, "events"?: string, "giving"?: string, "expenses"?: string, "volunteers"?: string, "prayer"?: string}}. "narrative" is 2 to 4 short paragraphs separated by a blank line. "highlights" is 3 to 5 short bullet points, each a single sentence about one figure. "sections" has, for every section present in the JSON, one flowing paragraph of 2 to 4 sentences that explains that section in plain words, as it would read in a Word document: what happened, how it compares where the JSON allows (for example across byMonth), and what it means. Leave a section out if it is missing from the JSON.',
   ].join(" ");
 
   let raw: string | null;
   try {
-    raw = await generateJsonCompletion(system, JSON.stringify(figures), 1500);
+    raw = await generateJsonCompletion(system, JSON.stringify(figures), 3500);
   } catch {
     return null;
   }
   if (!raw) return null;
 
   try {
-    const parsed = JSON.parse(raw) as { narrative?: unknown; highlights?: unknown };
+    const parsed = JSON.parse(raw) as { narrative?: unknown; highlights?: unknown; sections?: unknown };
     const text = cut(parsed.narrative, 3000);
     const highlights = Array.isArray(parsed.highlights) ? parsed.highlights.map((h) => cut(h, 220)).filter(Boolean).slice(0, 5) : [];
-    return text ? { text, highlights } : null;
+    const sections: Partial<Record<MonthlySectionKey, string>> = {};
+    if (parsed.sections && typeof parsed.sections === "object") {
+      for (const key of data.sections) {
+        const paragraph = cut((parsed.sections as Record<string, unknown>)[key], 900);
+        if (paragraph) sections[key] = paragraph;
+      }
+    }
+    return text ? { text, highlights, sections } : null;
   } catch {
     return null;
   }

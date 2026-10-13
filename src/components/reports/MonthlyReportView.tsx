@@ -205,6 +205,21 @@ export function MonthlyReportView({ data, note, photoUrl }: { data: MonthlyRepor
                 </ul>
               )}
             <Para text={data.narrative?.sections?.events} />
+              {data.events.list.some((e) => e.flyerPath) && (
+                <div className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-3">
+                  {data.events.list
+                    .filter((e) => e.flyerPath)
+                    .map((e, i) => (
+                      <figure key={`${e.title}-${i}`} className="space-y-1">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={photoUrl(e.flyerPath!)} alt={e.title} className="w-full rounded-lg border border-border object-contain" />
+                        <figcaption className="text-xs text-muted-foreground">
+                          {e.title} · {e.dateLabel ?? e.date}
+                        </figcaption>
+                      </figure>
+                    ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

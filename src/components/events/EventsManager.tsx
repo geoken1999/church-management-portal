@@ -7,6 +7,7 @@ import { cn } from "cn";
 import { createEvent, updateEvent, deleteEvent, type EventFormState } from "@/lib/events/actions";
 import { getOccurrencesInRange, occurrenceLabel } from "@/lib/events/recurrence";
 import { RECURRENCE_FREQUENCIES, EVENT_STATUSES } from "@/lib/events/validation";
+import { EventFlyerUpload } from "@/components/events/EventFlyerUpload";
 import { EventRegistrationDialog } from "@/components/events/EventRegistrationDialog";
 import { EventPayoutDialog, type PayoutHistoryEntry } from "@/components/events/EventPayoutDialog";
 import type { PayoutDetailsDefaultValues } from "@/components/organizations/PayoutDetailsFields";
@@ -588,6 +589,7 @@ function EditEventDialog({
           <DialogTitle>Edit event</DialogTitle>
           <DialogDescription>Update this event&apos;s details.</DialogDescription>
         </DialogHeader>
+        <EventFlyerUpload eventId={event.id} flyerPath={event.flyer_path} />
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="id" value={event.id} />
           {state.error && (

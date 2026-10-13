@@ -24,6 +24,7 @@ import {
   type ReportPhoto,
   type ReportTemplateConfig,
 } from "@/lib/reports/monthly";
+import { FLYER_BUCKET } from "@/lib/events/flyer";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 
 const PATH = "/dashboard/reports";
@@ -123,6 +124,10 @@ export async function generateMonthlyReportAction(input: GenerateInput): Promise
   const { data: existing } = await existingQuery.maybeSingle();
   if (existing) data.photos = (existing.data as MonthlyReportData | null)?.photos ?? [];
 
+  // The report keeps its own copy of each event's flyer, so it still shows if the flyer is changed later.
+  const oldFlyers = ((existing?.data as MonthlyReportData | null)?.events?.list ?? []).map((e) => e.flyerPath).filter((p): p is string => Boolean(p));
+  await copyFlyersIntoReport(admin, organizationId, data);
+
   const label = periodLabelIn(input.period, language);
   const row = {
     organization_id: organizationId,
@@ -143,8 +148,37 @@ export async function generateMonthlyReportAction(input: GenerateInput): Promise
     return { error: "Couldn't save that report. Please try again." };
   }
 
+  // The previous version's flyer copies are no longer used.
+  if (oldFlyers.length > 0) await admin.storage.from(BUCKET).remove(oldFlyers);
+
   revalidatePath(PATH);
   return { success: true, id: saved.id, warning };
+}
+
+const MAX_FLYERS_IN_REPORT = 12;
+
+// Copies the flyers of the events in a report into the report's own folder. An event whose
+// flyer can't be copied (gone, too big for the church's storage) is just shown without one.
+async function copyFlyersIntoReport(admin: ReturnType<typeof createAdminClient>, organizationId: string, data: MonthlyReportData): Promise<void> {
+  const list = data.events?.list ?? [];
+  let copied = 0;
+  let bytes = 0;
+  for (const item of list) {
+    if (!item.flyerPath) continue;
+    const source = item.flyerPath;
+    delete item.flyerPath;
+    if (copied >= MAX_FLYERS_IN_REPORT) continue;
+    const { data: file } = await admin.storage.from(FLYER_BUCKET).download(source);
+    if (!file) continue;
+    bytes += file.size;
+    if (await checkStorageQuota(organizationId, bytes)) break;
+    const extension = source.split(".").pop() || "jpg";
+    const path = `${organizationId}/flyers/${crypto.randomUUID()}.${extension}`;
+    const { error } = await admin.storage.from(BUCKET).upload(path, file, { contentType: file.type || "image/jpeg", upsert: false });
+    if (error) continue;
+    item.flyerPath = path;
+    copied++;
+  }
 }
 
 // Publishing shows the report to every member in the app, so only an owner or admin can.
@@ -171,8 +205,9 @@ export async function deleteMonthlyReportAction(id: string): Promise<MonthlyRepo
   const { error } = await admin.from("monthly_reports").delete().eq("id", id).eq("organization_id", organizationId);
   if (error) return { error: "Couldn't delete that report." };
   // Its photos go with it.
-  const photos = (report?.data as MonthlyReportData | null)?.photos ?? [];
-  if (photos.length > 0) await admin.storage.from(BUCKET).remove(photos.map((p) => p.path));
+  const reportData = report?.data as MonthlyReportData | null;
+  const files = [...(reportData?.photos ?? []).map((p) => p.path), ...(reportData?.events?.list ?? []).map((e) => e.flyerPath).filter((p): p is string => Boolean(p))];
+  if (files.length > 0) await admin.storage.from(BUCKET).remove(files);
   revalidatePath(PATH);
   return { success: true };
 }

@@ -105,7 +105,7 @@ export interface MonthlyReportData {
   byMonth?: { month: string; giving: number; expenses: number }[];
   members?: { total: number; joined: number };
   attendance?: { services: number; total: number; average: number; best: { title: string; date: string; dateLabel?: string; count: number } | null };
-  events?: { held: number; list: { title: string; date: string; dateLabel?: string }[] };
+  events?: { held: number; list: { title: string; date: string; dateLabel?: string; flyerPath?: string }[] };
   giving?: { offerings: number; donations: number; total: number; byCategory: { name: string; amount: number }[] };
   expenses?: { expenses: number; income: number; balance: number };
   volunteers?: { active: number; joined: number };

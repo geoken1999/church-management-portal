@@ -1223,6 +1223,8 @@ export type Event = {
   registration_pass_color: string;
   registration_pass_message: string | null;
   registration_pass_background_url: string | null;
+  // The event's flyer image in the event-flyers bucket (migration 0176).
+  flyer_path: string | null;
   reminder_offset: EventReminderOffset | null;
   // Null/false when payment isn't required. "external" has no API/webhook
   // into whatever gateway the organizer actually uses (Stripe, PayPal,

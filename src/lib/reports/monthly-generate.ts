@@ -100,10 +100,10 @@ export async function buildMonthlyReport(input: BuildReportInput): Promise<Month
   }
 
   if (want.has("events")) {
-    let query = admin.from("events").select("title, start_at").eq("organization_id", organizationId).neq("status", "cancelled").gte("start_at", startUtc).lt("start_at", endUtc).order("start_at", { ascending: true });
+    let query = admin.from("events").select("title, start_at, flyer_path").eq("organization_id", organizationId).neq("status", "cancelled").gte("start_at", startUtc).lt("start_at", endUtc).order("start_at", { ascending: true });
     if (branchId) query = query.eq("branch_id", branchId);
     const { data: events } = await query.limit(500);
-    const list = (events ?? []).map((e) => ({ title: e.title, date: e.start_at.slice(0, 10), dateLabel: dateLabelIn(e.start_at, language) }));
+    const list = (events ?? []).map((e) => ({ title: e.title, date: e.start_at.slice(0, 10), dateLabel: dateLabelIn(e.start_at, language), ...(e.flyer_path ? { flyerPath: e.flyer_path } : {}) }));
     data.events = { held: list.length, list: list.slice(0, annual ? 20 : 12) };
   }
 

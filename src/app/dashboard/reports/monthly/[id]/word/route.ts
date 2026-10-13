@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { AlignmentType, Document, HeadingLevel, ImageRun, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from "docx";
+import { getImageDimensions } from "@/lib/events/image-dimensions";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getMonthlyReport } from "@/lib/reports/monthly-dal";
 import { fullDateIn, reportLabels, type MonthlyReportData, type MonthlySectionKey } from "@/lib/reports/monthly";
@@ -8,6 +9,14 @@ const rupees = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionD
 
 // Word shapes Tamil and Hindi itself, so one font name per script is enough.
 const FONTS = { en: "Calibri", ta: "Latha", hi: "Mangal" } as const;
+
+// Scales an image into a box without changing its shape (a flyer can be tall or wide).
+function fit(data: Buffer, maxWidth: number, maxHeight: number): { width: number; height: number } {
+  const size = getImageDimensions(data);
+  if (!size || size.width === 0 || size.height === 0) return { width: maxWidth, height: Math.round(maxWidth * 0.75) };
+  const scale = Math.min(maxWidth / size.width, maxHeight / size.height, 1);
+  return { width: Math.max(1, Math.round(size.width * scale)), height: Math.max(1, Math.round(size.height * scale)) };
+}
 
 async function fetchImage(url: string): Promise<{ data: Buffer; type: "png" | "jpg" } | null> {
   try {
@@ -68,7 +77,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (data.giving) body.push(heading(t.giving), ...words("giving"), table([[t.offerings, rupees(data.giving.offerings)], [t.donations, rupees(data.giving.donations)], [t.total, rupees(data.giving.total)], ...data.giving.byCategory.map((c): [string, string] => [`  ${c.name}`, rupees(c.amount)])]));
   if (data.expenses) body.push(heading(t.expensesBalance), ...words("expenses"), table([[t.givingReceived, rupees(data.expenses.income)], [t.expenses, rupees(data.expenses.expenses)], [t.leftOver, rupees(data.expenses.balance)]]));
   if (data.byMonth) body.push(heading(t.byMonth), table(data.byMonth.map((m): [string, string] => [m.month, `${t.giving}: ${rupees(m.giving)}  ·  ${t.expenses}: ${rupees(m.expenses)}`])));
-  if (data.events) body.push(heading(t.events), ...words("events"), table([[t.eventsHeld, String(data.events.held)], ...data.events.list.map((e): [string, string] => [e.title, e.dateLabel ?? e.date])]));
+  if (data.events) {
+    body.push(heading(t.events), ...words("events"), table([[t.eventsHeld, String(data.events.held)], ...data.events.list.map((e): [string, string] => [e.title, e.dateLabel ?? e.date])]));
+    const reportBase = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/report-images/`;
+    for (const e of data.events.list) {
+      if (!e.flyerPath) continue;
+      const flyer = await fetchImage(`${reportBase}${e.flyerPath}`);
+      if (!flyer) continue;
+      body.push(new Paragraph({ spacing: { before: 160 }, children: [new ImageRun({ type: flyer.type, data: flyer.data, transformation: fit(flyer.data, 300, 420) })] }));
+      body.push(para(`${e.title} · ${e.dateLabel ?? e.date}`, { size: 18, color: "666666" }));
+    }
+  }
   if (data.volunteers) body.push(heading(t.volunteers), ...words("volunteers"), table([[t.active, String(data.volunteers.active)], [annual ? t.joinedYear : t.joinedMonth, String(data.volunteers.joined)]]));
   if (data.prayer) body.push(heading(t.prayer), ...words("prayer"), table([[t.received, String(data.prayer.received)], [t.answered, String(data.prayer.answered)]]));
 

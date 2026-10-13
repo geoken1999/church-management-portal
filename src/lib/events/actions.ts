@@ -217,9 +217,10 @@ export async function deleteEvent(formData: FormData) {
   // perform it.
   const admin = createAdminClient();
   // Registrants are removed with the event, so tell them first.
-  const { data: doomed } = await admin.from("events").select("title").eq("id", id).maybeSingle();
+  const { data: doomed } = await admin.from("events").select("title, flyer_path").eq("id", id).maybeSingle();
   if (doomed) await notifyEventRegistrants(id, "Event cancelled", `${doomed.title} has been cancelled.`);
   await admin.from("events").delete().eq("id", id);
+  if (doomed?.flyer_path) await admin.storage.from("event-flyers").remove([doomed.flyer_path]);
 
   revalidatePath(EVENTS_PATH);
 }

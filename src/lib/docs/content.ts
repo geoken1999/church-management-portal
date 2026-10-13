@@ -98,7 +98,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
         id: "collapsible-menu",
         title: "Collapsing and expanding the side menu",
         body: [
-          "Each section of the side menu (People, Ministry, Tools, Finance and so on) can be folded away: click the section's name to collapse or expand it. The arrows beside the search box expand or collapse every section at once. The page you are on always opens its own section, and searching shows every match.",
+          "Each section of the side menu (People, Ministry, Tools, Finance and so on) can be folded away: click the section's name to collapse or expand it. The page you are on always opens its own section, and searching shows every match.",
           "This is on by default and remembered on each device. To turn it off (every section is then always shown), open Profile and untick Let me collapse and expand menu sections under Menu.",
         ],
       },

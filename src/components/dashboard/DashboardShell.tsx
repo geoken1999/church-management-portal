@@ -49,8 +49,6 @@ import {
   Wallet,
   Radio,
   ChevronDown,
-  ChevronsDownUp,
-  ChevronsUpDown,
 } from "lucide-react";
 import { MENU_PREFS_EVENT, readMenuPrefsFromBrowser, saveMenuPrefs, type MenuPrefs } from "@/lib/menu-prefs";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
@@ -355,9 +353,6 @@ function DashboardShellInner({
     const closed = menuPrefs.closed.includes(key) ? menuPrefs.closed.filter((k) => k !== key) : [...menuPrefs.closed, key];
     changeMenuPrefs({ ...menuPrefs, closed });
   }
-  function setAllSections(open: boolean) {
-    changeMenuPrefs({ ...menuPrefs, closed: open ? [] : filteredGroups.map((g) => g.groupKey) });
-  }
 
   const nav = (
     <nav className="flex flex-col gap-4 p-3">
@@ -372,16 +367,6 @@ function DashboardShellInner({
           aria-label={t.nav.searchPlaceholder}
         />
       </div>
-      {menuPrefs.collapsible && !forceOpen && (
-        <div className="-mt-2 flex justify-end gap-1 px-0.5">
-          <button type="button" onClick={() => setAllSections(true)} title="Expand all sections" aria-label="Expand all sections" className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground">
-            <ChevronsUpDown className="size-3.5" />
-          </button>
-          <button type="button" onClick={() => setAllSections(false)} title="Collapse all sections" aria-label="Collapse all sections" className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground">
-            <ChevronsDownUp className="size-3.5" />
-          </button>
-        </div>
-      )}
       {filteredGroups.length === 0 && <p className="px-3 text-sm text-muted-foreground">{t.nav.noTabsMatch(navSearch.trim())}</p>}
       {filteredGroups.map((group) => (
         <div key={group.groupKey} className="flex flex-col gap-1">

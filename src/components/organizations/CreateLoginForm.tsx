@@ -21,6 +21,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: CreateLoginState = {};
 
@@ -124,11 +125,7 @@ export function CreateLoginForm({
           <form action={handleSubmit} className="space-y-4">
             <input type="hidden" name="organizationId" value={organizationId} />
             <input type="hidden" name="role" value={role} />
-            {state.error && (
-              <Alert variant="destructive">
-                <AlertDescription>{state.error}</AlertDescription>
-              </Alert>
-            )}
+            <ErrorToast message={state.error} />
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="firstName">First name</Label>

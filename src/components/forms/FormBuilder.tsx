@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTab, TabsIndicator, TabsPanel } from "@/components/ui/tabs";
 import { QrCodeDialog } from "@/components/members/QrCodeDialog";
 import { BilingualSettings, bilingualChoiceFrom, bilingualChoiceToField } from "@/components/BilingualSettings";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: FormMetaState = {};
 
@@ -329,11 +330,7 @@ export function FormBuilder({
         <TabsPanel value="builder">
           <form action={handleSubmit} className="space-y-6">
             <input type="hidden" name="formId" value={form.id} />
-            {state.error && (
-              <Alert variant="destructive">
-                <AlertDescription>{state.error}</AlertDescription>
-              </Alert>
-            )}
+            <ErrorToast message={state.error} />
             {state.warning && (
               <Alert>
                 <AlertDescription>{state.warning}</AlertDescription>

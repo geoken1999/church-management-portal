@@ -18,9 +18,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CheckCircle2, Send } from "lucide-react";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: PublicEventRegistrationState = {};
 
@@ -148,11 +148,7 @@ function PaymentFailedCard({ registrationId }: { registrationId: string | null }
         <p className="font-heading text-lg font-bold">{t.publicEvent.paymentFailedTitle}</p>
         <p className="text-sm text-muted-foreground">{t.publicEvent.paymentFailedDescription}</p>
       </div>
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={error} />
       {registrationId && (
         <Button type="button" disabled={retrying} onClick={handleRetry}>
           {retrying ? t.publicEvent.processingPayment : t.publicEvent.retryPayment}
@@ -274,11 +270,7 @@ export function PublicEventRegistrationForm({ token, fields, bilingual = null }:
     <form action={formAction} className="space-y-5">
       <input type="hidden" name="__fieldKeys" value={fields.map((f) => f.key).join(",")} />
       <input type="hidden" name="__checkboxKeys" value={checkboxKeys.join(",")} />
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={state.error} />
       <div className="space-y-4">
         {fields.map((field) => (
           <PublicFieldInput key={field.key} field={field} bilingual={bilingual} />

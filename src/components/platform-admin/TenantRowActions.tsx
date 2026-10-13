@@ -8,7 +8,6 @@ import { PLANS, type PlanId } from "@/lib/plans/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
@@ -19,6 +18,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const planInitialState: SetTenantPlanState = {};
 const trialInitialState: ExtendTenantTrialState = {};
@@ -71,11 +71,7 @@ function SetPlanDialog({ organizationId, currentPlan }: { organizationId: string
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
           <input type="hidden" name="planId" value={planId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <div className="space-y-2">
             <Label>Plan</Label>
             <Select value={planId} onValueChange={(v) => setPlanId((v ?? "basic") as PlanId)}>
@@ -142,11 +138,7 @@ function ExtendTrialDialog({ organizationId }: { organizationId: string }) {
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <div className="space-y-2">
             <Label htmlFor="days">Days</Label>
             <Input id="days" name="days" type="number" min={1} defaultValue={14} required />

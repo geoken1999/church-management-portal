@@ -32,11 +32,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTab, TabsIndicator, TabsPanel } from "@/components/ui/tabs";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const createInitialState: WidgetCreateState = {};
 const settingsInitialState: WidgetSettingsState = {};
@@ -82,11 +82,7 @@ function EmptyWidgetState({ organizationId }: { organizationId: string }) {
             message — straight into KingdomFlow.
           </p>
         </div>
-        {state.error && (
-          <Alert variant="destructive" className="max-w-sm text-left">
-            <AlertDescription>{state.error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={state.error} />
         <form action={handleSubmit}>
           <input type="hidden" name="organizationId" value={organizationId} />
           <Button type="submit" disabled={pending}>
@@ -305,11 +301,7 @@ function DesignTab({ widget, canWrite }: { widget: WebsiteWidget; canWrite: bool
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
       <form action={handleSubmit} className="space-y-6">
         <input type="hidden" name="widgetId" value={widget.id} />
-        {state.error && (
-          <Alert variant="destructive">
-            <AlertDescription>{state.error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={state.error} />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">

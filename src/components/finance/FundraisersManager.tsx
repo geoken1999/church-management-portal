@@ -30,7 +30,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress, ProgressTrack, ProgressIndicator } from "@/components/ui/progress";
@@ -44,6 +43,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 type MemberBasic = Pick<Member, "id" | "first_name" | "last_name">;
 type BranchBasic = Pick<Branch, "id" | "name">;
@@ -185,11 +185,7 @@ function GivingLinkSettings({
         </p>
       )}
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={state.error} />
 
       {mode !== "none" && (
         <div className="flex items-center justify-between gap-2">
@@ -293,11 +289,7 @@ function PayoutRequestRow({
       {!pendingPayoutRequest && sharedOwed > 0 && (
         <form action={formAction} className="space-y-3">
           <input type="hidden" name="fundraiserId" value={fundraiserId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           {editing ? (
             <PayoutDetailsFields defaultValues={savedPayoutDetails ?? undefined} errors={state.fieldErrors} showSaveForFutureCheckbox />
           ) : (
@@ -557,11 +549,7 @@ function AddFundraiserDialog({
           <input type="hidden" name="branchId" value={branchId} />
           <input type="hidden" name="managedBy" value={managedBy} />
           <input type="hidden" name="status" value={status} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <FundraiserFields
             branches={branches}
             members={members}
@@ -641,11 +629,7 @@ function EditFundraiserDialog({
           <input type="hidden" name="branchId" value={branchId} />
           <input type="hidden" name="managedBy" value={managedBy} />
           <input type="hidden" name="status" value={status} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <FundraiserFields
             fundraiser={fundraiser}
             branches={branches}

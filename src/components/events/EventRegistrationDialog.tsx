@@ -52,6 +52,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const settingsInitialState: RegistrationSettingsState = {};
 
@@ -320,16 +321,8 @@ function SettingsTab({
 
       <form action={handleSubmit} className="space-y-6">
         <input type="hidden" name="eventId" value={event.id} />
-        {state.error && (
-          <Alert variant="destructive">
-            <AlertDescription>{state.error}</AlertDescription>
-          </Alert>
-        )}
-        {state.fieldErrors?.fields && (
-          <Alert variant="destructive">
-            <AlertDescription>{state.fieldErrors.fields}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={state.error} />
+        <ErrorToast message={state.fieldErrors?.fields} />
         {state.warning && (
           <Alert>
             <AlertDescription>{state.warning}</AlertDescription>

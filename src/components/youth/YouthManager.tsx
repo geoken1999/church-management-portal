@@ -14,7 +14,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,6 +26,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 type MemberBasic = Pick<Member, "id" | "first_name" | "last_name" | "phone" | "date_of_birth">;
 type YouthRow = Youth & { members: MemberBasic | null };
@@ -125,11 +125,7 @@ function AddYouthDialog({ organizationId, members }: { organizationId: string; m
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
           <input type="hidden" name="memberId" value={memberId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <MemberSelectField members={members} value={memberId} onChange={setMemberId} error={state.fieldErrors?.memberId} />
           <div className="space-y-2">
             <Label htmlFor="grade">Grade / school (optional)</Label>
@@ -194,11 +190,7 @@ function EditYouthDialog({ youth }: { youth: YouthRow }) {
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="youthId" value={youth.id} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <div className="space-y-2">
             <Label htmlFor="grade">Grade / school (optional)</Label>
             <Input id="grade" name="grade" defaultValue={youth.grade ?? ""} placeholder="10th Grade" />

@@ -9,11 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 type MemberBasic = Pick<Member, "id" | "first_name" | "last_name" | "phone">;
 type VolunteerRow = Volunteer & { members: MemberBasic | null };
@@ -144,11 +144,7 @@ function AddVolunteerDialog({ organizationId, members }: { organizationId: strin
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
           <input type="hidden" name="memberId" value={memberId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <VolunteerFields members={members} memberId={memberId} onMemberChange={setMemberId} status={status} onStatusChange={setStatus} errors={state.fieldErrors} />
           <DialogFooter>
             <Button type="submit" disabled={pending}>
@@ -201,11 +197,7 @@ function EditVolunteerDialog({ entry }: { entry: Volunteer }) {
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="id" value={entry.id} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <VolunteerFields entry={entry} memberId={entry.member_id} onMemberChange={() => {}} status={status} onStatusChange={(v) => setStatus(v === "inactive" ? "inactive" : "active")} errors={state.fieldErrors} />
           <DialogFooter>
             <Button type="submit" disabled={pending}>

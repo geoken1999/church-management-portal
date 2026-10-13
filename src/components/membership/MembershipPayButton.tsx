@@ -5,7 +5,7 @@ import { CheckCircle2 } from "lucide-react";
 import { createMembershipInvoiceOrder } from "@/lib/membership-fees/actions";
 import { redirectToPayU } from "@/lib/payu/browser";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 // Paying means the whole page navigates away to PayU's hosted checkout, then
 // PayU redirects back to /api/payu/membership/return?token=..., which lands
@@ -47,11 +47,7 @@ export function MembershipPayButton({ token, amount }: { token: string; amount: 
 
   return (
     <div className="space-y-3">
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={error} />
       <Button type="button" className="w-full" disabled={submitting} onClick={handlePay}>
         {submitting ? "Processing…" : `Pay ₹${amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
       </Button>

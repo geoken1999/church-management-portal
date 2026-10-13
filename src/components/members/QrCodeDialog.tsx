@@ -14,6 +14,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 export function QrCodeDialog({ link, title }: { link: string; title: string }) {
   const [open, setOpen] = useState(false);
@@ -75,7 +76,7 @@ export function QrCodeDialog({ link, title }: { link: string; title: string }) {
         </DialogHeader>
 
         <div className="flex flex-col items-center gap-4">
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          <ErrorToast message={error} />
           {!error && !dataUrl && (
             <div className="flex size-64 items-center justify-center rounded-lg bg-muted text-sm text-muted-foreground">
               Generating...

@@ -14,9 +14,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 function statusBadge(status: WhatsAppTemplateStatus) {
   if (status === "approved") return <Badge variant="secondary">Approved</Badge>;
@@ -83,11 +83,7 @@ function NewAutomationTemplateForm({ organizationId, kind, onCreated }: { organi
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={error} />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="automation-template-name" className="text-xs">
@@ -203,7 +199,7 @@ function TemplateRow({ template, canManage }: { template: AutomationTemplate; ca
           </div>
         )}
       </div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      <ErrorToast message={error} />
     </div>
   );
 }

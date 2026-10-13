@@ -20,7 +20,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -34,6 +33,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 type MemberBasic = Pick<Member, "id" | "first_name" | "last_name">;
 type BranchBasic = Pick<Branch, "id" | "name">;
@@ -493,11 +493,7 @@ function AddEventDialog({
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <EventFields
             members={members}
             branches={branches}
@@ -592,11 +588,7 @@ function EditEventDialog({
         <EventFlyerUpload eventId={event.id} flyerPath={event.flyer_path} />
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="id" value={event.id} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <EventFields
             members={members}
             branches={branches}

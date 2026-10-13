@@ -15,6 +15,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { MemberCountRange } from "@/types/database";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: UpdateOrganizationDetailsState = {};
 
@@ -54,11 +55,7 @@ export function EditOrganizationDetailsForm({
           <AlertDescription>Church details updated.</AlertDescription>
         </Alert>
       )}
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={state.error} />
 
       <div className="space-y-2">
         <Label htmlFor="memberCountRange">Congregation size</Label>

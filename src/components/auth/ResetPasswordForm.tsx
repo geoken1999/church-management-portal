@@ -4,9 +4,9 @@ import { useActionState } from "react";
 import { updatePassword, type ResetPasswordState } from "@/lib/auth/actions";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { FieldError } from "@/components/auth/FieldError";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: ResetPasswordState = {};
 
@@ -15,11 +15,7 @@ export function ResetPasswordForm() {
 
   return (
     <form action={formAction} noValidate className="space-y-5">
-      {state.message && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.message}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={state.message} />
 
       <div className="space-y-2">
         <Label htmlFor="password">New password</Label>

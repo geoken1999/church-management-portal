@@ -13,7 +13,6 @@ import { getCountryOptions, countryName } from "@/lib/phone/countries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,6 +25,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 // Leaders picker options — just what the Select needs (matches
 // getLeaderMembers()'s shape).
@@ -180,11 +180,7 @@ function AddBranchDialog({ organizationId, members }: { organizationId: string; 
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
           <input type="hidden" name="managedBy" value={managedBy} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <BranchFields members={members} managedBy={managedBy} onManagedByChange={setManagedBy} errors={state.fieldErrors} />
           <DialogFooter>
             <Button type="submit" disabled={pending}>
@@ -238,11 +234,7 @@ function EditBranchDialog({ branch, members }: { branch: Branch; members: Leader
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="branchId" value={branch.id} />
           <input type="hidden" name="managedBy" value={managedBy} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <BranchFields branch={branch} members={members} managedBy={managedBy} onManagedByChange={setManagedBy} errors={state.fieldErrors} />
           <DialogFooter>
             <Button type="submit" disabled={pending}>

@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -23,6 +22,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 type MemberBasic = Pick<Member, "id" | "first_name" | "last_name">;
 type FundraiserOption = { id: string; title: string };
@@ -238,11 +238,7 @@ function AddDonationDialog({
           <input type="hidden" name="memberId" value={memberId} />
           <input type="hidden" name="method" value={method} />
           <input type="hidden" name="fundraiserId" value={fundraiserId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <DonationFields
             members={members}
             fundraisers={fundraisers}
@@ -326,11 +322,7 @@ function EditDonationDialog({
           <input type="hidden" name="memberId" value={memberId} />
           <input type="hidden" name="method" value={method} />
           <input type="hidden" name="fundraiserId" value={fundraiserId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <DonationFields
             donation={donation}
             members={members}

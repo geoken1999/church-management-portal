@@ -8,9 +8,9 @@ import type { Branch } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 function base64ToBlob(base64: string, mimeType: string): Blob {
   const byteChars = atob(base64);
@@ -268,11 +268,7 @@ export function ReportsManager({
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">{definition.description}</p>
 
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+            <ErrorToast message={error} />
 
             <div className="flex flex-wrap items-end justify-between gap-3">
               <ReportFilterFields definition={definition} filters={filters} branches={branches} onChange={setFilters} />

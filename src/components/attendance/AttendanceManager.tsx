@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -23,6 +22,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 type SessionRow = AttendanceSession & {
   branches: { id: string; name: string } | null;
@@ -94,11 +94,7 @@ function CreateSessionDialog({ organizationId, branches, events }: { organizatio
           <input type="hidden" name="organizationId" value={organizationId} />
           <input type="hidden" name="branchId" value={branchId} />
           <input type="hidden" name="eventId" value={eventId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <div className="space-y-2">
             <Label htmlFor="title">Title</Label>
             <Input

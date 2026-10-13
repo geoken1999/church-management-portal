@@ -36,6 +36,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTab, TabsIndicator, TabsPanel } from "@/components/ui/tabs";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 // One placeholder as the composer edits it: a typed value for everyone, or a
 // member field with a fallback for numbers that aren't members.
@@ -239,11 +240,7 @@ function AiTemplateGenerator({
         placeholder="Remind members that Sunday service starts at 10 AM and they should come on time"
         rows={2}
       />
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={error} />
       <div className="flex gap-2">
         <Button type="button" size="sm" onClick={handleGenerate} disabled={pending || !draft.trim()}>
           {pending ? "Generating..." : "Generate"}
@@ -331,11 +328,7 @@ function NewTemplateForm({ organizationId }: { organizationId: string }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {state.error && (
-          <Alert variant="destructive">
-            <AlertDescription>{state.error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={state.error} />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="template-name" className="text-xs">
@@ -528,7 +521,7 @@ function TemplateRow({ template, canManage }: { template: WhatsAppTemplateRow; c
           </div>
         )}
       </div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      <ErrorToast message={error} />
     </div>
   );
 }
@@ -811,11 +804,7 @@ function Composer({
             <AlertDescription>{whatsappRemaining.toLocaleString()} WhatsApp messages left this month.</AlertDescription>
           </Alert>
         )}
-        {result?.error && (
-          <Alert variant="destructive">
-            <AlertDescription>{result.error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={result?.error} />
         {result?.success && (
           <Alert>
             <AlertDescription>{result.success}</AlertDescription>
@@ -1088,11 +1077,7 @@ function ChatThread({
         )}
       </div>
       <div className="border-t border-border p-3">
-        {error && (
-          <Alert variant="destructive" className="mb-2">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={error} />
         <div className="flex items-end gap-2">
           <Textarea
             value={body}

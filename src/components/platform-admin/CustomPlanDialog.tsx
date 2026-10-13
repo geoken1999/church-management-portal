@@ -20,7 +20,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
   DialogTrigger,
@@ -30,6 +29,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: SetTenantCustomPlanLimitsState = {};
 
@@ -131,11 +131,7 @@ export function CustomPlanDialog({
             ones from before the save. */}
         <form key={JSON.stringify(overrides)} action={handleSubmit} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">

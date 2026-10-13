@@ -24,6 +24,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const SELECT_CLASS = "h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
 
@@ -324,7 +325,7 @@ function ReportRow({ report, canDelete, canPublish }: { report: SavedMonthlyRepo
           <p className="text-xs text-muted-foreground">
             Made {new Date(report.updated_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} · {report.data.sections?.length ?? 0} sections · {report.data.photos?.length ?? 0} photos
           </p>
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          <ErrorToast message={error} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" size="sm" variant="outline" nativeButton={false} render={<Link href={`/dashboard/reports/monthly/${report.id}`} />}>

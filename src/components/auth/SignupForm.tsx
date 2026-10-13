@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { FieldError } from "@/components/auth/FieldError";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: SignupState = {};
 
@@ -29,11 +30,7 @@ export function SignupForm() {
   return (
     <form action={formAction} noValidate className="space-y-5">
       <input type="hidden" name="next" value={next} />
-      {state.message && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.message}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={state.message} />
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <div className="space-y-2">

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import {
   createFollowupAutomation,
   type FollowupFieldErrors,
@@ -14,8 +14,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const STEPS = ["Basics", "Trigger", "Action", "Review"] as const;
@@ -324,12 +324,7 @@ export function FollowupWizard({ automationId, initial, branches, assignees, tim
             </dl>
           )}
 
-          {formError && (
-            <Alert variant="destructive">
-              <AlertCircle className="size-4" />
-              <AlertDescription>{formError}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={formError} />
         </CardContent>
       </Card>
 

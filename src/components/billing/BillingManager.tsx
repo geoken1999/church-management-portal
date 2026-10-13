@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const STATUS_LABELS: Record<SubscriptionStatus, string> = {
   created: "Awaiting payment",
@@ -104,11 +105,7 @@ export function BillingManager({
         </Alert>
       )}
 
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={error} />
 
       {subscription && (
         <Card>

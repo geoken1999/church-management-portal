@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 interface RosterMember {
   id: string;
@@ -129,7 +130,7 @@ function RegisterCompleteToggle({ sessionId, recordedAt, canWrite }: { sessionId
           {recorded ? "Reopen register" : "Mark register complete"}
         </Button>
       )}
-      {error && <span className="text-xs text-destructive">{error}</span>}
+      <ErrorToast message={error} />
     </div>
   );
 }
@@ -177,7 +178,7 @@ function HeadcountEditor({ sessionId, initialHeadcount, canWrite }: { sessionId:
       <Button type="button" size="sm" variant="outline" onClick={handleSave} disabled={pending || Boolean(validateHeadcount(value))}>
         {pending ? "Saving..." : saved ? "Saved" : "Save"}
       </Button>
-      {error && <span className="text-xs text-destructive">{error}</span>}
+      <ErrorToast message={error} />
     </div>
   );
 }

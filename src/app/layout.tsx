@@ -3,6 +3,7 @@ import { DM_Sans, Geist_Mono } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
+import { AppToaster } from "@/components/ui/app-toaster";
 import "./globals.css";
 
 // DM Sans: matches the KingdomFlow reference design (launchpados.in) — one
@@ -55,6 +56,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           rather than "fixed" (there's nothing in our render to fix). */}
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <ThemeProvider>
+          <AppToaster />
           {/* Shows a top progress bar on every route transition — App Router
               gives no built-in "navigation pending" signal, and per-page
               loading.tsx skeletons would mean writing one per route, so this

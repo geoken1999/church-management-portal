@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setFollowupStatus } from "@/lib/automations/followup-actions";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 export function FollowupStatusControl({ automationId, status }: { automationId: string; status: "draft" | "active" | "paused" }) {
   const router = useRouter();
@@ -34,11 +34,7 @@ export function FollowupStatusControl({ automationId, status }: { automationId: 
           {isPending ? "Activating…" : status === "paused" ? "Resume" : "Activate"}
         </Button>
       )}
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={error} />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { formatBytes } from "@/lib/plans/format";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const ADDON_ICONS: Record<AddonType, typeof MessageSquareText> = {
   sms: MessageSquareText,
@@ -76,7 +77,7 @@ function PackCard({ pack, payuConfigured }: { pack: AddonPack; payuConfigured: b
             {pending ? "Redirecting..." : "Buy"}
           </Button>
         </div>
-        {error && <p className="text-xs text-destructive">{error}</p>}
+        <ErrorToast message={error} />
       </CardContent>
     </Card>
   );

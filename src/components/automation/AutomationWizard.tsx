@@ -28,6 +28,7 @@ import type {
   AutomationTemplate,
   AutomationTrigger,
 } from "@/types/database";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 export interface LeaderOption {
   id: string;
@@ -146,11 +147,7 @@ function TriggerRow({
 
   return (
     <div className="space-y-3 rounded-lg border border-border p-4">
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={error} />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label className="text-xs">Date field</Label>
@@ -367,11 +364,7 @@ export function AutomationWizard({
             <CardDescription>Name this automation and define which date fields trigger it.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {nameError && (
-              <Alert variant="destructive">
-                <AlertDescription>{nameError}</AlertDescription>
-              </Alert>
-            )}
+            <ErrorToast message={nameError} />
             <div className="flex items-end gap-2">
               <div className="flex-1 space-y-1.5">
                 <Label htmlFor="automation-name">Name</Label>
@@ -442,11 +435,7 @@ export function AutomationWizard({
             <CardDescription>WhatsApp groups aren&apos;t possible with this integration — choose who actually receives a message instead.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {destinationError && (
-              <Alert variant="destructive">
-                <AlertDescription>{destinationError}</AlertDescription>
-              </Alert>
-            )}
+            <ErrorToast message={destinationError} />
             <label className="flex items-start gap-2">
               <Checkbox
                 checked={directEnabled}
@@ -553,11 +542,7 @@ export function AutomationWizard({
             <CardDescription>Nothing sends until this automation&apos;s status is Active.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {statusError && (
-              <Alert variant="destructive">
-                <AlertDescription>{statusError}</AlertDescription>
-              </Alert>
-            )}
+            <ErrorToast message={statusError} />
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Status:</span>
               {statusBadge(automation.status)}

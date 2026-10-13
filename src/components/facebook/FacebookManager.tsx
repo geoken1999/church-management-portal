@@ -47,6 +47,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const INSIGHT_LABELS: Record<string, string> = {
   page_impressions: "Impressions",
@@ -126,11 +127,7 @@ function ChoosePageCard({ organizationId }: { organizationId: string }) {
           <p className="text-sm text-muted-foreground">Your Facebook account manages more than one Page.</p>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={error} />
 
         {pages === null && <p className="text-sm text-muted-foreground">Loading your Pages...</p>}
         {pages?.length === 0 && (
@@ -290,11 +287,7 @@ function EditPostDialog({
           <DialogTitle>Edit post</DialogTitle>
           <DialogDescription>Update this post&apos;s text.</DialogDescription>
         </DialogHeader>
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={error} />
         <Textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={4} />
         <DialogFooter>
           <Button type="button" onClick={handleSave} disabled={pending || !message.trim()}>
@@ -331,11 +324,7 @@ function DeletePostDialog({ organizationId, post, onDeleted }: { organizationId:
           <DialogTitle>Delete post?</DialogTitle>
           <DialogDescription>This will be permanently deleted from your Facebook Page.</DialogDescription>
         </DialogHeader>
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={error} />
         <DialogFooter>
           <Button type="button" variant="destructive" onClick={handleDelete} disabled={pending}>
             {pending ? "Deleting..." : "Delete post"}
@@ -460,11 +449,7 @@ function CreatePostDialog({ organizationId, onCreated }: { organizationId: strin
           <DialogDescription>Publish directly to your Facebook Page.</DialogDescription>
         </DialogHeader>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={error} />
 
         <div className="flex gap-2">
           <Button type="button" variant={view === "text" ? "default" : "outline"} size="sm" onClick={() => setView("text")}>
@@ -726,11 +711,7 @@ function ConversationThreadDialog({
           })}
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={error} />
 
         {conversation.participantId ? (
           <div className="flex items-end gap-2">

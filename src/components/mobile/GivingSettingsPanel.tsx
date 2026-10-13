@@ -7,6 +7,7 @@ import type { GivingConfig } from "@/lib/finance/giving-config";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 export function GivingSettingsPanel({ config }: { config: GivingConfig }) {
   const [enabled, setEnabled] = useState(config.enabled);
@@ -42,11 +43,7 @@ export function GivingSettingsPanel({ config }: { config: GivingConfig }) {
               <AlertDescription>{config.financeMessage}</AlertDescription>
             </Alert>
           )}
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={error} />
           {notice && (
             <Alert>
               <AlertDescription>{notice}</AlertDescription>

@@ -73,6 +73,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const INSIGHT_LABELS: Record<string, string> = {
   reach: "Reach",
@@ -218,11 +219,7 @@ function AccountSwitcher({
           </Button>
         )}
       </div>
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={error} />
     </div>
   );
 }
@@ -456,11 +453,7 @@ function PostAutomationDialog({
                 rows={3}
               />
             </div>
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+            <ErrorToast message={error} />
             <Button type="button" onClick={handleCreate} disabled={saving}>
               {saving ? "Saving..." : "Add rule for this post"}
             </Button>
@@ -608,11 +601,7 @@ function UploadPostDialog({ organizationId }: { organizationId: string }) {
             <Label htmlFor="post-caption">Caption (optional)</Label>
             <Textarea id="post-caption" name="caption" rows={3} placeholder="Write a caption..." />
           </div>
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={error} />
           <DialogFooter>
             <Button type="submit" disabled={pending}>
               {pending ? "Publishing..." : "Publish"}
@@ -1718,11 +1707,7 @@ function InstagramAutomationTab({
                 rows={3}
               />
             </div>
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+            <ErrorToast message={error} />
             <Button type="button" onClick={handleCreate} disabled={saving}>
               {saving ? "Saving..." : "Add rule"}
             </Button>

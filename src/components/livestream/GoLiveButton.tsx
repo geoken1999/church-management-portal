@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { Radio, Square } from "lucide-react";
 import { endStreamAndRoomAction, getLiveStateAction, goLiveAction } from "@/lib/livestream/actions";
 import { Button } from "@/components/ui/button";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 // The Go live / End stream button inside the broadcast room's controls.
 export function GoLiveButton({ streamId, onEnded }: { streamId: string; onEnded?: () => void }) {
@@ -69,7 +70,7 @@ export function GoLiveButton({ streamId, onEnded }: { streamId: string; onEnded?
         {status === "live" ? <Square className="size-3.5" /> : <Radio className="size-3.5" />}
         {status === "live" ? `Live · ${viewers} watching` : pending ? "Starting…" : "Go live"}
       </Button>
-      {message && <span className="basis-full text-center text-xs text-destructive">{message}</span>}
+      <ErrorToast message={message} />
     </>
   );
 }

@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { formatInTimezone } from "@/lib/organizations/timezone";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 export interface KmeetEventOption {
   id: string;
@@ -71,11 +72,7 @@ function InstantMeetingButton({ mode, disabled }: { mode: KmeetMode; disabled: b
           <DialogTitle>Start a meeting now</DialogTitle>
           <DialogDescription>Opens right away — share the link with whoever should join.</DialogDescription>
         </DialogHeader>
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={error} />
         <div className="space-y-1.5">
           <Label htmlFor="instant-title">Title (optional)</Label>
           <Input id="instant-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Quick sync" />
@@ -148,11 +145,7 @@ function ScheduleMeetingDialog({ mode, events, disabled }: { mode: KmeetMode; ev
           </DialogDescription>
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <div className="space-y-1.5">
             <Label htmlFor="schedule-title">Title</Label>
             <Input id="schedule-title" name="title" placeholder="Leadership call" required />

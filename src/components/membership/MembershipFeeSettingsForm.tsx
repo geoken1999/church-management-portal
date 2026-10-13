@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { MembershipFeeSettings } from "@/types/database";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: SaveMembershipFeeSettingsState = {};
 
@@ -19,11 +20,7 @@ export function MembershipFeeSettingsForm({ settings, canWrite }: { settings: Me
 
   return (
     <form action={formAction} className="space-y-4">
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={state.error} />
       {state.success && (
         <Alert>
           <AlertDescription>Settings saved. Changes apply from the next run.</AlertDescription>

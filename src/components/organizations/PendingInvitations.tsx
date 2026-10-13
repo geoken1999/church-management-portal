@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { acceptInvitation, type AcceptInvitationState } from "@/lib/organizations/actions";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: AcceptInvitationState = {};
 
@@ -20,7 +21,7 @@ function AcceptInvitationRow({ invitation }: { invitation: Invitation }) {
     <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-background px-4 py-3">
       <div>
         <p className="text-sm font-medium">{invitation.organizations?.name ?? "An organization"}</p>
-        {state.error && <p className="mt-1 text-xs text-destructive">{state.error}</p>}
+        <ErrorToast message={state.error} />
       </div>
       <form action={formAction}>
         <input type="hidden" name="token" value={invitation.token} />

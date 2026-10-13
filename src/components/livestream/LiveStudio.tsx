@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ErrorToast } from "@/components/ui/error-toast";
 import { ObsPanel } from "@/components/livestream/ObsPanel";
 import { NetworkCheck } from "@/components/livestream/NetworkCheck";
 import { StreamHealthPanel } from "@/components/livestream/StreamHealthPanel";
@@ -94,8 +95,9 @@ export function LiveStudio({ stream, canWrite, whipUrl }: { stream: LiveStream; 
         </p>
       </div>
 
-      {notice && (
-        <Alert variant={notice.kind === "error" ? "destructive" : "default"}>
+      <ErrorToast message={notice?.kind === "error" ? notice.text : null} />
+      {notice?.kind === "info" && (
+        <Alert>
           <AlertDescription>{notice.text}</AlertDescription>
         </Alert>
       )}

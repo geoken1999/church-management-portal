@@ -7,8 +7,8 @@ import { deferEventRegistrationToCheckin } from "@/lib/events/public-registratio
 import { redirectToPayU } from "@/lib/payu/browser";
 import { useLocale } from "@/lib/i18n/LocaleContext";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 export function EventRegistrationPayment({
   registrationId,
@@ -73,11 +73,7 @@ export function EventRegistrationPayment({
   return (
     <Card>
       <CardContent className="space-y-4">
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={error} />
         <Button type="button" className="w-full" disabled={submitting} onClick={handlePay}>
           {submitting ? t.publicEvent.processingPayment : t.publicEvent.payNow(amount)}
         </Button>

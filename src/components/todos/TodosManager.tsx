@@ -18,7 +18,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { formatInTimezone, partsInTimezone } from "@/lib/organizations/timezone";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,6 +32,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 // Someone a to-do can be assigned to: a team member who logs in to the
 // dashboard (value "u:<id>") or a leader (value "m:<member id>"). See
@@ -281,11 +281,7 @@ function CreateTodoDialog({ members, events, defaultEventId }: { members: TeamMe
           <DialogDescription>Track a task for your team, with an optional reminder.</DialogDescription>
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <TodoFormFields
             members={members}
             events={events}
@@ -364,11 +360,7 @@ function EditTodoDialog({ todo, members, events, timezone }: { todo: TodoRow; me
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="id" value={todo.id} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <TodoFormFields
             members={members}
             events={events}
@@ -556,11 +548,7 @@ function EventFormDialog({ event, onSaved, trigger }: { event?: EventOption; onS
           <DialogDescription>{event ? "Change the name or date." : "A camp, a conference, a trip. You can then add its to-dos and assign them."}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={error} />
           <div className="space-y-2">
             <Label htmlFor="todo-event-title">Event name</Label>
             <Input id="todo-event-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Youth Camp 2026" maxLength={80} />

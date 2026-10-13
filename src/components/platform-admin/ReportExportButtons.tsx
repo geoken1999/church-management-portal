@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { FileSpreadsheet, FileDown } from "lucide-react";
 import type { ExportReportResult } from "@/lib/platform-admin/report-actions";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 function base64ToBlob(base64: string, mimeType: string): Blob {
   const byteChars = atob(base64);
@@ -60,11 +60,7 @@ export function ReportExportButtons({ onExport }: { onExport: (format: "excel" |
           {pending === "pdf" ? "Preparing..." : "Export PDF"}
         </Button>
       </div>
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={error} />
     </div>
   );
 }

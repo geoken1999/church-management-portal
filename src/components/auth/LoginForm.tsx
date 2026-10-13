@@ -7,9 +7,9 @@ import { login, type LoginState } from "@/lib/auth/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { FieldError } from "@/components/auth/FieldError";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: LoginState = {};
 
@@ -25,11 +25,7 @@ export function LoginForm() {
     <form action={formAction} noValidate className="space-y-5">
       <input type="hidden" name="next" value={next} />
 
-      {message && (
-        <Alert variant="destructive">
-          <AlertDescription>{message}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={message} />
 
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>

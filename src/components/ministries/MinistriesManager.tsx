@@ -14,7 +14,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,6 +26,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 type MemberBasic = Pick<Member, "id" | "first_name" | "last_name">;
 type MinistryRow = Ministry & { members: MemberBasic | null };
@@ -156,11 +156,7 @@ function AddMinistryDialog({ organizationId, members }: { organizationId: string
         <form action={handleSubmit} className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
           <input type="hidden" name="organizationId" value={organizationId} />
           <input type="hidden" name="managedBy" value={managedBy} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <MinistryFields members={members} managedBy={managedBy} onManagedByChange={setManagedBy} errors={state.fieldErrors} />
           <DialogFooter>
             <Button type="submit" disabled={pending}>
@@ -214,11 +210,7 @@ function EditMinistryDialog({ ministry, members }: { ministry: Ministry; members
         <form action={handleSubmit} className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
           <input type="hidden" name="ministryId" value={ministry.id} />
           <input type="hidden" name="managedBy" value={managedBy} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <MinistryFields ministry={ministry} members={members} managedBy={managedBy} onManagedByChange={setManagedBy} errors={state.fieldErrors} />
           <DialogFooter>
             <Button type="submit" disabled={pending}>

@@ -23,7 +23,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -37,6 +36,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 type MemberBasic = Pick<Member, "id" | "first_name" | "last_name">;
 type TeamMemberRow = WorshipTeamMember & { members: MemberBasic | null };
@@ -164,11 +164,7 @@ function AddTeamMemberDialog({ organizationId, members }: { organizationId: stri
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <TeamMemberFields
             members={members}
             memberId={memberId}
@@ -226,11 +222,7 @@ function EditTeamMemberDialog({ entry, members }: { entry: TeamMemberRow; member
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="id" value={entry.id} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <TeamMemberFields
             members={members}
             memberId={memberId}
@@ -379,11 +371,7 @@ function UploadDocumentDialog({ organizationId }: { organizationId: string }) {
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={error} />
           <div className="space-y-2">
             <Label htmlFor="title">Title</Label>
             <Input id="title" name="title" placeholder="Sunday Order of Service" required />

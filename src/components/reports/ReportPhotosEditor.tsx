@@ -6,8 +6,8 @@ import { addReportPhotoAction, removeReportPhotoAction } from "@/lib/reports/mon
 import { MAX_REPORT_PHOTOS, type ReportPhoto } from "@/lib/reports/monthly";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 // Add photos to a report (for example from an event), or take them off again. Shown to
 // people who can edit reports, and not when the report is printed.
@@ -38,11 +38,7 @@ export function ReportPhotosEditor({ reportId, photos, photoBase, eventTitles }:
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={error} />
         {photos.length < MAX_REPORT_PHOTOS && (
           <form ref={formRef} action={add} className="flex flex-wrap items-end gap-3">
             <div className="space-y-1.5">

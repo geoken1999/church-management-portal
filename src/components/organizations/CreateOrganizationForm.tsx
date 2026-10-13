@@ -7,7 +7,6 @@ import { slugify, MEMBER_COUNT_OPTIONS, CHURCH_ROLE_OPTIONS } from "@/lib/organi
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import {
   Select,
@@ -16,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: CreateOrganizationState = {};
 
@@ -28,11 +28,7 @@ export function CreateOrganizationForm() {
 
   return (
     <form action={formAction} noValidate className="space-y-5">
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={state.error} />
 
       <div className="space-y-2">
         <Label htmlFor="name" className="gap-1.5">

@@ -34,6 +34,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const BLOCK_ICONS: Record<BlockType, typeof Sparkles> = {
   banner: ImageIcon,
@@ -106,11 +107,7 @@ function BannerEditor({ block, onChange }: { block: Extract<HomeBlock, { type: "
       <p className="text-xs text-muted-foreground">
         Images are cropped to {BANNER_WIDTH}×{BANNER_HEIGHT} (2:1). Add up to {MAX_BANNER_SLIDES}; more than one becomes a carousel. Uploads count toward your storage.
       </p>
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={error} />
       {block.slides.map((slide, index) => (
         <div key={slide.imagePath} className="flex gap-3 rounded-md border border-border p-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -365,11 +362,7 @@ function VideosEditor({ block, onChange }: { block: Extract<HomeBlock, { type: "
       <Field label="Heading (optional)">
         <Input value={block.title} maxLength={60} onChange={(e) => onChange({ ...block, title: e.target.value })} />
       </Field>
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={error} />
       {block.videos.map((video, index) => (
         <div key={video.videoId} className="flex items-center gap-3 rounded-md border border-border p-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 // Connect the church's own payment gateway (Razorpay, PayU or Cashfree) and
 // choose which one its own-account payments use.
@@ -56,11 +57,7 @@ export function GatewayAccountsCard({ connected, active }: { connected: Record<G
           </div>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={error} />
         {notice && (
           <Alert>
             <AlertDescription>{notice}</AlertDescription>

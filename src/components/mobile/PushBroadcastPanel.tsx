@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 export interface RecipientOption {
   id: string;
@@ -72,11 +73,7 @@ export function PushBroadcastPanel({ recipients, history, branches }: { recipien
       <Card>
         <CardContent>
           <form onSubmit={handleSend} className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+            <ErrorToast message={error} />
             {notice && (
               <Alert>
                 <AlertDescription>{notice}</AlertDescription>

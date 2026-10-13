@@ -6,6 +6,7 @@ import { regenerateIngestKeyAction } from "@/lib/livestream/actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 function CopyField({ label, value, secret }: { label: string; value: string; secret?: boolean }) {
   const [shown, setShown] = useState(!secret);
@@ -77,7 +78,7 @@ export function ObsPanel({ streamId, whipUrl, initialKey, connected }: { streamI
             <RefreshCw className="size-3.5" />
             Make a new key
           </Button>
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          <ErrorToast message={error} />
         </div>
 
         <div className="space-y-2">

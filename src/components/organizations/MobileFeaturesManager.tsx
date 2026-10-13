@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { Smartphone } from "lucide-react";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: UpdateMobileFeaturesState = {};
 
@@ -57,11 +58,7 @@ export function MobileFeaturesManager({
         </CardContent>
       </Card>
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={state.error} />
       {state.success && (
         <Alert>
           <AlertDescription>Saved.</AlertDescription>

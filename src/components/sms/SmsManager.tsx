@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 export interface SmsRecipientOption {
   id: string;
@@ -325,11 +326,7 @@ function Composer({
             </AlertDescription>
           </Alert>
         )}
-        {result?.error && (
-          <Alert variant="destructive">
-            <AlertDescription>{result.error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={result?.error} />
         {result?.success && (
           <Alert>
             <AlertDescription>{result.success}</AlertDescription>

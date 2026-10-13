@@ -4,12 +4,12 @@ import { useState, useTransition } from "react";
 import { ChevronDown, Megaphone, Trash2 } from "lucide-react";
 import { createGroupPostAction, deleteGroupPostAction } from "@/lib/groups/actions";
 import { GROUP_LABELS, type GroupKey } from "@/lib/groups/shares";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 export interface GroupPostView {
   id: string;
@@ -89,11 +89,7 @@ export function GroupSharesPanel({
 
         {open && canWrite && (
           <form onSubmit={handleShare} className="space-y-3 rounded-md border border-border p-3">
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+            <ErrorToast message={error} />
             <div className="space-y-1.5">
               <Label htmlFor={`share-title-${groupKey}`} className="text-xs">
                 Title

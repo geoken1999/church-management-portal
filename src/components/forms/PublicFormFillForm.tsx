@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   CheckCircle2,
@@ -24,6 +23,7 @@ import {
   ListChecks,
   SquareCheck,
 } from "lucide-react";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: PublicFormState = {};
 
@@ -149,11 +149,7 @@ export function PublicFormFillForm({ slug, fields, bilingual = null }: { slug: s
       {fields.length > 0 && (
         <p className="text-xs text-muted-foreground">{t.publicForm.questionCount(fields.length, estimatedMinutes)}</p>
       )}
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={state.error} />
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         {fields.map((field) => (
           <div key={field.key} className={COMPACT_FIELD_TYPES.includes(field.field_type) ? undefined : "sm:col-span-2"}>

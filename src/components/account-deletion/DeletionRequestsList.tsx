@@ -3,10 +3,10 @@
 import { useState, useTransition } from "react";
 import { processAccountDeletionAction } from "@/lib/account-deletion/actions";
 import { allowedDecisions, describeDecision, type DeletionDecision, type DeletionRequesterKind } from "@/lib/account-deletion/rules";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 export interface DeletionRequestView {
   id: string;
@@ -65,11 +65,7 @@ function PendingRow({ request }: { request: DeletionRequestView }) {
         </div>
         {request.contact && <p className="text-xs text-muted-foreground">{request.contact}</p>}
         {request.reason && <p className="rounded-md bg-muted/50 p-2 text-sm">&ldquo;{request.reason}&rdquo;</p>}
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={error} />
         <div className="flex flex-wrap gap-2">
           {allowedDecisions(request.kind).map((decision) => (
             <Button key={decision} type="button" size="sm" variant={decision === "reject" ? "outline" : "destructive"} disabled={pending} onClick={() => decide(decision)}>

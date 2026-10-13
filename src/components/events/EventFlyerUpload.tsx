@@ -6,6 +6,7 @@ import { ImagePlus, Trash2 } from "lucide-react";
 import { removeEventFlyerAction, uploadEventFlyerAction } from "@/lib/events/flyer-actions";
 import { flyerProblem, flyerUrl, MAX_FLYER_BYTES } from "@/lib/events/flyer";
 import { Button } from "@/components/ui/button";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 // An event's flyer: shown on the event, and used in the church report.
 export function EventFlyerUpload({ eventId, flyerPath }: { eventId: string; flyerPath: string | null }) {
@@ -69,7 +70,7 @@ export function EventFlyerUpload({ eventId, flyerPath }: { eventId: string; flye
         )}
         <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { choose(e.target.files?.[0]); e.target.value = ""; }} />
       </div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      <ErrorToast message={error} />
     </div>
   );
 }

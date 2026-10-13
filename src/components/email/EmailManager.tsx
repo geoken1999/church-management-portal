@@ -61,6 +61,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { cn } from "cn";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 export interface EmailRecipientOption {
   id: string;
@@ -456,11 +457,7 @@ function RaiseTicketDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={error} />
 
         <div className="space-y-1.5">
           <Label htmlFor="ticket-message">Anything we should know? (optional)</Label>
@@ -677,11 +674,7 @@ function Composer({
             </AlertDescription>
           </Alert>
         )}
-        {result?.error && (
-          <Alert variant="destructive">
-            <AlertDescription>{result.error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={result?.error} />
         {result?.success && (
           <Alert>
             <AlertDescription>{result.success}</AlertDescription>
@@ -723,11 +716,7 @@ function Composer({
 
         <div className="space-y-1.5">
           <Label>Attachments</Label>
-          {attachmentError && (
-            <Alert variant="destructive">
-              <AlertDescription>{attachmentError}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={attachmentError} />
           {attachments.length > 0 && (
             <ul className="space-y-1.5">
               {attachments.map((file, index) => (
@@ -978,16 +967,8 @@ function SmtpSettingsDialog({ summary, onSaved }: { summary: EmailSmtpSummary | 
           </Alert>
         )}
 
-        {saveError && (
-          <Alert variant="destructive">
-            <AlertDescription>{saveError}</AlertDescription>
-          </Alert>
-        )}
-        {testResult?.error && (
-          <Alert variant="destructive">
-            <AlertDescription>{testResult.error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={saveError} />
+        <ErrorToast message={testResult?.error} />
         {testResult?.success && (
           <Alert>
             <AlertDescription>Connection succeeded.</AlertDescription>

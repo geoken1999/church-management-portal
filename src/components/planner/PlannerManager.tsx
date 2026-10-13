@@ -21,7 +21,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -35,6 +34,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 export type PlanRow = Plan & { creator: { first_name: string; last_name: string } | null };
 
@@ -258,11 +258,7 @@ function CreatePlanDialog() {
           <DialogDescription>Jot down an initiative, then add checklist items once it&apos;s created.</DialogDescription>
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <PlanFormFields
             title={title}
             onTitleChange={setTitle}
@@ -329,11 +325,7 @@ function EditPlanDialog({ plan }: { plan: PlanRow }) {
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="id" value={plan.id} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <PlanFormFields
             title={title}
             onTitleChange={setTitle}
@@ -518,11 +510,7 @@ function PlanItemsSection({ plan, leaders }: { plan: PlanRow; leaders: LeaderOpt
         );
       })}
 
-      {addError && (
-        <Alert variant="destructive">
-          <AlertDescription>{addError}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={addError} />
 
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <Input
@@ -602,7 +590,7 @@ function ExportPlanPdfButton({ plan }: { plan: PlanRow }) {
       <Button type="button" variant="ghost" size="icon-sm" aria-label="Export as PDF" onClick={handleExport} disabled={pending}>
         <FileDown className="size-3.5" />
       </Button>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      <ErrorToast message={error} />
     </div>
   );
 }

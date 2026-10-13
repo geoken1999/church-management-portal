@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: PublicJoinFormState = {};
 
@@ -100,11 +101,7 @@ export function PublicJoinForm({
       <input type="hidden" name="__fieldKeys" value={fieldDefinitions.map((f) => f.key).join(",")} />
       <input type="hidden" name="__branchCount" value={branches.length} />
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={state.error} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">

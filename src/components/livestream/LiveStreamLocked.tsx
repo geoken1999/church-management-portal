@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const FEATURES = [
   "Members watch live inside the app, with live chat and a viewer count",
@@ -48,11 +49,7 @@ export function LiveStreamLocked({ requestedAt, canRequest }: { requestedAt: str
           ))}
         </ul>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={error} />
 
         {asked ? (
           <Alert>

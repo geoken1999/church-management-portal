@@ -9,6 +9,7 @@ import type { ScheduledCampaign } from "@/types/database";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const STATUS = {
   scheduled: { label: "Scheduled", variant: "secondary" as const },
@@ -45,7 +46,7 @@ export function ScheduledCampaigns({ items, timezone }: { items: ScheduledCampai
         <CardDescription>Times are in your church&apos;s time zone ({timezone}).</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
-        {error && <p className="text-xs text-destructive">{error}</p>}
+        <ErrorToast message={error} />
         {items.map((item) => {
           const status = STATUS[item.status];
           return (

@@ -21,7 +21,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverTrigger, PopoverContent, PopoverTitle, PopoverDescription } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -34,6 +33,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 type DocumentRow = SharedDocument & {
   profiles: { first_name: string; last_name: string } | null;
@@ -103,11 +103,7 @@ function CreateCategoryDialog({ organizationId }: { organizationId: string }) {
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
             <Input id="name" name="name" placeholder="Youth Ministry" required />
@@ -161,11 +157,7 @@ function CategoryChip({ category, siteUrl, canWrite, canDelete }: { category: Fo
             : "Enable this link to share every document in this category at once."}
         </PopoverDescription>
         <div className="mt-3 space-y-3">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={error} />
           {canWrite && (
             <Button type="button" size="sm" variant={shareEnabled ? "outline" : "default"} onClick={handleToggle} disabled={pending}>
               <Link2 className="size-3.5" />
@@ -256,11 +248,7 @@ function UploadDocumentDialog({ organizationId, categories }: { organizationId: 
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
           <input type="hidden" name="categoryId" value={categoryId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <div className="space-y-2">
             <Label htmlFor="title">Title</Label>
             <Input id="title" name="title" placeholder="Board meeting minutes — March" required />
@@ -339,11 +327,7 @@ function ShareDocumentPopover({ document, siteUrl }: { document: DocumentRow; si
             : "Enable a link so anyone who has it can view and download this file without logging in."}
         </PopoverDescription>
         <div className="mt-3 space-y-3">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={error} />
           <Button type="button" size="sm" variant={shareEnabled ? "outline" : "default"} onClick={handleToggle} disabled={pending}>
             <Link2 className="size-3.5" />
             {shareEnabled ? "Disable link" : "Enable link"}
@@ -472,11 +456,7 @@ function DocumentCard({
             )}
           </div>
         </div>
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={error} />
       </CardContent>
     </Card>
   );

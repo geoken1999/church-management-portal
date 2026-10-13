@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ClipboardCheck } from "lucide-react";
 import { addEventToAttendance } from "@/lib/attendance/actions";
 import { Button } from "@/components/ui/button";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 // Creates (or reuses, if one's already there for today/this event's date)
 // an Attendance session for this event, then takes the organizer straight
@@ -36,7 +37,7 @@ export function AddToAttendanceButton({ eventId }: { eventId: string }) {
         <ClipboardCheck className="size-3.5" />
         {pending ? "Adding..." : "Add to Attendance"}
       </Button>
-      {error && <p className="absolute top-full right-0 z-10 mt-1 w-48 text-right text-xs text-destructive">{error}</p>}
+      <ErrorToast message={error} />
     </div>
   );
 }

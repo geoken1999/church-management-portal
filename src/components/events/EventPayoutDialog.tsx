@@ -11,7 +11,6 @@ import {
 } from "@/components/organizations/PayoutDetailsFields";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
   DialogTrigger,
@@ -20,6 +19,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const SHARED_SERVICE_FEE_PERCENT = `${SHARED_SERVICE_FEE_RATE * 100}%`;
 
@@ -119,11 +119,7 @@ export function EventPayoutDialog({
             ) : owed > 0 ? (
               <form action={formAction} className="space-y-3">
                 <input type="hidden" name="eventId" value={eventId} />
-                {state.error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{state.error}</AlertDescription>
-                  </Alert>
-                )}
+                <ErrorToast message={state.error} />
                 {editing ? (
                   <PayoutDetailsFields defaultValues={savedPayoutDetails ?? undefined} errors={state.fieldErrors} showSaveForFutureCheckbox />
                 ) : (

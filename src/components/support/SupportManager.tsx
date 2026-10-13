@@ -23,7 +23,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -36,6 +35,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 type MessageRow = SupportTicketMessage & { profiles: { first_name: string; last_name: string } | null };
 type TicketRow = SupportTicket & { profiles: { first_name: string; last_name: string } | null; messages: MessageRow[] };
@@ -109,11 +109,7 @@ function ReplyForm({ ticketId, organizationId }: { ticketId: string; organizatio
     <form action={handleSubmit} className="space-y-2 border-t border-border pt-3">
       <input type="hidden" name="ticketId" value={ticketId} />
       <input type="hidden" name="organizationId" value={organizationId} />
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={state.error} />
       <Textarea
         name="body"
         value={body}
@@ -179,11 +175,7 @@ function RaiseTicketDialog({ organizationId }: { organizationId: string }) {
           <input type="hidden" name="organizationId" value={organizationId} />
           <input type="hidden" name="category" value={category} />
           <input type="hidden" name="urgency" value={urgency} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <div className="space-y-2">
             <Label htmlFor="subject">Subject</Label>
             <Input id="subject" name="subject" placeholder="Short summary of the issue" required aria-invalid={Boolean(state.fieldErrors?.subject)} />

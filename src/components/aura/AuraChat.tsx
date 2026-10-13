@@ -7,6 +7,7 @@ import { sendAuraMessage } from "@/lib/aura/actions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 export interface AuraChatMessage {
   id: string;
@@ -123,7 +124,7 @@ export function AuraChat({
           )}
         </div>
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        <ErrorToast message={error} />
 
         {!canWrite && <p className="text-sm text-muted-foreground">You don&apos;t have permission to chat with Aura — ask an admin to update your access.</p>}
 

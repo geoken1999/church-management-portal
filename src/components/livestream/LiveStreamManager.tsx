@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const SELECT_CLASS = "h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
 
@@ -84,11 +85,7 @@ export function LiveStreamManager({ streams, canWrite, canDelete, available }: {
 
   return (
     <div className="space-y-8">
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={error} />
       {!available && (
         <Alert>
           <AlertDescription>Live streaming isn&apos;t set up on this server yet. Ask your developer to add the VideoSDK keys.</AlertDescription>

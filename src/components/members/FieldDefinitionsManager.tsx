@@ -16,7 +16,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,6 +28,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: FieldDefinitionState = {};
 
@@ -166,11 +166,7 @@ function AddFieldDialog({ organizationId, hasMembers }: { organizationId: string
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <FieldForm
             fieldType={fieldType}
             onFieldTypeChange={setFieldType}
@@ -230,11 +226,7 @@ function EditFieldDialog({ field, hasMembers }: { field: MemberFieldDefinition; 
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="fieldId" value={field.id} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <FieldForm
             field={field}
             fieldType={fieldType}

@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { requestAllPayouts, type RequestAllPayoutsState } from "@/lib/payouts/actions";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: RequestAllPayoutsState = {};
 
@@ -12,11 +13,7 @@ export function RequestAllPayoutsButton({ disabled }: { disabled: boolean }) {
 
   return (
     <form action={formAction} className="space-y-3">
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={state.error} />
       {state.success && (
         <Alert>
           <AlertDescription>

@@ -6,9 +6,9 @@ import { Send } from "lucide-react";
 import { addPlatformSupportReply, type AddPlatformSupportReplyState } from "@/lib/platform-admin/actions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { SupportTicketMessageRow } from "@/lib/platform-admin/dal";
 import { formatPlatformDateTime } from "@/lib/platform-admin/format";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: AddPlatformSupportReplyState = {};
 
@@ -51,11 +51,7 @@ export function SupportTicketThread({ ticketId, messages }: { ticketId: string; 
 
       <form action={handleSubmit} className="space-y-2">
         <input type="hidden" name="ticketId" value={ticketId} />
-        {state.error && (
-          <Alert variant="destructive">
-            <AlertDescription>{state.error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={state.error} />
         <Textarea name="body" value={body} onChange={(e) => setBody(e.target.value)} placeholder="Reply to this church..." rows={2} />
         <div className="flex justify-end">
           <Button type="submit" size="sm" disabled={pending || !body.trim()}>

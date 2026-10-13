@@ -15,6 +15,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: RecordMembershipPayoutState = {};
 
@@ -42,11 +43,7 @@ export function RecordMembershipPayoutDialog({
         </DialogHeader>
         <form action={formAction} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           {state.success && (
             <Alert>
               <AlertDescription>Payout recorded.</AlertDescription>

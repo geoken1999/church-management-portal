@@ -16,6 +16,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: RecordExpenseState = {};
 
@@ -37,11 +38,7 @@ export function RecordExpenseDialog({ today }: { today: string }) {
           </DialogDescription>
         </DialogHeader>
         <form action={formAction} className="space-y-4">
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           {state.success && (
             <Alert>
               <AlertDescription>Payment recorded.</AlertDescription>

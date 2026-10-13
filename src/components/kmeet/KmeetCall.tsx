@@ -32,6 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const REACTIONS = ["👍", "❤️", "😂", "👏", "🎉"];
 
@@ -649,11 +650,7 @@ function CallView({
       onDenied={() => setDeniedEntry(true)}
     >
       <div className="flex h-full flex-col">
-        {connectionError && (
-          <Alert variant="destructive" className="m-2">
-            <AlertDescription>{connectionError}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={connectionError} />
         {isModerator && pendingRequests.length > 0 && (
           <div className="space-y-1 border-b border-border bg-accent/50 p-2">
             {pendingRequests.map((req) => (
@@ -879,11 +876,7 @@ function PreJoinLobby({
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
       <h1 className="font-heading text-2xl font-bold">{title}</h1>
-      {permissionError && (
-        <Alert variant="destructive">
-          <AlertDescription>{permissionError}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={permissionError} />
       <div className="relative mx-auto flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg bg-black">
         {audioOnly ? (
           <div className="flex flex-col items-center gap-2 text-white/70">

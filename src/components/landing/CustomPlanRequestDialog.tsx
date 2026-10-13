@@ -6,7 +6,6 @@ import { submitCustomPlanRequest, type CustomPlanRequestState } from "@/lib/cust
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import {
   Dialog,
@@ -17,6 +16,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: CustomPlanRequestState = {};
 
@@ -46,11 +46,7 @@ export function CustomPlanRequestDialog({ triggerLabel, triggerClassName }: { tr
               </DialogDescription>
             </DialogHeader>
             <form action={formAction} className="space-y-4">
-              {state.error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{state.error}</AlertDescription>
-                </Alert>
-              )}
+              <ErrorToast message={state.error} />
               <div className="space-y-2">
                 <Label htmlFor="custom-plan-church">Church name</Label>
                 <Input

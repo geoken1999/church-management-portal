@@ -35,7 +35,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -48,6 +47,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 type BranchBasic = Pick<Branch, "id" | "name">;
 type CategoryBasic = Pick<AccountingCategory, "id" | "name" | "type">;
@@ -281,11 +281,7 @@ function AccountingCategoryManager({ organizationId, categories }: { organizatio
             <form action={handleSubmit} className="space-y-4">
               <input type="hidden" name="organizationId" value={organizationId} />
               <input type="hidden" name="type" value={type} />
-              {state.error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{state.error}</AlertDescription>
-                </Alert>
-              )}
+              <ErrorToast message={state.error} />
               <div className="space-y-2">
                 <Label htmlFor="categoryName">Name</Label>
                 <Input id="categoryName" name="name" placeholder="Utilities, Salaries, Missions..." required />
@@ -471,11 +467,7 @@ function AddExpenseDialog({ organizationId, branches, categories }: { organizati
           <input type="hidden" name="branchId" value={branchId} />
           <input type="hidden" name="categoryId" value={categoryId} />
           <input type="hidden" name="paymentMethod" value={paymentMethod} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <ExpenseFields
             branches={branches}
             categories={categories}
@@ -540,11 +532,7 @@ function EditExpenseDialog({ expense, branches, categories }: { expense: Expense
           <input type="hidden" name="branchId" value={branchId} />
           <input type="hidden" name="categoryId" value={categoryId} />
           <input type="hidden" name="paymentMethod" value={paymentMethod} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <ExpenseFields
             expense={expense}
             branches={branches}

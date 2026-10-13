@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
   DialogTrigger,
@@ -16,6 +15,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: RecordPayoutState = {};
 
@@ -46,11 +46,7 @@ export function RecordEventPayoutDialog({
         <form action={formAction} className="space-y-4">
           <input type="hidden" name="eventId" value={eventId} />
           <input type="hidden" name="organizationId" value={organizationId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <div className="space-y-2">
             <Label htmlFor="amount">Amount (₹)</Label>
             <Input id="amount" name="amount" type="number" min={0.01} step="0.01" defaultValue={owed > 0 ? owed : undefined} required />

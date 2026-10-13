@@ -14,7 +14,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,6 +26,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 type MemberBasic = Pick<Member, "id" | "first_name" | "last_name" | "phone">;
 type LeaderRow = Leader & { members: MemberBasic | null };
@@ -116,11 +116,7 @@ function AddLeaderDialog({ organizationId, members }: { organizationId: string; 
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
           <input type="hidden" name="memberId" value={memberId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <MemberSelectField members={members} value={memberId} onChange={setMemberId} error={state.fieldErrors?.memberId} />
           <div className="space-y-2">
             <Label htmlFor="title">Title (optional)</Label>
@@ -177,11 +173,7 @@ function EditLeaderDialog({ leader }: { leader: LeaderRow }) {
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="leaderId" value={leader.id} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <div className="space-y-2">
             <Label htmlFor="title">Title (optional)</Label>
             <Input id="title" name="title" defaultValue={leader.title ?? ""} placeholder="Senior Pastor, Elder, Deacon..." />

@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,6 +20,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 type BranchBasic = Pick<Branch, "id" | "name">;
 type OfferingRow = Offering & { branches: BranchBasic | null };
@@ -160,11 +160,7 @@ function AddOfferingDialog({ organizationId, branches }: { organizationId: strin
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
           <input type="hidden" name="branchId" value={branchId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <OfferingFields branches={branches} branchId={branchId} onBranchChange={setBranchId} errors={state.fieldErrors} />
           <DialogFooter>
             <Button type="submit" disabled={pending}>
@@ -218,11 +214,7 @@ function EditOfferingDialog({ offering, branches }: { offering: Offering; branch
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="id" value={offering.id} />
           <input type="hidden" name="branchId" value={branchId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <OfferingFields offering={offering} branches={branches} branchId={branchId} onBranchChange={setBranchId} errors={state.fieldErrors} />
           <DialogFooter>
             <Button type="submit" disabled={pending}>

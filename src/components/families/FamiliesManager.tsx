@@ -18,7 +18,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,6 +30,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 type MemberBasic = Pick<Member, "id" | "first_name" | "last_name" | "phone">;
 type FamilyMemberRow = FamilyMember & { members: MemberBasic | null };
@@ -100,11 +100,7 @@ function CreateFamilyDialog({ organizationId }: { organizationId: string }) {
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <FamilyFields errors={state.fieldErrors} />
           <DialogFooter>
             <Button type="submit" disabled={pending}>
@@ -152,11 +148,7 @@ function EditFamilyDialog({ family }: { family: Family }) {
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="id" value={family.id} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <FamilyFields family={family} errors={state.fieldErrors} />
           <DialogFooter>
             <Button type="submit" disabled={pending}>
@@ -270,11 +262,7 @@ function AddFamilyMemberDialog({ familyId, members }: { familyId: string; member
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="familyId" value={familyId} />
           <input type="hidden" name="memberId" value={memberId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <FamilyMemberFields members={members} memberId={memberId} onMemberChange={setMemberId} errors={state.fieldErrors} />
           <DialogFooter>
             <Button type="submit" disabled={pending}>
@@ -327,11 +315,7 @@ function EditFamilyMemberDialog({ entry, members }: { entry: FamilyMember; membe
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="id" value={entry.id} />
           <input type="hidden" name="memberId" value={memberId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <FamilyMemberFields entry={entry} members={members} memberId={memberId} onMemberChange={setMemberId} errors={state.fieldErrors} />
           <DialogFooter>
             <Button type="submit" disabled={pending}>

@@ -76,6 +76,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const ANALYTICS_LABELS: Record<string, string> = {
   views: "Views",
@@ -197,11 +198,7 @@ function ChannelSwitcher({
           </Button>
         )}
       </div>
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <ErrorToast message={error} />
     </div>
   );
 }
@@ -494,11 +491,7 @@ function EditVideoDialog({
           <DialogDescription>Update this video&apos;s title, description, privacy, and thumbnail.</DialogDescription>
         </DialogHeader>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={error} />
 
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading video details...</p>
@@ -620,11 +613,7 @@ function DeleteVideoDialog({
             &quot;{video.title}&quot; will be permanently deleted from YouTube. This can&apos;t be undone.
           </DialogDescription>
         </DialogHeader>
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={error} />
         <DialogFooter>
           <Button type="button" variant="destructive" onClick={handleDelete} disabled={pending}>
             {pending ? "Deleting..." : "Delete video"}
@@ -899,11 +888,7 @@ function UploadVideoDialog({ organizationId, onUploaded }: { organizationId: str
           </DialogDescription>
         </DialogHeader>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={error} />
 
         {view === "form" && (
           <div className="space-y-4">
@@ -1351,11 +1336,7 @@ function CommentReplyDialog({
           <DialogDescription>{comment.text}</DialogDescription>
         </DialogHeader>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={error} />
 
         {sent ? (
           <p className="text-sm text-muted-foreground">Reply posted.</p>

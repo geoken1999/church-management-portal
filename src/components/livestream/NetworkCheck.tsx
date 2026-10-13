@@ -6,6 +6,7 @@ import { jitter, judgeConnection, median, QUALITY_NEEDS, type NetResult } from "
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 async function measure(): Promise<NetResult> {
   // Round trips to the server.
@@ -73,7 +74,7 @@ export function NetworkCheck({ quality }: { quality: "low" | "med" | "high" }) {
           {running ? <Loader2 className="size-3.5 animate-spin" /> : <Gauge className="size-3.5" />}
           {running ? "Testing…" : result ? "Test again" : "Start the test"}
         </Button>
-        {error && <p className="text-xs text-destructive">{error}</p>}
+        <ErrorToast message={error} />
         {result && judged && (
           <>
             <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">

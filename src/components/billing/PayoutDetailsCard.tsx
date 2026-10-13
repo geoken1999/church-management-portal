@@ -6,6 +6,7 @@ import { PayoutDetailsFields, type PayoutDetailsDefaultValues } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: SavePayoutDetailsState = {};
 
@@ -34,11 +35,7 @@ export function PayoutDetailsCard({
       <CardContent>
         <form action={formAction} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           {state.success && (
             <Alert>
               <AlertDescription>Saved.</AlertDescription>

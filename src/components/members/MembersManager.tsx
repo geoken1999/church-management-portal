@@ -24,7 +24,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -38,6 +37,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { FieldDefinitionsManager } from "@/components/members/FieldDefinitionsManager";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 type MemberWithBranch = Member & { branches: Pick<Branch, "id" | "name"> | null };
 
@@ -359,11 +359,7 @@ function AddMemberDialog({
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <MemberFormFields definitions={definitions} branches={branches} errors={state.fieldErrors} />
           <DialogFooter>
             <Button type="submit" disabled={pending}>
@@ -423,11 +419,7 @@ function EditMemberDialog({
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="memberId" value={member.id} />
           <input type="hidden" name="organizationId" value={organizationId} />
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorToast message={state.error} />
           <MemberFormFields member={member} definitions={definitions} branches={branches} errors={state.fieldErrors} />
           <DialogFooter>
             <Button type="submit" disabled={pending}>
@@ -812,11 +804,7 @@ function BulkUploadMembersDialog({ organizationId }: { organizationId: string })
           <DialogDescription>Add many members at once from an Excel file.</DialogDescription>
         </DialogHeader>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <ErrorToast message={error} />
 
         <div className="space-y-4">
           <div className="space-y-2 rounded-lg border border-border p-3">

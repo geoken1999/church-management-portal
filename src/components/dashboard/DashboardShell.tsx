@@ -45,6 +45,7 @@ import {
   ClipboardList,
   Workflow,
   HandHeart,
+  HandHelping,
   Wallet,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
@@ -105,6 +106,7 @@ const NAV_GROUPS = [
       { href: "/dashboard/leaders", itemKey: "leaders" as const, icon: Crown, tab: "leaders" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/youth", itemKey: "youth" as const, icon: GraduationCap, tab: "youth" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/committee", itemKey: "committee" as const, icon: Users2, tab: "committee" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/volunteers", itemKey: "volunteers" as const, icon: HandHelping, tab: "volunteers" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/families", itemKey: "families" as const, icon: House, tab: "families" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },

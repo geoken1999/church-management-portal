@@ -95,6 +95,16 @@ export const DOC_CATEGORIES: DocCategory[] = [
         ],
       },
       {
+        id: "volunteers",
+        title: "Volunteers and digital ID cards",
+        body: [
+          "People → Volunteers lists the members who serve your church (ushers, sound operators, kitchen helpers and so on). Add a volunteer by picking an existing member and entering what they volunteer as. A team, a start date and notes are optional, and you can mark a volunteer inactive when they stop serving.",
+          "Each volunteer gets an ID number automatically (VOL-0001, VOL-0002, and so on). A member can be a volunteer only once.",
+          "A volunteer who uses the KingdomFlow app sees a Volunteer entry under Explore. It opens a digital ID card with their name, ID number, role, team, church and contact details, and a QR code. Scanning the QR code opens a public page that confirms they are a volunteer of your church and whether they are still active — and shows nothing else about them.",
+          "Volunteers follow the same Read, Write and Delete permissions as every other tab, and appear under People in the mobile app if you choose them in Mobile App features.",
+        ],
+      },
+      {
         id: "families",
         title: "Families — grouping members into households",
         body: [

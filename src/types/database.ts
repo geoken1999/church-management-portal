@@ -959,6 +959,22 @@ export type KmeetMeeting = {
   last_active_at: string;
 };
 
+// Members who volunteer, with a volunteer ID and a digital ID card (migration 0166).
+export type Volunteer = {
+  id: string;
+  organization_id: string;
+  member_id: string;
+  volunteer_no: string;
+  role: string;
+  team: string | null;
+  joined_on: string;
+  status: "active" | "inactive";
+  notes: string | null;
+  verify_token: string;
+  created_at: string;
+  updated_at: string;
+};
+
 // Churches whose access has ended and are counting down to deletion (migration 0165).
 export type OrganizationRetention = {
   organization_id: string;
@@ -3013,6 +3029,20 @@ export type Database = {
           },
         ];
       };
+      volunteers: {
+        Row: Volunteer;
+        Insert: Partial<Volunteer> & Pick<Volunteer, "organization_id" | "member_id" | "role">;
+        Update: Partial<Volunteer>;
+        Relationships: [
+          {
+            foreignKeyName: "volunteers_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       organization_retention: {
         Row: OrganizationRetention;
         Insert: Partial<OrganizationRetention> & Pick<OrganizationRetention, "organization_id">;
@@ -3678,6 +3708,19 @@ export type Database = {
       get_shared_worship_document: {
         Args: { token: string };
         Returns: { title: string; file_path: string; file_type: string }[];
+      };
+      verify_volunteer: {
+        Args: { token: string };
+        Returns: {
+          volunteer_no: string;
+          first_name: string;
+          last_name: string;
+          role: string;
+          team: string | null;
+          status: string;
+          organization_name: string;
+          logo_url: string | null;
+        }[];
       };
       get_shared_document: {
         Args: { token: string };

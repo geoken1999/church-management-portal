@@ -19,7 +19,7 @@ export const MOBILE_FEATURE_LIMIT = 15;
 
 export const MOBILE_FEATURE_GROUPS: { groupKey: NavGroupKey; itemKeys: NavItemKey[] }[] = [
   { groupKey: "organization", itemKeys: ["profile", "team", "billing", "branches"] },
-  { groupKey: "people", itemKeys: ["members", "leaders", "youth", "committee", "families"] },
+  { groupKey: "people", itemKeys: ["members", "leaders", "youth", "committee", "volunteers", "families"] },
   { groupKey: "ministry", itemKeys: ["ministries", "worship", "media", "events", "todos"] },
   { groupKey: "tools", itemKeys: ["planner", "forms", "folder", "attendance", "reports", "widget", "accounting"] },
   { groupKey: "finance", itemKeys: ["fundraisers", "offerings", "donations"] },

@@ -47,6 +47,7 @@ export const en = {
       members: "Members",
       leaders: "Leaders",
       youth: "Youth",
+      volunteers: "Volunteers",
       committee: "Committee",
       families: "Families",
       ministries: "Ministries",

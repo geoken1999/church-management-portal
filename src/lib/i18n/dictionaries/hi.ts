@@ -45,6 +45,7 @@ export const hi: Dictionary = {
       members: "सदस्य",
       leaders: "नेता",
       youth: "युवा",
+      volunteers: "स्वयंसेवक",
       committee: "समिति",
       families: "परिवार",
       ministries: "सेवकाई",

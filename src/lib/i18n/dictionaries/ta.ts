@@ -45,6 +45,7 @@ export const ta: Dictionary = {
       members: "உறுப்பினர்கள்",
       leaders: "தலைவர்கள்",
       youth: "இளைஞர்",
+      volunteers: "தன்னார்வலர்கள்",
       committee: "கமிட்டி",
       families: "குடும்பங்கள்",
       ministries: "ஊழியங்கள்",

@@ -4,9 +4,10 @@ import { ALL_GROUPS, GroupFilterSelect, inGroup, useMemberGroups } from "@/compo
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { scheduleCampaignAction } from "@/lib/scheduler/actions";
+import { EmailTemplatePicker } from "@/components/email/EmailTemplatePicker";
 import { SchedulePicker } from "@/components/scheduler/SchedulePicker";
 import { ScheduledCampaigns } from "@/components/scheduler/ScheduledCampaigns";
-import type { ScheduledCampaign } from "@/types/database";
+import type { EmailTemplate, ScheduledCampaign } from "@/types/database";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
@@ -490,7 +491,11 @@ function Composer({
   setupRequestOpen,
   onConfigured,
   onTicketSent,
+  templates,
+  churchName,
 }: {
+  templates: EmailTemplate[];
+  churchName: string;
   members: EmailRecipientOption[];
   branches: EmailBranchOption[];
   disabled: boolean;
@@ -680,6 +685,19 @@ function Composer({
             <AlertDescription>{result.success}</AlertDescription>
           </Alert>
         )}
+
+        <EmailTemplatePicker
+          templates={templates}
+          churchName={churchName}
+          canSave
+          disabled={disabled}
+          hasContent={Boolean(subject.trim()) || !editor?.isEmpty}
+          current={() => ({ subject, html: editor?.getHTML() ?? "" })}
+          onApply={(nextSubject, html) => {
+            setSubject(nextSubject);
+            editor?.commands.setContent(html);
+          }}
+        />
 
         <div className="space-y-1.5">
           <Label htmlFor="email-subject">Subject</Label>
@@ -1119,7 +1137,11 @@ export function EmailManager({
   campaigns,
   scheduled,
   timezone,
+  templates,
+  churchName,
 }: {
+  templates: EmailTemplate[];
+  churchName: string;
   canManage: boolean;
   canSend: boolean;
   customSmtpEnabled: boolean;
@@ -1165,6 +1187,8 @@ export function EmailManager({
           setupRequestOpen={setupRequestOpen}
           onConfigured={refresh}
           onTicketSent={refresh}
+          templates={templates}
+          churchName={churchName}
         />
       ) : !emailAvailable ? (
         <Card>

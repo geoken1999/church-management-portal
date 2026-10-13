@@ -81,3 +81,10 @@ export const getLatestEmailSetupRequest = cache(async (organizationId: string) =
 
   return data;
 });
+
+// A church's own saved templates, by name.
+export const getEmailTemplates = cache(async (organizationId: string) => {
+  const supabase = await createClient();
+  const { data } = await supabase.from("email_templates").select("*").eq("organization_id", organizationId).order("name", { ascending: true });
+  return data ?? [];
+});

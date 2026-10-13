@@ -4,6 +4,7 @@ import { getMembers } from "@/lib/members/dal";
 import { getBranches } from "@/lib/branches/dal";
 import { getMemberGroups } from "@/lib/members/groups";
 import { MemberGroupsProvider } from "@/components/members/MemberGroups";
+import { getEmailTemplates } from "@/lib/email/dal";
 import { getEmailCampaigns, getEmailSmtpSummary, isEmailAvailable, getLatestEmailSetupRequest } from "@/lib/email/dal";
 import { getPlanUsage } from "@/lib/plans/dal";
 import { EmailManager } from "@/components/email/EmailManager";
@@ -62,6 +63,8 @@ export default async function EmailPage() {
 
       <MemberGroupsProvider groups={memberGroups}>
         <EmailManager
+          templates={await getEmailTemplates(organizationId)}
+          churchName={membership.organization.name}
           scheduled={await getScheduledCampaigns(organizationId, "email")}
           timezone={membership.organization.timezone}
           canManage={canManage}

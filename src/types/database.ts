@@ -1051,6 +1051,18 @@ export type LiveStreamAccess = {
   note: string | null;
   updated_at: string;
 };
+// A church's saved email template (migration 0180).
+export type EmailTemplate = {
+  id: string;
+  organization_id: string;
+  name: string;
+  subject: string;
+  body_html: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // A campaign saved to go out later (migration 0178).
 export type ScheduledCampaignChannel = "email" | "sms" | "whatsapp";
 export type ScheduledCampaignStatus = "scheduled" | "sending" | "sent" | "failed" | "cancelled";
@@ -3239,6 +3251,12 @@ export type Database = {
         Row: LiveStreamAccess;
         Insert: Partial<LiveStreamAccess> & Pick<LiveStreamAccess, "organization_id">;
         Update: Partial<LiveStreamAccess>;
+        Relationships: [];
+      };
+      email_templates: {
+        Row: EmailTemplate;
+        Insert: Partial<EmailTemplate> & Pick<EmailTemplate, "organization_id" | "name">;
+        Update: Partial<EmailTemplate>;
         Relationships: [];
       };
       scheduled_campaigns: {

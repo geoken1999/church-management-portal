@@ -438,6 +438,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
         title: "Email and SMS campaigns",
         body: [
           "Send bulk email newsletters or SMS announcements to your congregation from the Email and SMS tabs. Both use a shared sending account by default, metered by your plan's monthly quota.",
+          "Email templates: above the subject, Start from a template offers ready-made messages (Sunday service reminder, event invitation, welcome a visitor, monthly newsletter, thank you for giving, prayer meeting, call for volunteers and a general announcement) and your own. Your church's name is filled in for you, and anything in [square brackets] is a blank to fill in before sending. To make your own, write a subject and message and press Save as template; saving with an existing name replaces it, and the same box lets you delete templates you no longer use.",
           "Growth and Pro plans can connect their own SMTP server for unmetered email sending — SMS has no equivalent \"bring your own\" option.",
           "SMS recipients' country codes are resolved from their branch (or the church's country as a fallback) — this only works correctly if that's set.",
         ],

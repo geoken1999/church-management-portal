@@ -112,3 +112,35 @@ export async function whipOffer(roomId: string, participantId: string, sdpOffer:
 export async function whipEnd(sessionId: string): Promise<void> {
   await fetch(`${API}/whip/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE", headers: { Authorization: generateServerToken() } }).catch(() => {});
 }
+
+// How much a room was used: the time every participant spent in it, from the video service's
+// own session records. Null when the service has nothing for the room (or can't be reached).
+export async function roomUsage(roomId: string): Promise<{ participantSeconds: number; sessionSeconds: number; peakParticipants: number } | null> {
+  const r = await call(`/sessions/?roomId=${encodeURIComponent(roomId)}&perPage=50`, { method: "GET" });
+  const sessions = (r.json?.data as { start?: string; end?: string | null; participants?: { timelog?: { start?: string; end?: string | null }[] }[] }[] | undefined) ?? [];
+  if (!r.ok) return null;
+  const now = Date.now();
+  let participantSeconds = 0;
+  let sessionSeconds = 0;
+  let peak = 0;
+  for (const session of sessions) {
+    const sessionStart = session.start ? Date.parse(session.start) : NaN;
+    const sessionEnd = session.end ? Date.parse(session.end) : now;
+    if (!Number.isNaN(sessionStart)) sessionSeconds += Math.max(0, (sessionEnd - sessionStart) / 1000);
+    peak = Math.max(peak, session.participants?.length ?? 0);
+    for (const person of session.participants ?? []) {
+      for (const log of person.timelog ?? []) {
+        const start = log.start ? Date.parse(log.start) : NaN;
+        const end = log.end ? Date.parse(log.end) : sessionEnd;
+        if (!Number.isNaN(start) && !Number.isNaN(end)) participantSeconds += Math.max(0, (end - start) / 1000);
+      }
+    }
+  }
+  return { participantSeconds: Math.round(participantSeconds), sessionSeconds: Math.round(sessionSeconds), peakParticipants: peak };
+}
+
+// Closes a room's running session at the video service, so nobody stays connected (and counted)
+// after the church has ended it. Best effort: an already-empty room just says so.
+export async function endRoomSession(roomId: string): Promise<void> {
+  await call("/sessions/end", { method: "POST", body: { roomId } }).catch(() => {});
+}

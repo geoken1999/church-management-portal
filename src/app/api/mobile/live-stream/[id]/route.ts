@@ -16,7 +16,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!data) return NextResponse.json({ ok: false, error: "That live stream could not be found." }, { status: 404 });
   const stream = data as LiveStream;
 
-  const viewers = stream.status === "live" ? await reportViewer(id, member.authUserId) : 0;
+  // How the viewer's playback is going, as reported by the app.
+  const q = new URL(request.url).searchParams;
+  const num = (key: string) => {
+    const value = Number(q.get(key));
+    return q.get(key) !== null && Number.isFinite(value) ? value : null;
+  };
+  const viewers =
+    stream.status === "live"
+      ? await reportViewer(id, member.authUserId, { rttMs: num("rtt"), bufferedMs: num("buf"), stalls: num("stalls"), buffering: q.get("buffering") === "1", resolution: q.get("res") })
+      : 0;
 
   const after = new URL(request.url).searchParams.get("after");
   let messages: { id: string; name: string; host: boolean; body: string; at: string }[] = [];

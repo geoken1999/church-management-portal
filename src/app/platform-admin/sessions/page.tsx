@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Globe, Smartphone } from "lucide-react";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
 import { getActiveSessions } from "@/lib/platform-admin/dal";
+import { LiveSessionsUsage } from "@/components/platform-admin/LiveSessionsUsage";
 import { RevokeSessionButton } from "@/components/platform-admin/RevokeSessionButton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,10 +28,40 @@ const FILTERS: { value: "all" | SessionSource; label: string }[] = [
   { value: "mobile", label: "Mobile app" },
 ];
 
-export default async function PlatformAdminSessionsPage({ searchParams }: { searchParams: Promise<{ source?: string }> }) {
+function SessionTabs({ live }: { live: boolean }) {
+  const tab = (active: boolean) => `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`;
+  return (
+    <div className="flex gap-1">
+      <Link href="/platform-admin/sessions" className={tab(!live)}>
+        Sign-ins
+      </Link>
+      <Link href="/platform-admin/sessions?view=live" className={tab(live)}>
+        Live streams &amp; calls
+      </Link>
+    </div>
+  );
+}
+
+export const dynamic = "force-dynamic";
+
+export default async function PlatformAdminSessionsPage({ searchParams }: { searchParams: Promise<{ source?: string; view?: string }> }) {
   await requirePlatformAdmin();
-  const { source } = await searchParams;
+  const { source, view } = await searchParams;
+  const liveView = view === "live";
   const active: "all" | SessionSource = source === "web" || source === "mobile" || source === "other" ? source : "all";
+
+  if (liveView) {
+    return (
+      <div className="space-y-6">
+        <SessionTabs live />
+        <div>
+          <h1 className="font-heading text-3xl font-bold tracking-tight">Live streams and calls</h1>
+          <p className="mt-1 text-muted-foreground">What each live session used: time in the room, what viewers watched and the data they pulled. Useful for billing churches that stream.</p>
+        </div>
+        <LiveSessionsUsage />
+      </div>
+    );
+  }
 
   const all = (await getActiveSessions()).map((session) => ({ ...session, source: sessionSource(session.userAgent) }));
   const counts = { all: all.length, web: all.filter((s) => s.source === "web").length, mobile: all.filter((s) => s.source === "mobile").length };
@@ -38,6 +69,7 @@ export default async function PlatformAdminSessionsPage({ searchParams }: { sear
 
   return (
     <div className="space-y-6">
+      <SessionTabs live={false} />
       <div>
         <h1 className="font-heading text-3xl font-bold tracking-tight">Active Sessions</h1>
         <p className="mt-1 text-muted-foreground">

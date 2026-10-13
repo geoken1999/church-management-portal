@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ObsPanel } from "@/components/livestream/ObsPanel";
+import { NetworkCheck } from "@/components/livestream/NetworkCheck";
+import { StreamHealthPanel } from "@/components/livestream/StreamHealthPanel";
 
 const LAYOUT_NAMES = { GRID: "Grid", SPOTLIGHT: "Spotlight", SIDEBAR: "Sidebar" } as const;
 const QUALITY_NAMES = { low: "Standard", med: "HD", high: "Full HD" } as const;
@@ -24,7 +26,7 @@ export function LiveStudio({ stream, canWrite, whipUrl }: { stream: LiveStream; 
   const chatEnd = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
-    const next = await getLiveStateAction(stream.id);
+    const next = await getLiveStateAction(stream.id, true);
     if (!next.error) setState(next);
   }, [stream.id]);
 
@@ -132,6 +134,9 @@ export function LiveStudio({ stream, canWrite, whipUrl }: { stream: LiveStream; 
           </CardContent>
         </Card>
       )}
+
+      {status === "live" && <StreamHealthPanel health={state.health} />}
+      {status !== "ended" && canWrite && <NetworkCheck quality={stream.quality} />}
 
       {canWrite && stream.ingest_key && status !== "ended" && <ObsPanel streamId={stream.id} whipUrl={whipUrl} initialKey={stream.ingest_key} connected={obsConnected} />}
 

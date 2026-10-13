@@ -957,6 +957,9 @@ export type KmeetMeeting = {
   // Last time anyone connected to the call reported in; a live call silent for
   // 3 minutes is ended (migration 0161, kmeet/idle.ts).
   last_active_at: string;
+  // Time people spent in the room (video service), filled in by Super Admin (migration 0177).
+  participant_seconds: number | null;
+  usage_checked_at: string | null;
 };
 
 // A church's saved report template (migration 0168); `config` is a ReportTemplateConfig.
@@ -1061,7 +1064,19 @@ export type WhatsAppNotice = {
   error: string | null;
   created_at: string;
 };
-export type LiveStreamViewer = { stream_id: string; viewer_id: string; last_seen: string };
+export type LiveStreamViewer = {
+  stream_id: string;
+  viewer_id: string;
+  last_seen: string;
+  // How long they have watched, and how their playback is going (migration 0177).
+  first_seen_at: string;
+  watch_seconds: number;
+  rtt_ms: number | null;
+  buffered_ms: number | null;
+  stalls: number;
+  buffering: boolean;
+  resolution: string | null;
+};
 export type LiveStreamMessage = {
   id: string;
   stream_id: string;

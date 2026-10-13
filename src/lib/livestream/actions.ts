@@ -6,7 +6,8 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cleanOutputs, cleanSettings } from "@/lib/livestream/validation";
-import { createLiveStream, endLiveStream, goLive, countViewers } from "@/lib/livestream/service";
+import { createLiveStream, endLiveStream, goLive, countViewers, getStreamHealth } from "@/lib/livestream/service";
+import type { StreamHealth } from "@/lib/livestream/health-assess";
 import { roomRecordings } from "@/lib/livestream/videosdk";
 import { endStreamsForMeetings } from "@/lib/livestream/service";
 import type { LiveStreamMessage } from "@/types/database";
@@ -104,11 +105,12 @@ export interface LiveState {
   viewers?: number;
   peak?: number;
   messages?: LiveStreamMessage[];
+  health?: StreamHealth | null;
   error?: string;
 }
 
 // The host's view of a stream: its status, how many are watching, and the latest chat.
-export async function getLiveStateAction(streamId: string): Promise<LiveState> {
+export async function getLiveStateAction(streamId: string, withHealth = false): Promise<LiveState> {
   await requireUser();
   const membership = await requireOrganization();
   const organizationId = membership.organization.id;
@@ -118,7 +120,7 @@ export async function getLiveStateAction(streamId: string): Promise<LiveState> {
   const { data: stream } = await admin.from("live_streams").select("status, peak_viewers, ingest_active").eq("id", streamId).eq("organization_id", organizationId).maybeSingle();
   if (!stream) return { error: "That live stream could not be found." };
   const { data: messages } = await admin.from("live_stream_messages").select("*").eq("stream_id", streamId).order("created_at", { ascending: false }).limit(60);
-  return { status: stream.status, ingestActive: stream.ingest_active, viewers: await countViewers(streamId), peak: stream.peak_viewers, messages: (messages ?? []).reverse() };
+  return { status: stream.status, ingestActive: stream.ingest_active, viewers: await countViewers(streamId), peak: stream.peak_viewers, messages: (messages ?? []).reverse(), health: withHealth ? await getStreamHealth(streamId) : undefined };
 }
 
 export async function sendHostChatAction(streamId: string, body: string): Promise<StreamResult> {

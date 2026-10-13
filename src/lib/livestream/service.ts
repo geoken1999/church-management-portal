@@ -8,8 +8,9 @@ import { maxDurationMinutesForMode } from "@/lib/kmeet/join";
 import { isLiveStreamEnabled, LIVE_STREAM_NOT_ENABLED } from "@/lib/livestream/access";
 import { sendPushToUsers } from "@/lib/push/client";
 import { resolveAudienceAuthIds } from "@/lib/push/audience";
-import { startHls, startRtmp, stopHls, stopRtmp, whipEnd } from "@/lib/livestream/videosdk";
+import { endRoomSession, startHls, startRtmp, stopHls, stopRtmp, whipEnd } from "@/lib/livestream/videosdk";
 import { VIEWER_WINDOW_SECONDS, type StreamSettings } from "@/lib/livestream/validation";
+import { assessHealth, type FeedReading, type StreamHealth, type ViewerReading } from "@/lib/livestream/health-assess";
 import type { LiveStream, LiveStreamOutput } from "@/types/database";
 
 // Makes the K-Connect room a stream is broadcast from, and the stream itself.
@@ -119,6 +120,8 @@ export async function endLiveStream(organizationId: string, streamId: string): P
 // Called when K-Connect rooms end (by the host or for being empty): their streams end too.
 export async function endStreamsForMeetings(meetings: { id: string; room_id: string | null }[]): Promise<void> {
   if (meetings.length === 0) return;
+  // Whatever ended them, the rooms are closed at the video service too, so no one stays connected.
+  await Promise.allSettled(meetings.filter((m) => m.room_id).map((m) => endRoomSession(m.room_id as string)));
   const admin = createAdminClient();
   const { data: streams } = await admin.from("live_streams").select("id, meeting_id, status, rtmp_outputs, ingest_session").in("meeting_id", meetings.map((m) => m.id)).neq("status", "ended");
   for (const stream of streams ?? []) {
@@ -131,10 +134,38 @@ export async function endStreamsForMeetings(meetings: { id: string; room_id: str
   }
 }
 
-// Notes that a viewer is watching and returns how many are right now.
-export async function reportViewer(streamId: string, viewerId: string): Promise<number> {
+export interface ViewerMetrics {
+  rttMs?: number | null;
+  bufferedMs?: number | null;
+  stalls?: number | null;
+  buffering?: boolean;
+  resolution?: string | null;
+}
+
+const clampInt = (value: number | null | undefined, max: number) => (typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(max, Math.round(value))) : null);
+
+// Notes that a viewer is watching (and how their playback is going) and returns how many are
+// watching right now. Watch time adds up from one report to the next, so a viewer who leaves
+// and comes back is still counted for the time they were really there.
+export async function reportViewer(streamId: string, viewerId: string, metrics: ViewerMetrics = {}): Promise<number> {
   const admin = createAdminClient();
-  await admin.from("live_stream_viewers").upsert({ stream_id: streamId, viewer_id: viewerId, last_seen: new Date().toISOString() });
+  const now = new Date();
+  const { data: existing } = await admin.from("live_stream_viewers").select("last_seen, watch_seconds, first_seen_at").eq("stream_id", streamId).eq("viewer_id", viewerId).maybeSingle();
+  // Reports come every few seconds; a longer gap means they were away, so only a short gap counts.
+  const gap = existing ? (now.getTime() - new Date(existing.last_seen).getTime()) / 1000 : 0;
+  const added = gap > 0 && gap <= 15 ? Math.round(gap) : 0;
+  await admin.from("live_stream_viewers").upsert({
+    stream_id: streamId,
+    viewer_id: viewerId,
+    last_seen: now.toISOString(),
+    first_seen_at: existing?.first_seen_at ?? now.toISOString(),
+    watch_seconds: (existing?.watch_seconds ?? 0) + added,
+    rtt_ms: clampInt(metrics.rttMs, 60_000),
+    buffered_ms: clampInt(metrics.bufferedMs, 600_000),
+    stalls: clampInt(metrics.stalls, 100_000) ?? 0,
+    buffering: metrics.buffering === true,
+    resolution: typeof metrics.resolution === "string" ? metrics.resolution.slice(0, 16) : null,
+  });
   const count = await countViewers(streamId);
   const { data: stream } = await admin.from("live_streams").select("peak_viewers").eq("id", streamId).maybeSingle();
   if (stream && count > stream.peak_viewers) await admin.from("live_streams").update({ peak_viewers: count }).eq("id", streamId);
@@ -145,4 +176,60 @@ export async function countViewers(streamId: string): Promise<number> {
   const since = new Date(Date.now() - VIEWER_WINDOW_SECONDS * 1000).toISOString();
   const { count } = await createAdminClient().from("live_stream_viewers").select("viewer_id", { count: "exact", head: true }).eq("stream_id", streamId).gt("last_seen", since);
   return count ?? 0;
+}
+
+// --- Health ----------------------------------------------------------------
+
+const feedMemo = new Map<string, { at: number; value: FeedReading }>();
+
+// Looks at the stream's own playlist: is the video service still adding video to it, and how fresh is it?
+async function readFeed(playbackUrl: string | null): Promise<FeedReading> {
+  if (!playbackUrl) return { reachable: false, ageSeconds: null, targetSeconds: null };
+  const cached = feedMemo.get(playbackUrl);
+  if (cached && Date.now() - cached.at < 3000) return cached.value;
+  let value: FeedReading = { reachable: false, ageSeconds: null, targetSeconds: null };
+  try {
+    const master = await fetch(playbackUrl, { cache: "no-store", signal: AbortSignal.timeout(5000) });
+    if (master.ok) {
+      const text = await master.text();
+      const lines = text.split("\n").map((l) => l.trim());
+      const variant = lines.find((l, i) => i > 0 && lines[i - 1].startsWith("#EXT-X-STREAM-INF") && l && !l.startsWith("#"));
+      const mediaUrl = variant ? new URL(variant, playbackUrl).toString() : playbackUrl;
+      const media = await fetch(mediaUrl, { cache: "no-store", signal: AbortSignal.timeout(5000) });
+      if (media.ok) {
+        const body = await media.text();
+        const target = Number(/#EXT-X-TARGETDURATION:(\d+)/.exec(body)?.[1] ?? "") || null;
+        const modified = media.headers.get("last-modified");
+        const age = modified ? Math.max(0, (Date.now() - Date.parse(modified)) / 1000) : null;
+        value = { reachable: true, ageSeconds: age === null || Number.isNaN(age) ? null : Math.round(age * 10) / 10, targetSeconds: target };
+      }
+    }
+  } catch {
+    // Unreachable: reported as such.
+  }
+  feedMemo.set(playbackUrl, { at: Date.now(), value });
+  return value;
+}
+
+export async function getStreamHealth(streamId: string): Promise<StreamHealth | null> {
+  const admin = createAdminClient();
+  const { data } = await admin.from("live_streams").select("status, playback_url, ingest_active").eq("id", streamId).maybeSingle();
+  if (!data) return null;
+  const since = new Date(Date.now() - VIEWER_WINDOW_SECONDS * 1000).toISOString();
+  const { data: rows } = await admin.from("live_stream_viewers").select("rtt_ms, buffered_ms, stalls, buffering").eq("stream_id", streamId).gt("last_seen", since);
+  const list = rows ?? [];
+  const avg = (values: (number | null)[]) => {
+    const real = values.filter((v): v is number => typeof v === "number");
+    return real.length ? real.reduce((a, b) => a + b, 0) / real.length : null;
+  };
+  const viewers: ViewerReading = {
+    count: list.length,
+    bufferingCount: list.filter((r) => r.buffering).length,
+    avgRttMs: avg(list.map((r) => r.rtt_ms)),
+    avgBufferedMs: avg(list.map((r) => r.buffered_ms)),
+    stalls: list.reduce((sum, r) => sum + (r.stalls ?? 0), 0),
+  };
+  const live = data.status === "live";
+  const feed = live ? await readFeed(data.playback_url) : { reachable: false, ageSeconds: null, targetSeconds: null };
+  return assessHealth({ live, ingestActive: data.ingest_active, feed, viewers });
 }

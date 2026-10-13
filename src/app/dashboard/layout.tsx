@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { cookies } from "next/headers";
+import { MENU_COOKIE, parseMenuPrefs } from "@/lib/menu-prefs";
 import { requireUser, getProfile } from "@/lib/auth/dal";
 import { requireOrganization, getUserOrganizations } from "@/lib/organizations/dal";
 import { getNotifications } from "@/lib/notifications/dal";
@@ -12,6 +14,7 @@ import { getFeatureTags } from "@/lib/platform-admin/feature-flags";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   await requireUser();
+  const menuPrefs = parseMenuPrefs((await cookies()).get(MENU_COOKIE)?.value);
   const [membership, memberships, profile] = await Promise.all([
     requireOrganization(),
     getUserOrganizations(),
@@ -65,6 +68,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       }}
       trialDaysRemaining={planUsage.trialDaysRemaining}
       initialLocale={toAppLocale(profile?.locale)}
+      initialMenuPrefs={menuPrefs}
     >
       {children}
     </DashboardShell>

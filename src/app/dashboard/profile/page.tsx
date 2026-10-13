@@ -14,6 +14,9 @@ import { ChangePasswordForm } from "@/components/profile/ChangePasswordForm";
 import { QrLogoUpload } from "@/components/organizations/QrLogoUpload";
 import { getSiteUrl } from "@/lib/site-url";
 import { EditOrganizationDetailsForm } from "@/components/organizations/EditOrganizationDetailsForm";
+import { MenuPreferences } from "@/components/profile/MenuPreferences";
+import { cookies } from "next/headers";
+import { MENU_COOKIE, parseMenuPrefs } from "@/lib/menu-prefs";
 
 export const metadata: Metadata = {
   title: "Profile | KingdomFlow",
@@ -25,6 +28,7 @@ export default async function ProfilePage() {
   const canManage = membership.role === "owner" || membership.role === "admin";
   const { plan, accessStatus, trialDaysRemaining } = await getPlanUsage(membership.organization.id);
 
+  const menuPrefs = parseMenuPrefs((await cookies()).get(MENU_COOKIE)?.value);
   const memberCountLabel = MEMBER_COUNT_OPTIONS.find(
     (o) => o.value === membership.organization.member_count_range,
   )?.label;
@@ -36,6 +40,8 @@ export default async function ProfilePage() {
         <h1 className="font-heading text-3xl font-bold tracking-tight">Profile</h1>
         <p className="mt-1 text-muted-foreground">Your KingdomFlow account details.</p>
       </div>
+
+      <MenuPreferences initial={menuPrefs} />
 
       <div className="grid gap-6 sm:grid-cols-2">
         <Card>

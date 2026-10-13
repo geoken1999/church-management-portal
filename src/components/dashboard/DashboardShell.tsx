@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -49,7 +49,11 @@ import {
   Wallet,
   Radio,
   Settings,
+  ChevronDown,
+  ChevronsDownUp,
+  ChevronsUpDown,
 } from "lucide-react";
+import { MENU_PREFS_EVENT, readMenuPrefsFromBrowser, saveMenuPrefs, type MenuPrefs } from "@/lib/menu-prefs";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { YouTubeIcon } from "@/components/icons/YouTubeIcon";
 import { FacebookIcon } from "@/components/icons/FacebookIcon";
@@ -210,6 +214,7 @@ export function DashboardShell(
     creditBalances: { sms: CreditWallet; ai: CreditWallet; email: CreditWallet };
     trialDaysRemaining: number | null;
     initialLocale: AppLocale;
+    initialMenuPrefs: MenuPrefs;
     children: ReactNode;
   },
 ) {
@@ -246,6 +251,7 @@ function DashboardShellInner({
   planFeatures,
   creditBalances,
   trialDaysRemaining,
+  initialMenuPrefs,
   children,
 }: {
   organization: Organization;
@@ -257,6 +263,7 @@ function DashboardShellInner({
   planFeatures: { finance: boolean; socialMedia: boolean };
   creditBalances: { sms: CreditWallet; ai: CreditWallet; email: CreditWallet };
   trialDaysRemaining: number | null;
+  initialMenuPrefs: MenuPrefs;
   children: ReactNode;
 }) {
   const { t } = useLocale();
@@ -270,6 +277,32 @@ function DashboardShellInner({
   const [, startTourTransition] = useTransition();
   const [navSearch, setNavSearch] = useState("");
   const pathname = usePathname();
+  // The section holding the current page is always open when you arrive at it (the saved
+  // preference is only what you folded away yourself).
+  const sectionOf = (path: string) =>
+    NAV_GROUPS.find((g) => g.items.some((item) => path === item.href || (item.href === "/dashboard/kconnect" && (path.startsWith("/dashboard/kmeet") || path.startsWith("/dashboard/kaudio")))))?.groupKey;
+  const openCurrent = (prefs: MenuPrefs, path: string): MenuPrefs => {
+    const key = sectionOf(path);
+    return key && prefs.closed.includes(key) ? { ...prefs, closed: prefs.closed.filter((k) => k !== key) } : prefs;
+  };
+  const [menuPrefs, setMenuPrefs] = useState<MenuPrefs>(() => openCurrent(initialMenuPrefs, pathname));
+  const [seenPath, setSeenPath] = useState(pathname);
+  if (seenPath !== pathname) {
+    setSeenPath(pathname);
+    setMenuPrefs((prefs) => openCurrent(prefs, pathname));
+  }
+
+  // The preference can be changed from the Profile page while the menu is open.
+  useEffect(() => {
+    const reload = () => setMenuPrefs(readMenuPrefsFromBrowser());
+    window.addEventListener(MENU_PREFS_EVENT, reload);
+    return () => window.removeEventListener(MENU_PREFS_EVENT, reload);
+  }, []);
+
+  function changeMenuPrefs(next: MenuPrefs) {
+    setMenuPrefs(next);
+    saveMenuPrefs(next);
+  }
 
   function markTourDone() {
     startTourTransition(() => {
@@ -313,6 +346,21 @@ function DashboardShellInner({
         .filter((group) => group.items.length > 0)
     : visibleGroups;
 
+  // A section is shown open while searching, during the tour (it points at items inside), when the
+  // current page is in it, or unless the person has collapsed it.
+  const forceOpen = query.length > 0 || tourOpen || spotlightOpen;
+  function sectionOpen(key: string): boolean {
+    if (!menuPrefs.collapsible || forceOpen) return true;
+    return !menuPrefs.closed.includes(key);
+  }
+  function toggleSection(key: string) {
+    const closed = menuPrefs.closed.includes(key) ? menuPrefs.closed.filter((k) => k !== key) : [...menuPrefs.closed, key];
+    changeMenuPrefs({ ...menuPrefs, closed });
+  }
+  function setAllSections(open: boolean) {
+    changeMenuPrefs({ ...menuPrefs, closed: open ? [] : filteredGroups.map((g) => g.groupKey) });
+  }
+
   const nav = (
     <nav className="flex flex-col gap-4 p-3">
       <div className="relative px-0.5">
@@ -326,11 +374,33 @@ function DashboardShellInner({
           aria-label={t.nav.searchPlaceholder}
         />
       </div>
+      {menuPrefs.collapsible && !forceOpen && (
+        <div className="-mt-2 flex justify-end gap-1 px-0.5">
+          <button type="button" onClick={() => setAllSections(true)} title="Expand all sections" aria-label="Expand all sections" className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground">
+            <ChevronsUpDown className="size-3.5" />
+          </button>
+          <button type="button" onClick={() => setAllSections(false)} title="Collapse all sections" aria-label="Collapse all sections" className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground">
+            <ChevronsDownUp className="size-3.5" />
+          </button>
+        </div>
+      )}
       {filteredGroups.length === 0 && <p className="px-3 text-sm text-muted-foreground">{t.nav.noTabsMatch(navSearch.trim())}</p>}
       {filteredGroups.map((group) => (
         <div key={group.groupKey} className="flex flex-col gap-1">
-          <p className="px-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{t.nav.groups[group.groupKey]}</p>
-          {group.items.map((item) => {
+          {menuPrefs.collapsible ? (
+            <button
+              type="button"
+              aria-expanded={sectionOpen(group.groupKey)}
+              onClick={() => toggleSection(group.groupKey)}
+              className="flex items-center justify-between rounded-md px-3 py-1 text-left text-xs font-semibold tracking-wide text-muted-foreground uppercase transition-colors hover:text-foreground"
+            >
+              <span>{t.nav.groups[group.groupKey]}</span>
+              <ChevronDown className={`size-3.5 transition-transform ${sectionOpen(group.groupKey) ? "" : "-rotate-90"}`} />
+            </button>
+          ) : (
+            <p className="px-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{t.nav.groups[group.groupKey]}</p>
+          )}
+          {sectionOpen(group.groupKey) && group.items.map((item) => {
             // A call's own page (/dashboard/kmeet/<id>, /dashboard/kaudio/<id>) belongs to K-Connect too.
             const active = pathname === item.href || (item.href === "/dashboard/kconnect" && (pathname.startsWith("/dashboard/kmeet") || pathname.startsWith("/dashboard/kaudio")));
             // A plan-gated item still links through to its page — that's

@@ -484,6 +484,15 @@ export const DOC_CATEGORIES: DocCategory[] = [
     title: "Billing & Plans",
     articles: [
       {
+        id: "gst-invoices",
+        title: "GST and tax invoices",
+        body: [
+          "The prices on the Billing page and the pricing page are before GST. 18% GST is added when you pay: Starter, for example, is ₹1,499 a month plus ₹269.82 GST, ₹1,768.82 in total. The same applies to add-on packs. The total is shown before you pay.",
+          "When you subscribe or buy an add-on pack you are asked for your billing details: the name to put on the invoice, your address and state, an email for the invoice, and your GSTIN if you have one (optional). They are saved for next time, and you can change them whenever you pay. If your state is the same as ours the invoice shows CGST and SGST (9% each); otherwise it shows IGST (18%).",
+          "Every payment gets a numbered GST tax invoice, which is emailed to your billing email as a PDF and kept under Invoices on the Billing page, where you can download it again. Monthly plan invoices are issued each time the plan is charged.",
+        ],
+      },
+      {
         id: "plans",
         title: "Starter, Growth, Pro, and Custom",
         body: [

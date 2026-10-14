@@ -20,6 +20,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ErrorToast } from "@/components/ui/error-toast";
+import { BillingDetailsDialog, type CheckoutResult } from "@/components/billing/BillingDetailsDialog";
+import type { BillingDetailsInput } from "@/lib/billing/billing-details";
+import { formatPrice, withGst } from "@/lib/billing/gst";
 
 const STATUS_LABELS: Record<SubscriptionStatus, string> = {
   created: "Awaiting payment",
@@ -40,14 +43,19 @@ export function BillingManager({
   currentPlanId,
   subscription,
   payuConfigured,
+  billingDetails,
+  sellerState,
 }: {
   currentPlanId: PlanId;
   subscription: OrganizationSubscription | null;
   payuConfigured: boolean;
+  billingDetails: BillingDetailsInput;
+  sellerState: string;
 }) {
   const router = useRouter();
   const [vpa, setVpa] = useState("");
-  const [pendingPlanId, setPendingPlanId] = useState<PlanId | null>(null);
+  // The plan being bought: asks for billing details first.
+  const [checkoutPlanId, setCheckoutPlanId] = useState<PlanId | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,22 +68,22 @@ export function BillingManager({
   // capable mandate method (cards/e-NACH) built yet. Only monthly billing
   // is offered for new subscriptions; an existing annual Razorpay
   // subscription (if any) still just displays as-is below.
-  async function handleSubscribe(planId: PlanId) {
+  function handleSubscribe(planId: PlanId) {
     setError(null);
     if (!vpa.trim().includes("@")) {
       setError("Enter your UPI ID first (e.g. yourname@bank) — it's needed to set up the Autopay mandate.");
       return;
     }
-    setPendingPlanId(planId);
+    setCheckoutPlanId(planId);
+  }
 
-    const result = await startPayUSubscriptionCheckout(planId, vpa);
-    if (result.error || !result.payuFields || !result.payuActionUrl) {
-      setError(result.error ?? "Couldn't start checkout.");
-      setPendingPlanId(null);
-      return;
-    }
-
+  // Called by the billing details dialog. On success the page leaves for PayU, so only a problem comes back.
+  async function startCheckout(details: BillingDetailsInput): Promise<CheckoutResult> {
+    if (!checkoutPlanId) return { error: "Choose a plan." };
+    const result = await startPayUSubscriptionCheckout(checkoutPlanId, vpa, details);
+    if (result.error || !result.payuFields || !result.payuActionUrl) return { error: result.error ?? "Couldn't start checkout.", billingErrors: result.billingErrors };
     redirectToPayU(result.payuActionUrl, result.payuFields);
+    return {};
   }
 
   async function handleCancel() {
@@ -166,6 +174,7 @@ export function BillingManager({
                   {isCurrent && <Badge>Current plan</Badge>}
                 </div>
                 <p className="font-heading text-3xl font-bold">{price.label}</p>
+                <p className="text-xs text-muted-foreground">+ 18% GST: {formatPrice(withGst(plan.priceInRupees).total)} a month in total</p>
                 <CardDescription>{planDescription(planId)}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -184,22 +193,32 @@ export function BillingManager({
                 <Button
                   className="w-full"
                   variant={isCurrent ? "outline" : "default"}
-                  disabled={isCurrent || blockedBySwitch || pendingPlanId === planId || !payuConfigured}
+                  disabled={isCurrent || blockedBySwitch || !payuConfigured}
                   onClick={() => handleSubscribe(planId)}
                 >
                   {isCurrent
                     ? "Current plan"
-                    : pendingPlanId === planId
-                      ? "Starting checkout..."
-                      : blockedBySwitch
-                        ? "Cancel current plan first"
-                        : "Subscribe"}
+                    : blockedBySwitch
+                      ? "Cancel current plan first"
+                      : "Subscribe"}
                 </Button>
               </CardContent>
             </Card>
           );
         })}
       </div>
+
+      {checkoutPlanId && (
+        <BillingDetailsDialog
+          open
+          onOpenChange={(open) => !open && setCheckoutPlanId(null)}
+          title={`Subscribe to ${PLANS[checkoutPlanId].name}`}
+          basePrice={PLANS[checkoutPlanId].priceInRupees}
+          sellerState={sellerState}
+          initial={billingDetails}
+          onSubmit={startCheckout}
+        />
+      )}
     </div>
   );
 }

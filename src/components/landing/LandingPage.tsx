@@ -287,6 +287,10 @@ const FAQS = [
     answer: "An owner or admin needs to subscribe from the Billing page to keep using the app. Other team members will see a message asking them to contact an owner or admin.",
   },
   {
+    question: "Do the prices include GST?",
+    answer: "No. The prices shown are before GST. 18% GST is added at checkout, so Starter at ₹1,499 a month comes to ₹1,768.82 in total. You give your billing details (name, address, state and, if you have one, GSTIN) when you pay, and a GST tax invoice is emailed to you for every plan payment and add-on pack.",
+  },
+  {
     question: "Can I cancel anytime?",
     answer: "Yes, from the Billing page. Cancellation takes effect immediately rather than at the end of your paid period, so there's no partial refund for the unused remainder.",
   },

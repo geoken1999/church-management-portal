@@ -7,6 +7,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrganizationSubscription } from "@/lib/billing/dal";
 import { sendSubscriptionActivatedEmail, sendSubscriptionCancelledEmail } from "@/lib/billing/receipts";
 import { isPlanId, PLANS, type PlanId } from "@/lib/plans/config";
+import { withGst } from "@/lib/billing/gst";
+import { saveBillingDetails } from "@/lib/billing/billing-details-dal";
+import type { BillingDetailsErrors, BillingDetailsInput } from "@/lib/billing/billing-details";
 import { buildMandateRegistrationFields, type MandateRegistrationFields } from "@/lib/billing/payu-subscription";
 import { getSiteUrl } from "@/lib/site-url";
 import { logPlatformEvent } from "@/lib/platform-events/log";
@@ -20,6 +23,7 @@ const IN_PROGRESS_STATUSES = ["created", "authenticated", "active", "pending", "
 
 export interface PayUSubscriptionCheckoutState {
   error?: string;
+  billingErrors?: BillingDetailsErrors;
   payuFields?: MandateRegistrationFields;
   payuActionUrl?: string;
 }
@@ -29,7 +33,7 @@ export interface PayUSubscriptionCheckoutState {
 // registration is a single one-time hash-checkout POST — there's no
 // separate "create" step and no id to reuse if the customer abandons it,
 // so retrying always builds fresh fields against a new txnid.
-export async function startPayUSubscriptionCheckout(planId: string, vpa: string): Promise<PayUSubscriptionCheckoutState> {
+export async function startPayUSubscriptionCheckout(planId: string, vpa: string, billing: BillingDetailsInput): Promise<PayUSubscriptionCheckoutState> {
   const user = await requireUser();
   const [profile, membership] = await Promise.all([getProfile(), requireOrganization()]);
 
@@ -43,6 +47,10 @@ export async function startPayUSubscriptionCheckout(planId: string, vpa: string)
   if (!trimmedVpa.includes("@")) {
     return { error: "Enter a valid UPI ID (e.g. yourname@bank)." };
   }
+
+  // Each monthly invoice is made out to these details, so they are checked and saved first.
+  const saved = await saveBillingDetails(membership.organization.id, billing);
+  if ("errors" in saved) return { error: "Check your billing details.", billingErrors: saved.errors };
 
   const existing = await getOrganizationSubscription(membership.organization.id);
   if (existing && IN_PROGRESS_STATUSES.includes(existing.status)) {
@@ -70,7 +78,8 @@ export async function startPayUSubscriptionCheckout(planId: string, vpa: string)
   try {
     built = buildMandateRegistrationFields({
       txnid,
-      amountRupees: plan.priceInRupees,
+      // The monthly charge including 18% GST: this is the most the mandate lets us debit.
+      amountRupees: withGst(plan.priceInRupees).total,
       productinfo: `${plan.name} plan subscription (Monthly)`,
       firstname: profile ? profile.first_name : membership.organization.name,
       email: profile?.email ?? user.email ?? "",

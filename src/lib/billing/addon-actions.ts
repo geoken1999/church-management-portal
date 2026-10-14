@@ -7,14 +7,22 @@ import { buildPaymentRequestFields, type PayUFormFields } from "@/lib/payu/clien
 import { getAddonPack } from "@/lib/plans/config";
 import { getSiteUrl } from "@/lib/site-url";
 import { sendAddonPurchaseEmail } from "@/lib/billing/receipts";
+import { withGst } from "@/lib/billing/gst";
+import { saveBillingDetails } from "@/lib/billing/billing-details-dal";
+import type { BillingDetailsErrors, BillingDetailsInput } from "@/lib/billing/billing-details";
+import { issueAndEmailInvoice } from "@/lib/invoices/issue";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import type { AddonType } from "@/lib/plans/config";
 
 export interface CreateAddonOrderState {
   error?: string;
+  billingErrors?: BillingDetailsErrors;
   payuFields?: PayUFormFields;
   payuActionUrl?: string;
+  // What the buyer pays: the price, the GST on it, and the total.
   amount?: number;
+  gst?: number;
+  total?: number;
   packLabel?: string;
 }
 
@@ -27,7 +35,7 @@ export interface CreateAddonOrderState {
 // browser will POST straight to PayU's hosted checkout (a full-page
 // redirect, not a popup), and records the attempt under this app's own
 // transaction id so the return handler can find it again.
-export async function createAddonOrder(packId: string): Promise<CreateAddonOrderState> {
+export async function createAddonOrder(packId: string, billing: BillingDetailsInput): Promise<CreateAddonOrderState> {
   const user = await requireUser();
   const membership = await requireOrganization();
 
@@ -41,6 +49,12 @@ export async function createAddonOrder(packId: string): Promise<CreateAddonOrder
   }
 
   const organizationId = membership.organization.id;
+
+  // The invoice is made out to these details, so they are checked and saved before any payment starts.
+  const saved = await saveBillingDetails(organizationId, billing);
+  if ("errors" in saved) return { error: "Check your billing details.", billingErrors: saved.errors };
+  const price = withGst(pack.priceInRupees);
+
   const txnid = `addon${Date.now()}${organizationId.replace(/-/g, "").slice(0, 8)}`;
 
   const admin = createAdminClient();
@@ -50,6 +64,8 @@ export async function createAddonOrder(packId: string): Promise<CreateAddonOrder
     pack_id: pack.id,
     credits: pack.credits,
     amount: pack.priceInRupees,
+    gst_amount: price.gst,
+    total_amount: price.total,
     payu_txnid: txnid,
   });
 
@@ -71,7 +87,7 @@ export async function createAddonOrder(packId: string): Promise<CreateAddonOrder
   try {
     built = buildPaymentRequestFields({
       txnid,
-      amountRupees: pack.priceInRupees,
+      amountRupees: price.total,
       productinfo: `Add-on pack: ${pack.label}`,
       firstname: profile?.first_name || "Admin",
       email: user.email ?? "billing@kingdomflow.in",
@@ -91,7 +107,7 @@ export async function createAddonOrder(packId: string): Promise<CreateAddonOrder
     return { error: "Payments aren't configured yet. Please try again later." };
   }
 
-  return { payuFields: built.fields, payuActionUrl: built.actionUrl, amount: pack.priceInRupees, packLabel: pack.label };
+  return { payuFields: built.fields, payuActionUrl: built.actionUrl, amount: price.base, gst: price.gst, total: price.total, packLabel: pack.label };
 }
 
 export interface FinalizeAddonOrderResult {
@@ -155,7 +171,12 @@ export async function finalizeAddonOrderPayment(txnid: string, mihpayid: string)
 
   await admin.from("organizations").update(update).eq("id", order.organization_id);
 
-  await sendAddonPurchaseEmail(order.organization_id, getAddonPack(order.pack_id)?.label ?? order.addon_type, order.amount);
+  // The tax invoice for this payment, emailed to the billing email. It never holds up the credits.
+  const packLabel = getAddonPack(order.pack_id)?.label ?? order.addon_type;
+  const invoiceId = await issueAndEmailInvoice({ organizationId: order.organization_id, kind: "addon", reference: txnid, description: `Add-on pack: ${packLabel}`, baseAmount: Number(order.amount) });
+  if (invoiceId) await admin.from("organization_addon_orders").update({ invoice_id: invoiceId }).eq("id", order.id);
+
+  await sendAddonPurchaseEmail(order.organization_id, packLabel, order.amount);
 
   return { success: true };
 }

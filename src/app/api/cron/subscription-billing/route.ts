@@ -4,6 +4,8 @@ import { triggerRecurringCharge } from "@/lib/billing/payu-subscription";
 import { sendSubscriptionChargedEmail, sendSubscriptionPaymentFailedEmail, sendUpcomingChargeNoticeEmail } from "@/lib/billing/receipts";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { isPlanId, PLANS } from "@/lib/plans/config";
+import { withGst } from "@/lib/billing/gst";
+import { issueAndEmailInvoice } from "@/lib/invoices/issue";
 import { withCronLogging } from "@/lib/cron/run-logger";
 
 // Owns the entire recurring side of PayU plan subscriptions — see
@@ -57,7 +59,9 @@ async function run(request: Request) {
 
   for (const sub of subscriptions ?? []) {
     const planName = isPlanId(sub.plan_id) ? PLANS[sub.plan_id].name : sub.plan_id;
-    const amountRupees = isPlanId(sub.plan_id) ? PLANS[sub.plan_id].priceInRupees : null;
+    // The plan price is without GST; the customer is charged (and told) the total with 18% GST.
+    const price = isPlanId(sub.plan_id) ? withGst(PLANS[sub.plan_id].priceInRupees) : null;
+    const amountRupees = price ? price.total : null;
     const nextChargeAt = new Date(sub.next_charge_at as string);
 
     // Pre-debit notice — checked before the charge itself so a brand-new
@@ -85,6 +89,7 @@ async function run(request: Request) {
       subscription_id: sub.id,
       txnid,
       amount: amountRupees,
+      gst_amount: price?.gst ?? 0,
       status: result.success ? "charged" : "failed",
       payu_response: result.raw as never,
       charged_at: result.success ? now.toISOString() : null,
@@ -98,6 +103,11 @@ async function run(request: Request) {
         .from("organization_subscriptions")
         .update({ next_charge_at: nextCycle.toISOString(), consecutive_charge_failures: 0, current_start: now.toISOString() })
         .eq("id", sub.id);
+      // The tax invoice for this charge, emailed to the church; it never blocks the next cycle.
+      const invoiceId = price
+        ? await issueAndEmailInvoice({ organizationId: sub.organization_id, kind: "subscription", reference: txnid, description: `${planName} plan subscription (monthly)`, baseAmount: price.base })
+        : null;
+      if (invoiceId) await admin.from("subscription_charges").update({ invoice_id: invoiceId }).eq("txnid", txnid);
       await sendSubscriptionChargedEmail(sub.organization_id, planName, Math.round(amountRupees * 100));
       continue;
     }

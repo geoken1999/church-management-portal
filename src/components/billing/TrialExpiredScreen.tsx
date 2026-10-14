@@ -2,6 +2,7 @@ import { Clock } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { BillingManager } from "@/components/billing/BillingManager";
+import type { BillingDetailsInput } from "@/lib/billing/billing-details";
 import type { PlanId } from "@/lib/plans/config";
 import type { OrganizationSubscription } from "@/types/database";
 
@@ -16,7 +17,11 @@ export function TrialExpiredScreen({
   currentPlanId,
   subscription,
   payuConfigured,
+  billingDetails,
+  sellerState,
 }: {
+  billingDetails: BillingDetailsInput;
+  sellerState: string;
   organizationName: string;
   canManage: boolean;
   currentPlanId: PlanId;
@@ -47,7 +52,7 @@ export function TrialExpiredScreen({
         </div>
 
         {canManage ? (
-          <BillingManager currentPlanId={currentPlanId} subscription={subscription} payuConfigured={payuConfigured} />
+          <BillingManager currentPlanId={currentPlanId} subscription={subscription} payuConfigured={payuConfigured} billingDetails={billingDetails} sellerState={sellerState} />
         ) : null}
       </main>
     </div>

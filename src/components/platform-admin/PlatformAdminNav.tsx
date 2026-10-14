@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Building2, LifeBuoy, HeartPulse, ScrollText, HandCoins, BookOpen, Radio, ToggleLeft, Wallet, Receipt, BarChart3, Timer, MessageSquareText, Activity, UserX, Smartphone, Hourglass, Tag } from "lucide-react";
+import { LayoutDashboard, Building2, LifeBuoy, HeartPulse, ScrollText, HandCoins, BookOpen, Radio, ToggleLeft, Wallet, Receipt, BarChart3, Timer, MessageSquareText, Activity, UserX, Smartphone, Hourglass, Tag, FileText } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/platform-admin", label: "Overview", icon: LayoutDashboard, exact: true },
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/platform-admin/feature-flags", label: "Feature Flags", icon: ToggleLeft, exact: false },
   { href: "/platform-admin/support", label: "Support", icon: LifeBuoy, exact: false },
   { href: "/platform-admin/earnings", label: "Earnings", icon: Wallet, exact: false },
+  { href: "/platform-admin/invoice-template", label: "Invoices", icon: FileText, exact: false },
   { href: "/platform-admin/expenses", label: "Expenses", icon: Receipt, exact: false },
   { href: "/platform-admin/usage", label: "Usage", icon: BarChart3, exact: false },
   { href: "/platform-admin/payouts", label: "Payouts", icon: HandCoins, exact: false },

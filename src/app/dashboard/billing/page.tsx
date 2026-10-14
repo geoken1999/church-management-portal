@@ -8,6 +8,9 @@ import { isPayUConfigured } from "@/lib/payu/env";
 import { getOrganizationPayoutDetails } from "@/lib/organizations/payout-details-dal";
 import { BillingManager } from "@/components/billing/BillingManager";
 import { AddonsManager } from "@/components/billing/AddonsManager";
+import { InvoicesCard } from "@/components/billing/InvoicesCard";
+import { getCheckoutContext } from "@/lib/billing/checkout-context";
+import { getOrganizationInvoices } from "@/lib/invoices/dal";
 import { PayoutDetailsCard } from "@/components/billing/PayoutDetailsCard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -28,10 +31,12 @@ export default async function BillingPage({
     redirect("/dashboard");
   }
 
-  const [planUsage, subscription, payoutDetails] = await Promise.all([
+  const [planUsage, subscription, payoutDetails, checkout, invoices] = await Promise.all([
     getPlanUsage(membership.organization.id),
     getOrganizationSubscription(membership.organization.id),
     getOrganizationPayoutDetails(membership.organization.id),
+    getCheckoutContext(membership.organization.id),
+    getOrganizationInvoices(membership.organization.id),
   ]);
 
   return (
@@ -89,9 +94,11 @@ export default async function BillingPage({
         </Alert>
       )}
 
-      <BillingManager currentPlanId={planUsage.plan.id} subscription={subscription} payuConfigured={isPayUConfigured()} />
+      <BillingManager currentPlanId={planUsage.plan.id} subscription={subscription} payuConfigured={isPayUConfigured()} billingDetails={checkout.billingDetails} sellerState={checkout.sellerState} />
 
       <AddonsManager
+        billingDetails={checkout.billingDetails}
+        sellerState={checkout.sellerState}
         payuConfigured={isPayUConfigured()}
         balances={{
           sms: planUsage.addonSmsCredits,
@@ -101,6 +108,8 @@ export default async function BillingPage({
           ai: planUsage.addonAiCredits,
         }}
       />
+
+      <InvoicesCard invoices={invoices} />
 
       <PayoutDetailsCard organizationId={membership.organization.id} defaultValues={payoutDetails} />
     </div>

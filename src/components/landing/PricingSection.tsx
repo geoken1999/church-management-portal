@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Check, X, Sparkles } from "lucide-react";
 import { PLANS, priceForInterval, type BillingInterval } from "@/lib/plans/config";
+import { formatPrice, GST_PERCENT, withGst } from "@/lib/billing/gst";
 import { PLAN_ORDER, planFeatureRows, planDescription } from "@/lib/plans/display";
 import { CustomPlanRequestDialog } from "@/components/landing/CustomPlanRequestDialog";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,9 @@ export function PricingSection() {
                   {featured && <Badge>Most popular</Badge>}
                 </div>
                 <p className="font-heading text-3xl font-bold">{price.label}</p>
+                <p className="text-xs text-muted-foreground">
+                  + {GST_PERCENT}% GST ({formatPrice(withGst(price.amount).total)} {billingInterval === "monthly" ? "a month" : "a year"} in total)
+                </p>
                 <CardDescription>{planDescription(planId)}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -89,6 +93,10 @@ export function PricingSection() {
         })}
 
       </div>
+
+      <p className="mt-6 text-center text-xs text-muted-foreground">
+        All prices are shown without GST. {GST_PERCENT}% GST is added at checkout, and a GST tax invoice is emailed to you with every payment, for plans and add-on packs alike.
+      </p>
 
       <Card className="mt-6 overflow-hidden border-primary/30 bg-gradient-to-r from-primary/5 via-transparent to-transparent">
         <CardContent className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">

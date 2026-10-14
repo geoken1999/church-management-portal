@@ -11,6 +11,7 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { TrialExpiredScreen } from "@/components/billing/TrialExpiredScreen";
 import { toAppLocale } from "@/lib/i18n/config";
 import { getFeatureTags } from "@/lib/platform-admin/feature-flags";
+import { getCheckoutContext } from "@/lib/billing/checkout-context";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   await requireUser();
@@ -29,6 +30,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   if (planUsage.accessStatus === "expired") {
     const subscription = await getOrganizationSubscription(membership.organization.id);
+    const checkout = await getCheckoutContext(membership.organization.id);
     return (
       <TrialExpiredScreen
         organizationName={membership.organization.name}
@@ -36,6 +38,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         currentPlanId={planUsage.plan.id}
         subscription={subscription}
         payuConfigured={isPayUConfigured()}
+        billingDetails={checkout.billingDetails}
+        sellerState={checkout.sellerState}
       />
     );
   }

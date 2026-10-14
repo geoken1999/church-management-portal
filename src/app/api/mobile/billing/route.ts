@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     ok: true,
     plan: p.name,
-    price: p.priceLabel,
+    price: `${p.priceLabel} + 18% GST`,
     status: u.accessStatus,
     trialDaysRemaining: u.trialDaysRemaining,
     usage: [

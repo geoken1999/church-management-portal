@@ -9,7 +9,8 @@ import { formatBytes } from "@/lib/plans/format";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ErrorToast } from "@/components/ui/error-toast";
+import { BillingDetailsDialog, type CheckoutResult } from "@/components/billing/BillingDetailsDialog";
+import type { BillingDetailsInput } from "@/lib/billing/billing-details";
 
 const ADDON_ICONS: Record<AddonType, typeof MessageSquareText> = {
   sms: MessageSquareText,
@@ -45,24 +46,16 @@ function redirectToPayU(actionUrl: string, fields: PayUFormFields) {
   form.submit();
 }
 
-function PackCard({ pack, payuConfigured }: { pack: AddonPack; payuConfigured: boolean }) {
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+function PackCard({ pack, payuConfigured, billingDetails, sellerState }: { pack: AddonPack; payuConfigured: boolean; billingDetails: BillingDetailsInput; sellerState: string }) {
+  const [open, setOpen] = useState(false);
 
-  async function handleBuy() {
-    setError(null);
-    setPending(true);
-
-    const result = await createAddonOrder(pack.id);
-    if (result.error || !result.payuFields || !result.payuActionUrl) {
-      setError(result.error ?? "Couldn't start the payment.");
-      setPending(false);
-      return;
-    }
-
-    // The page is about to navigate away to PayU, so there's no "pending"
-    // state to clear on success — only on the error paths above.
+  // Called by the billing details dialog. The page is about to navigate away to PayU, so success
+  // leaves nothing to clear; only a problem comes back.
+  async function handleBuy(details: BillingDetailsInput): Promise<CheckoutResult> {
+    const result = await createAddonOrder(pack.id, details);
+    if (result.error || !result.payuFields || !result.payuActionUrl) return { error: result.error ?? "Couldn't start the payment.", billingErrors: result.billingErrors };
     redirectToPayU(result.payuActionUrl, result.payuFields);
+    return {};
   }
 
   return (
@@ -71,13 +64,13 @@ function PackCard({ pack, payuConfigured }: { pack: AddonPack; payuConfigured: b
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-sm font-medium">{pack.label}</p>
-            <p className="text-xs text-muted-foreground">₹{pack.priceInRupees.toLocaleString("en-IN")}</p>
+            <p className="text-xs text-muted-foreground">₹{pack.priceInRupees.toLocaleString("en-IN")} + 18% GST</p>
           </div>
-          <Button type="button" size="sm" variant="outline" disabled={pending || !payuConfigured} onClick={handleBuy}>
-            {pending ? "Redirecting..." : "Buy"}
+          <Button type="button" size="sm" variant="outline" disabled={!payuConfigured} onClick={() => setOpen(true)}>
+            Buy
           </Button>
         </div>
-        <ErrorToast message={error} />
+        <BillingDetailsDialog open={open} onOpenChange={setOpen} title={`Buy ${pack.label}`} basePrice={pack.priceInRupees} sellerState={sellerState} initial={billingDetails} onSubmit={handleBuy} />
       </CardContent>
     </Card>
   );
@@ -86,9 +79,13 @@ function PackCard({ pack, payuConfigured }: { pack: AddonPack; payuConfigured: b
 export function AddonsManager({
   payuConfigured,
   balances,
+  billingDetails,
+  sellerState,
 }: {
   payuConfigured: boolean;
   balances: Record<AddonType, number>;
+  billingDetails: BillingDetailsInput;
+  sellerState: string;
 }) {
   const types: AddonType[] = ["sms", "email", "whatsapp", "storage", "ai"];
 
@@ -119,7 +116,7 @@ export function AddonsManager({
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {addonPacksFor(type).map((pack) => (
-                  <PackCard key={pack.id} pack={pack} payuConfigured={payuConfigured} />
+                  <PackCard billingDetails={billingDetails} sellerState={sellerState} key={pack.id} pack={pack} payuConfigured={payuConfigured} />
                 ))}
               </div>
             </div>

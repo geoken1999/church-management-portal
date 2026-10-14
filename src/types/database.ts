@@ -100,6 +100,10 @@ export type OrganizationAddonOrder = {
   pack_id: string;
   credits: number;
   amount: number;
+  // GST on top of amount, the total the buyer paid, and the invoice for it (migration 0181).
+  gst_amount: number;
+  total_amount: number | null;
+  invoice_id: string | null;
   // Legacy — no live Razorpay orders were ever created. New orders use
   // payu_txnid/payu_mihpayid instead.
   razorpay_order_id: string | null;
@@ -183,7 +187,10 @@ export type SubscriptionCharge = {
   organization_id: string;
   subscription_id: string;
   txnid: string;
+  // The total charged; gst_amount is the GST inside it.
   amount: number;
+  gst_amount: number;
+  invoice_id: string | null;
   status: SubscriptionChargeStatus;
   payu_response: Record<string, unknown> | null;
   charged_at: string | null;
@@ -1051,6 +1058,45 @@ export type LiveStreamAccess = {
   note: string | null;
   updated_at: string;
 };
+// A church's billing details, for invoices (migration 0181).
+export type OrganizationBillingDetails = {
+  organization_id: string;
+  legal_name: string;
+  gstin: string | null;
+  address_line1: string;
+  address_line2: string | null;
+  city: string;
+  state: string;
+  pincode: string;
+  email: string;
+  phone: string | null;
+  updated_at: string;
+};
+
+export type PlatformInvoiceKind = "subscription" | "addon";
+export type PlatformInvoiceLineItem = { description: string; hsn: string; quantity: number; unitPrice: number; amount: number };
+export type PlatformInvoice = {
+  id: string;
+  organization_id: string;
+  invoice_number: string;
+  kind: PlatformInvoiceKind;
+  reference: string;
+  issued_at: string;
+  buyer: Record<string, unknown>;
+  seller: Record<string, unknown>;
+  template: Record<string, unknown>;
+  line_items: PlatformInvoiceLineItem[];
+  subtotal: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  total: number;
+  gst_rate: number;
+  place_of_supply: string | null;
+  email_sent_at: string | null;
+  email_error: string | null;
+};
+
 // A church's saved email template (migration 0180).
 export type EmailTemplate = {
   id: string;
@@ -3253,6 +3299,18 @@ export type Database = {
         Update: Partial<LiveStreamAccess>;
         Relationships: [];
       };
+      organization_billing_details: {
+        Row: OrganizationBillingDetails;
+        Insert: Partial<OrganizationBillingDetails> & Pick<OrganizationBillingDetails, "organization_id" | "legal_name" | "address_line1" | "city" | "state" | "pincode" | "email">;
+        Update: Partial<OrganizationBillingDetails>;
+        Relationships: [];
+      };
+      platform_invoices: {
+        Row: PlatformInvoice;
+        Insert: Partial<PlatformInvoice> & Pick<PlatformInvoice, "organization_id" | "invoice_number" | "kind" | "reference" | "buyer" | "seller" | "template" | "line_items" | "subtotal" | "total">;
+        Update: Partial<PlatformInvoice>;
+        Relationships: [];
+      };
       email_templates: {
         Row: EmailTemplate;
         Insert: Partial<EmailTemplate> & Pick<EmailTemplate, "organization_id" | "name">;
@@ -3912,6 +3970,10 @@ export type Database = {
       get_shared_worship_document: {
         Args: { token: string };
         Returns: { title: string; file_path: string; file_type: string }[];
+      };
+      next_invoice_number: {
+        Args: { p_fy: string };
+        Returns: number;
       };
       verify_volunteer: {
         Args: { token: string };

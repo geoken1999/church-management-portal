@@ -181,7 +181,7 @@ export default async function ProfilePage() {
                 <p className="text-muted-foreground">
                   {accessStatus === "trial"
                     ? `Free trial — ${trialDaysRemaining} ${trialDaysRemaining === 1 ? "day" : "days"} left`
-                    : plan.priceLabel}
+                    : `${plan.priceLabel} + GST`}
                 </p>
               </div>
               <Badge variant="secondary">{accessStatus === "trial" ? "Trial" : plan.name}</Badge>

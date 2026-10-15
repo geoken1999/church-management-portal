@@ -8,6 +8,7 @@ const TABS = [
   { href: "/dashboard/mobile/design-studio", label: "Design Studio" },
   { href: "/dashboard/mobile/giving", label: "Giving" },
   { href: "/dashboard/mobile/notifications", label: "Notifications" },
+  { href: "/dashboard/mobile/popups", label: "Popups" },
 ];
 
 export function MobileSectionTabs() {

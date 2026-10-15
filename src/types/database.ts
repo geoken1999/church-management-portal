@@ -1110,6 +1110,22 @@ export type EmailTemplate = {
 };
 
 // A campaign saved to go out later (migration 0178).
+export type AppPopup = {
+  id: string;
+  organization_id: string;
+  title: string;
+  message: string;
+  button_label: string | null;
+  link_url: string | null;
+  starts_at: string;
+  ends_at: string | null;
+  is_active: boolean;
+  show_every_time: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ScheduledCampaignChannel = "email" | "sms" | "whatsapp";
 export type ScheduledCampaignStatus = "scheduled" | "sending" | "sent" | "failed" | "cancelled";
 export type ScheduledAttachment = { path: string; filename: string; contentType: string | null; size: number };
@@ -3315,6 +3331,12 @@ export type Database = {
         Row: EmailTemplate;
         Insert: Partial<EmailTemplate> & Pick<EmailTemplate, "organization_id" | "name">;
         Update: Partial<EmailTemplate>;
+        Relationships: [];
+      };
+      app_popups: {
+        Row: AppPopup;
+        Insert: Partial<AppPopup> & Pick<AppPopup, "organization_id" | "title">;
+        Update: Partial<AppPopup>;
         Relationships: [];
       };
       scheduled_campaigns: {

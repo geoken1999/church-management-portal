@@ -47,7 +47,7 @@ async function run(request: Request) {
 
   const { data: subscriptions } = await admin
     .from("organization_subscriptions")
-    .select("id, organization_id, plan_id, status, payu_authpayuid, next_charge_at, predebit_notice_sent_at, consecutive_charge_failures")
+    .select("id, organization_id, plan_id, monthly_amount, status, payu_authpayuid, next_charge_at, predebit_notice_sent_at, consecutive_charge_failures")
     .eq("status", "active")
     .not("next_charge_at", "is", null)
     .not("payu_authpayuid", "is", null);
@@ -58,9 +58,11 @@ async function run(request: Request) {
   let halted = 0;
 
   for (const sub of subscriptions ?? []) {
-    const planName = isPlanId(sub.plan_id) ? PLANS[sub.plan_id].name : sub.plan_id;
-    // The plan price is without GST; the customer is charged (and told) the total with 18% GST.
-    const price = isPlanId(sub.plan_id) ? withGst(PLANS[sub.plan_id].priceInRupees) : null;
+    // A subscription from a tenant onboarding bills its own monthly amount for its modules.
+    const customAmount = sub.monthly_amount !== null && sub.monthly_amount !== undefined ? Number(sub.monthly_amount) : null;
+    const planName = customAmount !== null ? "KingdomFlow modules" : isPlanId(sub.plan_id) ? PLANS[sub.plan_id].name : sub.plan_id;
+    // The price is without GST; the customer is charged (and told) the total with 18% GST.
+    const price = customAmount !== null ? withGst(customAmount) : isPlanId(sub.plan_id) ? withGst(PLANS[sub.plan_id].priceInRupees) : null;
     const amountRupees = price ? price.total : null;
     const nextChargeAt = new Date(sub.next_charge_at as string);
 
@@ -105,7 +107,7 @@ async function run(request: Request) {
         .eq("id", sub.id);
       // The tax invoice for this charge, emailed to the church; it never blocks the next cycle.
       const invoiceId = price
-        ? await issueAndEmailInvoice({ organizationId: sub.organization_id, kind: "subscription", reference: txnid, description: `${planName} plan subscription (monthly)`, baseAmount: price.base })
+        ? await issueAndEmailInvoice({ organizationId: sub.organization_id, kind: "subscription", reference: txnid, description: customAmount !== null ? "KingdomFlow modules subscription (monthly)" : `${planName} plan subscription (monthly)`, baseAmount: price.base })
         : null;
       if (invoiceId) await admin.from("subscription_charges").update({ invoice_id: invoiceId }).eq("txnid", txnid);
       await sendSubscriptionChargedEmail(sub.organization_id, planName, Math.round(amountRupees * 100));

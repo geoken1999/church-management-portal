@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Building2, LifeBuoy, HeartPulse, ScrollText, HandCoins, BookOpen, Radio, ToggleLeft, Wallet, Receipt, BarChart3, Timer, MessageSquareText, Activity, UserX, Smartphone, Hourglass, Tag, FileText } from "lucide-react";
+import { LayoutDashboard, Building2, LifeBuoy, HeartPulse, ScrollText, HandCoins, BookOpen, Radio, ToggleLeft, Wallet, Receipt, BarChart3, Timer, MessageSquareText, Activity, UserX, Smartphone, Hourglass, Tag, FileText, ClipboardCheck, Boxes } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/platform-admin", label: "Overview", icon: LayoutDashboard, exact: true },
   { href: "/platform-admin/tenants", label: "Tenants", icon: Building2, exact: false },
+  { href: "/platform-admin/onboarding", label: "Onboarding", icon: ClipboardCheck, exact: false },
+  { href: "/platform-admin/modules", label: "Modules", icon: Boxes, exact: false },
   { href: "/platform-admin/sessions", label: "Sessions", icon: Radio, exact: false },
   { href: "/platform-admin/feature-flags", label: "Feature Flags", icon: ToggleLeft, exact: false },
   { href: "/platform-admin/support", label: "Support", icon: LifeBuoy, exact: false },

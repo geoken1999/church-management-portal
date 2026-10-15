@@ -107,3 +107,14 @@ export async function sendMembershipPayoutProcessedEmail(organizationId: string,
     `<p>A payout of <strong>${formatRupees(amountRupees)}</strong> from membership fee collections has been processed and wired to you.</p>`,
   );
 }
+
+// Sent when the platform admin finishes a tenant's onboarding: what was chosen, what it costs, and
+// where to authorize the subscription.
+export async function sendOnboardingReadyEmail(organizationId: string, moduleLabels: string[], totalWithGst: number, billingUrl: string): Promise<void> {
+  const list = moduleLabels.map((label) => `<li>${label}</li>`).join("");
+  await sendBillingEmail(
+    organizationId,
+    "Your KingdomFlow plan is ready — one step left",
+    `<p>Your onboarding with KingdomFlow is complete. Your plan includes:</p><ul>${list}</ul><p>Monthly total including 18% GST: <strong>${formatRupees(totalWithGst)}</strong>.</p><p>To start, open <a href="${billingUrl}">Billing</a> and authorize the UPI Autopay subscription. Your modules switch on as soon as it is confirmed.</p>`,
+  );
+}

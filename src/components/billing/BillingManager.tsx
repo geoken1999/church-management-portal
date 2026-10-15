@@ -128,7 +128,9 @@ export function BillingManager({
               </Badge>
             </div>
             <CardDescription>
-              {PLANS[currentPlanId].name} plan — {INTERVAL_LABELS[subscription.billing_interval]}
+              {subscription.monthly_amount !== null
+                ? `Custom modules plan (${subscription.onboarding_modules?.length ?? 0} modules) — ${formatPrice(withGst(Number(subscription.monthly_amount)).total)} a month including GST`
+                : `${PLANS[currentPlanId].name} plan — ${INTERVAL_LABELS[subscription.billing_interval]}`}
               {subscription.next_charge_at && subscription.status === "active"
                 ? ` — next charge ${new Date(subscription.next_charge_at).toLocaleDateString()}`
                 : subscription.current_end && subscription.status === "active"

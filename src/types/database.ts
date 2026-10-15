@@ -176,6 +176,10 @@ export type OrganizationSubscription = {
   next_charge_at: string | null;
   predebit_notice_sent_at: string | null;
   consecutive_charge_failures: number;
+  // Set when the subscription came from a tenant onboarding: the monthly price before GST, and the
+  // modules it covers. Null for an ordinary plan subscription.
+  monthly_amount: number | null;
+  onboarding_modules: string[] | null;
   created_at: string;
   updated_at: string;
 };
@@ -2039,6 +2043,73 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      module_pricing: {
+        Row: { module_key: string; monthly_price: number; is_default: boolean; updated_at: string };
+        Insert: Partial<{ module_key: string; monthly_price: number; is_default: boolean; updated_at: string }> & { module_key: string };
+        Update: Partial<{ module_key: string; monthly_price: number; is_default: boolean; updated_at: string }>;
+        Relationships: [];
+      };
+      tenant_onboarding: {
+        Row: {
+          organization_id: string;
+          status: string;
+          modules: string[];
+          monthly_base: number;
+          notes: string;
+          started_by: string | null;
+          sent_at: string | null;
+          activated_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          organization_id: string;
+          status?: string;
+          modules?: string[];
+          monthly_base?: number;
+          notes?: string;
+          started_by?: string | null;
+          sent_at?: string | null;
+          activated_at?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          status?: string;
+          modules?: string[];
+          monthly_base?: number;
+          notes?: string;
+          sent_at?: string | null;
+          activated_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      tenant_onboarding_documents: {
+        Row: {
+          id: string;
+          organization_id: string;
+          doc_type: string;
+          file_name: string;
+          file_path: string;
+          status: string;
+          note: string;
+          uploaded_by: string | null;
+          verified_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          organization_id: string;
+          doc_type: string;
+          file_name: string;
+          file_path: string;
+          status?: string;
+          note?: string;
+          uploaded_by?: string | null;
+          verified_at?: string | null;
+        };
+        Update: { status?: string; note?: string; verified_at?: string | null };
+        Relationships: [];
       };
       organization_subscriptions: {
         Row: OrganizationSubscription;

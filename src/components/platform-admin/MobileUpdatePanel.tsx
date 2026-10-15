@@ -62,7 +62,7 @@ export function MobileUpdatePanel({ initial }: { initial: UpdateConfig }) {
                 <Input value={config[platform].storeUrl} onChange={(e) => set(platform, "storeUrl", e.target.value)} placeholder="https://play.google.com/store/apps/details?id=…" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">What's new (optional)</Label>
+                <Label className="text-xs">What&apos;s new (optional)</Label>
                 <Textarea rows={3} maxLength={500} value={config[platform].notes} onChange={(e) => set(platform, "notes", e.target.value)} />
               </div>
             </div>

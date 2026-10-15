@@ -223,7 +223,7 @@ export function PopupsPanel({ popups }: { popups: AppPopup[] }) {
                       }))
                     }
                   />
-                  Show every time the app opens (members get a “Don't show this
+                  Show every time the app opens (members get a “Don&apos;t show this
                   again” option). Otherwise a member sees it once.
                 </label>
                 <div className="flex gap-2">

@@ -3,6 +3,8 @@ import { Globe, Smartphone } from "lucide-react";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
 import { getMobileVersions } from "@/lib/mobile-health/dal";
 import { getWebVersion } from "@/lib/version";
+import { getUpdateConfig } from "@/lib/mobile/update-store";
+import { MobileUpdatePanel } from "@/components/platform-admin/MobileUpdatePanel";
 import { formatPlatformDate } from "@/lib/platform-admin/format";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +22,7 @@ export default async function VersionsPage() {
   await requirePlatformAdmin();
   const web = getWebVersion();
   const mobile = await getMobileVersions();
+  const updateConfig = await getUpdateConfig();
 
   return (
     <div className="space-y-6">
@@ -91,6 +94,8 @@ export default async function VersionsPage() {
           );
         })}
       </div>
+
+      <MobileUpdatePanel initial={updateConfig} />
 
       <Card>
         <CardHeader>

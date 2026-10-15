@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ONBOARDING_MODULES,
+  cleanCredits,
   quoteFor,
   tabStatesFor,
   MANDATE_LIMIT_RUPEES,

@@ -1115,6 +1115,7 @@ export type AppPopup = {
   organization_id: string;
   title: string;
   message: string;
+  image_url: string | null;
   button_label: string | null;
   link_url: string | null;
   starts_at: string;

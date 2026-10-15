@@ -4,8 +4,12 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { checkStorageQuota } from "@/lib/plans/dal";
 
 const PATH = "/dashboard/mobile/popups";
+const BUCKET = "app-popup-images";
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+const IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
 export interface PopupInput {
   title: string;
@@ -15,6 +19,7 @@ export interface PopupInput {
   startsAt: string; // ISO, or "" for now
   endsAt: string; // ISO, or "" for no end
   showEveryTime: boolean;
+  imageUrl: string; // from uploadPopupImageAction, or "" for none
 }
 
 export interface PopupResult {
@@ -61,8 +66,12 @@ function clean(input: PopupInput): { error: string } | { row: Record<string, unk
     if (ends <= starts) return { error: "The end time must be after the start time." };
   }
 
+  const imageUrl = input.imageUrl.trim();
+  if (imageUrl && !imageUrl.includes(`/storage/v1/object/public/${BUCKET}/`)) return { error: "That image isn't valid. Upload it again." };
+
   return {
     row: {
+      image_url: imageUrl || null,
       title,
       message,
       button_label: label || null,
@@ -88,6 +97,7 @@ export async function savePopupAction(id: string | null, input: PopupInput): Pro
     console.error("app_popups save failed:", error.message);
     return { error: "Couldn't save the popup. Please try again." };
   }
+  await removeUnusedImages(actor.organizationId);
   revalidatePath(PATH);
   return { success: true };
 }
@@ -106,6 +116,46 @@ export async function deletePopupAction(id: string): Promise<PopupResult> {
   if (!actor) return NOT_ALLOWED;
   const { error } = await createAdminClient().from("app_popups").delete().eq("id", id).eq("organization_id", actor.organizationId);
   if (error) return { error: "Couldn't delete the popup. Please try again." };
+  await removeUnusedImages(actor.organizationId);
   revalidatePath(PATH);
   return { success: true };
+}
+
+export interface PopupImageResult {
+  error?: string;
+  url?: string;
+}
+
+// Uploads a popup's picture (JPEG, PNG or WebP, up to 2 MB) and returns its public link.
+export async function uploadPopupImageAction(formData: FormData): Promise<PopupImageResult> {
+  const actor = await requireAdmin();
+  if (!actor) return { error: NOT_ALLOWED.error };
+  const file = formData.get("image");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose an image to upload." };
+  const ext = IMAGE_TYPES[file.type];
+  if (!ext) return { error: "Use a JPEG, PNG or WebP image." };
+  if (file.size > MAX_IMAGE_BYTES) return { error: "That image is over 2 MB. Try a smaller one." };
+  const quotaError = await checkStorageQuota(actor.organizationId, file.size);
+  if (quotaError) return { error: quotaError };
+
+  const admin = createAdminClient();
+  const path = `${actor.organizationId}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await admin.storage.from(BUCKET).upload(path, new Uint8Array(await file.arrayBuffer()), { contentType: file.type });
+  if (error) return { error: "Couldn't upload that image. Try again." };
+  return { url: admin.storage.from(BUCKET).getPublicUrl(path).data.publicUrl };
+}
+
+// Removes picture files no popup uses any more. Best effort: a stray file never breaks anything.
+async function removeUnusedImages(organizationId: string): Promise<void> {
+  try {
+    const admin = createAdminClient();
+    const { data: rows } = await admin.from("app_popups").select("image_url").eq("organization_id", organizationId);
+    const used = new Set((rows ?? []).map((r) => r.image_url).filter(Boolean).map((u) => (u as string).split(`/${BUCKET}/`)[1]));
+    const { data: files } = await admin.storage.from(BUCKET).list(organizationId, { limit: 1000 });
+    const cutoff = Date.now() - 60 * 60 * 1000; // a fresh upload isn't saved into a popup yet
+    const stale = (files ?? []).filter((f) => !used.has(`${organizationId}/${f.name}`) && f.created_at && new Date(f.created_at).getTime() < cutoff).map((f) => `${organizationId}/${f.name}`);
+    if (stale.length > 0) await admin.storage.from(BUCKET).remove(stale);
+  } catch (err) {
+    console.error("removeUnusedImages failed:", err);
+  }
 }

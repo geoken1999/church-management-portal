@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { deletePopupAction, savePopupAction, setPopupActiveAction } from "@/lib/mobile/popup-actions";
+import {
+  deletePopupAction,
+  savePopupAction,
+  setPopupActiveAction,
+  uploadPopupImageAction,
+} from "@/lib/mobile/popup-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,12 +27,23 @@ function toLocalInput(iso: string | null): string {
 function statusOf(p: AppPopup): { label: string; live: boolean } {
   const now = Date.now();
   if (!p.is_active) return { label: "Paused", live: false };
-  if (new Date(p.starts_at).getTime() > now) return { label: "Scheduled", live: false };
-  if (p.ends_at && new Date(p.ends_at).getTime() <= now) return { label: "Ended", live: false };
+  if (new Date(p.starts_at).getTime() > now)
+    return { label: "Scheduled", live: false };
+  if (p.ends_at && new Date(p.ends_at).getTime() <= now)
+    return { label: "Ended", live: false };
   return { label: "Live", live: true };
 }
 
-const EMPTY = { title: "", message: "", buttonLabel: "", linkUrl: "", startsAt: "", endsAt: "", showEveryTime: false };
+const EMPTY = {
+  title: "",
+  message: "",
+  buttonLabel: "",
+  linkUrl: "",
+  startsAt: "",
+  endsAt: "",
+  showEveryTime: false,
+  imageUrl: "",
+};
 
 export function PopupsPanel({ popups }: { popups: AppPopup[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -52,6 +68,7 @@ export function PopupsPanel({ popups }: { popups: AppPopup[] }) {
       startsAt: toLocalInput(p.starts_at),
       endsAt: toLocalInput(p.ends_at),
       showEveryTime: p.show_every_time,
+      imageUrl: p.image_url ?? "",
     });
     setOpen(true);
   }
@@ -62,6 +79,18 @@ export function PopupsPanel({ popups }: { popups: AppPopup[] }) {
       const result = await action();
       if (result.error) setError(result.error);
       else after?.();
+    });
+  }
+
+  function upload(file: File | undefined) {
+    if (!file) return;
+    setError(null);
+    startTransition(async () => {
+      const data = new FormData();
+      data.set("image", file);
+      const result = await uploadPopupImageAction(data);
+      if (result.error) setError(result.error);
+      else setForm((f) => ({ ...f, imageUrl: result.url ?? "" }));
     });
   }
 
@@ -78,7 +107,10 @@ export function PopupsPanel({ popups }: { popups: AppPopup[] }) {
     );
   }
 
-  const set = (key: keyof typeof EMPTY) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  const set =
+    (key: keyof typeof EMPTY) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setForm((f) => ({ ...f, [key]: e.target.value }));
 
   return (
     <div className="space-y-6">
@@ -92,41 +124,121 @@ export function PopupsPanel({ popups }: { popups: AppPopup[] }) {
               <form onSubmit={save} className="space-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="popup-title">Title</Label>
-                  <Input id="popup-title" value={form.title} onChange={set("title")} maxLength={80} placeholder="Easter service this Sunday" />
+                  <Input
+                    id="popup-title"
+                    value={form.title}
+                    onChange={set("title")}
+                    maxLength={80}
+                    placeholder="Easter service this Sunday"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="popup-image">
+                    Image (optional, JPEG, PNG or WebP up to 2 MB)
+                  </Label>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      id="popup-image"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      disabled={pending}
+                      onChange={(e) => upload(e.target.files?.[0])}
+                    />
+                    {form.imageUrl && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setForm((f) => ({ ...f, imageUrl: "" }))}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="popup-message">Message (optional)</Label>
-                  <Textarea id="popup-message" value={form.message} onChange={set("message")} maxLength={600} rows={4} />
+                  <Textarea
+                    id="popup-message"
+                    value={form.message}
+                    onChange={set("message")}
+                    maxLength={600}
+                    rows={4}
+                  />
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label htmlFor="popup-button">Button label (optional)</Label>
-                    <Input id="popup-button" value={form.buttonLabel} onChange={set("buttonLabel")} maxLength={30} placeholder="Register now" />
+                    <Label htmlFor="popup-button">
+                      Button label (optional)
+                    </Label>
+                    <Input
+                      id="popup-button"
+                      value={form.buttonLabel}
+                      onChange={set("buttonLabel")}
+                      maxLength={30}
+                      placeholder="Register now"
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="popup-link">Button link</Label>
-                    <Input id="popup-link" value={form.linkUrl} onChange={set("linkUrl")} placeholder="https://" inputMode="url" />
+                    <Input
+                      id="popup-link"
+                      value={form.linkUrl}
+                      onChange={set("linkUrl")}
+                      placeholder="https://"
+                      inputMode="url"
+                    />
                   </div>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label htmlFor="popup-start">Show from (blank = now)</Label>
-                    <Input id="popup-start" type="datetime-local" value={form.startsAt} onChange={set("startsAt")} />
+                    <Input
+                      id="popup-start"
+                      type="datetime-local"
+                      value={form.startsAt}
+                      onChange={set("startsAt")}
+                    />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="popup-end">Show until (blank = until you pause it)</Label>
-                    <Input id="popup-end" type="datetime-local" value={form.endsAt} onChange={set("endsAt")} />
+                    <Label htmlFor="popup-end">
+                      Show until (blank = until you pause it)
+                    </Label>
+                    <Input
+                      id="popup-end"
+                      type="datetime-local"
+                      value={form.endsAt}
+                      onChange={set("endsAt")}
+                    />
                   </div>
                 </div>
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={form.showEveryTime} onChange={(e) => setForm((f) => ({ ...f, showEveryTime: e.target.checked }))} />
-                  Show every time the app opens (otherwise a member sees it once)
+                  <input
+                    type="checkbox"
+                    checked={form.showEveryTime}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        showEveryTime: e.target.checked,
+                      }))
+                    }
+                  />
+                  Show every time the app opens (members get a “Don't show this
+                  again” option). Otherwise a member sees it once.
                 </label>
                 <div className="flex gap-2">
                   <Button type="submit" disabled={pending}>
-                    {pending ? "Saving..." : editingId ? "Save changes" : "Publish popup"}
+                    {pending
+                      ? "Saving..."
+                      : editingId
+                        ? "Save changes"
+                        : "Publish popup"}
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setOpen(false)}
+                  >
                     Cancel
                   </Button>
                 </div>
@@ -135,13 +247,37 @@ export function PopupsPanel({ popups }: { popups: AppPopup[] }) {
           </Card>
 
           <div>
-            <p className="mb-2 text-xs font-medium text-muted-foreground">Preview</p>
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <h3 className="font-heading text-lg font-semibold">{form.title || "Popup title"}</h3>
-              {form.message && <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{form.message}</p>}
-              <div className="mt-4 flex justify-end gap-2">
-                <span className="rounded-md px-3 py-1.5 text-sm text-muted-foreground">Close</span>
-                {form.buttonLabel && <span className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground">{form.buttonLabel}</span>}
+            <p className="mb-2 text-xs font-medium text-muted-foreground">
+              Preview
+            </p>
+            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+              {form.imageUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={form.imageUrl}
+                  alt=""
+                  className="max-h-48 w-full object-cover"
+                />
+              )}
+              <div className="p-5">
+                <h3 className="font-heading text-lg font-semibold">
+                  {form.title || "Popup title"}
+                </h3>
+                {form.message && (
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
+                    {form.message}
+                  </p>
+                )}
+                <div className="mt-4 flex justify-end gap-2">
+                  <span className="rounded-md px-3 py-1.5 text-sm text-muted-foreground">
+                    Close
+                  </span>
+                  {form.buttonLabel && (
+                    <span className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground">
+                      {form.buttonLabel}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -149,7 +285,9 @@ export function PopupsPanel({ popups }: { popups: AppPopup[] }) {
       )}
 
       <div className="space-y-3">
-        {popups.length === 0 && <p className="text-sm text-muted-foreground">No popups yet.</p>}
+        {popups.length === 0 && (
+          <p className="text-sm text-muted-foreground">No popups yet.</p>
+        )}
         {popups.map((p) => {
           const status = statusOf(p);
           return (
@@ -158,19 +296,35 @@ export function PopupsPanel({ popups }: { popups: AppPopup[] }) {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{p.title}</span>
-                    <Badge variant={status.live ? "default" : "secondary"}>{status.label}</Badge>
+                    <Badge variant={status.live ? "default" : "secondary"}>
+                      {status.label}
+                    </Badge>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {new Date(p.starts_at).toLocaleString()}
-                    {p.ends_at ? ` – ${new Date(p.ends_at).toLocaleString()}` : " – no end"} · {p.show_every_time ? "every app open" : "once per member"}
+                    {p.ends_at
+                      ? ` – ${new Date(p.ends_at).toLocaleString()}`
+                      : " – no end"}{" "}
+                    · {p.show_every_time ? "every app open" : "once per member"}
                     {p.button_label ? ` · button: ${p.button_label}` : ""}
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => startEdit(p)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => startEdit(p)}
+                  >
                     Edit
                   </Button>
-                  <Button size="sm" variant="outline" disabled={pending} onClick={() => run(() => setPopupActiveAction(p.id, !p.is_active))}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={pending}
+                    onClick={() =>
+                      run(() => setPopupActiveAction(p.id, !p.is_active))
+                    }
+                  >
                     {p.is_active ? "Pause" : "Resume"}
                   </Button>
                   <Button
@@ -178,7 +332,8 @@ export function PopupsPanel({ popups }: { popups: AppPopup[] }) {
                     variant="outline"
                     disabled={pending}
                     onClick={() => {
-                      if (confirm(`Delete "${p.title}"?`)) run(() => deletePopupAction(p.id));
+                      if (confirm(`Delete "${p.title}"?`))
+                        run(() => deletePopupAction(p.id));
                     }}
                   >
                     Delete

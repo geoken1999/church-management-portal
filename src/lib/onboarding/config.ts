@@ -55,6 +55,55 @@ export function tabStatesFor(moduleKeys: string[]): Record<TabKey, boolean> {
   return result;
 }
 
+export type PlanType = "package" | "custom";
+
+export type CreditKey = "email" | "sms" | "whatsapp" | "ai" | "storage";
+
+export interface CreditType {
+  key: CreditKey;
+  label: string;
+  unit: string;
+}
+
+// Monthly allowances the platform admin sets, with a count and a price, for a custom plan.
+export const CREDIT_TYPES: CreditType[] = [
+  { key: "email", label: "Emails", unit: "per month" },
+  { key: "sms", label: "SMS", unit: "per month" },
+  { key: "whatsapp", label: "WhatsApp messages", unit: "per month" },
+  { key: "ai", label: "AI replies", unit: "per month" },
+  { key: "storage", label: "Storage", unit: "GB" },
+];
+
+export interface CreditLine {
+  count: number;
+  price: number; // per month, before GST
+}
+
+export type Credits = Partial<Record<CreditKey, CreditLine>>;
+
+// Only well-formed lines with a count above zero; everything else is dropped.
+export function cleanCredits(input: unknown): Credits {
+  const result: Credits = {};
+  const source =
+    input && typeof input === "object"
+      ? (input as Record<string, unknown>)
+      : {};
+  for (const type of CREDIT_TYPES) {
+    const line = source[type.key] as
+      { count?: unknown; price?: unknown } | undefined;
+    const count = Math.floor(Number(line?.count));
+    const price = Math.round(Number(line?.price) * 100) / 100;
+    if (
+      Number.isFinite(count) &&
+      count > 0 &&
+      Number.isFinite(price) &&
+      price >= 0
+    )
+      result[type.key] = { count, price };
+  }
+  return result;
+}
+
 export interface Quote {
   base: number;
   gst: number;
@@ -62,18 +111,26 @@ export interface Quote {
   overMandateLimit: boolean;
 }
 
-// The monthly price of the chosen modules: before GST, the GST on it, and what is charged.
+// The monthly price of the chosen modules and credit allowances: before GST, the GST on it, and what is charged.
 export function quoteFor(
   moduleKeys: string[],
   prices: Record<string, number>,
+  credits: Credits = {},
 ): Quote {
-  const base = moduleKeys.reduce((sum, key) => sum + (prices[key] ?? 0), 0);
-  const { gst, total } = withGst(base);
+  const modulesBase = moduleKeys.reduce(
+    (sum, key) => sum + (prices[key] ?? 0),
+    0,
+  );
+  const creditsBase = Object.values(credits).reduce(
+    (sum, line) => sum + (line?.price ?? 0),
+    0,
+  );
+  const priced = withGst(modulesBase + creditsBase);
   return {
-    base: withGst(base).base,
-    gst,
-    total,
-    overMandateLimit: total > MANDATE_LIMIT_RUPEES,
+    base: priced.base,
+    gst: priced.gst,
+    total: priced.total,
+    overMandateLimit: priced.total > MANDATE_LIMIT_RUPEES,
   };
 }
 

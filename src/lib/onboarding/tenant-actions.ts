@@ -40,7 +40,11 @@ export async function startOnboardingCheckout(
 
   const organizationId = membership.organization.id;
   const onboarding = await getOnboarding(organizationId);
-  if (!onboarding || onboarding.status !== "awaiting_payment")
+  if (
+    !onboarding ||
+    onboarding.plan_type !== "custom" ||
+    onboarding.status !== "awaiting_payment"
+  )
     return { error: "There's no plan waiting for you to start." };
   const trimmedVpa = vpa.trim();
   if (!trimmedVpa.includes("@"))
@@ -96,6 +100,7 @@ export async function startOnboardingCheckout(
         payu_vpa: trimmedVpa,
         monthly_amount: onboarding.monthly_base,
         onboarding_modules: onboarding.modules,
+        onboarding_credits: onboarding.credits as never,
       },
       { onConflict: "organization_id" },
     );

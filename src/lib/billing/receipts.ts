@@ -110,8 +110,8 @@ export async function sendMembershipPayoutProcessedEmail(organizationId: string,
 
 // Sent when the platform admin finishes a tenant's onboarding: what was chosen, what it costs, and
 // where to authorize the subscription.
-export async function sendOnboardingReadyEmail(organizationId: string, moduleLabels: string[], totalWithGst: number, billingUrl: string): Promise<void> {
-  const list = moduleLabels.map((label) => `<li>${label}</li>`).join("");
+export async function sendOnboardingReadyEmail(organizationId: string, moduleLabels: string[], creditLabels: string[], totalWithGst: number, billingUrl: string): Promise<void> {
+  const list = [...moduleLabels, ...creditLabels].map((label) => `<li>${label}</li>`).join("");
   await sendBillingEmail(
     organizationId,
     "Your KingdomFlow plan is ready — one step left",

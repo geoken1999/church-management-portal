@@ -180,6 +180,7 @@ export type OrganizationSubscription = {
   // modules it covers. Null for an ordinary plan subscription.
   monthly_amount: number | null;
   onboarding_modules: string[] | null;
+  onboarding_credits: Record<string, { count: number; price: number }> | null;
   created_at: string;
   updated_at: string;
 };
@@ -2055,6 +2056,8 @@ export type Database = {
           organization_id: string;
           status: string;
           modules: string[];
+          plan_type: string;
+          credits: Record<string, { count: number; price: number }>;
           monthly_base: number;
           notes: string;
           started_by: string | null;
@@ -2067,6 +2070,8 @@ export type Database = {
           organization_id: string;
           status?: string;
           modules?: string[];
+          plan_type?: string;
+          credits?: Record<string, { count: number; price: number }>;
           monthly_base?: number;
           notes?: string;
           started_by?: string | null;
@@ -2077,6 +2082,8 @@ export type Database = {
         Update: {
           status?: string;
           modules?: string[];
+          plan_type?: string;
+          credits?: Record<string, { count: number; price: number }>;
           monthly_base?: number;
           notes?: string;
           sent_at?: string | null;

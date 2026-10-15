@@ -13,6 +13,7 @@ import type { BillingDetailsErrors, BillingDetailsInput } from "@/lib/billing/bi
 import { buildMandateRegistrationFields, type MandateRegistrationFields } from "@/lib/billing/payu-subscription";
 import { getSiteUrl } from "@/lib/site-url";
 import { applyOnboardingModules } from "@/lib/onboarding/store";
+import { cleanCredits } from "@/lib/onboarding/config";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 
 const BILLING_PATH = "/dashboard/billing";
@@ -136,7 +137,7 @@ export async function finalizePayUMandateRegistration(
   const admin = createAdminClient();
   const { data: subscription } = await admin
     .from("organization_subscriptions")
-    .select("id, plan_id, billing_interval, status, monthly_amount, onboarding_modules")
+    .select("id, plan_id, billing_interval, status, monthly_amount, onboarding_modules, onboarding_credits")
     .eq("organization_id", organizationId)
     .eq("payu_txnid", txnid)
     .maybeSingle();
@@ -171,7 +172,7 @@ export async function finalizePayUMandateRegistration(
 
   // A subscription from a tenant onboarding switches on exactly the modules chosen for it.
   if (subscription.monthly_amount !== null && subscription.onboarding_modules) {
-    await applyOnboardingModules(organizationId, subscription.onboarding_modules);
+    await applyOnboardingModules(organizationId, subscription.onboarding_modules, cleanCredits(subscription.onboarding_credits));
     await admin
       .from("tenant_onboarding")
       .update({ status: "active", activated_at: new Date().toISOString(), updated_at: new Date().toISOString() })

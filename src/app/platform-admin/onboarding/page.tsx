@@ -29,10 +29,13 @@ export default async function OnboardingListPage() {
     getAllTenants(),
     createAdminClient()
       .from("tenant_onboarding")
-      .select("organization_id, status"),
+      .select("organization_id, status, plan_type"),
   ]);
   const statusOf = new Map(
     (rows ?? []).map((r) => [r.organization_id, r.status]),
+  );
+  const kindOf = new Map(
+    (rows ?? []).map((r) => [r.organization_id, r.plan_type]),
   );
 
   return (
@@ -42,7 +45,8 @@ export default async function OnboardingListPage() {
           Onboarding
         </h1>
         <p className="mt-1 text-muted-foreground">
-          Take a signed-up tenant through legal documents, module selection and
+          Take a signed-up tenant through legal documents. Package-plan tenants
+          stop there; custom plans continue to modules, credits and
           subscription. Prices and default modules are set on the Modules page.
         </p>
       </div>
@@ -60,6 +64,13 @@ export default async function OnboardingListPage() {
                       <Badge variant={badge.variant}>{badge.label}</Badge>
                     ) : (
                       <Badge variant="outline">Not started</Badge>
+                    )}
+                    {kindOf.get(tenant.id) && (
+                      <Badge variant="outline">
+                        {kindOf.get(tenant.id) === "custom"
+                          ? "Custom plan"
+                          : "Package plan"}
+                      </Badge>
                     )}
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">

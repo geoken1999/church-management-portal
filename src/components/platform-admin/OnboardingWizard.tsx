@@ -3,21 +3,26 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  completePackageOnboardingAction,
   deleteDocumentAction,
   getDocumentLinkAction,
   reopenOnboardingAction,
-  saveModulesAction,
+  saveCustomPlanAction,
   sendOnboardingToTenantAction,
   setDocumentStatusAction,
+  setPlanTypeAction,
   startOnboardingAction,
   uploadDocumentAction,
   type OnboardingResult,
 } from "@/lib/onboarding/actions";
 import {
+  CREDIT_TYPES,
   ONBOARDING_DOCS,
   ONBOARDING_MODULES,
   MANDATE_LIMIT_RUPEES,
+  cleanCredits,
   quoteFor,
+  type Credits,
 } from "@/lib/onboarding/config";
 import { formatPrice } from "@/lib/billing/gst";
 import type { OnboardingDocument, OnboardingRow } from "@/lib/onboarding/store";
@@ -37,7 +42,7 @@ import { ErrorToast } from "@/components/ui/error-toast";
 
 const STEPS = [
   { key: "documents", label: "Legal documents" },
-  { key: "modules", label: "Modules" },
+  { key: "modules", label: "Modules & credits" },
   { key: "review", label: "Review & send" },
 ];
 
@@ -55,6 +60,19 @@ export function OnboardingWizard({
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [selected, setSelected] = useState<string[]>(onboarding?.modules ?? []);
+  const [credits, setCredits] = useState<
+    Record<string, { count: string; price: string }>
+  >(() =>
+    Object.fromEntries(
+      CREDIT_TYPES.map((t) => [
+        t.key,
+        {
+          count: String(onboarding?.credits[t.key]?.count ?? ""),
+          price: String(onboarding?.credits[t.key]?.price ?? ""),
+        },
+      ]),
+    ),
+  );
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -81,24 +99,60 @@ export function OnboardingWizard({
     return (
       <Card>
         <ErrorToast message={error} />
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            This tenant hasn&apos;t been onboarded yet. Starting pre-selects the
-            default modules from the Modules page.
-          </p>
-          <Button
+        <CardHeader>
+          <CardTitle>What kind of onboarding?</CardTitle>
+          <CardDescription>
+            You can switch before it is sent or completed.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
             disabled={pending}
-            onClick={() => run(() => startOnboardingAction(organizationId))}
+            className="rounded-lg border border-border p-4 text-left hover:border-primary"
+            onClick={() =>
+              run(() => startOnboardingAction(organizationId, "package"))
+            }
           >
-            Start onboarding
-          </Button>
+            <p className="font-medium">Package plan</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              The tenant picks Starter, Growth or Pro themselves. You only
+              collect and verify their legal documents.
+            </p>
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            className="rounded-lg border border-border p-4 text-left hover:border-primary"
+            onClick={() =>
+              run(() => startOnboardingAction(organizationId, "custom"))
+            }
+          >
+            <p className="font-medium">Custom plan</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Documents, then the modules and monthly credits you price for
+              them, then a subscription for the total.
+            </p>
+          </button>
         </CardContent>
       </Card>
     );
   }
 
+  const isCustom = onboarding.plan_type === "custom";
+  const steps = isCustom ? STEPS : STEPS.slice(0, 1);
+  const stepIndex = Math.min(step, steps.length - 1);
   const locked = onboarding.status !== "in_progress";
-  const quote = quoteFor(selected, prices);
+  const creditInput = Object.fromEntries(
+    CREDIT_TYPES.map((t) => [
+      t.key,
+      {
+        count: Number(credits[t.key].count) || 0,
+        price: Number(credits[t.key].price) || 0,
+      },
+    ]),
+  );
+  const quote = quoteFor(selected, prices, cleanCredits(creditInput));
   const missing = ONBOARDING_DOCS.filter(
     (d) =>
       d.required &&
@@ -114,6 +168,26 @@ export function OnboardingWizard({
         <Alert>
           <AlertDescription>{notice}</AlertDescription>
         </Alert>
+      )}
+
+      {onboarding.status === "in_progress" && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Onboarding kind:</span>
+          {(["package", "custom"] as const).map((type) => (
+            <Button
+              key={type}
+              size="sm"
+              variant={onboarding.plan_type === type ? "default" : "outline"}
+              disabled={pending}
+              onClick={() =>
+                onboarding.plan_type !== type &&
+                run(() => setPlanTypeAction(organizationId, type))
+              }
+            >
+              {type === "package" ? "Package plan" : "Custom plan"}
+            </Button>
+          ))}
+        </div>
       )}
       {onboarding.status === "awaiting_payment" && (
         <Alert>
@@ -131,7 +205,7 @@ export function OnboardingWizard({
               onClick={() =>
                 run(
                   () => reopenOnboardingAction(organizationId),
-                  "Reopened. You can change the modules.",
+                  "Reopened. You can change the plan.",
                 )
               }
             >
@@ -147,33 +221,64 @@ export function OnboardingWizard({
             {onboarding.activated_at
               ? ` on ${new Date(onboarding.activated_at).toLocaleDateString()}`
               : ""}
-            . The subscription is active and the modules are switched on.
+            .
+            {isCustom
+              ? " The subscription is active and the modules are switched on."
+              : " Their documents are verified; they choose a package plan on their Billing page."}
           </AlertDescription>
         </Alert>
       )}
 
-      <Stepper steps={STEPS} currentStepIndex={step} onStepClick={setStep} />
-
-      {step === 0 && (
-        <DocumentsStep
-          organizationId={organizationId}
-          documents={documents}
-          locked={onboarding.status === "active"}
-          run={run}
-          pending={pending}
+      {steps.length > 1 && (
+        <Stepper
+          steps={steps}
+          currentStepIndex={stepIndex}
+          onStepClick={setStep}
         />
       )}
 
-      {step === 1 && (
+      {stepIndex === 0 && (
+        <>
+          <DocumentsStep
+            organizationId={organizationId}
+            documents={documents}
+            locked={onboarding.status === "active"}
+            run={run}
+            pending={pending}
+          />
+          {!isCustom && onboarding.status === "in_progress" && (
+            <div className="flex items-center gap-3">
+              <Button
+                disabled={pending}
+                onClick={() =>
+                  run(
+                    () => completePackageOnboardingAction(organizationId),
+                    "Onboarding complete.",
+                  )
+                }
+              >
+                Complete onboarding
+              </Button>
+              {missing.length > 0 && (
+                <span className="text-sm text-muted-foreground">
+                  Still to verify: {missing.map((d) => d.label).join(", ")}.
+                </span>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {isCustom && stepIndex === 1 && (
         <Card>
           <CardHeader>
-            <CardTitle>Modules</CardTitle>
+            <CardTitle>Modules &amp; credits</CardTitle>
             <CardDescription>
-              Pick what the tenant opts for. Prices come from the Modules page;
-              the default modules start ticked.
+              Pick the modules, then set the monthly credits you are giving this
+              tenant, with the count and the price you decide.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-5">
             <div className="divide-y divide-border rounded-lg border border-border">
               {ONBOARDING_MODULES.map((m) => (
                 <label
@@ -203,14 +308,74 @@ export function OnboardingWizard({
                 </label>
               ))}
             </div>
+
+            <div>
+              <p className="mb-2 text-sm font-medium">Monthly credits</p>
+              <div className="rounded-lg border border-border">
+                <div className="grid grid-cols-[1fr_130px_130px] gap-3 border-b border-border px-4 py-2 text-xs uppercase text-muted-foreground">
+                  <span>Credit</span>
+                  <span>Count</span>
+                  <span>₹ per month</span>
+                </div>
+                {CREDIT_TYPES.map((t) => (
+                  <div
+                    key={t.key}
+                    className="grid grid-cols-[1fr_130px_130px] items-center gap-3 border-b border-border px-4 py-2 last:border-0"
+                  >
+                    <span className="text-sm">
+                      {t.label}{" "}
+                      <span className="text-muted-foreground">({t.unit})</span>
+                    </span>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="1"
+                      disabled={locked}
+                      aria-label={`${t.label} count`}
+                      value={credits[t.key].count}
+                      onChange={(e) =>
+                        setCredits((c) => ({
+                          ...c,
+                          [t.key]: { ...c[t.key], count: e.target.value },
+                        }))
+                      }
+                    />
+                    <Input
+                      type="number"
+                      min={0}
+                      step="1"
+                      disabled={locked}
+                      aria-label={`${t.label} price per month`}
+                      value={credits[t.key].price}
+                      onChange={(e) =>
+                        setCredits((c) => ({
+                          ...c,
+                          [t.key]: { ...c[t.key], price: e.target.value },
+                        }))
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                A credit left blank means none for this tenant (storage falls
+                back to the Starter allowance so uploads keep working).
+              </p>
+            </div>
+
             <Totals quote={quote} count={selected.length} />
             {!locked && (
               <Button
                 disabled={pending}
                 onClick={() =>
                   run(
-                    () => saveModulesAction(organizationId, selected),
-                    "Modules saved.",
+                    () =>
+                      saveCustomPlanAction(
+                        organizationId,
+                        selected,
+                        creditInput,
+                      ),
+                    "Saved.",
                     () => setStep(2),
                   )
                 }
@@ -222,14 +387,14 @@ export function OnboardingWizard({
         </Card>
       )}
 
-      {step === 2 && (
+      {isCustom && stepIndex === 2 && (
         <Card>
           <CardHeader>
             <CardTitle>Review &amp; send</CardTitle>
             <CardDescription>
               The tenant gets an email with the total and authorizes the UPI
-              Autopay subscription from their Billing page. Modules switch on
-              when it is confirmed.
+              Autopay subscription from their Billing page. Modules and credits
+              switch on when it is confirmed.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -257,8 +422,26 @@ export function OnboardingWizard({
                   .join(", ") || "None chosen yet."}
               </p>
             </div>
+            <div>
+              <p className="text-sm font-medium">Credits</p>
+              <p className="text-sm text-muted-foreground">
+                {CREDIT_TYPES.filter((t) => onboarding.credits[t.key])
+                  .map(
+                    (t) =>
+                      `${t.label}: ${onboarding.credits[t.key]!.count.toLocaleString("en-IN")} ${t.unit}`,
+                  )
+                  .join(" · ") || "None set."}
+              </p>
+              {creditWarnings(onboarding.modules, onboarding.credits).map(
+                (w) => (
+                  <p key={w} className="text-sm text-amber-600">
+                    {w}
+                  </p>
+                ),
+              )}
+            </div>
             <Totals
-              quote={quoteFor(onboarding.modules, prices)}
+              quote={quoteFor(onboarding.modules, prices, onboarding.credits)}
               count={onboarding.modules.length}
             />
             {onboarding.status === "in_progress" && (
@@ -278,24 +461,41 @@ export function OnboardingWizard({
         </Card>
       )}
 
-      <div className="flex justify-between">
-        <Button
-          variant="outline"
-          disabled={step === 0}
-          onClick={() => setStep(step - 1)}
-        >
-          Back
-        </Button>
-        <Button
-          variant="outline"
-          disabled={step === STEPS.length - 1}
-          onClick={() => setStep(step + 1)}
-        >
-          Next
-        </Button>
-      </div>
+      {steps.length > 1 && (
+        <div className="flex justify-between">
+          <Button
+            variant="outline"
+            disabled={stepIndex === 0}
+            onClick={() => setStep(stepIndex - 1)}
+          >
+            Back
+          </Button>
+          <Button
+            variant="outline"
+            disabled={stepIndex === steps.length - 1}
+            onClick={() => setStep(stepIndex + 1)}
+          >
+            Next
+          </Button>
+        </div>
+      )}
     </div>
   );
+}
+
+// A module that needs an allowance but has none would be switched on and unusable.
+function creditWarnings(modules: string[], credits: Credits): string[] {
+  const needs: [string, keyof Credits, string][] = [
+    ["email", "email", "Email"],
+    ["sms", "sms", "SMS"],
+    ["whatsapp", "whatsapp", "WhatsApp"],
+  ];
+  return needs
+    .filter(([module, credit]) => modules.includes(module) && !credits[credit])
+    .map(
+      ([, , label]) =>
+        `${label} is on but has no monthly allowance, so the tenant can't send any.`,
+    );
 }
 
 function Totals({

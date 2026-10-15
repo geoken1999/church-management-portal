@@ -25,12 +25,14 @@ import { ErrorToast } from "@/components/ui/error-toast";
 // total, and the UPI Autopay authorization that starts the subscription.
 export function OnboardingCheckoutCard({
   moduleLabels,
+  creditLabels,
   monthlyBase,
   billingDetails,
   sellerState,
   payuConfigured,
 }: {
   moduleLabels: string[];
+  creditLabels: string[];
   monthlyBase: number;
   billingDetails: BillingDetailsInput;
   sellerState: string;
@@ -73,13 +75,13 @@ export function OnboardingCheckoutCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <ul className="list-inside list-disc text-sm">
-          {moduleLabels.map((label) => (
+          {[...moduleLabels, ...creditLabels].map((label) => (
             <li key={label}>{label}</li>
           ))}
         </ul>
         <div className="rounded-lg bg-muted/50 p-4 text-sm">
           <div className="flex justify-between">
-            <span>Modules per month</span>
+            <span>Modules and credits per month</span>
             <span>{formatPrice(price.base)}</span>
           </div>
           <div className="flex justify-between text-muted-foreground">

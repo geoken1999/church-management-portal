@@ -6,10 +6,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendOnboardingReadyEmail } from "@/lib/billing/receipts";
 import { getSiteUrl } from "@/lib/site-url";
 import {
+  CREDIT_TYPES,
   ONBOARDING_DOCS,
   ONBOARDING_MODULES,
+  cleanCredits,
   isModuleKey,
   quoteFor,
+  type PlanType,
 } from "@/lib/onboarding/config";
 import {
   getModulePricing,
@@ -79,49 +82,135 @@ async function requireOrganization(organizationId: string) {
 
 export async function startOnboardingAction(
   organizationId: string,
+  planType: PlanType,
 ): Promise<OnboardingResult> {
   const user = await requirePlatformAdmin();
+  if (planType !== "package" && planType !== "custom")
+    return { error: "Choose the kind of onboarding." };
   if (!(await requireOrganization(organizationId)))
     return { error: "That tenant wasn't found." };
   if (await getOnboarding(organizationId)) return { success: true };
   const pricing = await getModulePricing();
-  const defaults = ONBOARDING_MODULES.filter(
-    (m) => pricing[m.key]?.is_default,
-  ).map((m) => m.key);
-  const { error } = await createAdminClient()
-    .from("tenant_onboarding")
-    .insert({
-      organization_id: organizationId,
-      modules: defaults,
-      started_by: user.id,
-    });
+  const defaults =
+    planType === "custom"
+      ? ONBOARDING_MODULES.filter((m) => pricing[m.key]?.is_default).map(
+          (m) => m.key,
+        )
+      : [];
+  const { error } = await createAdminClient().from("tenant_onboarding").insert({
+    organization_id: organizationId,
+    plan_type: planType,
+    modules: defaults,
+    started_by: user.id,
+  });
   if (error)
     return { error: "Couldn't start the onboarding. Please try again." };
   revalidatePath("/platform-admin/onboarding");
   return { success: true };
 }
 
-export async function saveModulesAction(
+// Switches between a package-plan onboarding (documents only) and a custom plan, while still being set up.
+export async function setPlanTypeAction(
+  organizationId: string,
+  planType: PlanType,
+): Promise<OnboardingResult> {
+  await requirePlatformAdmin();
+  if (planType !== "package" && planType !== "custom")
+    return { error: "Choose the kind of onboarding." };
+  const onboarding = await getOnboarding(organizationId);
+  if (!onboarding) return { error: "Start the onboarding first." };
+  if (onboarding.status !== "in_progress")
+    return { error: "Reopen the onboarding to change its kind." };
+  const pricing = await getModulePricing();
+  const modules =
+    planType === "custom" && onboarding.modules.length === 0
+      ? ONBOARDING_MODULES.filter((m) => pricing[m.key]?.is_default).map(
+          (m) => m.key,
+        )
+      : onboarding.modules;
+  const { error } = await createAdminClient()
+    .from("tenant_onboarding")
+    .update({
+      plan_type: planType,
+      modules,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("organization_id", organizationId);
+  if (error) return { error: "Couldn't change it. Please try again." };
+  revalidatePath(pathFor(organizationId));
+  return { success: true };
+}
+
+// A custom plan's modules and monthly allowances (count and price for each).
+export async function saveCustomPlanAction(
   organizationId: string,
   modules: string[],
+  credits: unknown,
 ): Promise<OnboardingResult> {
   await requirePlatformAdmin();
   const onboarding = await getOnboarding(organizationId);
   if (!onboarding) return { error: "Start the onboarding first." };
+  if (onboarding.plan_type !== "custom")
+    return {
+      error: "This is a package-plan onboarding, which has no modules to set.",
+    };
   if (onboarding.status !== "in_progress")
     return {
-      error:
-        "This onboarding was already sent. Reopen it to change the modules.",
+      error: "This onboarding was already sent. Reopen it to change it.",
     };
   const clean = ONBOARDING_MODULES.map((m) => m.key).filter((k) =>
     modules.includes(k),
   );
+  const cleaned = cleanCredits(credits);
+  for (const type of CREDIT_TYPES) {
+    const line = cleaned[type.key];
+    if (line && line.count > 100_000_000)
+      return { error: `${type.label}: that count is too large.` };
+  }
   const { error } = await createAdminClient()
     .from("tenant_onboarding")
-    .update({ modules: clean, updated_at: new Date().toISOString() })
+    .update({
+      modules: clean,
+      credits: cleaned as never,
+      updated_at: new Date().toISOString(),
+    })
     .eq("organization_id", organizationId);
-  if (error) return { error: "Couldn't save the modules. Please try again." };
+  if (error) return { error: "Couldn't save. Please try again." };
   revalidatePath(pathFor(organizationId));
+  return { success: true };
+}
+
+function missingDocs(docs: Awaited<ReturnType<typeof getOnboardingDocuments>>) {
+  return ONBOARDING_DOCS.filter(
+    (d) =>
+      d.required &&
+      !docs.some((doc) => doc.doc_type === d.type && doc.status === "verified"),
+  );
+}
+
+// Package-plan tenants only need their documents: once the required ones are verified, onboarding is done.
+export async function completePackageOnboardingAction(
+  organizationId: string,
+): Promise<OnboardingResult> {
+  await requirePlatformAdmin();
+  const onboarding = await getOnboarding(organizationId);
+  if (!onboarding) return { error: "Start the onboarding first." };
+  if (onboarding.plan_type !== "package")
+    return { error: "A custom plan is completed by sending it to the tenant." };
+  if (onboarding.status === "active") return { success: true };
+  const missing = missingDocs(await getOnboardingDocuments(organizationId));
+  if (missing.length > 0)
+    return {
+      error: `Verify these documents first: ${missing.map((d) => d.label).join(", ")}.`,
+    };
+  const now = new Date().toISOString();
+  const { error } = await createAdminClient()
+    .from("tenant_onboarding")
+    .update({ status: "active", activated_at: now, updated_at: now })
+    .eq("organization_id", organizationId);
+  if (error) return { error: "Couldn't complete it. Please try again." };
+  revalidatePath(pathFor(organizationId));
+  revalidatePath("/platform-admin/onboarding");
   return { success: true };
 }
 
@@ -153,15 +242,13 @@ export async function uploadDocumentAction(
     });
   if (uploadError)
     return { error: "Couldn't upload that file. Please try again." };
-  const { error } = await admin
-    .from("tenant_onboarding_documents")
-    .insert({
-      organization_id: organizationId,
-      doc_type: docType,
-      file_name: file.name.slice(0, 200),
-      file_path: path,
-      uploaded_by: user.id,
-    });
+  const { error } = await admin.from("tenant_onboarding_documents").insert({
+    organization_id: organizationId,
+    doc_type: docType,
+    file_name: file.name.slice(0, 200),
+    file_path: path,
+    uploaded_by: user.id,
+  });
   if (error) {
     await admin.storage.from(BUCKET).remove([path]);
     return { error: "Couldn't save that document. Please try again." };
@@ -268,7 +355,7 @@ export async function sendOnboardingToTenantAction(
   const prices = Object.fromEntries(
     Object.entries(pricing).map(([k, v]) => [k, v.monthly_price]),
   );
-  const quote = quoteFor(onboarding.modules, prices);
+  const quote = quoteFor(onboarding.modules, prices, onboarding.credits);
   if (quote.base <= 0)
     return {
       error: "Set a price for the chosen modules first (Modules page).",
@@ -294,9 +381,16 @@ export async function sendOnboardingToTenantAction(
   const labels = ONBOARDING_MODULES.filter((m) =>
     onboarding.modules.includes(m.key),
   ).map((m) => m.label);
+  const creditLabels = CREDIT_TYPES.filter(
+    (t) => onboarding.credits[t.key],
+  ).map(
+    (t) =>
+      `${t.label}: ${onboarding.credits[t.key]!.count.toLocaleString("en-IN")} ${t.unit}`,
+  );
   await sendOnboardingReadyEmail(
     organizationId,
     labels,
+    creditLabels,
     quote.total,
     `${getSiteUrl()}/dashboard/billing`,
   );

@@ -13,7 +13,7 @@ import { getCheckoutContext } from "@/lib/billing/checkout-context";
 import { getOrganizationInvoices } from "@/lib/invoices/dal";
 import { OnboardingCheckoutCard } from "@/components/billing/OnboardingCheckoutCard";
 import { getOnboarding } from "@/lib/onboarding/store";
-import { ONBOARDING_MODULES } from "@/lib/onboarding/config";
+import { CREDIT_TYPES, ONBOARDING_MODULES } from "@/lib/onboarding/config";
 import { PayoutDetailsCard } from "@/components/billing/PayoutDetailsCard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -24,9 +24,17 @@ export const metadata: Metadata = {
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ addon?: string; reason?: string; subscription?: string }>;
+  searchParams: Promise<{
+    addon?: string;
+    reason?: string;
+    subscription?: string;
+  }>;
 }) {
-  const { addon: addonStatus, reason: failureReason, subscription: subscriptionStatus } = await searchParams;
+  const {
+    addon: addonStatus,
+    reason: failureReason,
+    subscription: subscriptionStatus,
+  } = await searchParams;
   await requireUser();
   const membership = await requireOrganization();
 
@@ -34,7 +42,14 @@ export default async function BillingPage({
     redirect("/dashboard");
   }
 
-  const [planUsage, subscription, payoutDetails, checkout, invoices, onboarding] = await Promise.all([
+  const [
+    planUsage,
+    subscription,
+    payoutDetails,
+    checkout,
+    invoices,
+    onboarding,
+  ] = await Promise.all([
     getPlanUsage(membership.organization.id),
     getOrganizationSubscription(membership.organization.id),
     getOrganizationPayoutDetails(membership.organization.id),
@@ -46,13 +61,19 @@ export default async function BillingPage({
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-heading text-3xl font-bold tracking-tight">Billing</h1>
-        <p className="mt-1 text-muted-foreground">Manage {membership.organization.name}&apos;s subscription.</p>
+        <h1 className="font-heading text-3xl font-bold tracking-tight">
+          Billing
+        </h1>
+        <p className="mt-1 text-muted-foreground">
+          Manage {membership.organization.name}&apos;s subscription.
+        </p>
       </div>
 
       {addonStatus === "success" && (
         <Alert>
-          <AlertDescription>Add-on pack purchased — your credits have been topped up.</AlertDescription>
+          <AlertDescription>
+            Add-on pack purchased — your credits have been topped up.
+          </AlertDescription>
         </Alert>
       )}
       {addonStatus === "failed" && (
@@ -69,8 +90,8 @@ export default async function BillingPage({
       {subscriptionStatus === "success" && (
         <Alert>
           <AlertDescription>
-            Your UPI Autopay mandate was set up successfully — your subscription is now active. No charge happens
-            until your first billing cycle.
+            Your UPI Autopay mandate was set up successfully — your subscription
+            is now active. No charge happens until your first billing cycle.
           </AlertDescription>
         </Alert>
       )}
@@ -86,29 +107,46 @@ export default async function BillingPage({
         </Alert>
       )}
 
-      {planUsage.accessStatus === "trial" && planUsage.trialDaysRemaining !== null && (
-        <Alert>
-          <AlertDescription>
-            You&apos;re on a free trial —{" "}
-            {planUsage.trialDaysRemaining <= 0
-              ? "it ends today."
-              : `${planUsage.trialDaysRemaining} ${planUsage.trialDaysRemaining === 1 ? "day" : "days"} left.`}{" "}
-            Subscribe below to keep access afterward.
-          </AlertDescription>
-        </Alert>
-      )}
+      {planUsage.accessStatus === "trial" &&
+        planUsage.trialDaysRemaining !== null && (
+          <Alert>
+            <AlertDescription>
+              You&apos;re on a free trial —{" "}
+              {planUsage.trialDaysRemaining <= 0
+                ? "it ends today."
+                : `${planUsage.trialDaysRemaining} ${planUsage.trialDaysRemaining === 1 ? "day" : "days"} left.`}{" "}
+              Subscribe below to keep access afterward.
+            </AlertDescription>
+          </Alert>
+        )}
 
-      {onboarding?.status === "awaiting_payment" && subscription?.status !== "active" && (
-        <OnboardingCheckoutCard
-          moduleLabels={ONBOARDING_MODULES.filter((m) => onboarding.modules.includes(m.key)).map((m) => m.label)}
-          monthlyBase={onboarding.monthly_base}
-          billingDetails={checkout.billingDetails}
-          sellerState={checkout.sellerState}
-          payuConfigured={isPayUConfigured()}
-        />
-      )}
+      {onboarding?.plan_type === "custom" &&
+        onboarding.status === "awaiting_payment" &&
+        subscription?.status !== "active" && (
+          <OnboardingCheckoutCard
+            moduleLabels={ONBOARDING_MODULES.filter((m) =>
+              onboarding.modules.includes(m.key),
+            ).map((m) => m.label)}
+            creditLabels={CREDIT_TYPES.filter(
+              (t) => onboarding.credits[t.key],
+            ).map(
+              (t) =>
+                `${t.label}: ${onboarding.credits[t.key]!.count.toLocaleString("en-IN")} ${t.unit}`,
+            )}
+            monthlyBase={onboarding.monthly_base}
+            billingDetails={checkout.billingDetails}
+            sellerState={checkout.sellerState}
+            payuConfigured={isPayUConfigured()}
+          />
+        )}
 
-      <BillingManager currentPlanId={planUsage.plan.id} subscription={subscription} payuConfigured={isPayUConfigured()} billingDetails={checkout.billingDetails} sellerState={checkout.sellerState} />
+      <BillingManager
+        currentPlanId={planUsage.plan.id}
+        subscription={subscription}
+        payuConfigured={isPayUConfigured()}
+        billingDetails={checkout.billingDetails}
+        sellerState={checkout.sellerState}
+      />
 
       <AddonsManager
         billingDetails={checkout.billingDetails}
@@ -125,7 +163,10 @@ export default async function BillingPage({
 
       <InvoicesCard invoices={invoices} />
 
-      <PayoutDetailsCard organizationId={membership.organization.id} defaultValues={payoutDetails} />
+      <PayoutDetailsCard
+        organizationId={membership.organization.id}
+        defaultValues={payoutDetails}
+      />
     </div>
   );
 }

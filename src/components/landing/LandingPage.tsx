@@ -42,6 +42,7 @@ import { Badge } from "@/components/ui/badge";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { DashboardPreview } from "@/components/landing/DashboardPreview";
 import { AiAutomationSection } from "@/components/landing/AiAutomationSection";
+import { MobileAppPreview } from "@/components/landing/MobileAppPreview";
 import { AppStoreButtons } from "@/components/landing/AppStoreButtons";
 import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/app-links";
 
@@ -574,7 +575,8 @@ export function LandingPage() {
                 <AppStoreButtons />
               </div>
             </div>
-            <div className="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <MobileAppPreview />
+            <div className="mt-16 grid grid-cols-1 gap-6 lg:grid-cols-2">
               {APP_CARDS.map((card) => (
                 <Card key={card.title} size="lg">
                   <CardHeader>

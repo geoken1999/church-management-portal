@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthErrorMessage } from "@/lib/auth/errors";
 import { getSiteUrl } from "@/lib/site-url";
 import { sendPasswordResetLink } from "@/lib/auth/password-reset";
+import { checkAttemptLimit, clearAttempts, recordAttempt } from "@/lib/auth/rate-limit";
+import { LOGIN_RULE, PASSWORD_CHECK_RULE, PASSWORD_RESET_RULE } from "@/lib/auth/rate-limit-rules";
 import {
   validateLogin,
   validatePassword,
@@ -104,12 +106,17 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
     return { errors };
   }
 
+  const blocked = await checkAttemptLimit(LOGIN_RULE, email);
+  if (blocked) return { message: blocked };
+
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
+    await recordAttempt(LOGIN_RULE, email);
     return { message: getAuthErrorMessage(error) };
   }
+  await clearAttempts(LOGIN_RULE, email);
 
   redirect(next && next.startsWith("/") ? next : "/dashboard");
 }
@@ -132,6 +139,10 @@ export async function requestPasswordReset(
   if (!email) {
     return { errors: { email: "Email is required." } };
   }
+
+  const blocked = await checkAttemptLimit(PASSWORD_RESET_RULE, email);
+  if (blocked) return { errors: { email: blocked } };
+  await recordAttempt(PASSWORD_RESET_RULE, email);
 
   await sendPasswordResetLink(email);
 
@@ -201,12 +212,16 @@ export async function changePassword(
     return { message: "Your session has expired. Please sign in again." };
   }
 
+  const blocked = await checkAttemptLimit(PASSWORD_CHECK_RULE, user.email);
+  if (blocked) return { message: blocked };
+
   const { error: verifyError } = await supabase.auth.signInWithPassword({
     email: user.email,
     password: currentPassword,
   });
 
   if (verifyError) {
+    await recordAttempt(PASSWORD_CHECK_RULE, user.email);
     return { errors: { currentPassword: "Current password is incorrect." } };
   }
 

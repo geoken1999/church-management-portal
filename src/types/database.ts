@@ -2045,6 +2045,12 @@ export type Database = {
           },
         ];
       };
+      auth_attempts: {
+        Row: { id: number; key: string; created_at: string };
+        Insert: { key: string; created_at?: string };
+        Update: Partial<{ key: string; created_at: string }>;
+        Relationships: [];
+      };
       module_pricing: {
         Row: { module_key: string; monthly_price: number; is_default: boolean; updated_at: string };
         Insert: Partial<{ module_key: string; monthly_price: number; is_default: boolean; updated_at: string }> & { module_key: string };

@@ -42,10 +42,12 @@ import { Badge } from "@/components/ui/badge";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { DashboardPreview } from "@/components/landing/DashboardPreview";
 import { AiAutomationSection } from "@/components/landing/AiAutomationSection";
+import { PlayStoreButton } from "@/components/landing/PlayStoreButton";
+import { PLAY_STORE_URL } from "@/lib/app-links";
 
 const STATS = [
   { value: "30+", label: "built-in modules" },
-  { value: "iOS & Android", label: "apps for your team and members" },
+  { value: "Android app", label: "on Google Play for your team and members" },
   { value: "14-day", label: "free trial, no card" },
   { value: "Multi-branch", label: "ready from day one" },
 ];
@@ -296,7 +298,7 @@ const FAQS = [
   },
   {
     question: "Is there a mobile app?",
-    answer: "Yes — one KingdomFlow app for iPhone and Android. Your team signs in with their dashboard login to manage the church, and members sign in with their phone number to see the Home screen you design, register for events, give, pray and join calls.",
+    answer: "Yes — the KingdomFlow app is on Google Play for Android phones. Your team signs in with their dashboard login to manage the church, and members sign in with their phone number to see the Home screen you design, register for events, give, pray and join calls.",
   },
   {
     question: "Can we hold video and audio calls without another tool?",
@@ -367,6 +369,9 @@ export function LandingPage() {
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <Button size="lg" nativeButton={false} render={<Link href="/login">Get Started<ArrowRight className="size-4" /></Link>} />
               <Button size="lg" variant="outline" nativeButton={false} render={<a href="#pricing">See pricing</a>} />
+            </div>
+            <div className="mt-6 flex justify-center">
+              <PlayStoreButton />
             </div>
             <p className="mt-4 text-xs text-muted-foreground">No credit card required · 14-day free trial · Cancel anytime</p>
           </div>
@@ -565,6 +570,9 @@ export function LandingPage() {
               </Badge>
               <h2 className="font-heading text-3xl font-bold tracking-tight text-balance">Your church in everyone&apos;s pocket</h2>
               <p className="mt-3 text-muted-foreground">One app for your team to run the church, and the same app for members to belong to it.</p>
+              <div className="mt-6 flex justify-center">
+                <PlayStoreButton />
+              </div>
             </div>
             <div className="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-2">
               {APP_CARDS.map((card) => (
@@ -665,6 +673,9 @@ export function LandingPage() {
           <nav className="flex flex-wrap items-center gap-6">
             <a href="#features" className="text-sm text-muted-foreground hover:text-foreground">
               Features
+            </a>
+            <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground">
+              Android app
             </a>
             <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground">
               Pricing

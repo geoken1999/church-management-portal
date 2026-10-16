@@ -12,6 +12,8 @@ import {
   Users,
   Volume2,
   Compass,
+  ScanLine,
+  CheckCircle2,
   Send,
 } from "lucide-react";
 
@@ -271,6 +273,46 @@ function PrayerScreen() {
   );
 }
 
+function ScanScreen() {
+  return (
+    <>
+      <StatusBar />
+      <div className="px-4 py-2">
+        <p className="text-xs font-bold">Scan to check in</p>
+        <p className="text-[9px] text-muted-foreground">
+          Sunday Service · 126 present
+        </p>
+      </div>
+      <div className="mx-3 flex h-44 items-center justify-center rounded-xl bg-foreground/90">
+        <div className="relative size-28 rounded-lg border-2 border-primary-foreground/70">
+          <ScanLine className="absolute inset-0 m-auto size-16 text-primary-foreground/60" />
+        </div>
+      </div>
+      <div className="mx-3 mt-3 flex items-center gap-2 rounded-xl border border-border bg-card p-2.5">
+        <CheckCircle2 className="size-5 shrink-0 text-primary" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold">Anna Thomas checked in</p>
+          <p className="text-[9px] text-muted-foreground">
+            Member · Main branch
+          </p>
+        </div>
+      </div>
+      <div className="mx-3 mt-2 flex items-center gap-2 rounded-xl border border-border bg-card p-2.5">
+        <CheckCircle2 className="size-5 shrink-0 text-primary" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold">Volunteer verified</p>
+          <p className="text-[9px] text-muted-foreground">
+            Ushers team · ID V-0042
+          </p>
+        </div>
+      </div>
+      <div className="mx-3 mt-auto mb-3 rounded-lg bg-primary py-2 text-center text-[10px] font-medium text-primary-foreground">
+        Scan next
+      </div>
+    </>
+  );
+}
+
 export function MobileAppPreview() {
   return (
     <div className="relative mt-12">
@@ -278,7 +320,7 @@ export function MobileAppPreview() {
         className="pointer-events-none absolute inset-x-0 top-10 -z-10 mx-auto h-72 max-w-3xl bg-[radial-gradient(ellipse_60%_60%_at_50%_40%,var(--color-primary),transparent)] opacity-20 blur-3xl"
         aria-hidden
       />
-      <div className="-mx-4 flex snap-x snap-mandatory gap-6 overflow-x-auto px-4 pb-4 sm:mx-0 sm:justify-center sm:overflow-visible sm:px-0">
+      <div className="-mx-4 flex snap-x snap-mandatory gap-6 overflow-x-auto px-4 pb-4 sm:mx-0 sm:flex-wrap sm:justify-center sm:overflow-visible sm:px-0">
         <Phone caption="Home, designed by your church">
           <HomeScreen />
         </Phone>
@@ -291,9 +333,13 @@ export function MobileAppPreview() {
         <Phone caption="Prayer requests and the prayer wall">
           <PrayerScreen />
         </Phone>
+        <Phone caption="For your team: scan to check in and verify">
+          <ScanScreen />
+        </Phone>
       </div>
       <p className="mt-2 text-center text-xs text-muted-foreground">
-        Illustration of the member app. Your church designs its own Home screen.
+        Illustrations of the app. Your church designs its own member Home
+        screen.
       </p>
     </div>
   );

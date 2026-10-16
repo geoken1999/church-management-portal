@@ -61,3 +61,6 @@ export function decide(
 export function blockedMessage(minutes: number): string {
   return `Too many attempts. Please try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`;
 }
+
+// The public account-deletion form: counts every submission so it can't be used to send mail to others.
+export const DELETION_FORM_RULE: AttemptRule = { action: "deletion-form", windowMinutes: 60, perEmail: 3, perIp: 10 };

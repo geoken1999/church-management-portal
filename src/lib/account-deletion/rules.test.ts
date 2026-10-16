@@ -11,10 +11,13 @@ describe("account deletion rules", () => {
   it("only a member's request can also delete the member record", () => {
     expect(allowedDecisions("member")).toContain("delete_account_and_record");
     expect(allowedDecisions("team")).not.toContain("delete_account_and_record");
-    expect(allowedDecisions("owner")).not.toContain("delete_account_and_record");
+    expect(allowedDecisions("owner")).not.toContain(
+      "delete_account_and_record",
+    );
   });
 
   it("every kind can be declined", () => {
-    for (const kind of ["member", "team", "owner"] as const) expect(allowedDecisions(kind)).toContain("reject");
+    for (const kind of ["member", "team", "owner"] as const)
+      expect(allowedDecisions(kind)).toContain("reject");
   });
 });

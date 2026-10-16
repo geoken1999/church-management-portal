@@ -2051,6 +2051,55 @@ export type Database = {
         Update: Partial<{ key: string; created_at: string }>;
         Relationships: [];
       };
+      deletion_form_requests: {
+        Row: {
+          id: string;
+          name: string;
+          email: string;
+          phone: string | null;
+          church_name: string | null;
+          relationship: string;
+          scope: string;
+          details: string | null;
+          status: string;
+          token_hash: string | null;
+          token_expires_at: string | null;
+          verified_at: string | null;
+          outcome_note: string | null;
+          processed_by: string | null;
+          processed_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          name: string;
+          email: string;
+          phone?: string | null;
+          church_name?: string | null;
+          relationship: string;
+          scope?: string;
+          details?: string | null;
+          status?: string;
+          token_hash?: string | null;
+          token_expires_at?: string | null;
+        };
+        Update: Partial<{
+          name: string;
+          email: string;
+          phone: string | null;
+          church_name: string | null;
+          relationship: string;
+          scope: string;
+          details: string | null;
+          status: string;
+          token_hash: string | null;
+          token_expires_at: string | null;
+          verified_at: string | null;
+          outcome_note: string | null;
+          processed_by: string | null;
+          processed_at: string | null;
+        }>;
+        Relationships: [];
+      };
       module_pricing: {
         Row: { module_key: string; monthly_price: number; is_default: boolean; updated_at: string };
         Insert: Partial<{ module_key: string; monthly_price: number; is_default: boolean; updated_at: string }> & { module_key: string };

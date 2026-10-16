@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
 import { getAllDeletionRequests } from "@/lib/account-deletion/dal";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { WebDeletionRequests } from "@/components/account-deletion/WebDeletionRequests";
 import { DeletionRequestsList } from "@/components/account-deletion/DeletionRequestsList";
 
 export const metadata: Metadata = {
@@ -12,6 +14,25 @@ export const dynamic = "force-dynamic";
 export default async function PlatformAdminDeletionRequestsPage() {
   await requirePlatformAdmin();
   const requests = await getAllDeletionRequests();
+  const { data: formRows } = await createAdminClient()
+    .from("deletion_form_requests")
+    .select("id, name, email, phone, church_name, relationship, scope, details, status, verified_at, processed_at, created_at")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  const webRequests = (formRows ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    email: r.email,
+    phone: r.phone,
+    churchName: r.church_name,
+    relationship: r.relationship,
+    scope: r.scope,
+    details: r.details,
+    status: r.status as "unverified" | "pending" | "completed" | "rejected",
+    verifiedAt: r.verified_at,
+    processedAt: r.processed_at,
+    createdAt: r.created_at,
+  }));
 
   return (
     <div className="space-y-6">
@@ -23,6 +44,12 @@ export default async function PlatformAdminDeletionRequestsPage() {
         </p>
       </div>
       <DeletionRequestsList requests={requests} emptyText="No account deletion requests." />
+
+      <div className="space-y-2 pt-4">
+        <h2 className="font-heading text-xl font-bold tracking-tight">From the web form</h2>
+        <p className="text-sm text-muted-foreground">People who can&apos;t use the app and asked at /delete-account. Each has confirmed their email.</p>
+        <WebDeletionRequests requests={webRequests} unconfirmed={webRequests.filter((r) => r.status === "unverified").length} />
+      </div>
     </div>
   );
 }

@@ -58,6 +58,9 @@ export function LegalPageLayout({
             <Link href="/refund" className="text-sm text-muted-foreground hover:text-foreground">
               Refund Policy
             </Link>
+            <Link href="/delete-account" className="text-sm text-muted-foreground hover:text-foreground">
+              Delete Account
+            </Link>
             <Link href="/contact" className="text-sm text-muted-foreground hover:text-foreground">
               Contact Us
             </Link>

@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: "How KingdomFlow collects, uses, and protects data for churches and their congregations.",
 };
 
-const LAST_UPDATED = "September 29, 2026";
+const LAST_UPDATED = "October 16, 2026";
 
 export default function PrivacyPolicyPage() {
   return (
@@ -42,19 +42,50 @@ export default function PrivacyPolicyPage() {
           worship documents, images).
         </p>
         <p>
-          <strong>Payment information.</strong> Subscription payments are processed by Razorpay. We do not store your
-          card, UPI, or bank account details — Razorpay handles that and shares with us only what&apos;s needed to
-          manage your subscription (plan, status, billing history).
+          <strong>Payment and billing information.</strong> Subscription and add-on payments are processed by PayU
+          (UPI Autopay), and online giving by the payment gateway your Organization uses (PayU, Cashfree or its own
+          Razorpay account). We do not store your card, UPI PIN, or bank login — the gateway handles that and shares
+          with us only what&apos;s needed to manage the payment (status, amount, reference, and your UPI ID for
+          subscription mandates). We also keep the billing details you give us for tax invoices (organization name,
+          address, state, and GST number if you have one) and the invoices we issue, which include 18% GST.
+        </p>
+        <p>
+          <strong>Onboarding documents.</strong> When we onboard an Organization we may collect legal documents such
+          as its registration certificate, PAN, an authorised signatory&apos;s ID, address proof, a signed agreement,
+          and bank or GST proof. These are used only to verify the Organization, are stored in a private location,
+          and are visible only to authorised KingdomFlow staff.
         </p>
         <p>
           <strong>Communications sent through the platform.</strong> If your Organization sends email, SMS, or
           WhatsApp messages to its members through KingdomFlow, we process the message content and recipient details
-          necessary to deliver it, and retain delivery status (sent, delivered, bounced) for troubleshooting.
+          necessary to deliver it, and retain delivery status (sent, delivered, bounced) for troubleshooting. Where an
+          Organization connects its own WhatsApp number, its access token is stored encrypted.
         </p>
         <p>
-          <strong>Usage &amp; device data.</strong> Log data (IP address, browser/device type, pages visited,
-          timestamps) collected automatically when you use our web or mobile app, and — if you enable notifications
-          in the mobile app — a device push-notification token used solely to deliver those notifications.
+          <strong>Calls and live streams.</strong> Video and audio calls (K-Connect) and live streams are carried by
+          our video provider. Calls are not recorded by default. If you join, your device&apos;s camera and microphone
+          are used only for that session, after you grant permission.
+        </p>
+        <p>
+          <strong>AI features.</strong> When an Organization uses AI features (such as Ask Aura, AI-written report
+          summaries, or automatic replies), the text needed for that request — for example report figures or a
+          message to answer — is sent to our AI provider, OpenAI, to produce a response. Organizations control what
+          data AI is allowed to use in AI Rules. We do not use your data to train AI models.
+        </p>
+        <p>
+          <strong>Mobile app data.</strong> The app asks for permission to use the <strong>camera</strong> (scanning
+          QR codes for check-in and volunteer verification, video calls), the <strong>microphone</strong> (calls) and
+          <strong> notifications</strong>. Each is optional and can be turned off in your phone&apos;s settings. The app
+          also sends us a device identifier, platform, app and operating-system version, device model, the screen you
+          were on, and error or crash reports, so we can find and fix problems. If you save an offline check-in, it is
+          stored on your device until it can sync. Your language and theme choices are stored on your device.
+        </p>
+        <p>
+          <strong>Usage &amp; security data.</strong> Log data (IP address, browser/device type, pages visited,
+          timestamps) collected automatically, and a device push-notification token if you enable notifications. To
+          protect accounts from password guessing, we keep short-lived records of failed sign-in and password-reset
+          attempts, stored as one-way hashes of the email and IP address rather than the values themselves, and
+          deleted within a day or so.
         </p>
         <p>
           <strong>Public forms &amp; pages.</strong> If you submit a public join request, event registration, form,
@@ -67,7 +98,8 @@ export default function PrivacyPolicyPage() {
         <ul>
           <li>To provide, maintain, and improve the platform and its features.</li>
           <li>To authenticate accounts and enforce the access permissions your Organization configures.</li>
-          <li>To process subscription payments and manage billing, via Razorpay.</li>
+          <li>To process subscription payments, issue tax invoices, and manage billing.</li>
+          <li>To verify Organizations during onboarding.</li>
           <li>To deliver emails, SMS, WhatsApp messages, and push notifications your Organization sends or that relate to your own account (password resets, billing receipts, service notices).</li>
           <li>To respond to support requests and communicate with you about the service.</li>
           <li>To detect, prevent, and address technical issues, fraud, or abuse.</li>
@@ -81,9 +113,11 @@ export default function PrivacyPolicyPage() {
         <ul>
           <li><strong>Supabase</strong> — database, authentication, and file storage infrastructure.</li>
           <li><strong>Vercel</strong> — application hosting.</li>
-          <li><strong>Razorpay</strong> — subscription payment processing.</li>
+          <li><strong>PayU, Cashfree and Razorpay</strong> — payment processing for subscriptions, add-ons, giving and event payments.</li>
           <li><strong>Resend</strong> — transactional and bulk email delivery.</li>
           <li><strong>Twilio</strong> — SMS and WhatsApp message delivery.</li>
+          <li><strong>VideoSDK</strong> — video and audio calls and live streaming.</li>
+          <li><strong>OpenAI</strong> — AI-generated text for AI features, when an Organization uses them.</li>
           <li><strong>Firebase Cloud Messaging (Google)</strong> — push notifications to the KingdomFlow mobile app.</li>
         </ul>
         <p>
@@ -100,11 +134,33 @@ export default function PrivacyPolicyPage() {
 
       <LegalSection heading="Data retention">
         <p>
-          We retain Organization and congregation data for as long as the Organization&apos;s account is active, plus
-          a reasonable period afterward to allow recovery of accidentally deleted data and to meet legal, accounting,
-          or reporting obligations. An Organization&apos;s admins can delete individual records (members, events,
-          files) at any time through the app. To request deletion of an entire Organization&apos;s account and data,
-          contact us at{" "}
+          We retain Organization and congregation data for as long as the Organization&apos;s account is active. If an
+          Organization&apos;s access ends (for example an unpaid subscription), we send reminders and a final warning,
+          and delete its account and data 30 days after access ended unless it resubscribes. An Organization&apos;s
+          admins can delete individual records (members, events, files) at any time through the app.
+        </p>
+        <p>
+          Some records we must keep even after you delete your account, such as tax invoices and payment records, for
+          the period Indian tax and accounting law requires. Operational logs and error reports are kept only as
+          long as needed to run and secure the service.
+        </p>
+      </LegalSection>
+
+      <LegalSection heading="Deleting your account">
+        <p>
+          <strong>In the app:</strong> open Profile and choose Delete account. The request goes to your
+          church&apos;s admin (or to us, if you are a church owner), who processes it. Your sign-in is deleted, and
+          your church may also delete your member record.
+        </p>
+        <p>
+          <strong>Without the app:</strong> if you can&apos;t use the app — for example you lost your phone, can no
+          longer sign in, or only filled in a church&apos;s form — use our{" "}
+          <a href="/delete-account">account deletion form</a>. We email you a link to confirm it&apos;s you, review
+          the request, and email you when it&apos;s done. You can also write to{" "}
+          <a href="mailto:admin@kingdomflow.in">admin@kingdomflow.in</a>.
+        </p>
+        <p>
+          To delete a whole Organization&apos;s account and data, an owner can contact us at{" "}
           <a href="mailto:admin@kingdomflow.in">admin@kingdomflow.in</a>.
         </p>
       </LegalSection>
@@ -113,8 +169,9 @@ export default function PrivacyPolicyPage() {
         <p>
           We use industry-standard safeguards to protect information, including encryption in transit (TLS),
           encryption at rest for stored data, row-level access controls so an Organization&apos;s data is isolated
-          from every other Organization on the platform, and role-based permissions your admins configure for their
-          own team. No method of transmission or storage is 100% secure, and we cannot guarantee absolute security.
+          from every other Organization on the platform, role-based permissions your admins configure for their own
+          team, private storage for sensitive documents, encrypted storage of third-party access tokens, and limits
+          on repeated sign-in attempts. No method of transmission or storage is 100% secure, and we cannot guarantee absolute security.
         </p>
       </LegalSection>
 

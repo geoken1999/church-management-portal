@@ -2,7 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { processAccountDeletionAction } from "@/lib/account-deletion/actions";
-import { allowedDecisions, describeDecision, type DeletionDecision, type DeletionRequesterKind } from "@/lib/account-deletion/rules";
+import {
+  allowedDecisions,
+  describeDecision,
+  type DeletionDecision,
+  type DeletionRequesterKind,
+} from "@/lib/account-deletion/rules";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,7 +26,11 @@ export interface DeletionRequestView {
   processedAt: string | null;
 }
 
-const KIND_LABELS: Record<DeletionRequesterKind, string> = { member: "Member", team: "Team member", owner: "Church owner" };
+const KIND_LABELS: Record<DeletionRequesterKind, string> = {
+  member: "Member",
+  team: "Team member",
+  owner: "Church owner",
+};
 const OUTCOME_LABELS: Record<string, string> = {
   account_deleted: "Account deleted",
   account_and_member_deleted: "Account and member record deleted",
@@ -35,7 +44,13 @@ const BUTTON_LABELS: Record<DeletionDecision, string> = {
 };
 
 function formatWhen(iso: string): string {
-  return new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+  return new Date(iso).toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 function PendingRow({ request }: { request: DeletionRequestView }) {
@@ -44,10 +59,19 @@ function PendingRow({ request }: { request: DeletionRequestView }) {
 
   function decide(decision: DeletionDecision) {
     const explanation = describeDecision(request.kind, decision);
-    if (!window.confirm(`${BUTTON_LABELS[decision]} for ${request.name}?\n\n${explanation}${decision === "reject" ? "" : "\n\nThis can't be undone."}`)) return;
+    if (
+      !window.confirm(
+        `${BUTTON_LABELS[decision]} for ${request.name}?\n\n${explanation}${decision === "reject" ? "" : "\n\nThis can't be undone."}`,
+      )
+    )
+      return;
     setError(null);
     startTransition(async () => {
-      const result = await processAccountDeletionAction(request.id, decision, "");
+      const result = await processAccountDeletionAction(
+        request.id,
+        decision,
+        "",
+      );
       if (result.error) setError(result.error);
     });
   }
@@ -59,16 +83,33 @@ function PendingRow({ request }: { request: DeletionRequestView }) {
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium">{request.name}</span>
             <Badge variant="secondary">{KIND_LABELS[request.kind]}</Badge>
-            {request.churchName && <Badge variant="outline">{request.churchName}</Badge>}
+            {request.churchName && (
+              <Badge variant="outline">{request.churchName}</Badge>
+            )}
           </div>
-          <span className="text-xs text-muted-foreground">Asked {formatWhen(request.requestedAt)}</span>
+          <span className="text-xs text-muted-foreground">
+            Asked {formatWhen(request.requestedAt)}
+          </span>
         </div>
-        {request.contact && <p className="text-xs text-muted-foreground">{request.contact}</p>}
-        {request.reason && <p className="rounded-md bg-muted/50 p-2 text-sm">&ldquo;{request.reason}&rdquo;</p>}
+        {request.contact && (
+          <p className="text-xs text-muted-foreground">{request.contact}</p>
+        )}
+        {request.reason && (
+          <p className="rounded-md bg-muted/50 p-2 text-sm">
+            &ldquo;{request.reason}&rdquo;
+          </p>
+        )}
         <ErrorToast message={error} />
         <div className="flex flex-wrap gap-2">
           {allowedDecisions(request.kind).map((decision) => (
-            <Button key={decision} type="button" size="sm" variant={decision === "reject" ? "outline" : "destructive"} disabled={pending} onClick={() => decide(decision)}>
+            <Button
+              key={decision}
+              type="button"
+              size="sm"
+              variant={decision === "reject" ? "outline" : "destructive"}
+              disabled={pending}
+              onClick={() => decide(decision)}
+            >
               {BUTTON_LABELS[decision]}
             </Button>
           ))}
@@ -80,7 +121,13 @@ function PendingRow({ request }: { request: DeletionRequestView }) {
 
 // Account deletion requests raised from the mobile app: the open ones with
 // the choices for each, then a short history of the ones already handled.
-export function DeletionRequestsList({ requests, emptyText }: { requests: DeletionRequestView[]; emptyText: string }) {
+export function DeletionRequestsList({
+  requests,
+  emptyText,
+}: {
+  requests: DeletionRequestView[];
+  emptyText: string;
+}) {
   const pending = requests.filter((r) => r.status === "pending");
   const done = requests.filter((r) => r.status !== "pending").slice(0, 8);
 
@@ -88,19 +135,28 @@ export function DeletionRequestsList({ requests, emptyText }: { requests: Deleti
     <div className="space-y-3">
       {pending.length === 0 ? (
         <Card>
-          <CardContent className="py-8 text-center text-sm text-muted-foreground">{emptyText}</CardContent>
+          <CardContent className="py-8 text-center text-sm text-muted-foreground">
+            {emptyText}
+          </CardContent>
         </Card>
       ) : (
-        pending.map((request) => <PendingRow key={request.id} request={request} />)
+        pending.map((request) => (
+          <PendingRow key={request.id} request={request} />
+        ))
       )}
 
       {done.length > 0 && (
         <div className="space-y-1 pt-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase">Recently handled</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase">
+            Recently handled
+          </p>
           {done.map((request) => (
             <p key={request.id} className="text-sm text-muted-foreground">
-              {request.name} · {OUTCOME_LABELS[request.outcome ?? ""] ?? request.status}
-              {request.processedAt ? ` · ${formatWhen(request.processedAt)}` : ""}
+              {request.name} ·{" "}
+              {OUTCOME_LABELS[request.outcome ?? ""] ?? request.status}
+              {request.processedAt
+                ? ` · ${formatWhen(request.processedAt)}`
+                : ""}
             </p>
           ))}
         </div>

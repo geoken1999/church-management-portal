@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findSpecialDays, isOnThisDay, specialDayMessage } from "@/lib/push/special-days";
+import { buildSpecialDayDigest, findSpecialDays, isOnThisDay, specialDayMessage } from "@/lib/push/special-days";
 
 const member = (over: Partial<Parameters<typeof findSpecialDays>[0][number]> = {}) => ({
   id: "m1",
@@ -37,5 +37,36 @@ describe("specialDayMessage", () => {
   it("names the member and church", () => {
     expect(specialDayMessage("birthday", "Asha", "Grace Church").title).toContain("Asha");
     expect(specialDayMessage("anniversary", "", "Grace Church").body).toContain("Grace Church");
+  });
+});
+
+describe("buildSpecialDayDigest", () => {
+  const person = (first_name: string, over: { date_of_birth?: string | null; wedding_date?: string | null } = {}) => ({
+    first_name,
+    last_name: "Thomas",
+    date_of_birth: null,
+    wedding_date: null,
+    ...over,
+  });
+
+  it("says there are no special days when nobody has one", () => {
+    const digest = buildSpecialDayDigest([person("Asha", { date_of_birth: "1990-01-01" })], "2026-05-14");
+    expect(digest.title).toBe("No special days today");
+    expect(digest.hasCelebrations).toBe(false);
+  });
+
+  it("lists birthdays and anniversaries, including members without the app", () => {
+    const digest = buildSpecialDayDigest(
+      [person("Asha", { date_of_birth: "1990-05-14" }), person("Ben", { wedding_date: "2010-05-14" }), person("Cara", { date_of_birth: "1985-06-01" })],
+      "2026-05-14",
+    );
+    expect(digest.hasCelebrations).toBe(true);
+    expect(digest.title).toContain("(2)");
+    expect(digest.body).toBe("Birthdays: Asha Thomas. Anniversaries: Ben Thomas.");
+  });
+
+  it("shortens a long list", () => {
+    const many = Array.from({ length: 9 }, (_, i) => person(`P${i}`, { date_of_birth: "1990-05-14" }));
+    expect(buildSpecialDayDigest(many, "2026-05-14").body).toContain("and 3 more");
   });
 });

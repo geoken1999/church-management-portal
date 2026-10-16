@@ -1853,7 +1853,8 @@ export type NotificationType =
   | "instagram_ai_followup"
   | "whatsapp_ai_followup"
   | "prayer_request"
-  | "account_deletion_request";
+  | "account_deletion_request"
+  | "special_days";
 
 export type Notification = {
   id: string;
@@ -3287,6 +3288,12 @@ export type Database = {
         Row: PushBroadcast;
         Insert: Partial<PushBroadcast> & Pick<PushBroadcast, "organization_id" | "audience" | "title" | "body">;
         Update: Partial<PushBroadcast>;
+        Relationships: [];
+      };
+      special_day_digests: {
+        Row: { organization_id: string; day: string; created_at: string };
+        Insert: { organization_id: string; day: string; created_at?: string };
+        Update: Partial<{ organization_id: string; day: string; created_at: string }>;
         Relationships: [];
       };
       special_day_pushes: {

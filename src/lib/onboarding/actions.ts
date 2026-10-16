@@ -10,6 +10,7 @@ import {
   ONBOARDING_DOCS,
   ONBOARDING_MODULES,
   cleanCredits,
+  creditText,
   isModuleKey,
   quoteFor,
   type PlanType,
@@ -162,11 +163,6 @@ export async function saveCustomPlanAction(
     modules.includes(k),
   );
   const cleaned = cleanCredits(credits);
-  for (const type of CREDIT_TYPES) {
-    const line = cleaned[type.key];
-    if (line && line.count > 100_000_000)
-      return { error: `${type.label}: that count is too large.` };
-  }
   const { error } = await createAdminClient()
     .from("tenant_onboarding")
     .update({
@@ -383,10 +379,7 @@ export async function sendOnboardingToTenantAction(
   ).map((m) => m.label);
   const creditLabels = CREDIT_TYPES.filter(
     (t) => onboarding.credits[t.key],
-  ).map(
-    (t) =>
-      `${t.label}: ${onboarding.credits[t.key]!.count.toLocaleString("en-IN")} ${t.unit}`,
-  );
+  ).map((t) => creditText(t, onboarding.credits[t.key]!));
   await sendOnboardingReadyEmail(
     organizationId,
     labels,

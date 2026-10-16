@@ -21,6 +21,7 @@ import {
   ONBOARDING_MODULES,
   MANDATE_LIMIT_RUPEES,
   cleanCredits,
+  creditText,
   quoteFor,
   type Credits,
 } from "@/lib/onboarding/config";
@@ -61,7 +62,7 @@ export function OnboardingWizard({
   const [step, setStep] = useState(0);
   const [selected, setSelected] = useState<string[]>(onboarding?.modules ?? []);
   const [credits, setCredits] = useState<
-    Record<string, { count: string; price: string }>
+    Record<string, { count: string; price: string; unlimited: boolean }>
   >(() =>
     Object.fromEntries(
       CREDIT_TYPES.map((t) => [
@@ -69,6 +70,7 @@ export function OnboardingWizard({
         {
           count: String(onboarding?.credits[t.key]?.count ?? ""),
           price: String(onboarding?.credits[t.key]?.price ?? ""),
+          unlimited: onboarding?.credits[t.key]?.unlimited === true,
         },
       ]),
     ),
@@ -149,6 +151,7 @@ export function OnboardingWizard({
       {
         count: Number(credits[t.key].count) || 0,
         price: Number(credits[t.key].price) || 0,
+        unlimited: credits[t.key].unlimited,
       },
     ]),
   );
@@ -310,56 +313,88 @@ export function OnboardingWizard({
             </div>
 
             <div>
-              <p className="mb-2 text-sm font-medium">Monthly credits</p>
+              <p className="mb-2 text-sm font-medium">Limits &amp; credits</p>
               <div className="rounded-lg border border-border">
-                <div className="grid grid-cols-[1fr_130px_130px] gap-3 border-b border-border px-4 py-2 text-xs uppercase text-muted-foreground">
-                  <span>Credit</span>
+                <div className="grid grid-cols-[1fr_120px_90px_120px] gap-3 border-b border-border px-4 py-2 text-xs uppercase text-muted-foreground">
+                  <span>Limit</span>
                   <span>Count</span>
+                  <span>No limit</span>
                   <span>₹ per month</span>
                 </div>
-                {CREDIT_TYPES.map((t) => (
-                  <div
-                    key={t.key}
-                    className="grid grid-cols-[1fr_130px_130px] items-center gap-3 border-b border-border px-4 py-2 last:border-0"
-                  >
-                    <span className="text-sm">
-                      {t.label}{" "}
-                      <span className="text-muted-foreground">({t.unit})</span>
-                    </span>
-                    <Input
-                      type="number"
-                      min={0}
-                      step="1"
-                      disabled={locked}
-                      aria-label={`${t.label} count`}
-                      value={credits[t.key].count}
-                      onChange={(e) =>
-                        setCredits((c) => ({
-                          ...c,
-                          [t.key]: { ...c[t.key], count: e.target.value },
-                        }))
-                      }
-                    />
-                    <Input
-                      type="number"
-                      min={0}
-                      step="1"
-                      disabled={locked}
-                      aria-label={`${t.label} price per month`}
-                      value={credits[t.key].price}
-                      onChange={(e) =>
-                        setCredits((c) => ({
-                          ...c,
-                          [t.key]: { ...c[t.key], price: e.target.value },
-                        }))
-                      }
-                    />
+                {CREDIT_TYPES.map((t, i) => (
+                  <div key={t.key}>
+                    {(i === 0 || CREDIT_TYPES[i - 1].group !== t.group) && (
+                      <p className="bg-muted/40 px-4 py-1.5 text-xs font-medium text-muted-foreground">
+                        {t.group}
+                      </p>
+                    )}
+                    <div className="grid grid-cols-[1fr_120px_90px_120px] items-center gap-3 border-b border-border px-4 py-2 last:border-0">
+                      <span className="text-sm">
+                        {t.label}{" "}
+                        <span className="text-muted-foreground">
+                          ({t.unit})
+                        </span>
+                      </span>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={t.max}
+                        step="1"
+                        disabled={locked || credits[t.key].unlimited}
+                        aria-label={`${t.label} count`}
+                        value={
+                          credits[t.key].unlimited ? "" : credits[t.key].count
+                        }
+                        onChange={(e) =>
+                          setCredits((c) => ({
+                            ...c,
+                            [t.key]: { ...c[t.key], count: e.target.value },
+                          }))
+                        }
+                      />
+                      {t.canBeUnlimited ? (
+                        <input
+                          type="checkbox"
+                          disabled={locked}
+                          aria-label={`${t.label} has no limit`}
+                          checked={credits[t.key].unlimited}
+                          onChange={(e) =>
+                            setCredits((c) => ({
+                              ...c,
+                              [t.key]: {
+                                ...c[t.key],
+                                unlimited: e.target.checked,
+                              },
+                            }))
+                          }
+                        />
+                      ) : (
+                        <span />
+                      )}
+                      <Input
+                        type="number"
+                        min={0}
+                        step="1"
+                        disabled={locked}
+                        aria-label={`${t.label} price per month`}
+                        value={credits[t.key].price}
+                        onChange={(e) =>
+                          setCredits((c) => ({
+                            ...c,
+                            [t.key]: { ...c[t.key], price: e.target.value },
+                          }))
+                        }
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                A credit left blank means none for this tenant (storage falls
-                back to the Starter allowance so uploads keep working).
+                Blank means none for monthly emails, SMS, WhatsApp and AI
+                replies. For the size limits (storage, members, branches, forms,
+                logins, call length, social accounts) blank means the Starter
+                plan&apos;s number, so a tenant never gets more than you priced.
+                Mobile app features default to 15.
               </p>
             </div>
 
@@ -426,10 +461,7 @@ export function OnboardingWizard({
               <p className="text-sm font-medium">Credits</p>
               <p className="text-sm text-muted-foreground">
                 {CREDIT_TYPES.filter((t) => onboarding.credits[t.key])
-                  .map(
-                    (t) =>
-                      `${t.label}: ${onboarding.credits[t.key]!.count.toLocaleString("en-IN")} ${t.unit}`,
-                  )
+                  .map((t) => creditText(t, onboarding.credits[t.key]!))
                   .join(" · ") || "None set."}
               </p>
               {creditWarnings(onboarding.modules, onboarding.credits).map(

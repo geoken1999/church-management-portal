@@ -13,7 +13,11 @@ import { getCheckoutContext } from "@/lib/billing/checkout-context";
 import { getOrganizationInvoices } from "@/lib/invoices/dal";
 import { OnboardingCheckoutCard } from "@/components/billing/OnboardingCheckoutCard";
 import { getOnboarding } from "@/lib/onboarding/store";
-import { CREDIT_TYPES, ONBOARDING_MODULES } from "@/lib/onboarding/config";
+import {
+  CREDIT_TYPES,
+  ONBOARDING_MODULES,
+  creditText,
+} from "@/lib/onboarding/config";
 import { PayoutDetailsCard } from "@/components/billing/PayoutDetailsCard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -129,10 +133,7 @@ export default async function BillingPage({
             ).map((m) => m.label)}
             creditLabels={CREDIT_TYPES.filter(
               (t) => onboarding.credits[t.key],
-            ).map(
-              (t) =>
-                `${t.label}: ${onboarding.credits[t.key]!.count.toLocaleString("en-IN")} ${t.unit}`,
-            )}
+            ).map((t) => creditText(t, onboarding.credits[t.key]!))}
             monthlyBase={onboarding.monthly_base}
             billingDetails={checkout.billingDetails}
             sellerState={checkout.sellerState}

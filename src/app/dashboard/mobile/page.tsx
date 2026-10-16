@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { VALID_MOBILE_FEATURE_KEYS } from "@/lib/organizations/mobile-features";
+import { getMobileFeatureLimit } from "@/lib/plans/dal";
 import { MobileFeaturesManager } from "@/components/organizations/MobileFeaturesManager";
 
 export const metadata: Metadata = {
@@ -15,17 +16,28 @@ export default async function MobileFeaturesPage() {
     redirect("/dashboard");
   }
 
+  const limit = await getMobileFeatureLimit(membership.organization.id);
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-3xl font-bold tracking-tight">Mobile App</h1>
+        <h1 className="font-heading text-3xl font-bold tracking-tight">
+          Mobile App
+        </h1>
         <p className="mt-1 text-muted-foreground">
-          Choose up to 15 features to make available in KingdomFlow&apos;s mobile app. Everyone on your team sees the same
-          set — this isn&apos;t a per-person preference.
+          Choose up to {limit} features to make available in KingdomFlow&apos;s
+          mobile app. Everyone on your team sees the same set — this isn&apos;t
+          a per-person preference.
         </p>
       </div>
 
-      <MobileFeaturesManager organizationId={membership.organization.id} initialFeatures={(membership.organization.mobile_features ?? []).filter((key) => VALID_MOBILE_FEATURE_KEYS.includes(key))} />
+      <MobileFeaturesManager
+        limit={limit}
+        organizationId={membership.organization.id}
+        initialFeatures={(membership.organization.mobile_features ?? []).filter(
+          (key) => VALID_MOBILE_FEATURE_KEYS.includes(key),
+        )}
+      />
     </div>
   );
 }

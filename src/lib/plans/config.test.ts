@@ -42,14 +42,24 @@ describe("resolvePlanLimits", () => {
   });
 
   it("keeps Automation off when the tab is off, whatever the rule value says", () => {
-    const merged = resolvePlanLimits("premium", { ...PLANS.premium, automationLimit: 5, tabOverrides: { automations: false } });
+    const merged = resolvePlanLimits("premium", {
+      ...PLANS.premium,
+      automationLimit: 5,
+      tabOverrides: { automations: false },
+    });
     expect(merged.automationLimit).toBe(0);
   });
 
   it("derives Finance and Social Media flags from the tab switches", () => {
-    const starter = resolvePlanLimits("basic", { ...PLANS.basic, tabOverrides: { instagram: true, youtube: true, facebook: true } });
+    const starter = resolvePlanLimits("basic", {
+      ...PLANS.basic,
+      tabOverrides: { instagram: true, youtube: true, facebook: true },
+    });
     expect(starter.socialMediaEnabled).toBe(true);
-    const growth = resolvePlanLimits("premium", { ...PLANS.premium, tabOverrides: { fundraisers: false } });
+    const growth = resolvePlanLimits("premium", {
+      ...PLANS.premium,
+      tabOverrides: { fundraisers: false },
+    });
     expect(growth.financeEnabled).toBe(false);
   });
 });
@@ -63,7 +73,10 @@ describe("resolveTabStates", () => {
   });
 
   it("applies overrides on top of the plan default in both directions", () => {
-    const tabs = resolveTabStates("basic", { ...PLANS.basic, tabOverrides: { events: false, automations: true } });
+    const tabs = resolveTabStates("basic", {
+      ...PLANS.basic,
+      tabOverrides: { events: false, automations: true },
+    });
     expect(tabs.events).toBe(false);
     expect(tabs.automations).toBe(true);
   });
@@ -72,11 +85,15 @@ describe("resolveTabStates", () => {
 describe("featureCapFor", () => {
   it("returns null (unlimited) when no cap is set", () => {
     expect(featureCapFor(null, "events")).toBeNull();
-    expect(featureCapFor({ ...PLANS.basic, featureCaps: {} }, "events")).toBeNull();
+    expect(
+      featureCapFor({ ...PLANS.basic, featureCaps: {} }, "events"),
+    ).toBeNull();
   });
 
   it("returns the configured cap", () => {
-    expect(featureCapFor({ ...PLANS.basic, featureCaps: { events: 25 } }, "events")).toBe(25);
+    expect(
+      featureCapFor({ ...PLANS.basic, featureCaps: { events: 25 } }, "events"),
+    ).toBe(25);
   });
 });
 

@@ -87,7 +87,15 @@ function tier(
   id: PlanId,
   name: string,
   monthlyRupees: number,
-  rest: Omit<PlanLimits, "id" | "name" | "priceInRupees" | "priceLabel" | "priceInRupeesAnnual" | "priceLabelAnnual">,
+  rest: Omit<
+    PlanLimits,
+    | "id"
+    | "name"
+    | "priceInRupees"
+    | "priceLabel"
+    | "priceInRupeesAnnual"
+    | "priceLabelAnnual"
+  >,
   annualRupeesOverride?: number,
 ): PlanLimits {
   const annualRupees = annualRupeesOverride ?? annualRupeesFor(monthlyRupees);
@@ -212,7 +220,9 @@ export const PLANS: Record<PlanId, PlanLimits> = {
 // unlimited) — a relative rule, not an independent number, so it can
 // never drift out of sync if K-Meet's own limits ever change.
 export function kaudioMaxDurationMinutes(plan: PlanLimits): number | null {
-  return plan.kmeetMaxDurationMinutes === null ? null : plan.kmeetMaxDurationMinutes + 10;
+  return plan.kmeetMaxDurationMinutes === null
+    ? null
+    : plan.kmeetMaxDurationMinutes + 10;
 }
 
 // A platform admin's per-org override for a negotiated "Custom" deal
@@ -240,7 +250,12 @@ export type CappableTab = (typeof CAPPABLE_TABS)[number];
 
 // Module-level switches. Each group is one switch in the Custom rules
 // dialog, so every tab in a group always resolves the same way.
-export const FINANCE_TABS: TabKey[] = ["fundraisers", "offerings", "donations", "accounting"];
+export const FINANCE_TABS: TabKey[] = [
+  "fundraisers",
+  "offerings",
+  "donations",
+  "accounting",
+];
 export const SOCIAL_TABS: TabKey[] = ["instagram", "youtube", "facebook"];
 
 export interface TenantFeatureSettings {
@@ -248,6 +263,8 @@ export interface TenantFeatureSettings {
   tabOverrides?: Partial<Record<TabKey, boolean>>;
   // Missing or null = unlimited.
   featureCaps?: Partial<Record<CappableTab, number | null>>;
+  // How many features the church can offer in its mobile app. Missing = 15, the most the app allows.
+  mobileFeatureLimit?: number;
 }
 
 // The rule fields a platform admin can set for a negotiated deal, plus
@@ -255,7 +272,12 @@ export interface TenantFeatureSettings {
 // underlying plan.
 export type CustomPlanOverrides = Omit<
   PlanLimits,
-  "id" | "name" | "priceInRupees" | "priceLabel" | "priceInRupeesAnnual" | "priceLabelAnnual"
+  | "id"
+  | "name"
+  | "priceInRupees"
+  | "priceLabel"
+  | "priceInRupeesAnnual"
+  | "priceLabelAnnual"
 > &
   TenantFeatureSettings;
 
@@ -269,7 +291,10 @@ function planTabDefault(base: PlanLimits, tab: TabKey): boolean {
 
 // Every tab's effective on/off state for an org: the plan default, with
 // any tenant override applied on top.
-export function effectiveTabs(base: PlanLimits, tabOverrides: TenantFeatureSettings["tabOverrides"]): Record<TabKey, boolean> {
+export function effectiveTabs(
+  base: PlanLimits,
+  tabOverrides: TenantFeatureSettings["tabOverrides"],
+): Record<TabKey, boolean> {
   const result = {} as Record<TabKey, boolean>;
   for (const tab of TAB_KEYS) {
     result[tab] = tabOverrides?.[tab] ?? planTabDefault(base, tab);
@@ -277,7 +302,10 @@ export function effectiveTabs(base: PlanLimits, tabOverrides: TenantFeatureSetti
   return result;
 }
 
-export function resolveTabStates(planId: PlanId, customOverrides: CustomPlanOverrides | null): Record<TabKey, boolean> {
+export function resolveTabStates(
+  planId: PlanId,
+  customOverrides: CustomPlanOverrides | null,
+): Record<TabKey, boolean> {
   return effectiveTabs(PLANS[planId], customOverrides?.tabOverrides);
 }
 
@@ -285,13 +313,17 @@ export function resolveTabStates(planId: PlanId, customOverrides: CustomPlanOver
 // computed. Module flags and automation limit are derived from the tab
 // switches, so a tab turned on or off for one tenant also changes the
 // page-level checks that read those flags.
-export function resolvePlanLimits(planId: PlanId, customOverrides: CustomPlanOverrides | null): PlanLimits {
+export function resolvePlanLimits(
+  planId: PlanId,
+  customOverrides: CustomPlanOverrides | null,
+): PlanLimits {
   const basePlan = PLANS[planId];
   if (!customOverrides) return basePlan;
 
   const rules: Partial<CustomPlanOverrides> = { ...customOverrides };
   delete rules.tabOverrides;
   delete rules.featureCaps;
+  delete rules.mobileFeatureLimit;
   const tabs = effectiveTabs(basePlan, customOverrides.tabOverrides);
 
   let automationLimit = rules.automationLimit ?? basePlan.automationLimit;
@@ -308,7 +340,10 @@ export function resolvePlanLimits(planId: PlanId, customOverrides: CustomPlanOve
   };
 }
 
-export function featureCapFor(customOverrides: CustomPlanOverrides | null, tab: CappableTab): number | null {
+export function featureCapFor(
+  customOverrides: CustomPlanOverrides | null,
+  tab: CappableTab,
+): number | null {
   return customOverrides?.featureCaps?.[tab] ?? null;
 }
 
@@ -320,7 +355,10 @@ export function isBillingInterval(value: string): value is BillingInterval {
   return value === "monthly" || value === "annual";
 }
 
-export function priceForInterval(plan: PlanLimits, interval: BillingInterval): { amount: number; label: string } {
+export function priceForInterval(
+  plan: PlanLimits,
+  interval: BillingInterval,
+): { amount: number; label: string } {
   return interval === "monthly"
     ? { amount: plan.priceInRupees, label: plan.priceLabel }
     : { amount: plan.priceInRupeesAnnual, label: plan.priceLabelAnnual };
@@ -348,16 +386,76 @@ export const ADDON_TYPE_LABELS: Record<AddonType, string> = {
 };
 
 export const ADDON_PACKS: AddonPack[] = [
-  { id: "sms_500", addonType: "sms", label: "500 SMS credits", credits: 500, priceInRupees: 399 },
-  { id: "sms_2000", addonType: "sms", label: "2,000 SMS credits", credits: 2000, priceInRupees: 1399 },
-  { id: "email_2000", addonType: "email", label: "2,000 email credits", credits: 2000, priceInRupees: 199 },
-  { id: "email_10000", addonType: "email", label: "10,000 email credits", credits: 10000, priceInRupees: 799 },
-  { id: "whatsapp_500", addonType: "whatsapp", label: "500 WhatsApp credits", credits: 500, priceInRupees: 499 },
-  { id: "whatsapp_2000", addonType: "whatsapp", label: "2,000 WhatsApp credits", credits: 2000, priceInRupees: 1699 },
-  { id: "storage_5gb", addonType: "storage", label: "+5 GB storage", credits: 5 * 1024 * 1024 * 1024, priceInRupees: 249 },
-  { id: "storage_25gb", addonType: "storage", label: "+25 GB storage", credits: 25 * 1024 * 1024 * 1024, priceInRupees: 999 },
-  { id: "ai_100", addonType: "ai", label: "100 AI credits", credits: 100, priceInRupees: 299 },
-  { id: "ai_500", addonType: "ai", label: "500 AI credits", credits: 500, priceInRupees: 1199 },
+  {
+    id: "sms_500",
+    addonType: "sms",
+    label: "500 SMS credits",
+    credits: 500,
+    priceInRupees: 399,
+  },
+  {
+    id: "sms_2000",
+    addonType: "sms",
+    label: "2,000 SMS credits",
+    credits: 2000,
+    priceInRupees: 1399,
+  },
+  {
+    id: "email_2000",
+    addonType: "email",
+    label: "2,000 email credits",
+    credits: 2000,
+    priceInRupees: 199,
+  },
+  {
+    id: "email_10000",
+    addonType: "email",
+    label: "10,000 email credits",
+    credits: 10000,
+    priceInRupees: 799,
+  },
+  {
+    id: "whatsapp_500",
+    addonType: "whatsapp",
+    label: "500 WhatsApp credits",
+    credits: 500,
+    priceInRupees: 499,
+  },
+  {
+    id: "whatsapp_2000",
+    addonType: "whatsapp",
+    label: "2,000 WhatsApp credits",
+    credits: 2000,
+    priceInRupees: 1699,
+  },
+  {
+    id: "storage_5gb",
+    addonType: "storage",
+    label: "+5 GB storage",
+    credits: 5 * 1024 * 1024 * 1024,
+    priceInRupees: 249,
+  },
+  {
+    id: "storage_25gb",
+    addonType: "storage",
+    label: "+25 GB storage",
+    credits: 25 * 1024 * 1024 * 1024,
+    priceInRupees: 999,
+  },
+  {
+    id: "ai_100",
+    addonType: "ai",
+    label: "100 AI credits",
+    credits: 100,
+    priceInRupees: 299,
+  },
+  {
+    id: "ai_500",
+    addonType: "ai",
+    label: "500 AI credits",
+    credits: 500,
+    priceInRupees: 1199,
+  },
 ];
 
 export function getAddonPack(packId: string): AddonPack | undefined {

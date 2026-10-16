@@ -1,8 +1,11 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { updateMobileFeatures, type UpdateMobileFeaturesState } from "@/lib/organizations/actions";
-import { MOBILE_FEATURE_GROUPS, MOBILE_FEATURE_LIMIT } from "@/lib/organizations/mobile-features";
+import {
+  updateMobileFeatures,
+  type UpdateMobileFeaturesState,
+} from "@/lib/organizations/actions";
+import { MOBILE_FEATURE_GROUPS } from "@/lib/organizations/mobile-features";
 import { useLocale } from "@/lib/i18n/LocaleContext";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -16,20 +19,25 @@ const initialState: UpdateMobileFeaturesState = {};
 export function MobileFeaturesManager({
   organizationId,
   initialFeatures,
+  limit,
 }: {
   organizationId: string;
   initialFeatures: string[];
+  limit: number;
 }) {
   const { t } = useLocale();
   const [selected, setSelected] = useState<string[]>(initialFeatures);
-  const [state, formAction, pending] = useActionState(updateMobileFeatures, initialState);
+  const [state, formAction, pending] = useActionState(
+    updateMobileFeatures,
+    initialState,
+  );
 
-  const atLimit = selected.length >= MOBILE_FEATURE_LIMIT;
+  const atLimit = selected.length >= limit;
 
   function toggle(itemKey: string) {
     setSelected((prev) => {
       if (prev.includes(itemKey)) return prev.filter((k) => k !== itemKey);
-      if (prev.length >= MOBILE_FEATURE_LIMIT) return prev;
+      if (prev.length >= limit) return prev;
       return [...prev, itemKey];
     });
   }
@@ -47,9 +55,12 @@ export function MobileFeaturesManager({
             </div>
             <div>
               <p className="font-medium">
-                {selected.length} / {MOBILE_FEATURE_LIMIT} selected
+                {selected.length} / {limit} selected
               </p>
-              <p className="text-sm text-muted-foreground">Uncheck one to pick a different feature once you&apos;re at the limit.</p>
+              <p className="text-sm text-muted-foreground">
+                Uncheck one to pick a different feature once you&apos;re at the
+                limit.
+              </p>
             </div>
           </div>
           <Button type="submit" disabled={pending}>
@@ -69,7 +80,9 @@ export function MobileFeaturesManager({
         {MOBILE_FEATURE_GROUPS.map((group) => (
           <Card key={group.groupKey}>
             <CardContent>
-              <h3 className="mb-3 font-heading text-sm font-bold">{t.nav.groups[group.groupKey]}</h3>
+              <h3 className="mb-3 font-heading text-sm font-bold">
+                {t.nav.groups[group.groupKey]}
+              </h3>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
                 {group.itemKeys.map((itemKey) => {
                   const checked = selected.includes(itemKey);
@@ -77,7 +90,11 @@ export function MobileFeaturesManager({
                     <label
                       key={itemKey}
                       className={`flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm transition-colors ${
-                        checked ? "bg-accent/60" : atLimit ? "opacity-50" : "hover:bg-muted/60"
+                        checked
+                          ? "bg-accent/60"
+                          : atLimit
+                            ? "opacity-50"
+                            : "hover:bg-muted/60"
                       } ${!checked && atLimit ? "cursor-not-allowed" : "cursor-pointer"}`}
                     >
                       <Checkbox

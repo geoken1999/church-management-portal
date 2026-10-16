@@ -20,9 +20,9 @@ import {
   MAX_LOGO_BYTES,
   ALLOWED_LOGO_TYPES,
 } from "@/lib/organizations/validation";
-import { checkStorageQuota, checkTeamMemberQuota } from "@/lib/plans/dal";
+import { checkStorageQuota, checkTeamMemberQuota, getMobileFeatureLimit } from "@/lib/plans/dal";
 import { sendWelcomeEmail } from "@/lib/organizations/welcome-email";
-import { MOBILE_FEATURE_LIMIT, VALID_MOBILE_FEATURE_KEYS } from "@/lib/organizations/mobile-features";
+import { VALID_MOBILE_FEATURE_KEYS } from "@/lib/organizations/mobile-features";
 import { isKnownTimezone, DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 import type { MemberCountRange, OrganizationRole, TabPermissions } from "@/types/database";
 
@@ -531,8 +531,9 @@ export async function updateMobileFeatures(
     .map((f) => f.trim())
     .filter(Boolean);
 
-  if (features.length > MOBILE_FEATURE_LIMIT) {
-    return { error: `Choose at most ${MOBILE_FEATURE_LIMIT} features.` };
+  const limit = await getMobileFeatureLimit(organizationId);
+  if (features.length > limit) {
+    return { error: `Your plan allows at most ${limit} mobile app features. Choose fewer, or contact us to raise it.` };
   }
   if (features.some((f) => !VALID_MOBILE_FEATURE_KEYS.includes(f))) {
     return { error: "One of those isn't a recognized feature. Please try again." };

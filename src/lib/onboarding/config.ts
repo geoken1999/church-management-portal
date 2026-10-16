@@ -57,31 +57,156 @@ export function tabStatesFor(moduleKeys: string[]): Record<TabKey, boolean> {
 
 export type PlanType = "package" | "custom";
 
-export type CreditKey = "email" | "sms" | "whatsapp" | "ai" | "storage";
+export type CreditKey =
+  | "email"
+  | "sms"
+  | "whatsapp"
+  | "ai"
+  | "storage"
+  | "members"
+  | "branches"
+  | "forms"
+  | "admins"
+  | "staff"
+  | "kmeet"
+  | "instagram"
+  | "youtube"
+  | "mobileFeatures";
 
 export interface CreditType {
   key: CreditKey;
   label: string;
   unit: string;
+  group:
+    | "Messaging and AI"
+    | "Capacity"
+    | "Team"
+    | "Calls"
+    | "Social media"
+    | "Mobile app";
+  /** The limit can be set to no limit at all. */
+  canBeUnlimited?: boolean;
+  /** The largest count that makes sense. */
+  max: number;
 }
 
-// Monthly allowances the platform admin sets, with a count and a price, for a custom plan.
+// What the platform admin sets for a custom plan, each with a count (or no limit) and a monthly
+// price. The first four are monthly allowances; the rest are the plan's size limits.
 export const CREDIT_TYPES: CreditType[] = [
-  { key: "email", label: "Emails", unit: "per month" },
-  { key: "sms", label: "SMS", unit: "per month" },
-  { key: "whatsapp", label: "WhatsApp messages", unit: "per month" },
-  { key: "ai", label: "AI replies", unit: "per month" },
-  { key: "storage", label: "Storage", unit: "GB" },
+  {
+    key: "email",
+    label: "Emails",
+    unit: "per month",
+    group: "Messaging and AI",
+    max: 100_000_000,
+  },
+  {
+    key: "sms",
+    label: "SMS",
+    unit: "per month",
+    group: "Messaging and AI",
+    max: 100_000_000,
+  },
+  {
+    key: "whatsapp",
+    label: "WhatsApp messages",
+    unit: "per month",
+    group: "Messaging and AI",
+    max: 100_000_000,
+  },
+  {
+    key: "ai",
+    label: "AI replies",
+    unit: "per month",
+    group: "Messaging and AI",
+    max: 100_000_000,
+  },
+  {
+    key: "storage",
+    label: "Storage",
+    unit: "GB",
+    group: "Capacity",
+    max: 100_000,
+  },
+  {
+    key: "members",
+    label: "Members",
+    unit: "members",
+    group: "Capacity",
+    canBeUnlimited: true,
+    max: 10_000_000,
+  },
+  {
+    key: "branches",
+    label: "Branches",
+    unit: "branches",
+    group: "Capacity",
+    canBeUnlimited: true,
+    max: 100_000,
+  },
+  {
+    key: "forms",
+    label: "Forms",
+    unit: "forms",
+    group: "Capacity",
+    canBeUnlimited: true,
+    max: 1_000_000,
+  },
+  {
+    key: "admins",
+    label: "Admin logins",
+    unit: "besides the owner",
+    group: "Team",
+    max: 10_000,
+  },
+  {
+    key: "staff",
+    label: "Staff logins",
+    unit: "besides the owner",
+    group: "Team",
+    max: 10_000,
+  },
+  {
+    key: "kmeet",
+    label: "K-Connect call length",
+    unit: "minutes per call",
+    group: "Calls",
+    canBeUnlimited: true,
+    max: 1_440,
+  },
+  {
+    key: "instagram",
+    label: "Instagram accounts",
+    unit: "accounts",
+    group: "Social media",
+    max: 1_000,
+  },
+  {
+    key: "youtube",
+    label: "YouTube channels",
+    unit: "channels",
+    group: "Social media",
+    max: 1_000,
+  },
+  {
+    key: "mobileFeatures",
+    label: "Mobile app features",
+    unit: "features (up to 15)",
+    group: "Mobile app",
+    max: 15,
+  },
 ];
 
 export interface CreditLine {
+  /** Ignored when unlimited. */
   count: number;
+  unlimited?: boolean;
   price: number; // per month, before GST
 }
 
 export type Credits = Partial<Record<CreditKey, CreditLine>>;
 
-// Only well-formed lines with a count above zero; everything else is dropped.
+// Only well-formed lines: a count above zero (within what makes sense) or, where allowed, no limit.
 export function cleanCredits(input: unknown): Credits {
   const result: Credits = {};
   const source =
@@ -90,18 +215,25 @@ export function cleanCredits(input: unknown): Credits {
       : {};
   for (const type of CREDIT_TYPES) {
     const line = source[type.key] as
-      { count?: unknown; price?: unknown } | undefined;
-    const count = Math.floor(Number(line?.count));
+      { count?: unknown; price?: unknown; unlimited?: unknown } | undefined;
     const price = Math.round(Number(line?.price) * 100) / 100;
-    if (
-      Number.isFinite(count) &&
-      count > 0 &&
-      Number.isFinite(price) &&
-      price >= 0
-    )
+    const priceOk = Number.isFinite(price) && price >= 0;
+    if (type.canBeUnlimited && line?.unlimited === true && priceOk) {
+      result[type.key] = { count: 0, unlimited: true, price };
+      continue;
+    }
+    const count = Math.floor(Number(line?.count));
+    if (Number.isFinite(count) && count > 0 && count <= type.max && priceOk)
       result[type.key] = { count, price };
   }
   return result;
+}
+
+// "5,000 per month", "Unlimited members".
+export function creditText(type: CreditType, line: CreditLine): string {
+  return line.unlimited
+    ? `${type.label}: unlimited`
+    : `${type.label}: ${line.count.toLocaleString("en-IN")} ${type.unit}`;
 }
 
 export interface Quote {

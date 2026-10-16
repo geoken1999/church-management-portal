@@ -3,6 +3,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PLANS } from "@/lib/plans/config";
 import type { CustomPlanOverrides } from "@/lib/plans/config";
+import { limitsFor } from "@/lib/onboarding/limits";
 import {
   cleanCredits,
   tabStatesFor,
@@ -79,10 +80,11 @@ export async function getOnboardingDocuments(
   return (data ?? []) as OnboardingDocument[];
 }
 
-// Switches a tenant's chosen modules and monthly allowances on: the Pro plan's rules, with every
-// module not chosen turned off for this tenant. Emails, SMS, WhatsApp and AI replies are exactly the
-// counts set for them (none set means none); storage falls back to the Starter allowance so uploads
-// keep working.
+// Switches a tenant's chosen modules and limits on: the Pro plan's rules for everything not set
+// here, with every module not chosen turned off for this tenant. What the platform admin set is
+// exactly what the tenant gets: monthly emails, SMS, WhatsApp and AI replies are none unless given;
+// the size limits (storage, members, branches, forms, logins, call length, social accounts) fall
+// back to the Starter plan's numbers unless set, so a tenant never gets more than was priced.
 export async function applyOnboardingModules(
   organizationId: string,
   modules: string[],
@@ -109,13 +111,7 @@ export async function applyOnboardingModules(
   const next: CustomPlanOverrides = {
     ...proRules,
     ...(existing ?? {}),
-    emailsPerMonth: credits.email?.count ?? 0,
-    smsPerMonth: credits.sms?.count ?? 0,
-    whatsappPerMonth: credits.whatsapp?.count ?? 0,
-    aiRepliesPerMonth: credits.ai?.count ?? 0,
-    storageBytes: credits.storage
-      ? credits.storage.count * 1024 ** 3
-      : PLANS.basic.storageBytes,
+    ...limitsFor(credits),
     tabOverrides: tabStatesFor(modules),
   };
   await admin

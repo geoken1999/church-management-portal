@@ -118,3 +118,12 @@ export async function sendOnboardingReadyEmail(organizationId: string, moduleLab
     `<p>Your onboarding with KingdomFlow is complete. Your plan includes:</p><ul>${list}</ul><p>Monthly total including 18% GST: <strong>${formatRupees(totalWithGst)}</strong>.</p><p>To start, open <a href="${billingUrl}">Billing</a> and authorize the UPI Autopay subscription. Your modules switch on as soon as it is confirmed.</p>`,
   );
 }
+
+// Sent when a church cancels part-way through a period: what happens and until when.
+export async function sendSubscriptionCancellationScheduledEmail(organizationId: string, planName: string, endsOn: string): Promise<void> {
+  await sendBillingEmail(
+    organizationId,
+    "Your subscription will end on " + endsOn,
+    `<p>We've received your request to cancel the <strong>${planName}</strong> subscription.</p><p>You keep full access until <strong>${endsOn}</strong>, the end of the period you've already paid for. You won't be charged again. After that your organization moves to the Basic plan.</p><p>Changed your mind? You can keep your subscription from the Billing page any time before ${endsOn}.</p>`,
+  );
+}

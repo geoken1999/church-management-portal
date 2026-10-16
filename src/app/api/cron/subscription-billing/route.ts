@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { triggerRecurringCharge } from "@/lib/billing/payu-subscription";
-import { sendSubscriptionChargedEmail, sendSubscriptionPaymentFailedEmail, sendUpcomingChargeNoticeEmail } from "@/lib/billing/receipts";
+import {
+  sendSubscriptionChargedEmail,
+  sendSubscriptionPaymentFailedEmail,
+  sendUpcomingChargeNoticeEmail,
+} from "@/lib/billing/receipts";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { isPlanId, PLANS } from "@/lib/plans/config";
 import { withGst } from "@/lib/billing/gst";
 import { issueAndEmailInvoice } from "@/lib/invoices/issue";
+import { cancellationDue } from "@/lib/billing/cancellation";
+import { finishScheduledCancellation } from "@/lib/billing/cancellation-store";
 import { withCronLogging } from "@/lib/cron/run-logger";
 
 // Owns the entire recurring side of PayU plan subscriptions — see
@@ -47,7 +53,9 @@ async function run(request: Request) {
 
   const { data: subscriptions } = await admin
     .from("organization_subscriptions")
-    .select("id, organization_id, plan_id, monthly_amount, status, payu_authpayuid, next_charge_at, predebit_notice_sent_at, consecutive_charge_failures")
+    .select(
+      "id, organization_id, plan_id, monthly_amount, cancel_at_period_end, status, payu_authpayuid, next_charge_at, predebit_notice_sent_at, consecutive_charge_failures",
+    )
     .eq("status", "active")
     .not("next_charge_at", "is", null)
     .not("payu_authpayuid", "is", null);
@@ -56,34 +64,87 @@ async function run(request: Request) {
   let charged = 0;
   let failed = 0;
   let halted = 0;
+  let ended = 0;
 
   for (const sub of subscriptions ?? []) {
     // A subscription from a tenant onboarding bills its own monthly amount for its modules.
-    const customAmount = sub.monthly_amount !== null && sub.monthly_amount !== undefined ? Number(sub.monthly_amount) : null;
-    const planName = customAmount !== null ? "KingdomFlow modules" : isPlanId(sub.plan_id) ? PLANS[sub.plan_id].name : sub.plan_id;
+    const customAmount =
+      sub.monthly_amount !== null && sub.monthly_amount !== undefined
+        ? Number(sub.monthly_amount)
+        : null;
+    const planName =
+      customAmount !== null
+        ? "KingdomFlow modules"
+        : isPlanId(sub.plan_id)
+          ? PLANS[sub.plan_id].name
+          : sub.plan_id;
     // The price is without GST; the customer is charged (and told) the total with 18% GST.
-    const price = customAmount !== null ? withGst(customAmount) : isPlanId(sub.plan_id) ? withGst(PLANS[sub.plan_id].priceInRupees) : null;
+    const price =
+      customAmount !== null
+        ? withGst(customAmount)
+        : isPlanId(sub.plan_id)
+          ? withGst(PLANS[sub.plan_id].priceInRupees)
+          : null;
     const amountRupees = price ? price.total : null;
     const nextChargeAt = new Date(sub.next_charge_at as string);
+
+    // The church cancelled part-way through the period: no pre-debit notice and no charge. Once the
+    // period they paid for has ended the subscription is closed out.
+    if (sub.cancel_at_period_end) {
+      if (cancellationDue(true, sub.next_charge_at, now)) {
+        await finishScheduledCancellation({
+          id: sub.id,
+          organization_id: sub.organization_id,
+          plan_id: sub.plan_id,
+          monthly_amount: customAmount,
+        });
+        ended++;
+      }
+      continue;
+    }
 
     // Pre-debit notice — checked before the charge itself so a brand-new
     // "due today" subscription still gets a (late, best-effort) notice
     // rather than none at all.
-    const noticeAlreadySent = sub.predebit_notice_sent_at && new Date(sub.predebit_notice_sent_at) >= new Date(nextChargeAt.getTime() - 30 * 24 * 60 * 60 * 1000);
-    if (!noticeAlreadySent && nextChargeAt.getTime() - now.getTime() <= PREDEBIT_NOTICE_WINDOW_MS && amountRupees !== null) {
-      await sendUpcomingChargeNoticeEmail(sub.organization_id, planName, amountRupees, nextChargeAt.toLocaleDateString("en-IN"));
-      await admin.from("organization_subscriptions").update({ predebit_notice_sent_at: now.toISOString() }).eq("id", sub.id);
+    const noticeAlreadySent =
+      sub.predebit_notice_sent_at &&
+      new Date(sub.predebit_notice_sent_at) >=
+        new Date(nextChargeAt.getTime() - 30 * 24 * 60 * 60 * 1000);
+    if (
+      !noticeAlreadySent &&
+      nextChargeAt.getTime() - now.getTime() <= PREDEBIT_NOTICE_WINDOW_MS &&
+      amountRupees !== null
+    ) {
+      await sendUpcomingChargeNoticeEmail(
+        sub.organization_id,
+        planName,
+        amountRupees,
+        nextChargeAt.toLocaleDateString("en-IN"),
+      );
+      await admin
+        .from("organization_subscriptions")
+        .update({ predebit_notice_sent_at: now.toISOString() })
+        .eq("id", sub.id);
       noticesSent++;
     }
 
-    if (nextChargeAt.getTime() > now.getTime() || amountRupees === null) continue;
+    if (nextChargeAt.getTime() > now.getTime() || amountRupees === null)
+      continue;
 
     const txnid = `subchg${Date.now()}${sub.id.replace(/-/g, "").slice(0, 8)}`;
     let result;
     try {
-      result = await triggerRecurringCharge({ authpayuid: sub.payu_authpayuid as string, amountRupees, txnid });
+      result = await triggerRecurringCharge({
+        authpayuid: sub.payu_authpayuid as string,
+        amountRupees,
+        txnid,
+      });
     } catch (err) {
-      result = { success: false, status: "error", raw: { error: err instanceof Error ? err.message : "unknown error" } };
+      result = {
+        success: false,
+        status: "error",
+        raw: { error: err instanceof Error ? err.message : "unknown error" },
+      };
     }
 
     await admin.from("subscription_charges").insert({
@@ -103,14 +164,35 @@ async function run(request: Request) {
       nextCycle.setMonth(nextCycle.getMonth() + 1);
       await admin
         .from("organization_subscriptions")
-        .update({ next_charge_at: nextCycle.toISOString(), consecutive_charge_failures: 0, current_start: now.toISOString() })
+        .update({
+          next_charge_at: nextCycle.toISOString(),
+          consecutive_charge_failures: 0,
+          current_start: now.toISOString(),
+        })
         .eq("id", sub.id);
       // The tax invoice for this charge, emailed to the church; it never blocks the next cycle.
       const invoiceId = price
-        ? await issueAndEmailInvoice({ organizationId: sub.organization_id, kind: "subscription", reference: txnid, description: customAmount !== null ? "KingdomFlow modules subscription (monthly)" : `${planName} plan subscription (monthly)`, baseAmount: price.base })
+        ? await issueAndEmailInvoice({
+            organizationId: sub.organization_id,
+            kind: "subscription",
+            reference: txnid,
+            description:
+              customAmount !== null
+                ? "KingdomFlow modules subscription (monthly)"
+                : `${planName} plan subscription (monthly)`,
+            baseAmount: price.base,
+          })
         : null;
-      if (invoiceId) await admin.from("subscription_charges").update({ invoice_id: invoiceId }).eq("txnid", txnid);
-      await sendSubscriptionChargedEmail(sub.organization_id, planName, Math.round(amountRupees * 100));
+      if (invoiceId)
+        await admin
+          .from("subscription_charges")
+          .update({ invoice_id: invoiceId })
+          .eq("txnid", txnid);
+      await sendSubscriptionChargedEmail(
+        sub.organization_id,
+        planName,
+        Math.round(amountRupees * 100),
+      );
       continue;
     }
 
@@ -126,16 +208,40 @@ async function run(request: Request) {
 
     if (failures >= MAX_CONSECUTIVE_FAILURES) {
       halted++;
-      await admin.from("organization_subscriptions").update({ status: "halted", consecutive_charge_failures: failures }).eq("id", sub.id);
-      await admin.from("organizations").update({ plan: "basic" }).eq("id", sub.organization_id);
-      await sendSubscriptionPaymentFailedEmail(sub.organization_id, planName, false);
+      await admin
+        .from("organization_subscriptions")
+        .update({ status: "halted", consecutive_charge_failures: failures })
+        .eq("id", sub.id);
+      await admin
+        .from("organizations")
+        .update({ plan: "basic" })
+        .eq("id", sub.organization_id);
+      await sendSubscriptionPaymentFailedEmail(
+        sub.organization_id,
+        planName,
+        false,
+      );
     } else {
-      await admin.from("organization_subscriptions").update({ consecutive_charge_failures: failures }).eq("id", sub.id);
-      await sendSubscriptionPaymentFailedEmail(sub.organization_id, planName, true);
+      await admin
+        .from("organization_subscriptions")
+        .update({ consecutive_charge_failures: failures })
+        .eq("id", sub.id);
+      await sendSubscriptionPaymentFailedEmail(
+        sub.organization_id,
+        planName,
+        true,
+      );
     }
   }
 
-  return NextResponse.json({ ok: true, noticesSent, charged, failed, halted });
+  return NextResponse.json({
+    ok: true,
+    noticesSent,
+    charged,
+    failed,
+    halted,
+    ended,
+  });
 }
 
 export const GET = withCronLogging("subscription-billing", run);

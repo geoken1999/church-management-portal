@@ -181,6 +181,9 @@ export type OrganizationSubscription = {
   monthly_amount: number | null;
   onboarding_modules: string[] | null;
   onboarding_credits: Record<string, { count: number; price: number }> | null;
+  // Cancelled by the church but still running until next_charge_at, the end of the period it paid for.
+  cancel_at_period_end: boolean;
+  cancel_requested_at: string | null;
   created_at: string;
   updated_at: string;
 };

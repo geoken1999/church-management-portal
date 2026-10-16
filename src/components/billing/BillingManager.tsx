@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, X, CreditCard } from "lucide-react";
-import { startPayUSubscriptionCheckout, cancelPayUSubscription } from "@/lib/billing/payu-subscription-actions";
+import {
+  startPayUSubscriptionCheckout,
+  cancelPayUSubscription,
+  keepPayUSubscription,
+} from "@/lib/billing/payu-subscription-actions";
 // Legacy path: still used for any subscription a church started before
 // this moved to PayU — see handleCancel below. New checkouts never create
 // a razorpay_subscription_id, so this becomes unreachable once no org has
@@ -11,16 +15,33 @@ import { startPayUSubscriptionCheckout, cancelPayUSubscription } from "@/lib/bil
 import { cancelSubscription as cancelRazorpaySubscription } from "@/lib/billing/actions";
 import { redirectToPayU } from "@/lib/payu/browser";
 import { PLANS, priceForInterval, type PlanId } from "@/lib/plans/config";
-import { PLAN_ORDER, planFeatureRows, planDescription } from "@/lib/plans/display";
-import type { OrganizationSubscription, SubscriptionStatus, SubscriptionBillingInterval } from "@/types/database";
+import {
+  PLAN_ORDER,
+  planFeatureRows,
+  planDescription,
+} from "@/lib/plans/display";
+import type {
+  OrganizationSubscription,
+  SubscriptionStatus,
+  SubscriptionBillingInterval,
+} from "@/types/database";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ErrorToast } from "@/components/ui/error-toast";
-import { BillingDetailsDialog, type CheckoutResult } from "@/components/billing/BillingDetailsDialog";
+import {
+  BillingDetailsDialog,
+  type CheckoutResult,
+} from "@/components/billing/BillingDetailsDialog";
 import type { BillingDetailsInput } from "@/lib/billing/billing-details";
 import { formatPrice, withGst } from "@/lib/billing/gst";
 
@@ -35,9 +56,18 @@ const STATUS_LABELS: Record<SubscriptionStatus, string> = {
   expired: "Expired",
 };
 
-const INTERVAL_LABELS: Record<SubscriptionBillingInterval, string> = { monthly: "Monthly", annual: "Annual" };
+const INTERVAL_LABELS: Record<SubscriptionBillingInterval, string> = {
+  monthly: "Monthly",
+  annual: "Annual",
+};
 
-const IN_PROGRESS_STATUSES: SubscriptionStatus[] = ["created", "authenticated", "active", "pending", "halted"];
+const IN_PROGRESS_STATUSES: SubscriptionStatus[] = [
+  "created",
+  "authenticated",
+  "active",
+  "pending",
+  "halted",
+];
 
 export function BillingManager({
   currentPlanId,
@@ -59,7 +89,9 @@ export function BillingManager({
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const hasInProgressSubscription = Boolean(subscription && IN_PROGRESS_STATUSES.includes(subscription.status));
+  const hasInProgressSubscription = Boolean(
+    subscription && IN_PROGRESS_STATUSES.includes(subscription.status),
+  );
 
   // PayU subscriptions here are via UPI Autopay, which NPCI caps at
   // ₹15,000 per recurring debit without extra per-charge authentication —
@@ -71,29 +103,71 @@ export function BillingManager({
   function handleSubscribe(planId: PlanId) {
     setError(null);
     if (!vpa.trim().includes("@")) {
-      setError("Enter your UPI ID first (e.g. yourname@bank) — it's needed to set up the Autopay mandate.");
+      setError(
+        "Enter your UPI ID first (e.g. yourname@bank) — it's needed to set up the Autopay mandate.",
+      );
       return;
     }
     setCheckoutPlanId(planId);
   }
 
   // Called by the billing details dialog. On success the page leaves for PayU, so only a problem comes back.
-  async function startCheckout(details: BillingDetailsInput): Promise<CheckoutResult> {
+  async function startCheckout(
+    details: BillingDetailsInput,
+  ): Promise<CheckoutResult> {
     if (!checkoutPlanId) return { error: "Choose a plan." };
-    const result = await startPayUSubscriptionCheckout(checkoutPlanId, vpa, details);
-    if (result.error || !result.payuFields || !result.payuActionUrl) return { error: result.error ?? "Couldn't start checkout.", billingErrors: result.billingErrors };
+    const result = await startPayUSubscriptionCheckout(
+      checkoutPlanId,
+      vpa,
+      details,
+    );
+    if (result.error || !result.payuFields || !result.payuActionUrl)
+      return {
+        error: result.error ?? "Couldn't start checkout.",
+        billingErrors: result.billingErrors,
+      };
     redirectToPayU(result.payuActionUrl, result.payuFields);
     return {};
   }
 
+  const endsOn = subscription?.next_charge_at
+    ? new Date(subscription.next_charge_at).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : null;
+  const cancelPending = Boolean(
+    subscription?.cancel_at_period_end && subscription.status === "active",
+  );
+
+  async function handleKeep() {
+    setError(null);
+    setCancelling(true);
+    const result = await keepPayUSubscription();
+    setCancelling(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    router.refresh();
+  }
+
   async function handleCancel() {
     setError(null);
+    const live = subscription?.status === "active" && endsOn;
+    const question = live
+      ? `Cancel your subscription? You keep full access until ${endsOn}, the end of the period you've paid for, and you won't be charged again. There's no refund for the current period.`
+      : "Cancel this subscription?";
+    if (!window.confirm(question)) return;
     setCancelling(true);
     // A subscription started before this moved to PayU still has
     // razorpay_subscription_id (and no payu_txnid) — route it to the
     // matching cancel action rather than the new one, which wouldn't
     // recognize it.
-    const result = subscription?.razorpay_subscription_id ? await cancelRazorpaySubscription() : await cancelPayUSubscription();
+    const result = subscription?.razorpay_subscription_id
+      ? await cancelRazorpaySubscription()
+      : await cancelPayUSubscription();
     setCancelling(false);
     if (result.error) {
       setError(result.error);
@@ -107,8 +181,8 @@ export function BillingManager({
       {!payuConfigured && (
         <Alert>
           <AlertDescription>
-            Billing isn&apos;t configured yet for this app — an admin needs to set the PayU API keys before
-            subscriptions can be started.
+            Billing isn&apos;t configured yet for this app — an admin needs to
+            set the PayU API keys before subscriptions can be started.
           </AlertDescription>
         </Alert>
       )}
@@ -123,26 +197,55 @@ export function BillingManager({
                 <CreditCard className="size-4 text-primary" />
                 Current subscription
               </CardTitle>
-              <Badge variant={subscription.status === "active" ? "default" : "secondary"}>
-                {STATUS_LABELS[subscription.status]}
+              <Badge
+                variant={
+                  subscription.status === "active" && !cancelPending
+                    ? "default"
+                    : "secondary"
+                }
+              >
+                {cancelPending
+                  ? "Cancelling"
+                  : STATUS_LABELS[subscription.status]}
               </Badge>
             </div>
             <CardDescription>
               {subscription.monthly_amount !== null
                 ? `Custom modules plan (${subscription.onboarding_modules?.length ?? 0} modules) — ${formatPrice(withGst(Number(subscription.monthly_amount)).total)} a month including GST`
                 : `${PLANS[currentPlanId].name} plan — ${INTERVAL_LABELS[subscription.billing_interval]}`}
-              {subscription.next_charge_at && subscription.status === "active"
-                ? ` — next charge ${new Date(subscription.next_charge_at).toLocaleDateString()}`
-                : subscription.current_end && subscription.status === "active"
-                  ? ` — renews ${new Date(subscription.current_end).toLocaleDateString()}`
-                  : ""}
+              {cancelPending && endsOn
+                ? ` — ends on ${endsOn}`
+                : subscription.next_charge_at &&
+                    subscription.status === "active"
+                  ? ` — next charge ${new Date(subscription.next_charge_at).toLocaleDateString()}`
+                  : subscription.current_end && subscription.status === "active"
+                    ? ` — renews ${new Date(subscription.current_end).toLocaleDateString()}`
+                    : ""}
             </CardDescription>
           </CardHeader>
           {hasInProgressSubscription && (
-            <CardContent>
-              <Button variant="outline" size="sm" onClick={handleCancel} disabled={cancelling}>
-                {cancelling ? "Cancelling..." : "Cancel subscription"}
-              </Button>
+            <CardContent className="space-y-3">
+              {cancelPending && endsOn && (
+                <p className="text-sm text-muted-foreground">
+                  You&apos;ve cancelled. You keep full access until{" "}
+                  <strong>{endsOn}</strong> and won&apos;t be charged again.
+                  After that your organization moves to the Basic plan.
+                </p>
+              )}
+              {cancelPending ? (
+                <Button size="sm" onClick={handleKeep} disabled={cancelling}>
+                  {cancelling ? "Updating..." : "Keep my subscription"}
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                >
+                  {cancelling ? "Cancelling..." : "Cancel subscription"}
+                </Button>
+              )}
             </CardContent>
           )}
         </Card>
@@ -151,10 +254,15 @@ export function BillingManager({
       {!hasInProgressSubscription && (
         <div className="mx-auto max-w-sm space-y-2">
           <Label htmlFor="upi-vpa">Your UPI ID</Label>
-          <Input id="upi-vpa" placeholder="yourname@bank" value={vpa} onChange={(e) => setVpa(e.target.value)} />
+          <Input
+            id="upi-vpa"
+            placeholder="yourname@bank"
+            value={vpa}
+            onChange={(e) => setVpa(e.target.value)}
+          />
           <p className="text-xs text-muted-foreground">
-            Used to set up a UPI Autopay mandate — you&apos;ll confirm it in your own UPI app, and nothing is charged
-            until that&apos;s approved.
+            Used to set up a UPI Autopay mandate — you&apos;ll confirm it in
+            your own UPI app, and nothing is charged until that&apos;s approved.
           </p>
         </div>
       )}
@@ -164,19 +272,30 @@ export function BillingManager({
           const plan = PLANS[planId];
           const price = priceForInterval(plan, "monthly");
           const isCurrent =
-            planId === currentPlanId && subscription?.status === "active" && subscription.billing_interval === "monthly";
+            planId === currentPlanId &&
+            subscription?.status === "active" &&
+            subscription.billing_interval === "monthly";
           const blockedBySwitch =
-            hasInProgressSubscription && !isCurrent && (subscription?.plan_id !== planId || subscription?.billing_interval !== "monthly");
+            hasInProgressSubscription &&
+            !isCurrent &&
+            (subscription?.plan_id !== planId ||
+              subscription?.billing_interval !== "monthly");
 
           return (
-            <Card key={planId} className={isCurrent ? "border-primary shadow-lg" : undefined}>
+            <Card
+              key={planId}
+              className={isCurrent ? "border-primary shadow-lg" : undefined}
+            >
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg">{plan.name}</CardTitle>
                   {isCurrent && <Badge>Current plan</Badge>}
                 </div>
                 <p className="font-heading text-3xl font-bold">{price.label}</p>
-                <p className="text-xs text-muted-foreground">+ 18% GST: {formatPrice(withGst(plan.priceInRupees).total)} a month in total</p>
+                <p className="text-xs text-muted-foreground">
+                  + 18% GST: {formatPrice(withGst(plan.priceInRupees).total)} a
+                  month in total
+                </p>
                 <CardDescription>{planDescription(planId)}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -188,7 +307,13 @@ export function BillingManager({
                       ) : (
                         <X className="mt-0.5 size-4 shrink-0 text-muted-foreground/50" />
                       )}
-                      <span className={row.included ? "" : "text-muted-foreground/60"}>{row.label}</span>
+                      <span
+                        className={
+                          row.included ? "" : "text-muted-foreground/60"
+                        }
+                      >
+                        {row.label}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -201,7 +326,9 @@ export function BillingManager({
                   {isCurrent
                     ? "Current plan"
                     : blockedBySwitch
-                      ? "Cancel current plan first"
+                      ? cancelPending && endsOn
+                        ? `Available from ${endsOn}`
+                        : "Cancel current plan first"
                       : "Subscribe"}
                 </Button>
               </CardContent>

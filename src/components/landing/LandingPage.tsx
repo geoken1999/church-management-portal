@@ -42,8 +42,8 @@ import { Badge } from "@/components/ui/badge";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { DashboardPreview } from "@/components/landing/DashboardPreview";
 import { AiAutomationSection } from "@/components/landing/AiAutomationSection";
-import { PlayStoreButton } from "@/components/landing/PlayStoreButton";
-import { PLAY_STORE_URL } from "@/lib/app-links";
+import { AppStoreButtons } from "@/components/landing/AppStoreButtons";
+import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/app-links";
 
 const STATS = [
   { value: "30+", label: "built-in modules" },
@@ -371,7 +371,7 @@ export function LandingPage() {
               <Button size="lg" variant="outline" nativeButton={false} render={<a href="#pricing">See pricing</a>} />
             </div>
             <div className="mt-6 flex justify-center">
-              <PlayStoreButton />
+              <AppStoreButtons />
             </div>
             <p className="mt-4 text-xs text-muted-foreground">No credit card required · 14-day free trial · Cancel anytime</p>
           </div>
@@ -571,7 +571,7 @@ export function LandingPage() {
               <h2 className="font-heading text-3xl font-bold tracking-tight text-balance">Your church in everyone&apos;s pocket</h2>
               <p className="mt-3 text-muted-foreground">One app for your team to run the church, and the same app for members to belong to it.</p>
               <div className="mt-6 flex justify-center">
-                <PlayStoreButton />
+                <AppStoreButtons />
               </div>
             </div>
             <div className="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -677,6 +677,11 @@ export function LandingPage() {
             <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground">
               Android app
             </a>
+            {APP_STORE_URL && (
+              <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground">
+                iPhone app
+              </a>
+            )}
             <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground">
               Pricing
             </a>

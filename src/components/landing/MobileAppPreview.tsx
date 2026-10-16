@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
 import {
   Bell,
+  LayoutDashboard,
+  Settings,
+  BarChart3,
+  HandCoins,
+  BadgeCheck,
+  Search,
   CalendarDays,
   Heart,
   Home,
@@ -313,6 +319,125 @@ function ScanScreen() {
   );
 }
 
+function AdminTabBar({ active }: { active: number }) {
+  const tabs = [
+    { icon: LayoutDashboard, label: "Dashboard" },
+    { icon: LayoutGrid, label: "Services" },
+    { icon: Settings, label: "Settings" },
+  ];
+  return (
+    <div className="mt-auto grid grid-cols-3 border-t border-border bg-card px-1 py-1.5">
+      {tabs.map((tab, i) => (
+        <div
+          key={tab.label}
+          className={`flex flex-col items-center gap-0.5 text-[8px] ${i === active ? "font-semibold text-primary" : "text-muted-foreground"}`}
+        >
+          <tab.icon className="size-4" />
+          {tab.label}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AdminDashboardScreen() {
+  return (
+    <>
+      <StatusBar />
+      <Header title="Grace Community" />
+      <div className="space-y-2.5 px-3 pb-2">
+        <p className="text-[10px] font-semibold">This month</p>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            ["Members", "1,248", Users],
+            ["Attendance", "86%", BarChart3],
+            ["Giving", "₹86,400", HandCoins],
+            ["Events", "7", CalendarDays],
+          ].map(([label, value, Icon]) => {
+            const I = Icon as typeof Users;
+            return (
+              <div
+                key={label as string}
+                className="rounded-xl border border-border bg-card p-2.5"
+              >
+                <I className="size-3.5 text-primary" />
+                <p className="mt-1 text-sm font-bold">{value as string}</p>
+                <p className="text-[9px] text-muted-foreground">
+                  {label as string}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+        <div className="rounded-xl border border-border bg-card p-2.5">
+          <p className="text-[10px] font-semibold">
+            Attendance, last 6 Sundays
+          </p>
+          <div className="mt-2 flex h-14 items-end gap-1.5">
+            {[55, 62, 58, 70, 66, 78].map((h, i) => (
+              <div
+                key={i}
+                className="flex-1 rounded-t bg-primary/70"
+                style={{ height: `${h}%` }}
+              />
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 rounded-xl bg-accent p-2.5 text-accent-foreground">
+          <Bell className="size-4" />
+          <p className="text-[10px] font-semibold">3 new join requests</p>
+        </div>
+      </div>
+      <AdminTabBar active={0} />
+    </>
+  );
+}
+
+function AdminMembersScreen() {
+  return (
+    <>
+      <StatusBar />
+      <div className="px-4 py-2">
+        <p className="text-xs font-bold">Members</p>
+      </div>
+      <div className="mx-3 flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5">
+        <Search className="size-3.5 text-muted-foreground" />
+        <span className="text-[9px] text-muted-foreground">Search members</span>
+      </div>
+      <div className="mt-2 space-y-1.5 px-3">
+        {[
+          ["Anna Thomas", "Main branch", true],
+          ["David Joseph", "North branch", false],
+          ["Maria Fernandes", "Main branch", true],
+          ["Priya Nair", "Youth", false],
+          ["John Samuel", "Main branch", false],
+        ].map(([name, meta, verified]) => (
+          <div
+            key={name as string}
+            className="flex items-center gap-2 rounded-xl border border-border bg-card p-2"
+          >
+            <div className="flex size-7 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-accent-foreground">
+              {(name as string)[0]}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[10px] font-semibold">
+                {name as string}
+              </p>
+              <p className="text-[9px] text-muted-foreground">
+                {meta as string}
+              </p>
+            </div>
+            {verified ? <BadgeCheck className="size-4 text-primary" /> : null}
+          </div>
+        ))}
+      </div>
+      <div className="mx-3 mb-3 mt-auto rounded-lg bg-primary py-2 text-center text-[10px] font-medium text-primary-foreground">
+        Add member
+      </div>
+    </>
+  );
+}
+
 export function MobileAppPreview() {
   return (
     <div className="relative mt-12">
@@ -335,6 +460,12 @@ export function MobileAppPreview() {
         </Phone>
         <Phone caption="For your team: scan to check in and verify">
           <ScanScreen />
+        </Phone>
+        <Phone caption="For admins: your church at a glance">
+          <AdminDashboardScreen />
+        </Phone>
+        <Phone caption="For admins: members and volunteers">
+          <AdminMembersScreen />
         </Phone>
       </div>
       <p className="mt-2 text-center text-xs text-muted-foreground">

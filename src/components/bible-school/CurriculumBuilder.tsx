@@ -30,6 +30,12 @@ import { FieldError } from "@/components/auth/FieldError";
 import { ErrorToast } from "@/components/ui/error-toast";
 import { toast } from "sonner";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
+import {
+  formatClock,
+  formatFileSize,
+  minutesFromSeconds,
+  readMediaInfo,
+} from "@/lib/lms/media-metadata";
 import { RichTextEditor } from "@/components/bible-school/RichTextEditor";
 
 const SELECT_CLASS =
@@ -524,6 +530,9 @@ function LessonForm({
   );
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  // What was read from the chosen video or audio file (length, picture size, file size).
+  const [mediaNote, setMediaNote] = useState<string | null>(null);
+  const isMedia = form.contentType === "video" || form.contentType === "audio";
   const type = LESSON_TYPES.find((t) => t.value === form.contentType);
 
   // Sends a file for a lesson straight to storage and attaches it. Returns a message if it failed.
@@ -650,6 +659,14 @@ function LessonForm({
             id="lesson-minutes"
             type="number"
             min={0}
+            readOnly={
+              isMedia && Boolean(mediaNote && (fileName || pendingFile))
+            }
+            title={
+              isMedia && mediaNote && (fileName || pendingFile)
+                ? "Read from the uploaded file"
+                : undefined
+            }
             value={form.durationMinutes}
             onChange={(e) =>
               setForm((f) => ({ ...f, durationMinutes: e.target.value }))
@@ -712,6 +729,29 @@ function LessonForm({
                 e.target.value = "";
                 if (!file) return;
                 setError(null);
+                setMediaNote(null);
+                // Video and audio: take the length from the file itself.
+                const kind =
+                  form.contentType === "video" || form.contentType === "audio"
+                    ? form.contentType
+                    : null;
+                if (kind) {
+                  const read = readMediaInfo(file, kind).then((info) => {
+                    if (!info) return;
+                    setForm((f) => ({
+                      ...f,
+                      durationMinutes: String(minutesFromSeconds(info.seconds)),
+                    }));
+                    const size =
+                      info.width && info.height
+                        ? ` · ${info.width}×${info.height}`
+                        : "";
+                    setMediaNote(
+                      `Length ${formatClock(info.seconds)}${size} · ${formatFileSize(file.size)}. Minutes filled in from the file.`,
+                    );
+                  });
+                  void read;
+                }
                 if (lesson) {
                   // An existing lesson: upload right away.
                   startTransition(async () => {
@@ -727,6 +767,12 @@ function LessonForm({
                 }
               }}
             />
+            {mediaNote && (fileName || pendingFile) && (
+              <p className="basis-full text-xs text-muted-foreground">
+                {mediaNote}
+                {lesson ? " Save the lesson to keep it." : ""}
+              </p>
+            )}
             {(fileName || pendingFile) && (
               <Button
                 type="button"
@@ -736,6 +782,7 @@ function LessonForm({
                 onClick={() => {
                   if (pendingFile || !lesson) {
                     setPendingFile(null);
+                    setMediaNote(null);
                     return;
                   }
                   startTransition(async () => {

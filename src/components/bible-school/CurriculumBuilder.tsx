@@ -627,12 +627,13 @@ function LessonForm({
           <select
             id="lesson-type"
             value={form.contentType}
-            onChange={(e) =>
-              setForm((f) => ({
-                ...f,
-                contentType: e.target.value as typeof f.contentType,
-              }))
-            }
+            onChange={(e) => {
+              const next = e.target.value as typeof form.contentType;
+              setForm((f) => ({ ...f, contentType: next }));
+              // A file picked for a video can't follow the lesson to a type that takes no file.
+              const nextType = LESSON_TYPES.find((t) => t.value === next);
+              if (!nextType?.allowsUpload) setPendingFile(null);
+            }}
             className={SELECT_CLASS}
           >
             {LESSON_TYPES.map((t) => (

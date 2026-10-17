@@ -194,7 +194,8 @@ and plan limits. Nothing about calls was duplicated.
 - `src/lib/lms/migration.test.ts`: structural checks on the migration (RLS on every table, church id on every table,
   students never get write policies, transactional functions locked down, additive only).
 - Phase 2: `0191` structure tests (RLS, no student writes, functions closed to anonymous callers, no member-id arguments, progress restrict, private bucket); progress and file-type rules; app tests for progress, course navigation (next / previous / resume), catalogue seats and dates, media link detection and the reading-lesson renderer.
-- **Not covered**: running the migrations and the RLS policies against a real database, and clicking through the screens.
+- `src/lib/lms/db.test.ts` runs migrations 0190 to 0193 in a real Postgres (PGlite, in-process, with a small stand-in for Supabase's `auth.uid()`, roles and buckets) and exercises the student and teacher functions and the row level security as different people: joining, locked lessons, completion, watch-time credit, notes privacy, other-church isolation, seat limits, enrollment windows, reordering, live-class joining and attendance, and the feature switch. Update the stub (`src/lib/lms/test-support/supabase-stub.sql`) if a migration starts to rely on more of Supabase.
+- **Not covered by tests**: the server actions against Supabase itself (storage uploads, signed links), the screens, and the mobile app on a device. Running the migrations and the RLS policies against a real database, and clicking through the screens.
   There is no database in the development environment; this must be done on staging before rollout (checklist below).
 
 ### Staging checklist (run as each role)
@@ -223,3 +224,8 @@ and plan limits. Nothing about calls was duplicated.
 3. Teaching operations: live classes with attendance and notifications (**done**); assignments, submissions, grading (next).
 4. Assessments and certification: quizzes and exams, gradebook, PDF certificates and verification.
 5. Reporting and commercial readiness: dashboards, plan entitlements, usage limits, audit coverage, performance and accessibility review.
+
+## 7. Behaviours worth knowing
+
+- **Seats.** A course's seat limit counts *approved and active* students. A student who has *completed* the course no longer holds a seat, so a self-paced course keeps taking new students; a pending request never holds a seat.
+- **Attendance.** A student is marked present when they open a live class from the app. A teacher can change any mark.

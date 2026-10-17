@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   LESSON_FILE_TYPES,
+  creditedSeconds,
+  lessonFileProblem,
+  watchedEnough,
   availableEnrollmentActions,
   canManageCourse,
   courseComplete,
@@ -306,5 +309,74 @@ describe("a lesson with an uploaded file", () => {
         mediaUrl: "http://x.com/a.pdf",
       }).mediaUrl,
     ).toBeTruthy();
+  });
+});
+
+describe("lesson files", () => {
+  const MB = 1024 * 1024;
+  it("accepts an MP4 video up to 500 MB for a video lesson", () => {
+    expect(
+      lessonFileProblem({ type: "video/mp4", size: 400 * MB }, "video"),
+    ).toBeNull();
+    expect(
+      lessonFileProblem({ type: "video/mp4", size: 600 * MB }, "video"),
+    ).toMatch(/500 MB/);
+  });
+  it("keeps documents small and audio in between", () => {
+    expect(
+      lessonFileProblem({ type: "application/pdf", size: 20 * MB }, "document"),
+    ).toBeNull();
+    expect(
+      lessonFileProblem({ type: "application/pdf", size: 30 * MB }, "document"),
+    ).toMatch(/25 MB/);
+    expect(
+      lessonFileProblem({ type: "audio/mpeg", size: 90 * MB }, "audio"),
+    ).toBeNull();
+    expect(
+      lessonFileProblem({ type: "audio/mpeg", size: 120 * MB }, "audio"),
+    ).toMatch(/100 MB/);
+  });
+  it("matches the file to the kind of lesson", () => {
+    expect(
+      lessonFileProblem({ type: "application/pdf", size: MB }, "video"),
+    ).toMatch(/MP4/);
+    expect(
+      lessonFileProblem({ type: "video/mp4", size: MB }, "document"),
+    ).toMatch(/document/);
+    expect(lessonFileProblem({ type: "video/mp4", size: MB }, "audio")).toMatch(
+      /audio/i,
+    );
+    expect(
+      lessonFileProblem({ type: "video/mp4", size: MB }, "external"),
+    ).toBeNull();
+  });
+  it("refuses types it does not know and empty files", () => {
+    expect(
+      lessonFileProblem({ type: "video/x-matroska", size: MB }, "video"),
+    ).toBeTruthy();
+    expect(
+      lessonFileProblem({ type: "text/html", size: MB }, "document"),
+    ).toBeTruthy();
+    expect(lessonFileProblem({ type: "video/mp4", size: 0 }, "video")).toMatch(
+      /empty/,
+    );
+  });
+});
+
+describe("watch progress", () => {
+  it("credits forward movement, never more than real time at double speed", () => {
+    expect(creditedSeconds(0, 15, 15)).toBe(15);
+    expect(creditedSeconds(100, 130, 15)).toBe(30);
+    expect(creditedSeconds(100, 400, 15)).toBe(32);
+  });
+  it("credits nothing for going back, standing still or a clock that ran backwards", () => {
+    expect(creditedSeconds(100, 90, 15)).toBe(0);
+    expect(creditedSeconds(100, 100, 15)).toBe(0);
+    expect(creditedSeconds(100, 120, -5)).toBe(2);
+  });
+  it("completes a lesson once 90% has been watched", () => {
+    expect(watchedEnough(539, 600)).toBe(false);
+    expect(watchedEnough(540, 600)).toBe(true);
+    expect(watchedEnough(0, 0)).toBe(false);
   });
 });

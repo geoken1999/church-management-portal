@@ -9,7 +9,8 @@ import {
   moveLessonAction,
   moveModuleAction,
   removeLessonFileAction,
-  uploadLessonFileAction,
+  createLessonUploadAction,
+  finalizeLessonUploadAction,
   saveLessonAction,
   saveModuleAction,
   setLessonStatusAction,
@@ -27,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FieldError } from "@/components/auth/FieldError";
 import { ErrorToast } from "@/components/ui/error-toast";
+import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import { RichTextEditor } from "@/components/bible-school/RichTextEditor";
 
 const SELECT_CLASS =
@@ -628,19 +630,43 @@ function LessonForm({
                 type="file"
                 className="max-w-xs"
                 disabled={pending}
-                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.mp3,.m4a,.mp4"
+                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.mp3,.m4a,.mp4,video/mp4"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
+                  e.target.value = "";
                   if (!file) return;
-                  const data = new FormData();
-                  data.set("organizationId", organizationId);
-                  data.set("courseId", courseId);
-                  data.set("lessonId", lesson.id);
-                  data.set("file", file);
                   setError(null);
                   startTransition(async () => {
-                    const result = await uploadLessonFileAction(data);
-                    if (result.error) setError(result.error);
+                    // The file goes from here straight to storage, so large videos don't pass through the server.
+                    const start = await createLessonUploadAction(
+                      organizationId,
+                      courseId,
+                      lesson.id,
+                      { name: file.name, type: file.type, size: file.size },
+                    );
+                    if (start.error || !start.path || !start.token) {
+                      setError(start.error ?? "Couldn't start the upload.");
+                      return;
+                    }
+                    const { error: uploadError } = await createBrowserClient()
+                      .storage.from("lms-lesson-files")
+                      .uploadToSignedUrl(start.path, start.token, file, {
+                        contentType: file.type,
+                      });
+                    if (uploadError) {
+                      setError(
+                        "The upload failed. Check your connection and try again.",
+                      );
+                      return;
+                    }
+                    const done = await finalizeLessonUploadAction(
+                      organizationId,
+                      courseId,
+                      lesson.id,
+                      start.path,
+                      file.name,
+                    );
+                    if (done.error) setError(done.error);
                     else setFileName(file.name);
                   });
                 }}

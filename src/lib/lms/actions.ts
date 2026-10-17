@@ -8,9 +8,9 @@ import { logLmsEvent } from "@/lib/lms/audit";
 import { sanitizeLessonHtml } from "@/lib/lms/sanitize";
 import { LMS_BASE_PATH, type EnrollmentAction } from "@/lib/lms/constants";
 import {
-  LESSON_FILE_MAX_BYTES,
-  LESSON_FILE_TYPES,
+  LESSON_FILE_RULES,
   lessonDeletable,
+  lessonFileProblem,
 } from "@/lib/lms/rules";
 import {
   hasErrors,
@@ -989,20 +989,24 @@ export async function decideEnrollmentAction(
 
 const LESSON_BUCKET = "lms-lesson-files";
 
-// Attaches a private file to a lesson. Students never get the storage path: the server hands out a
-// short-lived link after checking that they may open the lesson (/api/mobile/lms/lesson-file).
-export async function uploadLessonFileAction(
-  formData: FormData,
-): Promise<LmsResult> {
-  const organizationId = String(formData.get("organizationId") ?? "");
-  const courseId = String(formData.get("courseId") ?? "");
-  const lessonId = String(formData.get("lessonId") ?? "");
+// Uploading a lesson file takes two steps, so that large videos go from the browser straight to storage
+// instead of through the server: (1) the server checks the lesson, the file type and size and the
+// church's storage, and returns a one-time upload link for a path it chose; (2) after the upload the
+// server checks the object really is there and within its size limit, then attaches it. Students never
+// get the storage path: the server hands out a short-lived link after checking that they may open the
+// lesson (/api/mobile/lms/lesson-file).
+export async function createLessonUploadAction(
+  organizationId: string,
+  courseId: string,
+  lessonId: string,
+  file: { name: string; type: string; size: number },
+): Promise<LmsResult & { path?: string; token?: string }> {
   const access = await authorizeCurriculum(organizationId, courseId);
   if (!access.ok) return fail(access.message);
   const admin = createAdminClient();
   const { data: lesson } = await admin
     .from("lms_lessons")
-    .select("file_path, content_type")
+    .select("content_type")
     .eq("id", lessonId)
     .eq("course_id", courseId)
     .eq("organization_id", organizationId)
@@ -1010,36 +1014,70 @@ export async function uploadLessonFileAction(
   if (!lesson) return fail("Save the lesson first, then attach a file to it.");
   if (lesson.content_type === "text")
     return fail(
-      "A reading lesson has no file. Use a document, audio, video or resource lesson.",
+      "A reading lesson has no file. Use a video, audio, document or resource lesson.",
     );
-  const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0)
-    return fail("Choose a file to upload.");
-  const ext = LESSON_FILE_TYPES[file.type];
-  if (!ext)
-    return fail("Use a PDF, Word, PowerPoint, Excel, MP3, M4A or MP4 file.");
-  if (file.size > LESSON_FILE_MAX_BYTES)
-    return fail("That file is over 25 MB.");
+  const problem = lessonFileProblem(file, lesson.content_type);
+  if (problem) return fail(problem);
   const quota = await checkStorageQuota(organizationId, file.size);
   if (quota) return fail(quota);
 
-  const path = `${organizationId}/${courseId}/${lessonId}-${crypto.randomUUID()}.${ext}`;
-  const { error } = await admin.storage
+  const rule = LESSON_FILE_RULES[file.type];
+  const path = `${organizationId}/${courseId}/${lessonId}-${crypto.randomUUID()}.${rule.ext}`;
+  const { data, error } = await admin.storage
     .from(LESSON_BUCKET)
-    .upload(path, new Uint8Array(await file.arrayBuffer()), {
-      contentType: file.type,
-    });
-  if (error) return fail("Couldn't upload that file. Try again.");
-  const { error: saveError } = await admin
+    .createSignedUploadUrl(path);
+  if (error || !data) return fail("Couldn't start the upload. Try again.");
+  return { success: true, path, token: data.token };
+}
+
+export async function finalizeLessonUploadAction(
+  organizationId: string,
+  courseId: string,
+  lessonId: string,
+  path: string,
+  fileName: string,
+): Promise<LmsResult> {
+  const access = await authorizeCurriculum(organizationId, courseId);
+  if (!access.ok) return fail(access.message);
+  // Only a path this church's server handed out for this very lesson.
+  const prefix = `${organizationId}/${courseId}/${lessonId}-`;
+  if (!path.startsWith(prefix) || path.includes(".."))
+    return fail("That upload isn't valid.");
+  const admin = createAdminClient();
+  const { data: lesson } = await admin
     .from("lms_lessons")
-    .update({ file_path: path, file_name: file.name.slice(0, 200) })
+    .select("file_path")
+    .eq("id", lessonId)
+    .eq("course_id", courseId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (!lesson) return fail("That lesson could not be found.");
+
+  const folder = `${organizationId}/${courseId}`;
+  const base = path.slice(folder.length + 1);
+  const { data: found } = await admin.storage
+    .from(LESSON_BUCKET)
+    .list(folder, { search: base, limit: 5 });
+  const object = (found ?? []).find((o) => o.name === base);
+  if (!object) return fail("The upload didn't finish. Try again.");
+  const ext = base.split(".").pop() ?? "";
+  const rule = Object.values(LESSON_FILE_RULES).find((r) => r.ext === ext);
+  const size = Number((object.metadata as { size?: number } | null)?.size ?? 0);
+  if (!rule || size <= 0 || size > rule.maxBytes) {
+    await admin.storage.from(LESSON_BUCKET).remove([path]);
+    return fail("That file isn't allowed. Check its type and size.");
+  }
+
+  const { error } = await admin
+    .from("lms_lessons")
+    .update({ file_path: path, file_name: fileName.slice(0, 200) })
     .eq("id", lessonId)
     .eq("organization_id", organizationId);
-  if (saveError) {
+  if (error) {
     await admin.storage.from(LESSON_BUCKET).remove([path]);
     return fail("Couldn't save the file. Try again.");
   }
-  if (lesson.file_path)
+  if (lesson.file_path && lesson.file_path !== path)
     await admin.storage.from(LESSON_BUCKET).remove([lesson.file_path]);
   refresh(`/courses/${courseId}`);
   return { success: true };

@@ -180,3 +180,41 @@ describe("0191_lms_learning.sql", () => {
     );
   });
 });
+
+const video = readFileSync(
+  "supabase/migrations/0192_lms_video_progress.sql",
+  "utf8",
+);
+
+describe("0192_lms_video_progress.sql", () => {
+  it("only lets signed-in users report playback, and takes no member id", () => {
+    expect(video).toMatch(
+      /revoke all on function public\.lms_save_playback\(uuid, integer, integer\) from public, anon;/,
+    );
+    expect(video).toMatch(
+      /grant execute on function public\.lms_save_playback\(uuid, integer, integer\) to authenticated;/,
+    );
+    const start = video.indexOf(
+      "create or replace function public.lms_save_playback(",
+    );
+    expect(video.slice(start, video.indexOf("returns", start))).not.toMatch(
+      /member/i,
+    );
+  });
+  it("credits only real watching: bounded by elapsed time, and completes through the shared function", () => {
+    expect(video).toContain("floor(v_elapsed * 2)");
+    expect(video).toContain("public.lms_complete_lesson(p_lesson, true)");
+  });
+  it("keeps the lesson bucket private while allowing large videos of known types only", () => {
+    expect(video).toMatch(/file_size_limit = 524288000/);
+    expect(video).toContain("'video/mp4'");
+    expect(video).not.toMatch(/public\s*=\s*true/);
+  });
+  it("is additive", () => {
+    const live = video
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("--"))
+      .join("\n");
+    expect(live).not.toMatch(/drop table|drop column|truncate|delete from/i);
+  });
+});

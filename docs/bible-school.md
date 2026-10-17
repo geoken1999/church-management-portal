@@ -132,6 +132,25 @@ church has a published course visible to the member.
 - Attach a private file to a lesson (PDF, Word, PowerPoint, Excel, MP3, M4A, MP4; up to 25 MB; counts against storage).
 - A course's Enrollments tab and the Enrollments page show each student's progress (required lessons done).
 
+### Videos and audio inside the app (migration `0192_lms_video_progress.sql`)
+
+- **Uploading.** In a video, audio, document or resource lesson, save the lesson, then upload a file: MP4 video up to
+  500 MB, MP3 / M4A audio up to 100 MB, PDF / Word / PowerPoint / Excel up to 25 MB. The file goes from the browser
+  straight to the private bucket with a one-time upload link the server issued for a path it chose; the server then checks
+  the object exists and is within its limit before attaching it. External links still work as before.
+- **Playing.** The member app streams the file from storage with a 5-minute signed link (the platform seeks and buffers
+  as it plays; it does not download the whole file first). Controls: play / pause, back / forward 10 s, speed (0.75x to 2x),
+  seek bar, and resume where the member stopped.
+- **Tracking.** The app reports its position about every 15 s, on pause, and when the member leaves the lesson
+  (`lms_save_playback`). The server counts *watched* seconds: forward movement of the position, never more than the real
+  time that passed at up to double speed, so skipping ahead or replaying a section adds nothing. At 90% watched the
+  lesson completes by itself (the same function as "Mark as complete", so course completion follows the normal rule).
+  Links to YouTube or Vimeo cannot be tracked; they only support "Mark as complete".
+- **Limits you should know.** Supabase has a project-wide upload limit (Dashboard → Storage → Settings) that must be at
+  least as large as your biggest video. Files are stored and served as uploaded: there is no transcoding or adaptive
+  bitrate, so upload H.264 MP4 at 720p or lower. For large audiences or HLS, move video to a streaming host later.
+  Playback bandwidth is storage egress and counts against the Supabase plan.
+
 ### Phase 2 acceptance checklist (staging, as a member signed in on the app)
 
 1. Bible School at *Testing*: the card is hidden. Move it to Beta: the card appears for a church with a published course.
@@ -139,6 +158,7 @@ church has a published course visible to the member.
 3. Open lessons, mark done, kill and reopen the app on another phone: progress is the same.
 4. Finish all required lessons: the course shows Completed; add a new required lesson: it stays Completed.
 5. Open a file lesson: the file opens; the same link requested after unenrolling is refused.
+5a. Upload a 100 MB MP4 to a video lesson from the dashboard; play it in the app, close it halfway, reopen: it resumes; watch to 90%: the lesson completes by itself.
 6. A member of another church sees nothing; a non-enrolled member cannot open a non-preview lesson.
 
 ## 4. Tests

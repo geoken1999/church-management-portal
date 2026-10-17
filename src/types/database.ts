@@ -1246,6 +1246,37 @@ export type LmsLessonProgress = {
   last_opened_at: string;
 };
 
+export type LmsLiveSession = {
+  id: string;
+  organization_id: string;
+  course_id: string;
+  meeting_id: string | null;
+  title: string;
+  description: string | null;
+  mode: "video" | "audio";
+  starts_at: string;
+  ends_at: string;
+  status: "scheduled" | "cancelled";
+  recording_url: string | null;
+  notes: string | null;
+  announced_at: string | null;
+  reminder_sent_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LmsSessionAttendance = {
+  session_id: string;
+  member_id: string;
+  organization_id: string;
+  status: "present" | "absent" | "excused";
+  source: "app" | "manual";
+  first_joined_at: string | null;
+  marked_by: string | null;
+  updated_at: string;
+};
+
 export type LmsAuditEvent = {
   id: number;
   organization_id: string;
@@ -3674,6 +3705,18 @@ export type Database = {
         Row: LmsLessonProgress;
         Insert: Partial<LmsLessonProgress> & Pick<LmsLessonProgress, "organization_id" | "enrollment_id" | "lesson_id" | "member_id">;
         Update: Partial<LmsLessonProgress>;
+        Relationships: [];
+      };
+      lms_live_sessions: {
+        Row: LmsLiveSession;
+        Insert: Partial<LmsLiveSession> & Pick<LmsLiveSession, "organization_id" | "course_id" | "title" | "starts_at" | "ends_at">;
+        Update: Partial<LmsLiveSession>;
+        Relationships: [];
+      };
+      lms_session_attendance: {
+        Row: LmsSessionAttendance;
+        Insert: Partial<LmsSessionAttendance> & Pick<LmsSessionAttendance, "session_id" | "member_id" | "organization_id">;
+        Update: Partial<LmsSessionAttendance>;
         Relationships: [];
       };
       lms_audit_events: {

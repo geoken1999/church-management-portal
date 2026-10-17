@@ -11,6 +11,7 @@ import {
   getCurriculum,
   getEnrollments,
   getInstructors,
+  getSessions,
   getMemberOptions,
   getPrerequisites,
   getTeamLogins,
@@ -21,6 +22,8 @@ import { CourseDetailsPanel } from "@/components/bible-school/CourseDetailsPanel
 import { CurriculumBuilder } from "@/components/bible-school/CurriculumBuilder";
 import { InstructorsPanel } from "@/components/bible-school/InstructorsPanel";
 import { EnrollmentsPanel } from "@/components/bible-school/EnrollmentsPanel";
+import { LiveClassesPanel } from "@/components/bible-school/LiveClassesPanel";
+import { DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -35,6 +38,7 @@ const TABS = [
   { key: "details", label: "Details" },
   { key: "instructors", label: "Instructors" },
   { key: "enrollments", label: "Enrollments" },
+  { key: "live", label: "Live classes" },
 ] as const;
 
 export default async function CoursePage({
@@ -149,6 +153,16 @@ export default async function CoursePage({
           }
           logins={canManageSchool ? await getTeamLogins(organizationId) : []}
           canManage={canManageSchool}
+        />
+      )}
+
+      {tab === "live" && (
+        <LiveClassesPanel
+          organizationId={organizationId}
+          courseId={id}
+          sessions={await getSessions(organizationId, { courseId: id })}
+          timeZone={membership.organization.timezone || DEFAULT_TIMEZONE}
+          canSchedule={canEditCurriculum}
         />
       )}
 

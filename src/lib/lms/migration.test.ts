@@ -218,3 +218,66 @@ describe("0192_lms_video_progress.sql", () => {
     expect(live).not.toMatch(/drop table|drop column|truncate|delete from/i);
   });
 });
+
+const live = readFileSync(
+  "supabase/migrations/0193_lms_live_classes.sql",
+  "utf8",
+);
+
+describe("0193_lms_live_classes.sql", () => {
+  it.each(["lms_live_sessions", "lms_session_attendance"])(
+    "%s has row level security and a church id",
+    (name) => {
+      expect(live).toContain(
+        `alter table public.${name} enable row level security;`,
+      );
+      const start = live.indexOf(`create table if not exists public.${name} (`);
+      expect(live.slice(start, live.indexOf("\n);", start))).toContain(
+        "organization_id uuid not null references public.organizations",
+      );
+    },
+  );
+
+  it("gives students no write policy", () => {
+    const studentPolicies = live
+      .split("\n")
+      .filter((line) => /create policy "Students can/.test(line));
+    expect(studentPolicies.length).toBeGreaterThan(0);
+    for (const policy of studentPolicies)
+      expect(policy).not.toMatch(/for (insert|update|delete|all)/);
+  });
+
+  it.each(["lms_my_sessions", "lms_join_session"])(
+    "%s is closed to anonymous callers, open to signed-in users, and takes no member id",
+    (fn) => {
+      expect(live).toMatch(
+        new RegExp(
+          `revoke all on function public\\.${fn}\\([^)]*\\) from public, anon;`,
+        ),
+      );
+      expect(live).toMatch(
+        new RegExp(
+          `grant execute on function public\\.${fn}\\([^)]*\\) to authenticated;`,
+        ),
+      );
+      const start = live.indexOf(`create or replace function public.${fn}(`);
+      expect(live.slice(start, live.indexOf("returns", start))).not.toMatch(
+        /member/i,
+      );
+    },
+  );
+
+  it("only opens a class to enrolled students within its window", () => {
+    expect(live).toContain("e.status in ('approved', 'active', 'completed')");
+    expect(live).toContain("interval '15 minutes'");
+    expect(live).toContain("This class was cancelled.");
+  });
+
+  it("is additive", () => {
+    const code = live
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("--"))
+      .join("\n");
+    expect(code).not.toMatch(/drop table|drop column|truncate|delete from/i);
+  });
+});

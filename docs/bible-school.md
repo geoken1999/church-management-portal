@@ -161,6 +161,33 @@ church has a published course visible to the member.
 5a. Upload a 100 MB MP4 to a video lesson from the dashboard; play it in the app, close it halfway, reopen: it resumes; watch to 90%: the lesson completes by itself.
 6. A member of another church sees nothing; a non-enrolled member cannot open a non-preview lesson.
 
+## 3b. Phase 3, part 1: live classes (migration `0193_lms_live_classes.sql`)
+
+Live classes are held in **K-Connect** rooms (video or audio), reusing the existing meeting, call screen, waiting room
+and plan limits. Nothing about calls was duplicated.
+
+- **Scheduling.** On a course's **Live classes** tab (or by an assigned instructor): title, optional description, start
+  (in the church's time zone), length (15 to 480 minutes), video or audio. Creating a class creates its K-Connect
+  meeting (admission off by default) and tells the course's enrolled students by push (and in their app inbox).
+  The page `/dashboard/bible-school/live-classes` lists every class across courses.
+- **Plan limit.** K-Connect ends a call at the plan's limit (Starter 20 min, Growth 40, Pro none; audio +10). A class
+  longer than that is refused when scheduling, so a class is never cut off silently.
+- **Changes.** Editing the time resets the reminder and notifies students; cancelling removes the room and notifies them.
+- **Joining (students, app).** Bible School → **Live classes** tab. The Join button opens 15 minutes before the start
+  and closes at the end. Joining checks the student is enrolled, records them as **present**, and opens the K-Connect
+  call screen. Attendance means "opened the class from the app"; it is not proof they stayed.
+- **Hosting (teachers, web).** **Start class** opens the K-Connect room. Moderator rights (admit, mute, end) need write
+  access on K-Connect (owners and admins have it); an instructor without it joins as a participant.
+- **Attendance.** Per class: present / absent / excused counts, and a roster where a teacher can set anyone's mark.
+- **Recording.** Added afterwards as an https link; students see "Watch the recording" once the class has ended.
+  KingdomFlow does not record calls itself.
+- **Reminder.** About 10 minutes before the start (5 to 10, depending on the job's 5-minute tick). It needs a one-time
+  setup: run `supabase/setup/lms-class-reminders-cron.sql` in the Supabase SQL editor (with your site address and
+  `CRON_SECRET`). It uses Supabase's scheduler, so it works on any Vercel plan. Without it, students still get the
+  "new class", "moved" and "cancelled" notifications, just not the reminder.
+- **Security.** `lms_my_sessions` and `lms_join_session` take no member id (the member is `auth.uid()`), are closed to
+  anonymous callers, and students have no write access to any live class table.
+
 ## 4. Tests
 
 - `src/lib/lms/lms.test.ts`: validation, the enrollment state machine, capacity, enrollment window, who can manage a course.
@@ -193,6 +220,6 @@ church has a published course visible to the member.
 
 1. **Foundation** (done).
 2. **Learning experience** (done): student portal in the mobile app, catalogue, lesson player, progress, completion rules, secure files.
-3. Teaching operations: live classes (K-Connect), attendance, assignments, submissions, grading, notifications.
+3. Teaching operations: live classes with attendance and notifications (**done**); assignments, submissions, grading (next).
 4. Assessments and certification: quizzes and exams, gradebook, PDF certificates and verification.
 5. Reporting and commercial readiness: dashboards, plan entitlements, usage limits, audit coverage, performance and accessibility review.

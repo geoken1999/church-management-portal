@@ -6,6 +6,7 @@ import type {
   LmsCourseInstructor,
   LmsEnrollment,
   LmsLesson,
+  LmsLiveSession,
   LmsModule,
   LmsProgram,
   LmsSettings,
@@ -546,4 +547,129 @@ export async function getEnrollments(
     page,
     pageCount: Math.max(1, Math.ceil(total / PAGE_SIZE)),
   };
+}
+
+export interface SessionRow extends LmsLiveSession {
+  courseTitle: string;
+  attendance: {
+    present: number;
+    absent: number;
+    excused: number;
+    unmarked: number;
+  };
+  students: number;
+}
+
+// Live classes with their course and attendance counts, soonest first. `courseId` limits it to one
+// course, `onlyCourseIds` to an instructor's own courses.
+export async function getSessions(
+  organizationId: string,
+  options: { courseId?: string; onlyCourseIds?: string[]; limit?: number } = {},
+): Promise<SessionRow[]> {
+  if (options.onlyCourseIds && options.onlyCourseIds.length === 0) return [];
+  const admin = createAdminClient();
+  let query = admin
+    .from("lms_live_sessions")
+    .select("*")
+    .eq("organization_id", organizationId);
+  if (options.courseId) query = query.eq("course_id", options.courseId);
+  if (options.onlyCourseIds)
+    query = query.in("course_id", options.onlyCourseIds);
+  const { data } = await query
+    .order("starts_at", { ascending: false })
+    .limit(options.limit ?? 100);
+  const sessions = (data ?? []) as LmsLiveSession[];
+  if (sessions.length === 0) return [];
+
+  const sessionIds = sessions.map((s) => s.id);
+  const courseIds = [...new Set(sessions.map((s) => s.course_id))];
+  const [{ data: courses }, { data: attendance }, { data: enrollments }] =
+    await Promise.all([
+      admin.from("lms_courses").select("id, title").in("id", courseIds),
+      admin
+        .from("lms_session_attendance")
+        .select("session_id, member_id, status")
+        .in("session_id", sessionIds),
+      admin
+        .from("lms_enrollments")
+        .select("course_id, member_id")
+        .in("course_id", courseIds)
+        .in("status", ["approved", "active", "completed"]),
+    ]);
+
+  return sessions.map((session) => {
+    const students = (enrollments ?? []).filter(
+      (e) => e.course_id === session.course_id,
+    );
+    const marks = new Map(
+      (attendance ?? [])
+        .filter((a) => a.session_id === session.id)
+        .map((a) => [
+          a.member_id,
+          a.status as "present" | "absent" | "excused",
+        ]),
+    );
+    const summary = { present: 0, absent: 0, excused: 0, unmarked: 0 };
+    for (const student of students) {
+      const mark = marks.get(student.member_id);
+      if (mark) summary[mark] += 1;
+      else summary.unmarked += 1;
+    }
+    return {
+      ...session,
+      courseTitle:
+        (courses ?? []).find((c) => c.id === session.course_id)?.title ??
+        "Unknown course",
+      attendance: summary,
+      students: students.length,
+    };
+  });
+}
+
+export interface AttendanceRosterRow {
+  memberId: string;
+  name: string;
+  status: "present" | "absent" | "excused" | null;
+  source: "app" | "manual" | null;
+}
+
+// Every student of the session's course with their mark (null = not marked yet).
+export async function getAttendanceRoster(
+  organizationId: string,
+  sessionId: string,
+): Promise<AttendanceRosterRow[]> {
+  const admin = createAdminClient();
+  const { data: session } = await admin
+    .from("lms_live_sessions")
+    .select("course_id")
+    .eq("id", sessionId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (!session) return [];
+  const [{ data: enrollments }, { data: marks }] = await Promise.all([
+    admin
+      .from("lms_enrollments")
+      .select("member_id")
+      .eq("course_id", session.course_id)
+      .eq("organization_id", organizationId)
+      .in("status", ["approved", "active", "completed"]),
+    admin
+      .from("lms_session_attendance")
+      .select("member_id, status, source")
+      .eq("session_id", sessionId),
+  ]);
+  const ids = [...new Set((enrollments ?? []).map((e) => e.member_id))];
+  if (ids.length === 0) return [];
+  const names = await memberNames(ids);
+  return ids
+    .map((id) => {
+      const mark = (marks ?? []).find((m) => m.member_id === id);
+      return {
+        memberId: id,
+        name: names.get(id) ?? "Unknown",
+        status: (mark?.status as AttendanceRosterRow["status"]) ?? null,
+        source: (mark?.source as AttendanceRosterRow["source"]) ?? null,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 }

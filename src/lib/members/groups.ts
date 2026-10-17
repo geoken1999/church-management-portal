@@ -15,12 +15,19 @@ const GROUP_SOURCES = [
   { key: "committee", label: "Committee", table: "committee_members" },
 ] as const;
 
-export async function getMemberGroups(organizationId: string): Promise<MemberGroup[]> {
+export async function getMemberGroups(
+  organizationId: string,
+): Promise<MemberGroup[]> {
   const supabase = await createClient();
   const results = await Promise.all(
     GROUP_SOURCES.map(async (source) => {
-      const { data } = await supabase.from(source.table).select("member_id").eq("organization_id", organizationId);
-      const memberIds = [...new Set((data ?? []).map((row) => row.member_id as string))];
+      const { data } = await supabase
+        .from(source.table)
+        .select("member_id")
+        .eq("organization_id", organizationId);
+      const memberIds = [
+        ...new Set((data ?? []).map((row) => row.member_id as string)),
+      ];
       return { key: source.key, label: source.label, memberIds };
     }),
   );

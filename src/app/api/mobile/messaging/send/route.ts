@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireMobileTabAccess } from "@/lib/mobile/staff-auth";
-import { parseAudience, resolveAudience, type Channel } from "@/lib/messaging/audience";
+import {
+  parseAudience,
+  resolveAudience,
+  type Channel,
+} from "@/lib/messaging/audience";
 import { plainTextToHtml } from "@/lib/messaging/plain-to-html";
 import { sendSmsCampaign } from "@/lib/sms/send";
 import { sendEmailCampaign } from "@/lib/email/send";
@@ -16,21 +20,43 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "Invalid request." },
+      { status: 400 },
+    );
   }
-  const text = (key: string) => (typeof body[key] === "string" ? (body[key] as string) : "");
+  const text = (key: string) =>
+    typeof body[key] === "string" ? (body[key] as string) : "";
   const organizationId = text("organizationId");
   const channel = body.channel as Channel;
   if (channel !== "sms" && channel !== "email" && channel !== "whatsapp") {
-    return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "Invalid request." },
+      { status: 400 },
+    );
   }
 
-  const auth = await requireMobileTabAccess(request, organizationId, channel, "write");
+  const auth = await requireMobileTabAccess(
+    request,
+    organizationId,
+    channel,
+    "write",
+  );
   if (auth instanceof NextResponse) return auth;
 
-  const people = await resolveAudience(organizationId, channel, parseAudience(body.audience));
+  const people = await resolveAudience(
+    organizationId,
+    channel,
+    parseAudience(body.audience),
+  );
   if (people.length === 0) {
-    return NextResponse.json({ ok: false, error: channel === "email" ? "Nobody in that audience has an email address." : "Nobody in that audience has a phone number." });
+    return NextResponse.json({
+      ok: false,
+      error:
+        channel === "email"
+          ? "Nobody in that audience has an email address."
+          : "Nobody in that audience has a phone number.",
+    });
   }
 
   const admin = createAdminClient();
@@ -40,13 +66,24 @@ export async function POST(request: Request) {
       organizationId,
       userId: auth.userId,
       body: text("body"),
-      rawRecipients: people.map((p) => ({ phone: p.phone, countryCode: p.countryCode })),
+      rawRecipients: people.map((p) => ({
+        phone: p.phone,
+        countryCode: p.countryCode,
+      })),
     });
-    return NextResponse.json(result.error ? { ok: false, error: result.error } : { ok: true, sent: result.sentCount, failed: result.failedCount });
+    return NextResponse.json(
+      result.error
+        ? { ok: false, error: result.error }
+        : { ok: true, sent: result.sentCount, failed: result.failedCount },
+    );
   }
 
   if (channel === "email") {
-    const { data: org } = await admin.from("organizations").select("name").eq("id", organizationId).maybeSingle();
+    const { data: org } = await admin
+      .from("organizations")
+      .select("name")
+      .eq("id", organizationId)
+      .maybeSingle();
     const { data: userData } = await admin.auth.admin.getUserById(auth.userId);
     const result = await sendEmailCampaign({
       organizationId,
@@ -57,7 +94,11 @@ export async function POST(request: Request) {
       html: plainTextToHtml(text("body")),
       rawRecipients: people.map((p) => p.email),
     });
-    return NextResponse.json(result.error ? { ok: false, error: result.error } : { ok: true, sent: result.sentCount, failed: result.failedCount });
+    return NextResponse.json(
+      result.error
+        ? { ok: false, error: result.error }
+        : { ok: true, sent: result.sentCount, failed: result.failedCount },
+    );
   }
 
   const result = await sendWhatsAppCampaign({
@@ -65,9 +106,20 @@ export async function POST(request: Request) {
     userId: auth.userId,
     templateId: text("templateId"),
     specsInput: body.placeholderSpecs ?? [],
-    rawRecipients: people.map((p) => ({ phone: p.phone, countryCode: p.countryCode, memberId: p.id })),
+    rawRecipients: people.map((p) => ({
+      phone: p.phone,
+      countryCode: p.countryCode,
+      memberId: p.id,
+    })),
   });
   return NextResponse.json(
-    result.error ? { ok: false, error: result.error, skipped: result.skippedCount } : { ok: true, sent: result.sentCount, failed: result.failedCount, skipped: result.skippedCount },
+    result.error
+      ? { ok: false, error: result.error, skipped: result.skippedCount }
+      : {
+          ok: true,
+          sent: result.sentCount,
+          failed: result.failedCount,
+          skipped: result.skippedCount,
+        },
   );
 }

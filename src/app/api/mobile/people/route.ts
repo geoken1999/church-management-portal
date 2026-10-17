@@ -27,31 +27,56 @@ import {
 
 // The staff mobile app's Leaders, Youth and Families changes. The same
 // permissions (per tab) and rules as the web pages.
-const TAB_FOR_KIND: Record<string, TabKey> = { leader: "leaders", youth: "youth", family: "families", family_member: "families", committee: "committee", volunteer: "volunteers" };
+const TAB_FOR_KIND: Record<string, TabKey> = {
+  leader: "leaders",
+  youth: "youth",
+  family: "families",
+  family_member: "families",
+  committee: "committee",
+  volunteer: "volunteers",
+};
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "Invalid request." },
+      { status: 400 },
+    );
   }
-  const text = (key: string) => (typeof body[key] === "string" ? (body[key] as string) : "");
+  const text = (key: string) =>
+    typeof body[key] === "string" ? (body[key] as string) : "";
   const organizationId = text("organizationId");
   const kind = text("kind");
   const action = text("action");
   const id = text("id");
 
   const tab = TAB_FOR_KIND[kind];
-  if (!tab) return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
+  if (!tab)
+    return NextResponse.json(
+      { ok: false, error: "Invalid request." },
+      { status: 400 },
+    );
   // Looking up a scanned ID card only needs to see volunteers; verifying changes one.
-  const level = action === "delete" ? "delete" : action === "lookup" ? "read" : "write";
-  const auth = await requireMobileTabAccess(request, organizationId, tab, level);
+  const level =
+    action === "delete" ? "delete" : action === "lookup" ? "read" : "write";
+  const auth = await requireMobileTabAccess(
+    request,
+    organizationId,
+    tab,
+    level,
+  );
   if (auth instanceof NextResponse) return auth;
 
   let result: PeopleResult = { ok: false, error: "Invalid request." };
   const needsId = action === "update" || action === "delete";
-  if (needsId && !id) return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
+  if (needsId && !id)
+    return NextResponse.json(
+      { ok: false, error: "Invalid request." },
+      { status: 400 },
+    );
 
   switch (`${kind}:${action}`) {
     case "leader:create":
@@ -82,7 +107,11 @@ export async function POST(request: Request) {
       result = await deleteFamilyForMobile(organizationId, id);
       break;
     case "family_member:create":
-      result = await addFamilyMemberForMobile(organizationId, text("familyId"), body);
+      result = await addFamilyMemberForMobile(
+        organizationId,
+        text("familyId"),
+        body,
+      );
       break;
     case "family_member:update":
       result = await updateFamilyMemberForMobile(organizationId, id, body);
@@ -110,11 +139,22 @@ export async function POST(request: Request) {
       break;
     case "volunteer:verify":
     case "volunteer:unverify":
-      result = id ? await setVolunteerVerifiedForMobile(organizationId, id, auth.userId, action === "verify") : result;
+      result = id
+        ? await setVolunteerVerifiedForMobile(
+            organizationId,
+            id,
+            auth.userId,
+            action === "verify",
+          )
+        : result;
       break;
     case "volunteer:delete":
       result = await deleteVolunteerForMobile(organizationId, id);
       break;
   }
-  return NextResponse.json(result.ok ? { ok: true, id: result.id, data: result.data } : { ok: false, error: result.error });
+  return NextResponse.json(
+    result.ok
+      ? { ok: true, id: result.id, data: result.data }
+      : { ok: false, error: result.error },
+  );
 }

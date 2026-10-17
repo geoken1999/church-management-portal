@@ -13,6 +13,8 @@ export interface MemberOrgMatch {
   organizationName: string;
   firstName: string;
   lastName: string;
+  /** "student" for someone from outside the church who takes Bible School courses; else "member". */
+  kind: "member" | "student";
 }
 
 // Shared by both mobile member-auth routes — check-phone calls this before
@@ -25,18 +27,24 @@ export interface MemberOrgMatch {
 // caller decides what "more than one" means (an ambiguous match is
 // refused the same way routing.ts refuses one, rather than guessing which
 // church this signs the person into).
-export async function matchMemberOrgsByPhone(phone: string): Promise<MemberOrgMatch[]> {
+export async function matchMemberOrgsByPhone(
+  phone: string,
+): Promise<MemberOrgMatch[]> {
   const tail = nationalTail(phone);
   if (tail.length !== 10) return [];
 
   const admin = createAdminClient();
   const { data: candidates } = await admin
     .from("members")
-    .select("id, organization_id, phone, first_name, last_name, status, organizations(name)")
+    .select(
+      "id, organization_id, phone, first_name, last_name, status, organizations(name)",
+    )
     .like("phone", `%${tail}`)
-    .eq("status", "active");
+    .in("status", ["active", "student"]);
 
-  const matches = (candidates ?? []).filter((m) => m.phone && isSameNumber(m.phone, phone));
+  const matches = (candidates ?? []).filter(
+    (m) => m.phone && isSameNumber(m.phone, phone),
+  );
 
   return matches.map((m) => ({
     memberId: m.id,
@@ -44,5 +52,6 @@ export async function matchMemberOrgsByPhone(phone: string): Promise<MemberOrgMa
     organizationName: (m.organizations as { name: string } | null)?.name ?? "",
     firstName: m.first_name,
     lastName: m.last_name,
+    kind: m.status === "student" ? "student" : "member",
   }));
 }

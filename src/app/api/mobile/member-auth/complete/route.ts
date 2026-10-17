@@ -12,22 +12,33 @@ import { logPlatformEvent } from "@/lib/platform-events/log";
 // but then actually verify an OTP sent to a different one.
 export async function POST(request: Request) {
   const authHeader = request.headers.get("authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : null;
+  const token = authHeader.startsWith("Bearer ")
+    ? authHeader.slice("Bearer ".length)
+    : null;
   if (!token) {
-    return NextResponse.json({ ok: false, error: "Missing session." }, { status: 401 });
+    return NextResponse.json(
+      { ok: false, error: "Missing session." },
+      { status: 401 },
+    );
   }
 
   const admin = createAdminClient();
   const { data: userData, error: userError } = await admin.auth.getUser(token);
   if (userError || !userData.user) {
-    return NextResponse.json({ ok: false, error: "That session could not be verified." }, { status: 401 });
+    return NextResponse.json(
+      { ok: false, error: "That session could not be verified." },
+      { status: 401 },
+    );
   }
 
   const verifiedPhone = userData.user.phone;
   if (!verifiedPhone) {
     // A session from the Team (email/password) login flow has no phone
     // claim at all — this route only ever applies to a phone-OTP session.
-    return NextResponse.json({ ok: false, error: "This isn't a phone sign-in session." }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "This isn't a phone sign-in session." },
+      { status: 400 },
+    );
   }
 
   const matches = await matchMemberOrgsByPhone(verifiedPhone);
@@ -60,7 +71,14 @@ export async function POST(request: Request) {
 
   if (updateError) {
     console.error("members.auth_user_id link failed:", updateError.message);
-    return NextResponse.json({ ok: false, error: "Signed in, but couldn't finish setting up your account. Please try again." }, { status: 500 });
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          "Signed in, but couldn't finish setting up your account. Please try again.",
+      },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({
@@ -70,5 +88,6 @@ export async function POST(request: Request) {
     organizationName: match.organizationName,
     firstName: match.firstName,
     lastName: match.lastName,
+    kind: match.kind,
   });
 }

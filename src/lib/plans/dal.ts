@@ -559,7 +559,9 @@ export async function checkMemberQuota(
   const { count } = await supabase
     .from("members")
     .select("id", { count: "exact", head: true })
-    .eq("organization_id", organizationId);
+    .eq("organization_id", organizationId)
+    // Bible School students are not church members and don't use up the member limit.
+    .neq("status", "student");
   if ((count ?? 0) >= plan.memberLimit) {
     return `Your ${plan.name} plan allows up to ${plan.memberLimit.toLocaleString()} members. Upgrade your plan to add more.`;
   }

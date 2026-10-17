@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/dal";
-import { buildMemberTemplate, parseMemberSpreadsheet } from "@/lib/members/excel";
+import {
+  buildMemberTemplate,
+  parseMemberSpreadsheet,
+} from "@/lib/members/excel";
 
 const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
 
@@ -13,19 +16,29 @@ export interface DownloadTemplateResult {
   filename?: string;
 }
 
-export async function downloadMemberTemplate(organizationId: string): Promise<DownloadTemplateResult> {
+export async function downloadMemberTemplate(
+  organizationId: string,
+): Promise<DownloadTemplateResult> {
   await requireUser();
 
   const supabase = await createClient();
-  const [{ data: definitions }, { data: branches }, { data: organization }] = await Promise.all([
-    supabase
-      .from("member_field_definitions")
-      .select("*")
-      .eq("organization_id", organizationId)
-      .order("sort_order", { ascending: true }),
-    supabase.from("branches").select("*").eq("organization_id", organizationId),
-    supabase.from("organizations").select("slug").eq("id", organizationId).single(),
-  ]);
+  const [{ data: definitions }, { data: branches }, { data: organization }] =
+    await Promise.all([
+      supabase
+        .from("member_field_definitions")
+        .select("*")
+        .eq("organization_id", organizationId)
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("branches")
+        .select("*")
+        .eq("organization_id", organizationId),
+      supabase
+        .from("organizations")
+        .select("slug")
+        .eq("id", organizationId)
+        .single(),
+    ]);
 
   const bytes = buildMemberTemplate(definitions ?? [], branches ?? []);
   const base64 = Buffer.from(bytes).toString("base64");
@@ -40,7 +53,10 @@ export interface BulkImportResult {
   rowErrors?: { row: number; message: string }[];
 }
 
-export async function bulkImportMembers(organizationId: string, formData: FormData): Promise<BulkImportResult> {
+export async function bulkImportMembers(
+  organizationId: string,
+  formData: FormData,
+): Promise<BulkImportResult> {
   const user = await requireUser();
 
   const file = formData.get("file");
@@ -53,7 +69,10 @@ export async function bulkImportMembers(organizationId: string, formData: FormDa
 
   const supabase = await createClient();
   const [{ data: definitions }, { data: branches }] = await Promise.all([
-    supabase.from("member_field_definitions").select("*").eq("organization_id", organizationId),
+    supabase
+      .from("member_field_definitions")
+      .select("*")
+      .eq("organization_id", organizationId),
     supabase.from("branches").select("*").eq("organization_id", organizationId),
   ]);
 
@@ -62,7 +81,10 @@ export async function bulkImportMembers(organizationId: string, formData: FormDa
     const bytes = await file.arrayBuffer();
     parsed = parseMemberSpreadsheet(bytes, definitions ?? [], branches ?? []);
   } catch {
-    return { error: "Couldn't read that file. Make sure it's a valid .xlsx file exported from the template." };
+    return {
+      error:
+        "Couldn't read that file. Make sure it's a valid .xlsx file exported from the template.",
+    };
   }
 
   if (parsed.rows.length === 0 && parsed.errors.length === 0) {
@@ -80,7 +102,10 @@ export async function bulkImportMembers(organizationId: string, formData: FormDa
   // batch — the roster is small enough that N inserts is not a real cost.
   for (const row of parsed.rows) {
     if (row.phone && seenPhones.has(row.phone)) {
-      rowErrors.push({ row: row.rowNumber, message: "This phone number is used by another row in this file." });
+      rowErrors.push({
+        row: row.rowNumber,
+        message: "This phone number is used by another row in this file.",
+      });
       continue;
     }
 

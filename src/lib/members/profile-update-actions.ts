@@ -17,23 +17,35 @@ const MEMBERS_PATH = "/dashboard/members";
 // migration 0123), stricter than the "write" tab-permission bar most
 // other members actions use, since this changes another person's
 // identity data on their behalf.
-async function reviewRequest(requestId: string, decision: Exclude<MemberProfileUpdateRequestStatus, "pending">): Promise<void> {
+async function reviewRequest(
+  requestId: string,
+  decision: Exclude<MemberProfileUpdateRequestStatus, "pending">,
+): Promise<void> {
   const user = await requireUser();
   const membership = await requireOrganization();
   if (membership.role !== "owner" && membership.role !== "admin") return;
 
-  await reviewProfileUpdateRequest({ requestId, organizationId: membership.organization.id, reviewerId: user.id, decision });
+  await reviewProfileUpdateRequest({
+    requestId,
+    organizationId: membership.organization.id,
+    reviewerId: user.id,
+    decision,
+  });
 
   revalidatePath(MEMBERS_PATH);
 }
 
-export async function approveMemberProfileUpdateRequest(formData: FormData): Promise<void> {
+export async function approveMemberProfileUpdateRequest(
+  formData: FormData,
+): Promise<void> {
   const requestId = String(formData.get("requestId") ?? "");
   if (!requestId) return;
   await reviewRequest(requestId, "approved");
 }
 
-export async function rejectMemberProfileUpdateRequest(formData: FormData): Promise<void> {
+export async function rejectMemberProfileUpdateRequest(
+  formData: FormData,
+): Promise<void> {
   const requestId = String(formData.get("requestId") ?? "");
   if (!requestId) return;
   await reviewRequest(requestId, "rejected");

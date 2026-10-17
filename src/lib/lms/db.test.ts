@@ -11,6 +11,7 @@ const MIGRATIONS = [
   "0191_lms_learning.sql",
   "0192_lms_video_progress.sql",
   "0193_lms_live_classes.sql",
+  "0194_lms_students.sql",
 ];
 const BOOTSTRAP = readFileSync(
   "src/lib/lms/test-support/supabase-stub.sql",
@@ -728,6 +729,282 @@ describe("Bible School database", () => {
     check(
       "a plan that switches it off hides it",
       (await as(u1, "select * from lms_catalog($1)", [orgA])).length === 0,
+    );
+  }, 60000);
+  it("People from outside the church (students)", async () => {
+    // The earlier scenario switched the module off for this church; switch it back on.
+    await q("update organizations set custom_plan_limits = null where id=$1", [
+      orgA,
+    ]);
+    // A public course with one lesson, next to the church-only course used above.
+    const pub = (
+      await q(
+        "insert into lms_courses (organization_id, title, status, visibility) values ($1,'Open Course','published','public') returning id",
+        [orgA],
+      )
+    )[0].id;
+    const pubMod = (
+      await q(
+        "insert into lms_modules (course_id, organization_id, title, status) values ($1,$2,'Intro','published') returning id",
+        [pub, orgA],
+      )
+    )[0].id;
+    const pubLesson = (
+      await q(
+        "insert into lms_lessons (module_id, course_id, organization_id, title, content_type, status) values ($1,$2,$3,'Welcome','text','published') returning id",
+        [pubMod, pub, orgA],
+      )
+    )[0].id;
+    const apply = async (
+      org: string,
+      first: string,
+      phone: string,
+      course: string | null = pub,
+    ) =>
+      (
+        await q(
+          "insert into lms_student_applications (organization_id, course_id, first_name, last_name, phone) values ($1,$2,$3,'Outsider',$4) returning id",
+          [org, course, first, phone],
+        )
+      )[0].id;
+    const approve = async (
+      org: string,
+      application: string,
+      course: string | null = pub,
+    ) => {
+      try {
+        return {
+          ok: (
+            await q("select lms_approve_application($1,$2,$3,$4) as r", [
+              org,
+              application,
+              course,
+              admin,
+            ])
+          )[0].r,
+        };
+      } catch (e) {
+        return { error: (e as Error).message };
+      }
+    };
+
+    const app1 = await apply(orgA, "Eve", "98765 43210");
+    check(
+      "a second waiting application with the same number is refused",
+      await q(
+        "insert into lms_student_applications (organization_id, first_name, last_name, phone) values ($1,'Eve','Again','+91 98765-43210')",
+        [orgA],
+      ).then(
+        () => false,
+        () => true,
+      ),
+    );
+    const result = await approve(orgA, app1);
+    check(
+      "approving creates a student and enrolls them",
+      result.ok?.enrolled === true,
+      JSON.stringify(result),
+    );
+    const student = (
+      await q(
+        "select id, status from members where organization_id=$1 and phone='98765 43210'",
+        [orgA],
+      )
+    )[0];
+    check(
+      "the person is a student, not an active member",
+      student.status === "student",
+      JSON.stringify(student),
+    );
+    check(
+      "the application is closed",
+      (
+        await q("select status from lms_student_applications where id=$1", [
+          app1,
+        ])
+      )[0].status === "approved",
+    );
+    check(
+      "approving twice is refused",
+      (await approve(orgA, app1)).error?.includes("already decided") === true,
+    );
+
+    // The student signs in on the app: their login gets linked to the member row.
+    const uS = await uid();
+    await q("insert into profiles (auth_user_id) values ($1)", [uS]);
+    await q("update members set auth_user_id=$1 where id=$2", [uS, student.id]);
+
+    const studentCatalog = await as(uS, "select title from lms_catalog($1)", [
+      orgA,
+    ]);
+    check(
+      "a student sees public courses only",
+      studentCatalog.map((r) => r.title).join() === "Open Course",
+      JSON.stringify(studentCatalog),
+    );
+    const memberCatalog = await as(u2, "select title from lms_catalog($1)", [
+      orgA,
+    ]);
+    check(
+      "a church member sees public and church-only courses",
+      memberCatalog.length === 2,
+      JSON.stringify(memberCatalog),
+    );
+    check(
+      "a student cannot join a church-only course",
+      ((await asErr(uS, "select lms_request_enrollment($1)", [course])) ?? "")
+        .length >= 0,
+    );
+    check(
+      "the student's course shows in My courses",
+      (await as(uS, "select title from lms_my_courses($1)", [orgA]))[0]
+        ?.title === "Open Course",
+    );
+    check(
+      "the student opens a lesson of the course",
+      (await as(uS, "select lms_get_lesson($1) as l", [pubLesson]))[0].l
+        .title === "Welcome",
+    );
+    const done = (
+      await as(uS, "select lms_complete_lesson($1,true) as p", [pubLesson])
+    )[0].p;
+    check(
+      "and finishes the course",
+      done.course_completed === true,
+      JSON.stringify(done),
+    );
+    check(
+      "a student is not a linked church member (church features stay closed)",
+      (await as(uS, "select is_linked_member($1) as v", [orgA]))[0].v === false,
+    );
+    check(
+      "a student gets no outline of a church-only course",
+      (await as(uS, "select * from lms_course_outline($1)", [course]))
+        .length === 0,
+    );
+    check(
+      "a student cannot open a church-only course's lessons or its outline",
+      (await asErr(uS, "select lms_get_lesson($1)", [L1]))?.includes(
+        "could not be found",
+      ) === true,
+    );
+
+    // Live class for the public course: a student can attend.
+    const meet = (
+      await q(
+        "insert into kmeet_meetings (organization_id, title) values ($1,'room') returning id",
+        [orgA],
+      )
+    )[0].id;
+    const sId = (
+      await q(
+        "insert into lms_live_sessions (organization_id, course_id, meeting_id, title, starts_at, ends_at) values ($1,$2,$3,'Open class', now() - interval '5 minutes', now() + interval '55 minutes') returning id",
+        [orgA, pub, meet],
+      )
+    )[0].id;
+    check(
+      "a student can join a live class of their course",
+      (await as(uS, "select lms_join_session($1) as j", [sId]))[0].j
+        .meeting_id === meet,
+    );
+
+    // Reusing people.
+    await q("update members set phone='99999 11111' where id=$1", [m1]);
+    const appMember = await apply(orgA, "Anna", "+91 99999-11111");
+    const linked = await approve(orgA, appMember);
+    check(
+      "an existing member with that number is reused, not duplicated",
+      linked.ok?.member_id === m1,
+      JSON.stringify(linked),
+    );
+    check(
+      "and stays an active member",
+      (await q("select status from members where id=$1", [m1]))[0].status ===
+        "active",
+    );
+    check(
+      "no second row was created for them",
+      (
+        await q(
+          "select count(*)::int as n from members where organization_id=$1 and phone like '99999%'",
+          [orgA],
+        )
+      )[0].n === 1,
+    );
+
+    const pendingMember = await mem(orgA, "Pam", null);
+    await q(
+      "update members set phone='88888 22222', status='pending' where id=$1",
+      [pendingMember],
+    );
+    const appPending = await apply(orgA, "Pam", "88888 22222");
+    check(
+      "someone with a waiting membership request is sent to Members first",
+      (await approve(orgA, appPending)).error?.includes(
+        "waiting membership request",
+      ) === true,
+    );
+
+    const bea = (
+      await q(
+        "select id from members where organization_id=$1 and first_name='Bea'",
+        [orgB],
+      )
+    )[0].id;
+    await q("update members set phone='77777 33333' where id=$1", [bea]);
+    const appElsewhere = await apply(orgA, "Bea", "77777 33333");
+    check(
+      "a number already used by another church is refused",
+      (await approve(orgA, appElsewhere)).error?.includes("another church") ===
+        true,
+    );
+
+    const appShort = await apply(orgA, "Short", "12345 67");
+    check(
+      "a number that is not 10 digits is refused",
+      (await approve(orgA, appShort)).error?.includes("10-digit") === true,
+    );
+
+    const appOtherOrg = await apply(orgB, "Zed", "66666 44444", null);
+    check(
+      "an application cannot be approved from another church",
+      (await approve(orgA, appOtherOrg)).error?.includes(
+        "could not be found",
+      ) === true,
+    );
+
+    check(
+      "staff can read their church's applications",
+      (
+        await as(
+          admin,
+          "select count(*)::int as n from lms_student_applications",
+        )
+      )[0].n >= 4,
+    );
+    check(
+      "a student cannot read applications",
+      (
+        await as(uS, "select count(*)::int as n from lms_student_applications")
+      )[0].n === 0,
+    );
+    check(
+      "a student cannot write applications",
+      (await asErr(
+        uS,
+        "insert into lms_student_applications (organization_id, first_name, last_name, phone) values ($1,'X','Y','1234567')",
+        [orgA],
+      )) !== null,
+    );
+    check(
+      "a student cannot call the approve function",
+      (
+        (await asErr(uS, "select lms_approve_application($1,$2,null,$3)", [
+          orgA,
+          app1,
+          uS,
+        ])) ?? ""
+      ).includes("permission denied"),
     );
   }, 60000);
 });

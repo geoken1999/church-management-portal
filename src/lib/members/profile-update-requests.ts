@@ -9,7 +9,13 @@ import type { Member, MemberProposedChanges } from "@/types/database";
 // are deliberately excluded. phone especially is the member's own login
 // identity (members.auth_user_id, migration 0120), not just a contact
 // field a profile edit should be able to touch.
-export const PROFILE_UPDATE_FIELDS = ["first_name", "last_name", "date_of_birth", "marital_status", "wedding_date"] as const;
+export const PROFILE_UPDATE_FIELDS = [
+  "first_name",
+  "last_name",
+  "date_of_birth",
+  "marital_status",
+  "wedding_date",
+] as const;
 export type ProfileUpdateField = (typeof PROFILE_UPDATE_FIELDS)[number];
 
 export function isProfileUpdateField(key: string): key is ProfileUpdateField {
@@ -19,8 +25,12 @@ export function isProfileUpdateField(key: string): key is ProfileUpdateField {
 // Rejects anything outside PROFILE_UPDATE_FIELDS up front — the caller
 // should show this as a hard error (a well-behaved client never sends
 // these), not a per-field validation message.
-export function rejectDisallowedFields(changes: Record<string, unknown>): string | null {
-  const disallowed = Object.keys(changes).filter((key) => !isProfileUpdateField(key));
+export function rejectDisallowedFields(
+  changes: Record<string, unknown>,
+): string | null {
+  const disallowed = Object.keys(changes).filter(
+    (key) => !isProfileUpdateField(key),
+  );
   if (disallowed.length > 0) {
     return `These fields can't be changed this way: ${disallowed.join(", ")}.`;
   }
@@ -35,27 +45,46 @@ export function rejectDisallowedFields(changes: Record<string, unknown>): string
 // Validated against the MERGED result (current row + proposed changes),
 // since e.g. a wedding_date on its own is only valid relative to whatever
 // date_of_birth and marital_status end up being.
-export function validateProposedChanges(current: Member, changes: MemberProposedChanges): string | null {
+export function validateProposedChanges(
+  current: Member,
+  changes: MemberProposedChanges,
+): string | null {
   const disallowed = rejectDisallowedFields(changes);
   if (disallowed) return disallowed;
 
-  if ("first_name" in changes && (!changes.first_name || changes.first_name.trim().length < 1)) {
+  if (
+    "first_name" in changes &&
+    (!changes.first_name || changes.first_name.trim().length < 1)
+  ) {
     return "First name is required.";
   }
-  if ("last_name" in changes && (!changes.last_name || changes.last_name.trim().length < 1)) {
+  if (
+    "last_name" in changes &&
+    (!changes.last_name || changes.last_name.trim().length < 1)
+  ) {
     return "Last name is required.";
   }
 
-  const dateOfBirth = "date_of_birth" in changes ? changes.date_of_birth : current.date_of_birth;
-  const maritalStatus = "marital_status" in changes ? changes.marital_status : current.marital_status;
-  const weddingDate = "wedding_date" in changes ? changes.wedding_date : current.wedding_date;
+  const dateOfBirth =
+    "date_of_birth" in changes ? changes.date_of_birth : current.date_of_birth;
+  const maritalStatus =
+    "marital_status" in changes
+      ? changes.marital_status
+      : current.marital_status;
+  const weddingDate =
+    "wedding_date" in changes ? changes.wedding_date : current.wedding_date;
   const today = new Date().toISOString().slice(0, 10);
 
   if (dateOfBirth && dateOfBirth > today) {
     return "Date of birth cannot be in the future.";
   }
 
-  if (maritalStatus !== null && maritalStatus !== undefined && maritalStatus !== "married" && maritalStatus !== "unmarried") {
+  if (
+    maritalStatus !== null &&
+    maritalStatus !== undefined &&
+    maritalStatus !== "married" &&
+    maritalStatus !== "unmarried"
+  ) {
     return "Please select a valid marital status.";
   }
 

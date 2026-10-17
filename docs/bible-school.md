@@ -188,6 +188,16 @@ and plan limits. Nothing about calls was duplicated.
 - **Security.** `lms_my_sessions` and `lms_join_session` take no member id (the member is `auth.uid()`), are closed to
   anonymous callers, and students have no write access to any live class table.
 
+## 3c. People from outside the church (migration `0194_lms_students.sql`)
+
+- Open a course to everyone by setting its visibility to **Open to the public**. It then appears on `/bible-school/<church slug>`, where anyone can apply (name, phone, optional email and message). Applications are rate limited and have a honeypot field.
+- The team reviews applications in **Bible School → Applications** (admins only) and approves or rejects them. Approving runs `lms_approve_application`, which creates a member with status `student` (or reuses an existing one), enrols them, and emails them if an address was given.
+- A student signs in to the mobile app with their phone number and sees **only** the Bible School (public courses, their lessons, live classes). Church-only courses are hidden from them.
+- Students are not counted as members: they are left out of the members list, member limit, reports, Aura and platform counts, fees and messaging. They can join live classes they are enrolled in.
+- One phone number belongs to one church. A number already used by an active, pending or student record cannot apply again.
+- Removing a student sets their status to `left`; their progress is kept.
+- Paid courses are not part of this.
+
 ## 4. Tests
 
 - `src/lib/lms/lms.test.ts`: validation, the enrollment state machine, capacity, enrollment window, who can manage a course.

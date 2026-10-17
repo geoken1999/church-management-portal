@@ -3,7 +3,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { pushToTeam } from "@/lib/push/team";
-import { validateMemberBasics, validateMemberDetails } from "@/lib/members/validation";
+import {
+  validateMemberBasics,
+  validateMemberDetails,
+} from "@/lib/members/validation";
 
 export interface PublicJoinFormState {
   error?: string;
@@ -22,10 +25,18 @@ export interface PublicJoinFormState {
 
 // Saves whether the new member agreed to WhatsApp updates, on the pending
 // request the join RPC just created for this phone.
-async function recordJoinWhatsAppChoice(orgSlug: string, phone: string, optIn: boolean): Promise<void> {
+async function recordJoinWhatsAppChoice(
+  orgSlug: string,
+  phone: string,
+  optIn: boolean,
+): Promise<void> {
   try {
     const admin = createAdminClient();
-    const { data: org } = await admin.from("organizations").select("id").eq("slug", orgSlug).maybeSingle();
+    const { data: org } = await admin
+      .from("organizations")
+      .select("id")
+      .eq("slug", orgSlug)
+      .maybeSingle();
     if (!org) return;
     const { data: request } = await admin
       .from("members")
@@ -36,7 +47,11 @@ async function recordJoinWhatsAppChoice(orgSlug: string, phone: string, optIn: b
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (request) await admin.from("members").update({ whatsapp_opt_in: optIn }).eq("id", request.id);
+    if (request)
+      await admin
+        .from("members")
+        .update({ whatsapp_opt_in: optIn })
+        .eq("id", request.id);
   } catch (err) {
     console.error("recordJoinWhatsAppChoice failed:", err);
   }
@@ -63,17 +78,22 @@ export async function submitMemberRequest(
   // a proper field-level error instead of leaning on the RPC's generic one.
   const branchRequired = String(formData.get("__branchCount") ?? "0") !== "0";
 
-  const fieldErrors: NonNullable<PublicJoinFormState["fieldErrors"]> = validateMemberBasics({
-    firstName,
-    lastName,
-    email,
-    phone,
-  });
+  const fieldErrors: NonNullable<PublicJoinFormState["fieldErrors"]> =
+    validateMemberBasics({
+      firstName,
+      lastName,
+      email,
+      phone,
+    });
   // Phone is required on the public form specifically — validateMemberBasics
   // leaves it optional since the admin-side add/edit form still allows it.
   if (!phone) fieldErrors.phone = "Phone number is required.";
-  if (branchRequired && !branchId) fieldErrors.branchId = "Please select a branch.";
-  Object.assign(fieldErrors, validateMemberDetails({ dateOfBirth, maritalStatus, weddingDate }));
+  if (branchRequired && !branchId)
+    fieldErrors.branchId = "Please select a branch.";
+  Object.assign(
+    fieldErrors,
+    validateMemberDetails({ dateOfBirth, maritalStatus, weddingDate }),
+  );
   if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
   }
@@ -106,16 +126,32 @@ export async function submitMemberRequest(
   });
 
   if (error) {
-    return { error: error.message || "Couldn't submit your request. Please try again." };
+    return {
+      error: error.message || "Couldn't submit your request. Please try again.",
+    };
   }
 
   // Their WhatsApp choice goes on the request just created (the join RPC
   // doesn't carry it). Best-effort: the request is already submitted.
-  await recordJoinWhatsAppChoice(orgSlug, phone, formData.get("whatsappOptIn") === "on");
+  await recordJoinWhatsAppChoice(
+    orgSlug,
+    phone,
+    formData.get("whatsappOptIn") === "on",
+  );
 
-  const { data: organization } = await createAdminClient().from("organizations").select("id").eq("slug", orgSlug).maybeSingle();
+  const { data: organization } = await createAdminClient()
+    .from("organizations")
+    .select("id")
+    .eq("slug", orgSlug)
+    .maybeSingle();
   if (organization) {
-    await pushToTeam({ organizationId: organization.id, tab: "members", title: "New membership request", body: `${firstName.trim()} ${lastName.trim()} asked to join.`, link: "/dashboard/members" });
+    await pushToTeam({
+      organizationId: organization.id,
+      tab: "members",
+      title: "New membership request",
+      body: `${firstName.trim()} ${lastName.trim()} asked to join.`,
+      link: "/dashboard/members",
+    });
   }
 
   return { success: true };

@@ -12,25 +12,56 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "Invalid request." },
+      { status: 400 },
+    );
   }
-  const text = (key: string) => (typeof body[key] === "string" ? (body[key] as string).trim() : "");
+  const text = (key: string) =>
+    typeof body[key] === "string" ? (body[key] as string).trim() : "";
   const organizationId = text("organizationId");
-  const auth = await requireMobileTabAccess(request, organizationId, "planner", "write");
+  const auth = await requireMobileTabAccess(
+    request,
+    organizationId,
+    "planner",
+    "write",
+  );
   if (auth instanceof NextResponse) return auth;
 
   const planId = text("planId");
   const memberId = text("memberId");
   const taskText = text("taskText").slice(0, 200);
-  if (!planId || !memberId) return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
+  if (!planId || !memberId)
+    return NextResponse.json(
+      { ok: false, error: "Invalid request." },
+      { status: 400 },
+    );
 
   const admin = createAdminClient();
   const [{ data: plan }, { data: member }] = await Promise.all([
-    admin.from("plans").select("title").eq("id", planId).eq("organization_id", organizationId).maybeSingle(),
-    admin.from("members").select("id").eq("id", memberId).eq("organization_id", organizationId).maybeSingle(),
+    admin
+      .from("plans")
+      .select("title")
+      .eq("id", planId)
+      .eq("organization_id", organizationId)
+      .maybeSingle(),
+    admin
+      .from("members")
+      .select("id")
+      .eq("id", memberId)
+      .eq("organization_id", organizationId)
+      .maybeSingle(),
   ]);
-  if (!plan || !member) return NextResponse.json({ ok: false, error: "That task or person could not be found." }, { status: 404 });
+  if (!plan || !member)
+    return NextResponse.json(
+      { ok: false, error: "That task or person could not be found." },
+      { status: 404 },
+    );
 
-  await notifyMember(memberId, "New task assigned to you", `${taskText}${plan.title ? ` (${plan.title})` : ""}`);
+  await notifyMember(
+    memberId,
+    "New task assigned to you",
+    `${taskText}${plan.title ? ` (${plan.title})` : ""}`,
+  );
   return NextResponse.json({ ok: true });
 }

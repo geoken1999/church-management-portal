@@ -18,13 +18,20 @@ import {
   type FieldDefinitionErrors,
   type MemberFieldErrors,
 } from "@/lib/members/validation";
-import type { MaritalStatus, MemberFieldDefinition, MemberFieldType, MemberStatus } from "@/types/database";
+import type {
+  MaritalStatus,
+  MemberFieldDefinition,
+  MemberFieldType,
+  MemberStatus,
+} from "@/types/database";
 
 const MEMBER_STATUSES: MemberStatus[] = ["active", "left"];
 
 function readMemberStatus(formData: FormData): MemberStatus {
   const raw = String(formData.get("status") ?? "active");
-  return MEMBER_STATUSES.includes(raw as MemberStatus) ? (raw as MemberStatus) : "active";
+  return MEMBER_STATUSES.includes(raw as MemberStatus)
+    ? (raw as MemberStatus)
+    : "active";
 }
 
 function readBranchId(formData: FormData): string | null {
@@ -143,16 +150,29 @@ export async function createFieldDefinition(
       created_at: now,
       updated_at: now,
     };
-    const { error } = await supabase.from("member_field_definitions").insert(definition);
+    const { error } = await supabase
+      .from("member_field_definitions")
+      .insert(definition);
 
     if (!error) {
-      await backfillRequiredFieldDefault(supabase, organizationId, definition, existingDefault);
+      await backfillRequiredFieldDefault(
+        supabase,
+        organizationId,
+        definition,
+        existingDefault,
+      );
       revalidatePath("/dashboard/members");
       return { success: true };
     }
 
-    if (!error.message.toLowerCase().includes("duplicate") && !error.message.includes("unique")) {
-      return { error: "Couldn't add that field. You may not have permission to customize the form." };
+    if (
+      !error.message.toLowerCase().includes("duplicate") &&
+      !error.message.includes("unique")
+    ) {
+      return {
+        error:
+          "Couldn't add that field. You may not have permission to customize the form.",
+      };
     }
   }
 
@@ -190,10 +210,18 @@ export async function updateFieldDefinition(
     .single();
 
   if (error || !updated) {
-    return { error: "Couldn't save that field. You may not have permission to customize the form." };
+    return {
+      error:
+        "Couldn't save that field. You may not have permission to customize the form.",
+    };
   }
 
-  await backfillRequiredFieldDefault(supabase, updated.organization_id, updated, existingDefault);
+  await backfillRequiredFieldDefault(
+    supabase,
+    updated.organization_id,
+    updated,
+    existingDefault,
+  );
 
   revalidatePath("/dashboard/members");
   return { success: true };
@@ -240,10 +268,21 @@ export async function createMember(
   const lastName = String(formData.get("lastName") ?? "");
   const email = String(formData.get("email") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
-  const { dateOfBirth, maritalStatus, weddingDate, baptismDate } = readMemberDetails(formData);
+  const { dateOfBirth, maritalStatus, weddingDate, baptismDate } =
+    readMemberDetails(formData);
 
-  const basicErrors = validateMemberBasics({ firstName, lastName, email, phone });
-  const detailErrors = validateMemberDetails({ dateOfBirth, maritalStatus, weddingDate, baptismDate });
+  const basicErrors = validateMemberBasics({
+    firstName,
+    lastName,
+    email,
+    phone,
+  });
+  const detailErrors = validateMemberDetails({
+    dateOfBirth,
+    maritalStatus,
+    weddingDate,
+    baptismDate,
+  });
 
   const supabase = await createClient();
   const { data: definitions } = await supabase
@@ -251,8 +290,9 @@ export async function createMember(
     .select("*")
     .eq("organization_id", organizationId);
 
-  const { values, errors: customErrors } = parseCustomFieldValues(definitions ?? [], (key) =>
-    String(formData.get(`custom_${key}`) ?? ""),
+  const { values, errors: customErrors } = parseCustomFieldValues(
+    definitions ?? [],
+    (key) => String(formData.get(`custom_${key}`) ?? ""),
   );
 
   const fieldErrors: MemberFieldErrors = { ...basicErrors, ...detailErrors };
@@ -284,7 +324,9 @@ export async function createMember(
 
   if (error) {
     if (error.code === "23505") {
-      return { fieldErrors: { phone: "Another member already has this phone number." } };
+      return {
+        fieldErrors: { phone: "Another member already has this phone number." },
+      };
     }
     return { error: "Couldn't add that member. Please try again." };
   }
@@ -310,10 +352,21 @@ export async function updateMember(
   const lastName = String(formData.get("lastName") ?? "");
   const email = String(formData.get("email") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
-  const { dateOfBirth, maritalStatus, weddingDate, baptismDate } = readMemberDetails(formData);
+  const { dateOfBirth, maritalStatus, weddingDate, baptismDate } =
+    readMemberDetails(formData);
 
-  const basicErrors = validateMemberBasics({ firstName, lastName, email, phone });
-  const detailErrors = validateMemberDetails({ dateOfBirth, maritalStatus, weddingDate, baptismDate });
+  const basicErrors = validateMemberBasics({
+    firstName,
+    lastName,
+    email,
+    phone,
+  });
+  const detailErrors = validateMemberDetails({
+    dateOfBirth,
+    maritalStatus,
+    weddingDate,
+    baptismDate,
+  });
 
   const supabase = await createClient();
   const { data: definitions } = await supabase
@@ -321,14 +374,18 @@ export async function updateMember(
     .select("*")
     .eq("organization_id", organizationId);
 
-  const { values, errors: customErrors } = parseCustomFieldValues(definitions ?? [], (key) =>
-    String(formData.get(`custom_${key}`) ?? ""),
+  const { values, errors: customErrors } = parseCustomFieldValues(
+    definitions ?? [],
+    (key) => String(formData.get(`custom_${key}`) ?? ""),
   );
 
   const fieldErrors: MemberFieldErrors = { ...basicErrors, ...detailErrors };
   if (Object.keys(customErrors).length > 0) fieldErrors.custom = customErrors;
 
-  if (phone && (await findMemberWithPhone(supabase, organizationId, phone, memberId))) {
+  if (
+    phone &&
+    (await findMemberWithPhone(supabase, organizationId, phone, memberId))
+  ) {
     fieldErrors.phone = "Another member already has this phone number.";
   }
 
@@ -355,12 +412,18 @@ export async function updateMember(
 
   if (error) {
     if (error.code === "23505") {
-      return { fieldErrors: { phone: "Another member already has this phone number." } };
+      return {
+        fieldErrors: { phone: "Another member already has this phone number." },
+      };
     }
     return { error: "Couldn't save those changes. Please try again." };
   }
 
-  await notifyMember(memberId, "Your details were updated", "Your church updated your details. Open the app to review them.");
+  await notifyMember(
+    memberId,
+    "Your details were updated",
+    "Your church updated your details. Open the app to review them.",
+  );
 
   revalidatePath("/dashboard/members");
   return { success: true };
@@ -369,10 +432,15 @@ export async function updateMember(
 // memberId-only forms (delete/approve/bulk actions below) don't carry
 // organizationId in the submitted form, so the org has to be looked up from
 // the record itself before a permission check is possible.
-async function organizationIdForMembers(memberIds: string[]): Promise<string | null> {
+async function organizationIdForMembers(
+  memberIds: string[],
+): Promise<string | null> {
   if (memberIds.length === 0) return null;
   const admin = createAdminClient();
-  const { data } = await admin.from("members").select("organization_id").in("id", memberIds);
+  const { data } = await admin
+    .from("members")
+    .select("organization_id")
+    .in("id", memberIds);
   const orgIds = new Set((data ?? []).map((row) => row.organization_id));
   return orgIds.size === 1 ? [...orgIds][0] : null;
 }
@@ -404,7 +472,10 @@ export async function approveMember(formData: FormData) {
   if (!access.ok) return;
 
   const supabase = await createClient();
-  await supabase.from("members").update({ status: "active" }).eq("id", memberId);
+  await supabase
+    .from("members")
+    .update({ status: "active" })
+    .eq("id", memberId);
 
   revalidatePath("/dashboard/members");
 }

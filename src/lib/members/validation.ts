@@ -1,4 +1,8 @@
-import type { MemberFieldDefinition, MemberFieldType, CustomFieldValue } from "@/types/database";
+import type {
+  MemberFieldDefinition,
+  MemberFieldType,
+  CustomFieldValue,
+} from "@/types/database";
 
 export const FIELD_TYPE_OPTIONS: { value: MemberFieldType; label: string }[] = [
   { value: "text", label: "Text" },
@@ -71,7 +75,10 @@ export function validateMemberBasics(input: {
   email: string;
   phone: string;
 }): Pick<MemberFieldErrors, "firstName" | "lastName" | "email" | "phone"> {
-  const errors: Pick<MemberFieldErrors, "firstName" | "lastName" | "email" | "phone"> = {};
+  const errors: Pick<
+    MemberFieldErrors,
+    "firstName" | "lastName" | "email" | "phone"
+  > = {};
 
   if (!input.firstName.trim()) errors.firstName = "First name is required.";
   if (!input.lastName.trim()) errors.lastName = "Last name is required.";
@@ -97,8 +104,14 @@ export function validateMemberDetails(input: {
   maritalStatus: string;
   weddingDate: string;
   baptismDate?: string;
-}): Pick<MemberFieldErrors, "dateOfBirth" | "maritalStatus" | "weddingDate" | "baptismDate"> {
-  const errors: Pick<MemberFieldErrors, "dateOfBirth" | "maritalStatus" | "weddingDate" | "baptismDate"> = {};
+}): Pick<
+  MemberFieldErrors,
+  "dateOfBirth" | "maritalStatus" | "weddingDate" | "baptismDate"
+> {
+  const errors: Pick<
+    MemberFieldErrors,
+    "dateOfBirth" | "maritalStatus" | "weddingDate" | "baptismDate"
+  > = {};
   const today = new Date().toISOString().slice(0, 10);
 
   if (!input.dateOfBirth) {
@@ -107,7 +120,11 @@ export function validateMemberDetails(input: {
     errors.dateOfBirth = "Date of birth can't be in the future.";
   }
 
-  if (!MARITAL_STATUSES.includes(input.maritalStatus as (typeof MARITAL_STATUSES)[number])) {
+  if (
+    !MARITAL_STATUSES.includes(
+      input.maritalStatus as (typeof MARITAL_STATUSES)[number],
+    )
+  ) {
     errors.maritalStatus = "Select a marital status.";
   }
 
@@ -139,7 +156,10 @@ export function validateMemberDetails(input: {
 export function parseCustomFieldValues(
   definitions: MemberFieldDefinition[],
   getRaw: (key: string) => string,
-): { values: Record<string, CustomFieldValue>; errors: Record<string, string> } {
+): {
+  values: Record<string, CustomFieldValue>;
+  errors: Record<string, string>;
+} {
   const values: Record<string, CustomFieldValue> = {};
   const errors: Record<string, string> = {};
 
@@ -168,7 +188,11 @@ export function parseCustomFieldValues(
       continue;
     }
 
-    if (def.field_type === "select" && def.options && !def.options.includes(raw)) {
+    if (
+      def.field_type === "select" &&
+      def.options &&
+      !def.options.includes(raw)
+    ) {
       errors[def.key] = `Select a valid option for ${def.label}.`;
       values[def.key] = null;
       continue;

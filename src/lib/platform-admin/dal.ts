@@ -357,7 +357,7 @@ export async function getTenantUsage(organizationId: string): Promise<TenantUsag
       .eq("id", organizationId)
       .maybeSingle(),
     admin.from("organization_subscriptions").select("status").eq("organization_id", organizationId).maybeSingle(),
-    admin.from("members").select("id", { count: "exact", head: true }).eq("organization_id", organizationId),
+    admin.from("members").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).neq("status", "student"),
     admin.from("branches").select("id", { count: "exact", head: true }).eq("organization_id", organizationId),
     admin.from("organization_members").select("id", { count: "exact", head: true }).eq("organization_id", organizationId),
     admin.from("leaders").select("id", { count: "exact", head: true }).eq("organization_id", organizationId),

@@ -249,7 +249,9 @@ export type PublicFieldDefinition = {
 };
 
 export type CustomFieldValue = string | number | boolean | null;
-export type MemberStatus = "active" | "left" | "pending";
+// "student" is someone outside the church who takes Bible School courses: every church feature looks at
+// "active" members, so students stay out of all of it (migration 0194).
+export type MemberStatus = "active" | "left" | "pending" | "student";
 export type MaritalStatus = "married" | "unmarried";
 
 export type Member = {
@@ -1158,7 +1160,7 @@ export type LmsCourse = {
   language: string;
   delivery_mode: "self_paced" | "instructor_led" | "blended";
   status: LmsPublishState;
-  visibility: "organization" | "unlisted";
+  visibility: "organization" | "unlisted" | "public";
   enrollment_opens_at: string | null;
   enrollment_closes_at: string | null;
   starts_on: string | null;
@@ -1244,6 +1246,23 @@ export type LmsLessonProgress = {
   member_id: string;
   completed_at: string | null;
   last_opened_at: string;
+};
+
+export type LmsStudentApplication = {
+  id: string;
+  organization_id: string;
+  course_id: string | null;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  email: string | null;
+  message: string | null;
+  status: "pending" | "approved" | "rejected";
+  member_id: string | null;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_note: string | null;
+  created_at: string;
 };
 
 export type LmsLiveSession = {
@@ -3707,6 +3726,12 @@ export type Database = {
         Update: Partial<LmsLessonProgress>;
         Relationships: [];
       };
+      lms_student_applications: {
+        Row: LmsStudentApplication;
+        Insert: Partial<LmsStudentApplication> & Pick<LmsStudentApplication, "organization_id" | "first_name" | "last_name" | "phone">;
+        Update: Partial<LmsStudentApplication>;
+        Relationships: [];
+      };
       lms_live_sessions: {
         Row: LmsLiveSession;
         Insert: Partial<LmsLiveSession> & Pick<LmsLiveSession, "organization_id" | "course_id" | "title" | "starts_at" | "ends_at">;
@@ -4388,6 +4413,10 @@ export type Database = {
       lms_lesson_file_access: {
         Args: { p_lesson: string };
         Returns: string | null;
+      };
+      lms_approve_application: {
+        Args: { p_org: string; p_application: string; p_course: string | null; p_actor: string };
+        Returns: { member_id: string; enrolled: boolean };
       };
       lms_create_enrollment: {
         Args: { p_organization_id: string; p_course_id: string; p_member_id: string; p_status: string; p_source: string; p_actor: string; p_ignore_window?: boolean };

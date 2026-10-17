@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { validateProposedChanges, rejectDisallowedFields, isProfileUpdateField } from "@/lib/members/profile-update-requests";
+import {
+  validateProposedChanges,
+  rejectDisallowedFields,
+  isProfileUpdateField,
+} from "@/lib/members/profile-update-requests";
 import type { Member } from "@/types/database";
 
 const BASE_MEMBER: Member = {
@@ -42,59 +46,87 @@ describe("rejectDisallowedFields", () => {
   });
 
   it("names every disallowed field it finds", () => {
-    expect(rejectDisallowedFields({ phone: "123", email: "x@y.com" })).toBe("These fields can't be changed this way: phone, email.");
+    expect(rejectDisallowedFields({ phone: "123", email: "x@y.com" })).toBe(
+      "These fields can't be changed this way: phone, email.",
+    );
   });
 });
 
 describe("validateProposedChanges", () => {
   it("accepts a simple name change", () => {
-    expect(validateProposedChanges(BASE_MEMBER, { first_name: "Janet" })).toBeNull();
+    expect(
+      validateProposedChanges(BASE_MEMBER, { first_name: "Janet" }),
+    ).toBeNull();
   });
 
   it("rejects a blank first name", () => {
-    expect(validateProposedChanges(BASE_MEMBER, { first_name: "  " })).toBe("First name is required.");
+    expect(validateProposedChanges(BASE_MEMBER, { first_name: "  " })).toBe(
+      "First name is required.",
+    );
   });
 
   it("rejects a date of birth in the future", () => {
-    expect(validateProposedChanges(BASE_MEMBER, { date_of_birth: "2999-01-01" })).toBe("Date of birth cannot be in the future.");
+    expect(
+      validateProposedChanges(BASE_MEMBER, { date_of_birth: "2999-01-01" }),
+    ).toBe("Date of birth cannot be in the future.");
   });
 
   it("requires a wedding date when switching to married", () => {
-    expect(validateProposedChanges(BASE_MEMBER, { marital_status: "married" })).toBe(
-      "Wedding date is required when marital status is Married.",
-    );
+    expect(
+      validateProposedChanges(BASE_MEMBER, { marital_status: "married" }),
+    ).toBe("Wedding date is required when marital status is Married.");
   });
 
   it("accepts switching to married with a valid wedding date in the same request", () => {
-    expect(validateProposedChanges(BASE_MEMBER, { marital_status: "married", wedding_date: "2015-06-01" })).toBeNull();
+    expect(
+      validateProposedChanges(BASE_MEMBER, {
+        marital_status: "married",
+        wedding_date: "2015-06-01",
+      }),
+    ).toBeNull();
   });
 
   it("rejects a wedding date before the (unchanged) date of birth", () => {
-    expect(validateProposedChanges(BASE_MEMBER, { marital_status: "married", wedding_date: "1980-01-01" })).toBe(
-      "Wedding date cannot be before the date of birth.",
-    );
+    expect(
+      validateProposedChanges(BASE_MEMBER, {
+        marital_status: "married",
+        wedding_date: "1980-01-01",
+      }),
+    ).toBe("Wedding date cannot be before the date of birth.");
   });
 
   it("rejects a wedding date in the future", () => {
-    expect(validateProposedChanges(BASE_MEMBER, { marital_status: "married", wedding_date: "2999-01-01" })).toBe(
-      "Wedding date cannot be in the future.",
-    );
+    expect(
+      validateProposedChanges(BASE_MEMBER, {
+        marital_status: "married",
+        wedding_date: "2999-01-01",
+      }),
+    ).toBe("Wedding date cannot be in the future.");
   });
 
   it("rejects providing a wedding date while unmarried", () => {
-    expect(validateProposedChanges(BASE_MEMBER, { wedding_date: "2015-06-01" })).toBe(
-      "Wedding date should be empty when marital status is Unmarried.",
-    );
+    expect(
+      validateProposedChanges(BASE_MEMBER, { wedding_date: "2015-06-01" }),
+    ).toBe("Wedding date should be empty when marital status is Unmarried.");
   });
 
   it("validates a wedding date against the CURRENT date of birth when only wedding_date changes for an already-married member", () => {
-    const married: Member = { ...BASE_MEMBER, marital_status: "married", wedding_date: "2015-06-01" };
-    expect(validateProposedChanges(married, { wedding_date: "1985-01-01" })).toBe("Wedding date cannot be before the date of birth.");
+    const married: Member = {
+      ...BASE_MEMBER,
+      marital_status: "married",
+      wedding_date: "2015-06-01",
+    };
+    expect(
+      validateProposedChanges(married, { wedding_date: "1985-01-01" }),
+    ).toBe("Wedding date cannot be before the date of birth.");
   });
 
   it("rejects an attempt to change email or phone alongside an allowed field", () => {
-    expect(validateProposedChanges(BASE_MEMBER, { first_name: "Janet", phone: "123" } as never)).toBe(
-      "These fields can't be changed this way: phone.",
-    );
+    expect(
+      validateProposedChanges(BASE_MEMBER, {
+        first_name: "Janet",
+        phone: "123",
+      } as never),
+    ).toBe("These fields can't be changed this way: phone.");
   });
 });

@@ -10,6 +10,7 @@ import type {
   LmsModule,
   LmsProgram,
   LmsSettings,
+  LmsStudentApplication,
 } from "@/types/database";
 
 // Reads for the Bible School screens. They use the service role, so every function takes the church
@@ -672,4 +673,85 @@ export async function getAttendanceRoster(
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export interface ApplicationRow extends LmsStudentApplication {
+  courseTitle: string | null;
+}
+
+// Applications from the public page, waiting ones first, then the latest decided.
+export async function getApplications(
+  organizationId: string,
+): Promise<ApplicationRow[]> {
+  const admin = createAdminClient();
+  const [{ data: pending }, { data: decided }] = await Promise.all([
+    admin
+      .from("lms_student_applications")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .eq("status", "pending")
+      .order("created_at"),
+    admin
+      .from("lms_student_applications")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .neq("status", "pending")
+      .order("decided_at", { ascending: false })
+      .limit(20),
+  ]);
+  const rows = [
+    ...((pending ?? []) as LmsStudentApplication[]),
+    ...((decided ?? []) as LmsStudentApplication[]),
+  ];
+  const courseIds = [
+    ...new Set(
+      rows.map((r) => r.course_id).filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const { data: courses } = courseIds.length
+    ? await admin.from("lms_courses").select("id, title").in("id", courseIds)
+    : { data: [] };
+  return rows.map((row) => ({
+    ...row,
+    courseTitle:
+      (courses ?? []).find((c) => c.id === row.course_id)?.title ?? null,
+  }));
+}
+
+export interface StudentRow {
+  id: string;
+  name: string;
+  phone: string | null;
+  courses: number;
+  signedIn: boolean;
+}
+
+// The students of the Bible School: people outside the church with a student account.
+export async function getStudents(
+  organizationId: string,
+): Promise<StudentRow[]> {
+  const admin = createAdminClient();
+  const { data: students } = await admin
+    .from("members")
+    .select("id, first_name, last_name, phone, auth_user_id")
+    .eq("organization_id", organizationId)
+    .eq("status", "student")
+    .order("first_name")
+    .limit(500);
+  const ids = (students ?? []).map((s) => s.id);
+  const { data: enrollments } = ids.length
+    ? await admin
+        .from("lms_enrollments")
+        .select("member_id")
+        .eq("organization_id", organizationId)
+        .in("member_id", ids)
+        .in("status", ["pending", "approved", "active", "completed"])
+    : { data: [] };
+  return (students ?? []).map((s) => ({
+    id: s.id,
+    name: `${s.first_name} ${s.last_name}`.trim(),
+    phone: s.phone,
+    courses: (enrollments ?? []).filter((e) => e.member_id === s.id).length,
+    signedIn: Boolean(s.auth_user_id),
+  }));
 }

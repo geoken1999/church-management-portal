@@ -14,7 +14,10 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "Invalid request." },
+      { status: 400 },
+    );
   }
 
   const phone = String(body.phone ?? "").trim();
@@ -26,17 +29,29 @@ export async function POST(request: Request) {
   const orgIds = new Set(matches.map((m) => m.organizationId));
 
   if (orgIds.size === 0) {
-    return NextResponse.json({ ok: false, error: "No member account was found for this number. Contact your church if you think this is a mistake." });
+    return NextResponse.json({
+      ok: false,
+      error:
+        "No member account was found for this number. Contact your church if you think this is a mistake.",
+    });
   }
   if (orgIds.size > 1) {
     await logPlatformEvent({
       level: "warning",
       source: "member_mobile_login",
-      message: "Mobile member login: phone number matches members in more than one organization — refused rather than guessing",
+      message:
+        "Mobile member login: phone number matches members in more than one organization — refused rather than guessing",
       metadata: { orgCount: orgIds.size },
     });
-    return NextResponse.json({ ok: false, error: "This number is linked to more than one church. Contact support for help signing in." });
+    return NextResponse.json({
+      ok: false,
+      error:
+        "This number is linked to more than one church. Contact support for help signing in.",
+    });
   }
 
-  return NextResponse.json({ ok: true, organizationName: matches[0].organizationName });
+  return NextResponse.json({
+    ok: true,
+    organizationName: matches[0].organizationName,
+  });
 }

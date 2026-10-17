@@ -13,9 +13,16 @@ export async function GET(request: Request) {
   const version = (params.get("version") ?? "").trim();
   try {
     const config = await getUpdateConfig();
-    return NextResponse.json(answerFor(config[platform], version), { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(answerFor(config[platform], version), {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch {
     // Never block the app because this lookup failed.
-    return NextResponse.json({ status: "none", latest: "", storeUrl: "", notes: "" });
+    return NextResponse.json({
+      status: "none",
+      latest: "",
+      storeUrl: "",
+      notes: "",
+    });
   }
 }

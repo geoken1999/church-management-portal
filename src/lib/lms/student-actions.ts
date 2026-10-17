@@ -1,0 +1,315 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { checkAttemptLimit, recordAttempt } from "@/lib/auth/rate-limit";
+import { STUDENT_APPLICATION_RULE } from "@/lib/auth/rate-limit-rules";
+import { pushToTeam } from "@/lib/push/team";
+import { sendBulkEmail } from "@/lib/email/client";
+import { isEmailConfigured } from "@/lib/email/env";
+import { PLAY_STORE_URL } from "@/lib/app-links";
+import { logPlatformEvent } from "@/lib/platform-events/log";
+import { nationalTail } from "@/lib/whatsapp/phone-match";
+import { authorizeTab } from "@/lib/lms/authz";
+import { logLmsEvent } from "@/lib/lms/audit";
+import { LMS_BASE_PATH } from "@/lib/lms/constants";
+import {
+  explainExistingPerson,
+  validateApplication,
+  type ApplicationErrors,
+} from "@/lib/lms/students";
+import { isBibleSchoolOpen } from "@/lib/lms/public-school";
+import type { LmsResult } from "@/lib/lms/actions";
+
+export interface ApplicationState {
+  errors?: ApplicationErrors;
+  error?: string;
+  success?: boolean;
+  message?: string;
+}
+
+function read(formData: FormData, key: string): string {
+  const value = formData.get(key);
+  return typeof value === "string" ? value : "";
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// Public: someone from outside the church applies to the Bible School. No sign-in; a hidden field, a
+// limit per phone number and per IP, and a human who approves each application keep it honest.
+export async function submitStudentApplication(
+  orgSlug: string,
+  _prev: ApplicationState,
+  formData: FormData,
+): Promise<ApplicationState> {
+  if (read(formData, "website"))
+    return { success: true, message: "Thank you. Your application was sent." };
+
+  const input = {
+    firstName: read(formData, "firstName").trim(),
+    lastName: read(formData, "lastName").trim(),
+    phone: read(formData, "phone").trim(),
+    email: read(formData, "email").trim(),
+    message: read(formData, "message").trim(),
+    courseId: read(formData, "courseId"),
+  };
+  const errors = validateApplication(input);
+  if (Object.keys(errors).length > 0) return { errors };
+
+  const admin = createAdminClient();
+  const { data: org } = await admin
+    .from("organizations")
+    .select("id, name")
+    .eq("slug", orgSlug)
+    .maybeSingle();
+  if (!org || !(await isBibleSchoolOpen(org.id)))
+    return { error: "This Bible School isn't taking applications right now." };
+
+  const limited = await checkAttemptLimit(
+    STUDENT_APPLICATION_RULE,
+    nationalTail(input.phone),
+  );
+  if (limited) return { error: limited };
+  await recordAttempt(STUDENT_APPLICATION_RULE, nationalTail(input.phone));
+
+  // The course, if one was chosen, must be a public, published course of this church.
+  let courseId: string | null = null;
+  if (input.courseId) {
+    const { data: course } = await admin
+      .from("lms_courses")
+      .select("id")
+      .eq("id", input.courseId)
+      .eq("organization_id", org.id)
+      .eq("status", "published")
+      .eq("visibility", "public")
+      .maybeSingle();
+    if (!course)
+      return { errors: { courseId: "That course isn't available." } };
+    courseId = course.id;
+  }
+
+  // Someone already known to this church by that number.
+  const tail = nationalTail(input.phone);
+  const { data: people } = await admin
+    .from("members")
+    .select("phone, status")
+    .eq("organization_id", org.id)
+    .like("phone", `%${tail}`);
+  const known = (people ?? []).find(
+    (p) => p.phone && nationalTail(p.phone) === tail,
+  );
+  const explained = explainExistingPerson(known?.status ?? null);
+  if (explained) return { error: explained };
+
+  const { error } = await admin.from("lms_student_applications").insert({
+    organization_id: org.id,
+    course_id: courseId,
+    first_name: input.firstName,
+    last_name: input.lastName,
+    phone: input.phone,
+    email: input.email || null,
+    message: input.message || null,
+  });
+  if (error?.code === "23505")
+    return {
+      success: true,
+      message:
+        "We already have your application. The church will contact you once it is reviewed.",
+    };
+  if (error) {
+    console.error("lms_student_applications insert failed:", error.message);
+    return { error: "Something went wrong. Please try again." };
+  }
+
+  await pushToTeam({
+    organizationId: org.id,
+    tab: "bibleschool",
+    title: "New Bible School application",
+    body: `${input.firstName} ${input.lastName} would like to join the Bible School.`,
+    link: `${LMS_BASE_PATH}/applications`,
+  });
+  return {
+    success: true,
+    message:
+      "Thank you. Your application was sent. The church will review it and contact you.",
+  };
+}
+
+async function emailApproved(
+  organizationName: string,
+  email: string,
+  firstName: string,
+  courseTitle: string | null,
+): Promise<void> {
+  if (!isEmailConfigured() || !email) return;
+  try {
+    await sendBulkEmail({
+      fromName: organizationName,
+      subject: `You're in: ${organizationName} Bible School`,
+      html: `<div style="font-family:sans-serif;max-width:480px"><p>Hi ${escapeHtml(firstName)},</p><p>Your application to the ${escapeHtml(organizationName)} Bible School was approved${
+        courseTitle
+          ? ` and you're enrolled in <strong>${escapeHtml(courseTitle)}</strong>`
+          : ""
+      }.</p><p>To start, install the KingdomFlow app and sign in with the mobile number you applied with:</p><p><a href="${PLAY_STORE_URL}">Get the app on Google Play</a></p><p>You'll see your courses straight away.</p></div>`,
+      recipients: [email],
+    });
+  } catch (err) {
+    await logPlatformEvent({
+      level: "warning",
+      source: "email_send",
+      message: `Bible School approval email failed: ${err instanceof Error ? err.message : "unknown"}`,
+    });
+  }
+}
+
+// Approves an application: creates the student (or reuses the person), enrolls them in the course the
+// team chooses, and tells the applicant if they gave an email.
+export async function approveApplicationAction(
+  organizationId: string,
+  applicationId: string,
+  courseId: string,
+): Promise<LmsResult> {
+  const access = await authorizeTab(organizationId, "write");
+  if (!access.ok) return { error: access.message };
+  const admin = createAdminClient();
+  const { data: application } = await admin
+    .from("lms_student_applications")
+    .select("first_name, email")
+    .eq("id", applicationId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (!application) return { error: "That application could not be found." };
+  if (courseId) {
+    const { data: course } = await admin
+      .from("lms_courses")
+      .select("id")
+      .eq("id", courseId)
+      .eq("organization_id", organizationId)
+      .eq("status", "published")
+      .maybeSingle();
+    if (!course) return { error: "Choose a published course, or none." };
+  }
+  const { error } = await admin.rpc("lms_approve_application", {
+    p_org: organizationId,
+    p_application: applicationId,
+    p_course: courseId || null,
+    p_actor: access.userId,
+  });
+  if (error) {
+    const known = [
+      "could not be found",
+      "already decided",
+      "10-digit",
+      "another church",
+      "waiting membership request",
+      "full",
+      "closed",
+    ];
+    return {
+      error: known.some((k) => error.message.includes(k))
+        ? error.message
+        : "Couldn't approve the application. Please try again.",
+    };
+  }
+  await logLmsEvent({
+    organizationId,
+    actorAuthUserId: access.userId,
+    action: "student.approved",
+    entityType: "application",
+    entityId: applicationId,
+    metadata: { courseId: courseId || null },
+  });
+  const [{ data: org }, { data: course }] = await Promise.all([
+    admin
+      .from("organizations")
+      .select("name")
+      .eq("id", organizationId)
+      .maybeSingle(),
+    courseId
+      ? admin
+          .from("lms_courses")
+          .select("title")
+          .eq("id", courseId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  await emailApproved(
+    org?.name ?? "the church",
+    application.email ?? "",
+    application.first_name,
+    course?.title ?? null,
+  );
+  revalidatePath(`${LMS_BASE_PATH}/applications`);
+  revalidatePath(`${LMS_BASE_PATH}/enrollments`);
+  return { success: true };
+}
+
+export async function rejectApplicationAction(
+  organizationId: string,
+  applicationId: string,
+  note: string,
+): Promise<LmsResult> {
+  const access = await authorizeTab(organizationId, "write");
+  if (!access.ok) return { error: access.message };
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("lms_student_applications")
+    .update({
+      status: "rejected",
+      decided_by: access.userId,
+      decided_at: new Date().toISOString(),
+      decision_note: note.trim().slice(0, 300) || null,
+    })
+    .eq("id", applicationId)
+    .eq("organization_id", organizationId)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
+  if (error || !data)
+    return {
+      error: "That application could not be found or was already decided.",
+    };
+  await logLmsEvent({
+    organizationId,
+    actorAuthUserId: access.userId,
+    action: "student.rejected",
+    entityType: "application",
+    entityId: applicationId,
+  });
+  revalidatePath(`${LMS_BASE_PATH}/applications`);
+  return { success: true };
+}
+
+// Takes a student's access away: they can no longer sign in to the Bible School. Their records stay.
+export async function removeStudentAction(
+  organizationId: string,
+  memberId: string,
+): Promise<LmsResult> {
+  const access = await authorizeTab(organizationId, "write");
+  if (!access.ok) return { error: access.message };
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("members")
+    .update({ status: "left" })
+    .eq("id", memberId)
+    .eq("organization_id", organizationId)
+    .eq("status", "student")
+    .select("id")
+    .maybeSingle();
+  if (error || !data) return { error: "That student could not be found." };
+  await logLmsEvent({
+    organizationId,
+    actorAuthUserId: access.userId,
+    action: "student.removed",
+    entityType: "student",
+    entityId: memberId,
+  });
+  revalidatePath(`${LMS_BASE_PATH}/applications`);
+  return { success: true };
+}

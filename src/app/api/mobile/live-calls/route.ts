@@ -9,19 +9,30 @@ import { getSiteUrl } from "@/lib/site-url";
 // session and returns only the live ones.
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : null;
-  if (!token) return NextResponse.json({ ok: false, error: "Missing session." }, { status: 401 });
+  const token = authHeader.startsWith("Bearer ")
+    ? authHeader.slice("Bearer ".length)
+    : null;
+  if (!token)
+    return NextResponse.json(
+      { ok: false, error: "Missing session." },
+      { status: 401 },
+    );
 
   const admin = createAdminClient();
   const { data: userData, error } = await admin.auth.getUser(token);
-  if (error || !userData.user) return NextResponse.json({ ok: false, error: "That session could not be verified." }, { status: 401 });
+  if (error || !userData.user)
+    return NextResponse.json(
+      { ok: false, error: "That session could not be verified." },
+      { status: 401 },
+    );
 
   const { data: member } = await admin
     .from("members")
     .select("first_name, last_name, organization_id, status")
     .eq("auth_user_id", userData.user.id)
     .maybeSingle();
-  if (!member || member.status !== "active") return NextResponse.json({ ok: true, calls: [] });
+  if (!member || member.status !== "active")
+    return NextResponse.json({ ok: true, calls: [] });
 
   await endIdleMeetings(member.organization_id);
   const { data: meetings } = await admin
@@ -33,18 +44,23 @@ export async function GET(request: Request) {
     .limit(5);
 
   // A live stream's own room isn't a call members join; they watch it as a stream.
-  const { data: streams } = await admin.from("live_streams").select("meeting_id").eq("organization_id", member.organization_id);
+  const { data: streams } = await admin
+    .from("live_streams")
+    .select("meeting_id")
+    .eq("organization_id", member.organization_id);
   const streamRooms = new Set((streams ?? []).map((s) => s.meeting_id));
 
   const name = `${member.first_name} ${member.last_name}`.trim();
   const base = getSiteUrl();
   return NextResponse.json({
     ok: true,
-    calls: (meetings ?? []).filter((m) => !streamRooms.has(m.id)).map((m) => ({
-      id: m.id,
-      title: m.title,
-      mode: m.mode,
-      joinUrl: `${base}/${m.mode === "audio" ? "kaudio" : "kmeet"}/${m.id}?name=${encodeURIComponent(name)}`,
-    })),
+    calls: (meetings ?? [])
+      .filter((m) => !streamRooms.has(m.id))
+      .map((m) => ({
+        id: m.id,
+        title: m.title,
+        mode: m.mode,
+        joinUrl: `${base}/${m.mode === "audio" ? "kaudio" : "kmeet"}/${m.id}?name=${encodeURIComponent(name)}`,
+      })),
   });
 }

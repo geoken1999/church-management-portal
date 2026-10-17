@@ -249,7 +249,7 @@ async function getMemberCount(organizationId: string, args: ToolArgs) {
     branchId = branch.id;
   }
 
-  let query = supabase.from("members").select("id", { count: "exact", head: true }).eq("organization_id", organizationId);
+  let query = supabase.from("members").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).neq("status", "student");
   if (branchId) query = query.eq("branch_id", branchId);
   if (status === "active" || status === "left" || status === "pending") query = query.eq("status", status);
 

@@ -21,31 +21,51 @@ export async function reviewProfileUpdateRequest(input: {
     .eq("id", input.requestId)
     .maybeSingle();
 
-  if (!request || request.organization_id !== input.organizationId) return { ok: false, error: "That request could not be found." };
-  if (request.status !== "pending") return { ok: false, error: "That request has already been reviewed." };
+  if (!request || request.organization_id !== input.organizationId)
+    return { ok: false, error: "That request could not be found." };
+  if (request.status !== "pending")
+    return { ok: false, error: "That request has already been reviewed." };
 
   if (input.decision === "approved") {
-    const { data: member } = await admin.from("members").select("*").eq("id", request.member_id).maybeSingle();
+    const { data: member } = await admin
+      .from("members")
+      .select("*")
+      .eq("id", request.member_id)
+      .maybeSingle();
     if (!member) return { ok: false, error: "That member could not be found." };
 
     // A request can sit pending for a while, so re-check it against the
     // member's row as it is NOW before writing it.
-    const validationError = validateProposedChanges(member, request.proposed_changes as MemberProposedChanges);
+    const validationError = validateProposedChanges(
+      member,
+      request.proposed_changes as MemberProposedChanges,
+    );
     if (validationError) return { ok: false, error: validationError };
 
-    const { error } = await admin.from("members").update(request.proposed_changes as MemberProposedChanges).eq("id", member.id);
+    const { error } = await admin
+      .from("members")
+      .update(request.proposed_changes as MemberProposedChanges)
+      .eq("id", member.id);
     if (error) return { ok: false, error: "Couldn't apply those changes." };
   }
 
   await admin
     .from("member_profile_update_requests")
-    .update({ status: input.decision, reviewed_by: input.reviewerId, reviewed_at: new Date().toISOString() })
+    .update({
+      status: input.decision,
+      reviewed_by: input.reviewerId,
+      reviewed_at: new Date().toISOString(),
+    })
     .eq("id", input.requestId);
 
   await notifyMember(
     request.member_id,
-    input.decision === "approved" ? "Your change was approved" : "Your change was not approved",
-    input.decision === "approved" ? "Your details have been updated." : "Your church didn't approve the change to your details.",
+    input.decision === "approved"
+      ? "Your change was approved"
+      : "Your change was not approved",
+    input.decision === "approved"
+      ? "Your details have been updated."
+      : "Your church didn't approve the change to your details.",
   );
 
   return { ok: true };

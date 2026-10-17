@@ -18,5 +18,8 @@ export async function GET(request: Request) {
     .order("started_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  return NextResponse.json({ ok: true, stream: data ? publicStream(data as LiveStream) : null });
+  return NextResponse.json({
+    ok: true,
+    stream: data ? publicStream(data as LiveStream) : null,
+  });
 }

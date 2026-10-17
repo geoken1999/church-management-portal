@@ -23,24 +23,47 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "Invalid request." },
+      { status: 400 },
+    );
   }
-  const text = (key: string) => (typeof body[key] === "string" ? (body[key] as string) : "");
+  const text = (key: string) =>
+    typeof body[key] === "string" ? (body[key] as string) : "";
   const organizationId = text("organizationId");
   const action = text("action");
   const id = text("id");
 
-  const level = READ_ACTIONS.includes(action) ? "read" : DELETE_ACTIONS.includes(action) ? "delete" : "write";
-  const auth = await requireMobileTabAccess(request, organizationId, "folder", level);
+  const level = READ_ACTIONS.includes(action)
+    ? "read"
+    : DELETE_ACTIONS.includes(action)
+      ? "delete"
+      : "write";
+  const auth = await requireMobileTabAccess(
+    request,
+    organizationId,
+    "folder",
+    level,
+  );
   if (auth instanceof NextResponse) return auth;
 
   let result: FolderResult = { ok: false, error: "Invalid request." };
   switch (action) {
     case "prepare_upload":
-      result = await prepareUpload(organizationId, { title: text("title"), mimeType: text("mimeType"), size: Number(body.size) || 0, categoryId: text("categoryId") });
+      result = await prepareUpload(organizationId, {
+        title: text("title"),
+        mimeType: text("mimeType"),
+        size: Number(body.size) || 0,
+        categoryId: text("categoryId"),
+      });
       break;
     case "finish_upload":
-      result = await finishUpload(organizationId, auth.userId, { documentId: text("documentId"), title: text("title"), mimeType: text("mimeType"), categoryId: text("categoryId") });
+      result = await finishUpload(organizationId, auth.userId, {
+        documentId: text("documentId"),
+        title: text("title"),
+        mimeType: text("mimeType"),
+        categoryId: text("categoryId"),
+      });
       break;
     case "create_category":
       result = await createCategory(organizationId, text("name"));
@@ -58,13 +81,21 @@ export async function POST(request: Request) {
         result = await setCategory(organizationId, id, text("categoryId"));
         break;
       case "share_document":
-        result = await toggleDocumentShareForMobile(organizationId, id, body.enabled === true);
+        result = await toggleDocumentShareForMobile(
+          organizationId,
+          id,
+          body.enabled === true,
+        );
         break;
       case "delete_category":
         result = await deleteCategory(organizationId, id);
         break;
       case "share_category":
-        result = await toggleCategoryShareForMobile(organizationId, id, body.enabled === true);
+        result = await toggleCategoryShareForMobile(
+          organizationId,
+          id,
+          body.enabled === true,
+        );
         break;
     }
   }

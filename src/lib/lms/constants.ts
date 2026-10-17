@@ -18,6 +18,10 @@ export type PublishState = (typeof PUBLISH_STATES)[number];
 export const VISIBILITIES = [
   { value: "organization", label: "Everyone in the church" },
   { value: "unlisted", label: "Only people with the link" },
+  {
+    value: "public",
+    label: "Open to the public (shown on your Bible School page)",
+  },
 ] as const;
 
 // Lesson types a teacher can create now. quiz, assignment and live_session lessons arrive with the

@@ -9,9 +9,13 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "Invalid request." },
+      { status: 400 },
+    );
   }
-  const text = (key: string) => (typeof body[key] === "string" ? (body[key] as string) : "");
+  const text = (key: string) =>
+    typeof body[key] === "string" ? (body[key] as string) : "";
 
   const auth = await requireMobileAdmin(request, text("organizationId"));
   if (auth instanceof NextResponse) return auth;
@@ -28,6 +32,7 @@ export async function POST(request: Request) {
     linkUrl: text("linkUrl"),
     buttonLabel: text("buttonLabel"),
   });
-  if (result.error) return NextResponse.json({ ok: false, error: result.error });
+  if (result.error)
+    return NextResponse.json({ ok: false, error: result.error });
   return NextResponse.json({ ok: true, sent: result.sent });
 }

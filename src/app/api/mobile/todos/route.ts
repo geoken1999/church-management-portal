@@ -16,15 +16,24 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "Invalid request." },
+      { status: 400 },
+    );
   }
-  const text = (key: string) => (typeof body[key] === "string" ? (body[key] as string) : "");
+  const text = (key: string) =>
+    typeof body[key] === "string" ? (body[key] as string) : "";
   const organizationId = text("organizationId");
   const action = text("action");
   const id = text("id");
 
   const level = action === "delete" ? "delete" : "write";
-  const auth = await requireMobileTabAccess(request, organizationId, "todos", level);
+  const auth = await requireMobileTabAccess(
+    request,
+    organizationId,
+    "todos",
+    level,
+  );
   if (auth instanceof NextResponse) return auth;
 
   const input: TodoInput = {
@@ -38,13 +47,22 @@ export async function POST(request: Request) {
   };
 
   if (action === "create") {
-    const result = await createTodoForMobile(organizationId, auth.userId, input);
-    return NextResponse.json(result.ok ? { ok: true } : { ok: false, error: result.error });
+    const result = await createTodoForMobile(
+      organizationId,
+      auth.userId,
+      input,
+    );
+    return NextResponse.json(
+      result.ok ? { ok: true } : { ok: false, error: result.error },
+    );
   }
 
   // Every other action works on an existing to-do of this church.
   if (!id || (await organizationIdForTodo(id)) !== organizationId) {
-    return NextResponse.json({ ok: false, error: "That to-do could not be found." }, { status: 404 });
+    return NextResponse.json(
+      { ok: false, error: "That to-do could not be found." },
+      { status: 404 },
+    );
   }
 
   const result =
@@ -55,5 +73,7 @@ export async function POST(request: Request) {
         : action === "delete"
           ? await deleteTodoForMobile(organizationId, id)
           : ({ ok: false, error: "Invalid request." } as const);
-  return NextResponse.json(result.ok ? { ok: true } : { ok: false, error: result.error });
+  return NextResponse.json(
+    result.ok ? { ok: true } : { ok: false, error: result.error },
+  );
 }

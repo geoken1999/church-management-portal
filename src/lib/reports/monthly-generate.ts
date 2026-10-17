@@ -74,7 +74,7 @@ export async function buildMonthlyReport(input: BuildReportInput): Promise<Month
 
   if (want.has("members")) {
     const base = () => {
-      let q = admin.from("members").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).neq("status", "pending");
+      let q = admin.from("members").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).neq("status", "pending").neq("status", "student");
       if (branchId) q = q.eq("branch_id", branchId);
       return q;
     };

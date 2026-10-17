@@ -15,7 +15,8 @@ create function public.set_updated_at() returns trigger language plpgsql as $$ b
 create table public.organizations (id uuid primary key default gen_random_uuid(), name text, plan text, custom_plan_limits jsonb);
 create table public.organization_members (id uuid primary key default gen_random_uuid(), organization_id uuid references public.organizations (id), auth_user_id uuid, role text);
 create table public.branches (id uuid primary key default gen_random_uuid(), organization_id uuid references public.organizations (id));
-create table public.members (id uuid primary key default gen_random_uuid(), organization_id uuid not null references public.organizations (id), first_name text not null, last_name text not null, status text not null default 'active', auth_user_id uuid, branch_id uuid);
+create table public.members (id uuid primary key default gen_random_uuid(), organization_id uuid not null references public.organizations (id), first_name text not null, last_name text not null, status text not null default 'active', auth_user_id uuid, branch_id uuid, phone text, email text, constraint members_status_check check (status in ('active', 'left', 'pending')));
+create unique index members_organization_id_phone_key on public.members (organization_id, phone) where phone is not null;
 create table public.platform_feature_flags (tab_key text primary key, enabled boolean not null default true, status text not null default 'live');
 create table public.kmeet_meetings (id uuid primary key default gen_random_uuid(), organization_id uuid not null references public.organizations (id), title text not null, status text not null default 'scheduled', mode text not null default 'video', scheduled_at timestamptz, created_by uuid);
 

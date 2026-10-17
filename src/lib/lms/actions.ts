@@ -756,7 +756,7 @@ export async function saveLessonAction(
     ? (
         await admin
           .from("lms_lessons")
-          .select("file_path")
+          .select("file_path, media_url")
           .eq("id", lessonId)
           .eq("course_id", courseId)
           .eq("organization_id", organizationId)
@@ -783,7 +783,13 @@ export async function saveLessonAction(
     title: input.title.trim(),
     content_type: type,
     body: type === "text" ? sanitizeLessonHtml(input.body) : null,
-    media_url: type === "text" ? null : input.mediaUrl.trim() || null,
+    // Video and audio are upload-only: a link is never taken from the request, only kept if an older lesson had one.
+    media_url:
+      type === "text"
+        ? null
+        : type === "video" || type === "audio"
+          ? (existing?.media_url ?? null)
+          : input.mediaUrl.trim() || null,
     duration_minutes: input.durationMinutes.trim()
       ? Number(input.durationMinutes)
       : null,
@@ -832,7 +838,29 @@ export async function setLessonStatusAction(
   const access = await authorizeCurriculum(organizationId, courseId);
   if (!access.ok) return fail(access.message);
   if (!STATES.includes(status)) return fail("Choose a valid status.");
-  const { error } = await createAdminClient()
+  const admin = createAdminClient();
+  if (status === "published") {
+    // A lesson with nothing to show can't go out to students.
+    const { data: lesson } = await admin
+      .from("lms_lessons")
+      .select("content_type, file_path, media_url")
+      .eq("id", lessonId)
+      .eq("course_id", courseId)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    if (!lesson) return fail("That lesson could not be found.");
+    if (
+      lesson.content_type !== "text" &&
+      !lesson.file_path &&
+      !lesson.media_url
+    )
+      return fail(
+        lesson.content_type === "video" || lesson.content_type === "audio"
+          ? "Upload the file for this lesson before publishing it."
+          : "Add a link or a file to this lesson before publishing it.",
+      );
+  }
+  const { error } = await admin
     .from("lms_lessons")
     .update({ status })
     .eq("id", lessonId)

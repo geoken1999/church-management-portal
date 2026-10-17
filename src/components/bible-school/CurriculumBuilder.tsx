@@ -661,7 +661,7 @@ function LessonForm({
         </div>
       </div>
 
-      {type?.needsLink ? (
+      {type?.allowsLink ? (
         <div className="space-y-1.5">
           <Label htmlFor="lesson-link">Link (https://)</Label>
           <Input
@@ -677,12 +677,14 @@ function LessonForm({
         </div>
       ) : null}
 
-      {type?.needsLink && (
+      {type?.allowsUpload && (
         <div className="space-y-1.5">
           <Label htmlFor="lesson-file">
-            Or upload a file here: MP4 video (up to 500 MB), MP3 or M4A audio
-            (up to 100 MB), or a PDF, Word, PowerPoint or Excel document (up to
-            25 MB)
+            {form.contentType === "video"
+              ? "Upload the video (MP4, up to 500 MB)"
+              : form.contentType === "audio"
+                ? "Upload the audio (MP3 or M4A, up to 100 MB)"
+                : "Or upload a file (PDF, Word, PowerPoint or Excel, up to 25 MB)"}
           </Label>
           <div className="flex flex-wrap items-center gap-2">
             {(pendingFile?.name ?? fileName) && (
@@ -697,7 +699,13 @@ function LessonForm({
               type="file"
               className="max-w-xs"
               disabled={pending}
-              accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.mp3,.m4a,.mp4,video/mp4"
+              accept={
+                form.contentType === "video"
+                  ? ".mp4,video/mp4"
+                  : form.contentType === "audio"
+                    ? ".mp3,.m4a,audio/mpeg,audio/mp4"
+                    : ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx"
+              }
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 e.target.value = "";
@@ -747,6 +755,15 @@ function LessonForm({
           {status && (
             <p className="text-xs text-muted-foreground">
               {status} Large videos take a few minutes. Keep this page open.
+            </p>
+          )}
+          {!type?.allowsLink && (
+            <FieldError id="lesson-file-error" message={errors.mediaUrl} />
+          )}
+          {!type?.allowsLink && form.mediaUrl && !fileName && !pendingFile && (
+            <p className="text-xs text-muted-foreground">
+              This lesson still uses an older link ({form.mediaUrl}). Upload a
+              file to replace it.
             </p>
           )}
           <p className="text-xs text-muted-foreground">

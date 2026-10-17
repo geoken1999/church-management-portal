@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { LESSON_TYPES } from "@/lib/lms/constants";
 import {
   LESSON_FILE_TYPES,
   creditedSeconds,
@@ -222,24 +223,42 @@ describe("validateLesson", () => {
   it("needs no link for a reading", () => {
     expect(hasErrors(validateLesson(lesson))).toBe(false);
   });
-  it("needs an https link for video, audio and external lessons", () => {
+  it("needs an https link for external lessons", () => {
+    const external = { ...lesson, contentType: "external" };
+    expect(validateLesson(external).mediaUrl).toBeTruthy();
+    expect(
+      validateLesson({ ...external, mediaUrl: "http://x.com/v" }).mediaUrl,
+    ).toBeTruthy();
+    expect(
+      validateLesson({ ...external, mediaUrl: "javascript:alert(1)" }).mediaUrl,
+    ).toBeTruthy();
+    expect(
+      hasErrors(
+        validateLesson({ ...external, mediaUrl: "https://example.com/a" }),
+      ),
+    ).toBe(false);
+  });
+  it("makes video and audio upload-only", () => {
+    // Nothing yet: the file has to be uploaded.
     expect(
       validateLesson({ ...lesson, contentType: "video" }).mediaUrl,
-    ).toBeTruthy();
+    ).toMatch(/Upload the video/);
     expect(
-      validateLesson({
-        ...lesson,
-        contentType: "video",
-        mediaUrl: "http://x.com/v",
-      }).mediaUrl,
-    ).toBeTruthy();
+      validateLesson({ ...lesson, contentType: "audio" }).mediaUrl,
+    ).toMatch(/Upload the audio/);
+    // A file is on its way (or already attached).
     expect(
-      validateLesson({
-        ...lesson,
-        contentType: "video",
-        mediaUrl: "javascript:alert(1)",
-      }).mediaUrl,
-    ).toBeTruthy();
+      hasErrors(
+        validateLesson({ ...lesson, contentType: "video", hasFile: true }),
+      ),
+    ).toBe(false);
+    expect(
+      hasErrors(
+        validateLesson({ ...lesson, contentType: "audio", hasFile: true }),
+      ),
+    ).toBe(false);
+  });
+  it("lets an older video lesson keep the link it already has", () => {
     expect(
       hasErrors(
         validateLesson({
@@ -249,6 +268,36 @@ describe("validateLesson", () => {
         }),
       ),
     ).toBe(false);
+    expect(
+      validateLesson({
+        ...lesson,
+        contentType: "video",
+        mediaUrl: "http://x.com/v",
+      }).mediaUrl,
+    ).toBeTruthy();
+  });
+  it("tells which lesson types take a link and which take an upload", () => {
+    const by = (value: string) => LESSON_TYPES.find((t) => t.value === value)!;
+    expect(by("video")).toMatchObject({
+      allowsLink: false,
+      allowsUpload: true,
+    });
+    expect(by("audio")).toMatchObject({
+      allowsLink: false,
+      allowsUpload: true,
+    });
+    expect(by("document")).toMatchObject({
+      allowsLink: true,
+      allowsUpload: true,
+    });
+    expect(by("external")).toMatchObject({
+      allowsLink: true,
+      allowsUpload: false,
+    });
+    expect(by("text")).toMatchObject({
+      allowsLink: false,
+      allowsUpload: false,
+    });
   });
   it("does not allow lesson types that come in later phases", () => {
     expect(

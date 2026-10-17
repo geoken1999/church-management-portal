@@ -137,7 +137,7 @@ church has a published course visible to the member.
 - **Uploading.** In a video, audio, document or resource lesson, save the lesson, then upload a file: MP4 video up to
   500 MB, MP3 / M4A audio up to 100 MB, PDF / Word / PowerPoint / Excel up to 25 MB. The file goes from the browser
   straight to the private bucket with a one-time upload link the server issued for a path it chose; the server then checks
-  the object exists and is within its limit before attaching it. External links still work as before.
+  the object exists and is within its limit before attaching it. Video and audio lessons are **upload-only** (no link field), so they always play inside the app and their progress is tracked; document and resource lessons take a link or a file; external lessons take a link. A video or audio lesson that already carried a link keeps working until a file replaces it. A lesson cannot be published until it has a file or link.
 - **Playing.** The member app streams the file from storage with a 5-minute signed link (the platform seeks and buffers
   as it plays; it does not download the whole file first). Controls: play / pause, back / forward 10 s, speed (0.75x to 2x),
   seek bar, and resume where the member stopped.

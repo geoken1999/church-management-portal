@@ -23,12 +23,51 @@ export const VISIBILITIES = [
 // Lesson types a teacher can create now. quiz, assignment and live_session lessons arrive with the
 // phases that build quizzes, assignments and live classes; the database already reserves them.
 export const LESSON_TYPES = [
-  { value: "text", label: "Reading", needsLink: false },
-  { value: "video", label: "Video", needsLink: true },
-  { value: "audio", label: "Audio", needsLink: true },
-  { value: "document", label: "Document (PDF)", needsLink: true },
-  { value: "resource", label: "Downloadable resource", needsLink: true },
-  { value: "external", label: "External resource", needsLink: true },
+  // needsLink: the lesson has to have a source (a link or an uploaded file) before it can be published.
+  // Videos and audio are upload-only: they play inside the app and their progress is tracked, which a
+  // link to another site cannot do. Older lessons that already carry a link keep working.
+  {
+    value: "text",
+    label: "Reading",
+    needsLink: false,
+    allowsLink: false,
+    allowsUpload: false,
+  },
+  {
+    value: "video",
+    label: "Video",
+    needsLink: true,
+    allowsLink: false,
+    allowsUpload: true,
+  },
+  {
+    value: "audio",
+    label: "Audio",
+    needsLink: true,
+    allowsLink: false,
+    allowsUpload: true,
+  },
+  {
+    value: "document",
+    label: "Document (PDF)",
+    needsLink: true,
+    allowsLink: true,
+    allowsUpload: true,
+  },
+  {
+    value: "resource",
+    label: "Downloadable resource",
+    needsLink: true,
+    allowsLink: true,
+    allowsUpload: true,
+  },
+  {
+    value: "external",
+    label: "External resource",
+    needsLink: true,
+    allowsLink: true,
+    allowsUpload: false,
+  },
 ] as const;
 
 export type LessonType = (typeof LESSON_TYPES)[number]["value"];

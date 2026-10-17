@@ -173,12 +173,25 @@ export function validateLesson(
   if (!type) {
     errors.contentType = "Choose a lesson type.";
   } else if (type.needsLink) {
-    if (!input.mediaUrl.trim()) {
-      if (!input.hasFile)
+    const link = input.mediaUrl.trim();
+    if (!type.allowsLink) {
+      // Video and audio come from an uploaded file. A link only survives from an older lesson.
+      if (!input.hasFile && !link) {
         errors.mediaUrl =
-          "Add a link for this lesson, or upload a file after saving it.";
-    } else if (!isHttpsUrl(input.mediaUrl.trim()))
+          type.value === "video"
+            ? "Upload the video (an MP4 file) for this lesson."
+            : "Upload the audio (an MP3 or M4A file) for this lesson.";
+      } else if (link && !isHttpsUrl(link)) {
+        errors.mediaUrl = "The link must start with https://.";
+      }
+    } else if (!link) {
+      if (!type.allowsUpload || !input.hasFile)
+        errors.mediaUrl = type.allowsUpload
+          ? "Add a link for this lesson, or upload a file."
+          : "Add the link for this lesson.";
+    } else if (!isHttpsUrl(link)) {
       errors.mediaUrl = "The link must start with https://.";
+    }
   }
   if (input.body.length > 200000) errors.body = "This lesson is too long.";
   if (input.durationMinutes.trim()) {

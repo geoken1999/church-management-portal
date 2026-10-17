@@ -1,0 +1,119 @@
+# Bible School (LMS) for KingdomFlow
+
+A native KingdomFlow module for running a Bible school: programs, courses, curriculum, instructors,
+students and enrollments. Built in phases; this document covers the architecture audit and **Phase 1
+(foundation)**. Later phases are listed at the end.
+
+## 1. Architecture audit
+
+What the repository already provides, and how the module uses it.
+
+| Area | What exists | How the LMS uses it |
+| --- | --- | --- |
+| Framework | Next.js 16 App Router, TypeScript, Tailwind v4, shadcn-style `components/ui`, Vitest | Same conventions; pages under `src/app/dashboard/bible-school`, logic under `src/lib/lms` |
+| Tenancy | `organizations`, `organization_members` (owner / admin / member), `branches`; helpers `is_org_member`, `is_org_admin`, `is_linked_member` | Every LMS row has `organization_id`; RLS uses the same helpers |
+| Module permissions | `TAB_KEYS` (`src/lib/permissions/tabs.ts`), per-login `tab_permissions` (read/write/delete), `checkTabAccess()` on every server action, platform feature flags (new modules start in *testing*), plan switches (`getOrgFeatureState`) | New tab key **`bibleschool`**; all actions go through `checkTabAccess` via `src/lib/lms/authz.ts` |
+| Students | `members` (`auth_user_id` links a member who signs in with their phone) | Students and instructors **are members** (`member_id`); no second person table |
+| Writes | Server actions with the service-role client after a permission check; RLS is read-side defence in depth | Same pattern |
+| Files | Supabase Storage; quota via `checkStorageQuota` | Course covers in public bucket `lms-course-covers`; private lesson files and submissions arrive in later phases |
+| Rich text | Tiptap (email composer) + `sanitize-html` | Lesson text uses Tiptap; `src/lib/lms/sanitize.ts` sanitizes on the server |
+| Notifications | `sendPushToUsers`, `createNotification`, email/SMS/WhatsApp clients | Not used in phase 1; enrollment and class notifications are phase 3 |
+| Calls | K-Connect (`kmeet`, `kaudio`) | Live classes will reuse K-Connect (phase 3) |
+| Billing / entitlements | Plans (`PLANS`), custom plan overrides (`custom_plan_limits.tabOverrides`), onboarding module catalogue (built from `TAB_KEYS`) | The module appears automatically in the onboarding module catalogue and the Feature Flags page; plan limits come in phase 5 |
+| Audit | `logPlatformEvent` (platform-wide) | New per-church `lms_audit_events` for sensitive LMS actions |
+| i18n | Dictionaries in en / hi / ta | Nav label added in all three |
+
+### Conflicts and decisions
+
+- **Branch scoping.** The platform has no per-login branch restriction (`organization_members` has no branch).
+  `branch_id` is stored on programs and courses for filtering and reporting, but permissions are church-wide.
+- **Student sign-in.** Members use the mobile app (phone sign-in); the web dashboard is for staff logins.
+  The student portal therefore ships in the mobile app (phase 2). Phase 1 includes the data model, the read-side
+  RLS for students, and admin-side enrollment.
+- **Instructors.** An instructor is a member. To edit curriculum from the dashboard they also need a team login with
+  read access on the Bible School tab, linked on the course's Instructors tab (`lms_course_instructors.auth_user_id`).
+- **Transactions.** supabase-js has none, so capacity checks, enrollment decisions and reordering are Postgres
+  functions called by the server (`lms_create_enrollment`, `lms_decide_enrollment`, `lms_move_module`, `lms_move_lesson`).
+
+## 2. Phase 1 scope
+
+Foundation: navigation and permissions, settings, programs, courses, curriculum (modules and lessons),
+instructors, enrollments (admin direct enrollment, approve / reject / activate / withdraw), overview counts.
+
+### Routes
+
+| Route | Who | What |
+| --- | --- | --- |
+| `/dashboard/bible-school` | Anyone with Bible School read | Overview (real counts; an instructor sees only their courses) |
+| `/dashboard/bible-school/programs` | Write | Programs and their courses |
+| `/dashboard/bible-school/courses` | Read (instructors: only their courses) | Search, filter, paginate; create (write) |
+| `/dashboard/bible-school/courses/[id]` | Write, or an instructor of that course | Tabs: Curriculum, Details (write), Instructors, Enrollments |
+| `/dashboard/bible-school/enrollments` | Read (instructors: only their courses) | Filter and paginate; enroll and decide (write) |
+| `/dashboard/bible-school/settings` | Write | School name, default language, enrollment policy |
+
+### Permissions
+
+Mapped onto the existing tab permissions; no separate role engine.
+
+| Action | Needs |
+| --- | --- |
+| View the module | Bible School **read** (and the module not hidden by feature flag / plan) |
+| Settings, programs, create / edit / publish / archive courses, instructors, prerequisites, enrollments | **write** |
+| Delete programs and courses | **delete** (and only drafts / unenrolled) |
+| Edit a course's curriculum | **write**, or **read** plus being an assigned instructor of that course |
+
+Owners and admins have everything. New modules start in *testing*: only the platform test users see Bible School
+until a platform admin moves it to Beta or Live (Super Admin → Feature Flags).
+
+### Database (migration `0190_lms_foundation.sql`, additive)
+
+`lms_settings`, `lms_programs`, `lms_courses`, `lms_program_courses`, `lms_course_prerequisites`,
+`lms_course_instructors`, `lms_modules`, `lms_lessons`, `lms_enrollments`, `lms_audit_events`; helper functions
+`lms_my_member_ids`, `lms_has_course_access`; transactional functions listed above; storage bucket `lms-course-covers`.
+
+Invariants enforced in the database: one open enrollment per student and course (partial unique index); course codes
+unique per church; capacity checked under a row lock; enrollment window and "published" checked when enrolling;
+published curriculum items are archived, not deleted.
+
+**RLS.** Staff can read their church's rows; owners and admins can write directly; the audit trail is admin-read-only.
+Students (members signed in with their phone) can read published courses of their own church (unlisted ones only when
+enrolled), their own enrollments, and published modules and lessons of courses they are enrolled in (plus free previews).
+They have no write policy anywhere. The four transactional functions are revoked from `public`, `anon` and `authenticated`.
+
+### Environment
+
+No new environment variables. Apply `supabase/migrations/0190_lms_foundation.sql` in Supabase, then move the module out of
+*testing* in Super Admin → Feature Flags when ready.
+
+## 3. Tests
+
+- `src/lib/lms/lms.test.ts`: validation, the enrollment state machine, capacity, enrollment window, who can manage a course.
+- `src/lib/lms/migration.test.ts`: structural checks on the migration (RLS on every table, church id on every table,
+  students never get write policies, transactional functions locked down, additive only).
+- **Not covered**: running the migration and the RLS policies against a real database, and clicking through the screens.
+  There is no database in the development environment; this must be done on staging before rollout (checklist below).
+
+### Staging checklist (run as each role)
+
+1. As an admin: create a program and a course, add a module and lessons, publish them, publish the course.
+2. Assign an instructor with a linked login; sign in as that login: they see only that course's curriculum and roster.
+3. Enroll a member; with a seat limit of 1, enrolling a second member is refused. Approve / reject a pending one.
+4. As a signed-in member (app login), a direct query for `lms_lessons` returns rows only for courses they are enrolled in.
+5. As a login from another church: no row of this church is readable.
+
+## 4. Known limitations (phase 1)
+
+- No student-facing screens yet (phase 2); self-enrollment requests are not created by anything yet.
+- Prerequisites are stored but not enforced until the student portal exists.
+- Lesson types quiz, assignment and live session are reserved in the database but cannot be created yet.
+- Member pickers load up to 2,000 active members and filter in the browser.
+- Instructor edit rights need a linked team login; instructors without one cannot edit from the web.
+- Plan limits (courses, students, storage) and course fees are not wired in (phase 5).
+
+## 5. Phases
+
+1. **Foundation** (this change).
+2. Learning experience: student portal in the mobile app, catalogue, lesson player, progress, completion rules, secure files.
+3. Teaching operations: live classes (K-Connect), attendance, assignments, submissions, grading, notifications.
+4. Assessments and certification: quizzes and exams, gradebook, PDF certificates and verification.
+5. Reporting and commercial readiness: dashboards, plan entitlements, usage limits, audit coverage, performance and accessibility review.

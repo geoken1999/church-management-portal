@@ -54,6 +54,7 @@ export const en = {
       worship: "Worship",
       media: "Media",
       events: "Events",
+      bibleSchool: "Bible School",
       prayer: "Prayer",
       todos: "To Do",
       planner: "Planner",

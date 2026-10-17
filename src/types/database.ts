@@ -1118,6 +1118,132 @@ export type EmailTemplate = {
 };
 
 // A campaign saved to go out later (migration 0178).
+// ---- Bible School (LMS), migration 0190 ----
+
+export type LmsPublishState = "draft" | "published" | "archived";
+
+export type LmsSettings = {
+  organization_id: string;
+  school_name: string;
+  tagline: string | null;
+  default_language: string;
+  enrollment_requires_approval: boolean;
+  allow_self_enrollment: boolean;
+  updated_at: string;
+};
+
+export type LmsProgram = {
+  id: string;
+  organization_id: string;
+  branch_id: string | null;
+  title: string;
+  description: string | null;
+  objectives: string | null;
+  status: LmsPublishState;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LmsCourse = {
+  id: string;
+  organization_id: string;
+  branch_id: string | null;
+  code: string | null;
+  title: string;
+  description: string | null;
+  objectives: string | null;
+  cover_image_url: string | null;
+  level: "beginner" | "intermediate" | "advanced";
+  language: string;
+  delivery_mode: "self_paced" | "instructor_led" | "blended";
+  status: LmsPublishState;
+  visibility: "organization" | "unlisted";
+  enrollment_opens_at: string | null;
+  enrollment_closes_at: string | null;
+  starts_on: string | null;
+  ends_on: string | null;
+  estimated_hours: number | null;
+  capacity: number | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LmsProgramCourse = { program_id: string; course_id: string; organization_id: string; position: number; is_required: boolean };
+
+export type LmsCoursePrerequisite = { course_id: string; prerequisite_course_id: string; organization_id: string };
+
+export type LmsCourseInstructor = {
+  id: string;
+  course_id: string;
+  organization_id: string;
+  member_id: string;
+  auth_user_id: string | null;
+  role: "lead" | "assistant";
+  created_at: string;
+};
+
+export type LmsModule = {
+  id: string;
+  course_id: string;
+  organization_id: string;
+  title: string;
+  description: string | null;
+  position: number;
+  status: LmsPublishState;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LmsLesson = {
+  id: string;
+  module_id: string;
+  course_id: string;
+  organization_id: string;
+  title: string;
+  content_type: "text" | "video" | "audio" | "document" | "resource" | "external" | "quiz" | "assignment" | "live_session";
+  body: string | null;
+  media_url: string | null;
+  duration_minutes: number | null;
+  position: number;
+  is_required: boolean;
+  is_free_preview: boolean;
+  prerequisite_lesson_id: string | null;
+  status: LmsPublishState;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LmsEnrollment = {
+  id: string;
+  organization_id: string;
+  course_id: string;
+  member_id: string;
+  status: "pending" | "approved" | "active" | "completed" | "withdrawn" | "rejected";
+  source: "admin" | "self";
+  note: string | null;
+  requested_at: string;
+  decided_at: string | null;
+  decided_by: string | null;
+  enrolled_at: string | null;
+  completed_at: string | null;
+  withdrawn_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LmsAuditEvent = {
+  id: number;
+  organization_id: string;
+  actor_auth_user_id: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
 export type AppPopup = {
   id: string;
   organization_id: string;
@@ -3477,6 +3603,66 @@ export type Database = {
         Update: Partial<EmailTemplate>;
         Relationships: [];
       };
+      lms_settings: {
+        Row: LmsSettings;
+        Insert: Partial<LmsSettings> & Pick<LmsSettings, "organization_id">;
+        Update: Partial<LmsSettings>;
+        Relationships: [];
+      };
+      lms_programs: {
+        Row: LmsProgram;
+        Insert: Partial<LmsProgram> & Pick<LmsProgram, "organization_id" | "title">;
+        Update: Partial<LmsProgram>;
+        Relationships: [];
+      };
+      lms_courses: {
+        Row: LmsCourse;
+        Insert: Partial<LmsCourse> & Pick<LmsCourse, "organization_id" | "title">;
+        Update: Partial<LmsCourse>;
+        Relationships: [];
+      };
+      lms_program_courses: {
+        Row: LmsProgramCourse;
+        Insert: Partial<LmsProgramCourse> & Pick<LmsProgramCourse, "program_id" | "course_id" | "organization_id">;
+        Update: Partial<LmsProgramCourse>;
+        Relationships: [];
+      };
+      lms_course_prerequisites: {
+        Row: LmsCoursePrerequisite;
+        Insert: Partial<LmsCoursePrerequisite> & Pick<LmsCoursePrerequisite, "course_id" | "prerequisite_course_id" | "organization_id">;
+        Update: Partial<LmsCoursePrerequisite>;
+        Relationships: [];
+      };
+      lms_course_instructors: {
+        Row: LmsCourseInstructor;
+        Insert: Partial<LmsCourseInstructor> & Pick<LmsCourseInstructor, "course_id" | "organization_id" | "member_id">;
+        Update: Partial<LmsCourseInstructor>;
+        Relationships: [];
+      };
+      lms_modules: {
+        Row: LmsModule;
+        Insert: Partial<LmsModule> & Pick<LmsModule, "course_id" | "organization_id" | "title">;
+        Update: Partial<LmsModule>;
+        Relationships: [];
+      };
+      lms_lessons: {
+        Row: LmsLesson;
+        Insert: Partial<LmsLesson> & Pick<LmsLesson, "module_id" | "course_id" | "organization_id" | "title">;
+        Update: Partial<LmsLesson>;
+        Relationships: [];
+      };
+      lms_enrollments: {
+        Row: LmsEnrollment;
+        Insert: Partial<LmsEnrollment> & Pick<LmsEnrollment, "organization_id" | "course_id" | "member_id">;
+        Update: Partial<LmsEnrollment>;
+        Relationships: [];
+      };
+      lms_audit_events: {
+        Row: LmsAuditEvent;
+        Insert: Partial<LmsAuditEvent> & Pick<LmsAuditEvent, "organization_id" | "action" | "entity_type">;
+        Update: Partial<LmsAuditEvent>;
+        Relationships: [];
+      };
       app_popups: {
         Row: AppPopup;
         Insert: Partial<AppPopup> & Pick<AppPopup, "organization_id" | "title">;
@@ -4136,6 +4322,22 @@ export type Database = {
       get_shared_worship_document: {
         Args: { token: string };
         Returns: { title: string; file_path: string; file_type: string }[];
+      };
+      lms_create_enrollment: {
+        Args: { p_organization_id: string; p_course_id: string; p_member_id: string; p_status: string; p_source: string; p_actor: string; p_ignore_window?: boolean };
+        Returns: string;
+      };
+      lms_decide_enrollment: {
+        Args: { p_organization_id: string; p_enrollment_id: string; p_action: string; p_actor: string };
+        Returns: string;
+      };
+      lms_move_module: {
+        Args: { p_organization_id: string; p_module_id: string; p_direction: number };
+        Returns: undefined;
+      };
+      lms_move_lesson: {
+        Args: { p_organization_id: string; p_lesson_id: string; p_direction: number };
+        Returns: undefined;
       };
       next_invoice_number: {
         Args: { p_fy: string };

@@ -28,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FieldError } from "@/components/auth/FieldError";
 import { ErrorToast } from "@/components/ui/error-toast";
+import { toast } from "sonner";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import { RichTextEditor } from "@/components/bible-school/RichTextEditor";
 
@@ -521,7 +522,46 @@ function LessonForm({
   const [fileName, setFileName] = useState<string | null>(
     lesson?.file_name ?? null,
   );
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
   const type = LESSON_TYPES.find((t) => t.value === form.contentType);
+
+  // Sends a file for a lesson straight to storage and attaches it. Returns a message if it failed.
+  async function uploadFile(
+    lessonId: string,
+    file: File,
+  ): Promise<string | null> {
+    const start = await createLessonUploadAction(
+      organizationId,
+      courseId,
+      lessonId,
+      {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      },
+    );
+    if (start.error || !start.path || !start.token)
+      return start.error ?? "Couldn't start the upload.";
+    const { error: uploadError } = await createBrowserClient()
+      .storage.from("lms-lesson-files")
+      .uploadToSignedUrl(start.path, start.token, file, {
+        contentType: file.type,
+      });
+    if (uploadError) {
+      return uploadError.message?.toLowerCase().includes("size")
+        ? "The file is larger than the storage limit. Ask your administrator to raise the upload limit in Supabase."
+        : `The upload failed (${uploadError.message}). Check your connection and try again.`;
+    }
+    const done = await finalizeLessonUploadAction(
+      organizationId,
+      courseId,
+      lessonId,
+      start.path,
+      file.name,
+    );
+    return done.error ?? null;
+  }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -533,11 +573,32 @@ function LessonForm({
         courseId,
         moduleId,
         lesson?.id ?? null,
-        form,
+        {
+          ...form,
+          hasFile: Boolean(fileName || pendingFile),
+        },
       );
-      if (result.error) setError(result.error);
-      else if (result.fieldErrors) setErrors(result.fieldErrors);
-      else onSaved();
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      if (result.fieldErrors) {
+        setErrors(result.fieldErrors);
+        return;
+      }
+      const savedId = lesson?.id ?? result.id;
+      if (pendingFile && savedId) {
+        setStatus(`Uploading ${pendingFile.name}…`);
+        const problem = await uploadFile(savedId, pendingFile);
+        setStatus(null);
+        if (problem) {
+          // The lesson itself is saved; say why the file is not attached and let them retry from Edit.
+          toast.error(
+            `The lesson was saved, but its file was not attached: ${problem} Open the lesson with Edit to try again.`,
+          );
+        }
+      }
+      onSaved();
     });
   }
 
@@ -619,86 +680,78 @@ function LessonForm({
       {type?.needsLink && (
         <div className="space-y-1.5">
           <Label htmlFor="lesson-file">
-            Or upload a file (PDF, Word, PowerPoint, Excel, MP3, M4A or MP4, up
-            to 25 MB)
+            Or upload a file here: MP4 video (up to 500 MB), MP3 or M4A audio
+            (up to 100 MB), or a PDF, Word, PowerPoint or Excel document (up to
+            25 MB)
           </Label>
-          {lesson ? (
-            <div className="flex flex-wrap items-center gap-2">
-              {fileName && <span className="text-sm">{fileName}</span>}
-              <Input
-                id="lesson-file"
-                type="file"
-                className="max-w-xs"
-                disabled={pending}
-                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.mp3,.m4a,.mp4,video/mp4"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = "";
-                  if (!file) return;
-                  setError(null);
+          <div className="flex flex-wrap items-center gap-2">
+            {(pendingFile?.name ?? fileName) && (
+              <span className="text-sm">
+                {pendingFile
+                  ? `${pendingFile.name} (uploads when you save)`
+                  : fileName}
+              </span>
+            )}
+            <Input
+              id="lesson-file"
+              type="file"
+              className="max-w-xs"
+              disabled={pending}
+              accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.mp3,.m4a,.mp4,video/mp4"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                setError(null);
+                if (lesson) {
+                  // An existing lesson: upload right away.
                   startTransition(async () => {
-                    // The file goes from here straight to storage, so large videos don't pass through the server.
-                    const start = await createLessonUploadAction(
-                      organizationId,
-                      courseId,
-                      lesson.id,
-                      { name: file.name, type: file.type, size: file.size },
-                    );
-                    if (start.error || !start.path || !start.token) {
-                      setError(start.error ?? "Couldn't start the upload.");
-                      return;
-                    }
-                    const { error: uploadError } = await createBrowserClient()
-                      .storage.from("lms-lesson-files")
-                      .uploadToSignedUrl(start.path, start.token, file, {
-                        contentType: file.type,
-                      });
-                    if (uploadError) {
-                      setError(
-                        "The upload failed. Check your connection and try again.",
-                      );
-                      return;
-                    }
-                    const done = await finalizeLessonUploadAction(
-                      organizationId,
-                      courseId,
-                      lesson.id,
-                      start.path,
-                      file.name,
-                    );
-                    if (done.error) setError(done.error);
+                    setStatus(`Uploading ${file.name}…`);
+                    const problem = await uploadFile(lesson.id, file);
+                    setStatus(null);
+                    if (problem) setError(problem);
                     else setFileName(file.name);
                   });
-                }}
-              />
-              {fileName && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={pending}
-                  onClick={() =>
-                    startTransition(async () => {
-                      const result = await removeLessonFileAction(
-                        organizationId,
-                        courseId,
-                        lesson.id,
-                      );
-                      if (result.error) setError(result.error);
-                      else setFileName(null);
-                    })
+                } else {
+                  // A new lesson has no id yet: the file uploads as soon as the lesson is saved.
+                  setPendingFile(file);
+                }
+              }}
+            />
+            {(fileName || pendingFile) && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={pending}
+                onClick={() => {
+                  if (pendingFile || !lesson) {
+                    setPendingFile(null);
+                    return;
                   }
-                >
-                  Remove file
-                </Button>
-              )}
-            </div>
-          ) : (
+                  startTransition(async () => {
+                    const result = await removeLessonFileAction(
+                      organizationId,
+                      courseId,
+                      lesson.id,
+                    );
+                    if (result.error) setError(result.error);
+                    else setFileName(null);
+                  });
+                }}
+              >
+                {pendingFile ? "Clear" : "Remove file"}
+              </Button>
+            )}
+          </div>
+          {status && (
             <p className="text-xs text-muted-foreground">
-              Save the lesson first, then come back to attach a file. Files are
-              private: only enrolled students can open them.
+              {status} Large videos take a few minutes. Keep this page open.
             </p>
           )}
+          <p className="text-xs text-muted-foreground">
+            Files are private: only enrolled students can open them.
+          </p>
         </div>
       )}
 

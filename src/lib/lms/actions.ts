@@ -765,7 +765,7 @@ export async function saveLessonAction(
     : null;
   const fieldErrors = validateLesson({
     ...input,
-    hasFile: Boolean(existing?.file_path),
+    hasFile: Boolean(existing?.file_path) || input.hasFile === true,
   });
   if (hasErrors(fieldErrors)) return { fieldErrors };
   const { data: module_ } = await admin
@@ -803,17 +803,24 @@ export async function saveLessonAction(
       .from("lms_lessons")
       .select("id", { count: "exact", head: true })
       .eq("module_id", moduleId);
-    const { error } = await admin.from("lms_lessons").insert({
-      ...row,
-      module_id: moduleId,
-      course_id: courseId,
-      organization_id: organizationId,
-      position: count ?? 0,
-    });
-    if (error) return fail("Couldn't add the lesson. Please try again.");
+    const { data: created, error } = await admin
+      .from("lms_lessons")
+      .insert({
+        ...row,
+        module_id: moduleId,
+        course_id: courseId,
+        organization_id: organizationId,
+        position: count ?? 0,
+      })
+      .select("id")
+      .single();
+    if (error || !created)
+      return fail("Couldn't add the lesson. Please try again.");
+    refresh(`/courses/${courseId}`);
+    return { success: true, id: created.id };
   }
   refresh(`/courses/${courseId}`);
-  return { success: true };
+  return { success: true, id: lessonId ?? undefined };
 }
 
 export async function setLessonStatusAction(

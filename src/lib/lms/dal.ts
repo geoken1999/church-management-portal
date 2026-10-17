@@ -222,9 +222,7 @@ export async function getCourses(
 }
 
 // Names for a set of member ids, in one query.
-async function memberNames(
-  ids: string[],
-): Promise<Map<string, string>> {
+async function memberNames(ids: string[]): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   if (ids.length === 0) return map;
   const { data } = await createAdminClient()
@@ -425,6 +423,8 @@ export async function getPrograms(
 }
 
 export interface EnrollmentRow extends LmsEnrollment {
+  requiredDone: number;
+  requiredTotal: number;
   studentName: string;
   studentPhone: string | null;
   courseTitle: string;
@@ -487,11 +487,53 @@ export async function getEnrollments(
       ? admin.from("lms_courses").select("id, title").in("id", courseIds)
       : Promise.resolve({ data: [] }),
   ]);
+  // How far each student has got: required lessons done, out of the course's required lessons.
+  const enrollmentIds = list.map((r) => r.id);
+  const [{ data: doneRows }, { data: lessonRows }] = await Promise.all([
+    enrollmentIds.length
+      ? admin
+          .from("lms_lesson_progress")
+          .select("enrollment_id, lesson_id")
+          .in("enrollment_id", enrollmentIds)
+          .not("completed_at", "is", null)
+      : Promise.resolve({ data: [] }),
+    courseIds.length
+      ? admin
+          .from("lms_lessons")
+          .select("id, course_id, module_id")
+          .in("course_id", courseIds)
+          .eq("status", "published")
+          .eq("is_required", true)
+      : Promise.resolve({ data: [] }),
+  ]);
+  const moduleIds = [...new Set((lessonRows ?? []).map((l) => l.module_id))];
+  const { data: publishedModules } = moduleIds.length
+    ? await admin
+        .from("lms_modules")
+        .select("id")
+        .in("id", moduleIds)
+        .eq("status", "published")
+    : { data: [] };
+  const publishedModuleIds = new Set((publishedModules ?? []).map((m) => m.id));
+  const requiredByCourse = new Map<string, Set<string>>();
+  for (const lesson of lessonRows ?? []) {
+    if (!publishedModuleIds.has(lesson.module_id)) continue;
+    if (!requiredByCourse.has(lesson.course_id))
+      requiredByCourse.set(lesson.course_id, new Set());
+    requiredByCourse.get(lesson.course_id)!.add(lesson.id);
+  }
+
   const rows: EnrollmentRow[] = list.map((row) => {
     const m = (members ?? []).find((x) => x.id === row.member_id);
     const c = (courses ?? []).find((x) => x.id === row.course_id);
+    const required = requiredByCourse.get(row.course_id) ?? new Set<string>();
+    const done = (doneRows ?? []).filter(
+      (d) => d.enrollment_id === row.id && required.has(d.lesson_id),
+    ).length;
     return {
       ...(row as LmsEnrollment),
+      requiredDone: done,
+      requiredTotal: required.size,
       studentName: m ? `${m.first_name} ${m.last_name}`.trim() : "Unknown",
       studentPhone: m?.phone ?? null,
       courseTitle: c?.title ?? "Unknown course",

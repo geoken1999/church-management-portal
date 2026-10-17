@@ -14,14 +14,16 @@ export async function logLmsEvent(input: {
   metadata?: Record<string, unknown>;
 }): Promise<void> {
   try {
-    await createAdminClient().from("lms_audit_events").insert({
-      organization_id: input.organizationId,
-      actor_auth_user_id: input.actorAuthUserId,
-      action: input.action,
-      entity_type: input.entityType,
-      entity_id: input.entityId ?? null,
-      metadata: input.metadata ?? {},
-    });
+    await createAdminClient()
+      .from("lms_audit_events")
+      .insert({
+        organization_id: input.organizationId,
+        actor_auth_user_id: input.actorAuthUserId,
+        action: input.action,
+        entity_type: input.entityType,
+        entity_id: input.entityId ?? null,
+        metadata: input.metadata ?? {},
+      });
   } catch (err) {
     console.error("logLmsEvent failed:", err);
   }

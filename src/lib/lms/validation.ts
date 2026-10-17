@@ -156,6 +156,8 @@ export interface LessonInput {
   body: string;
   mediaUrl: string;
   durationMinutes: string;
+  /** The lesson already carries an uploaded file, so it needs no link. */
+  hasFile?: boolean;
 }
 
 export function validateLesson(
@@ -171,9 +173,11 @@ export function validateLesson(
   if (!type) {
     errors.contentType = "Choose a lesson type.";
   } else if (type.needsLink) {
-    if (!input.mediaUrl.trim())
-      errors.mediaUrl = "Add the link for this lesson.";
-    else if (!isHttpsUrl(input.mediaUrl.trim()))
+    if (!input.mediaUrl.trim()) {
+      if (!input.hasFile)
+        errors.mediaUrl =
+          "Add a link for this lesson, or upload a file after saving it.";
+    } else if (!isHttpsUrl(input.mediaUrl.trim()))
       errors.mediaUrl = "The link must start with https://.";
   }
   if (input.body.length > 200000) errors.body = "This lesson is too long.";

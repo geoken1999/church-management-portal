@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  LESSON_FILE_TYPES,
   availableEnrollmentActions,
   canManageCourse,
+  courseComplete,
+  progressPercent,
   countsTowardCapacity,
   courseIsFull,
   enrollmentWindowProblem,
@@ -256,5 +259,52 @@ describe("validateLesson", () => {
     expect(
       validateLesson({ ...lesson, durationMinutes: "30" }).durationMinutes,
     ).toBeUndefined();
+  });
+});
+
+describe("progress", () => {
+  it("is the share of required lessons done", () => {
+    expect(progressPercent(0, 10)).toBe(0);
+    expect(progressPercent(3, 10)).toBe(30);
+    expect(progressPercent(10, 10)).toBe(100);
+    expect(progressPercent(12, 10)).toBe(100);
+  });
+  it("shows no progress for a course with nothing required", () => {
+    expect(progressPercent(0, 0)).toBe(0);
+  });
+  it("completes a course only when every required lesson is done", () => {
+    expect(courseComplete(9, 10)).toBe(false);
+    expect(courseComplete(10, 10)).toBe(true);
+    expect(courseComplete(0, 0)).toBe(false);
+  });
+  it("accepts only the lesson file types it knows", () => {
+    expect(LESSON_FILE_TYPES["application/pdf"]).toBe("pdf");
+    expect(LESSON_FILE_TYPES["text/html"]).toBeUndefined();
+    expect(LESSON_FILE_TYPES["application/x-msdownload"]).toBeUndefined();
+  });
+});
+
+describe("a lesson with an uploaded file", () => {
+  const lesson = {
+    title: "Overview slides",
+    contentType: "document",
+    body: "",
+    mediaUrl: "",
+    durationMinutes: "",
+  };
+  it("needs a link or a file", () => {
+    expect(validateLesson(lesson).mediaUrl).toBeTruthy();
+    expect(
+      validateLesson({ ...lesson, hasFile: true }).mediaUrl,
+    ).toBeUndefined();
+  });
+  it("still rejects a bad link when a file is present", () => {
+    expect(
+      validateLesson({
+        ...lesson,
+        hasFile: true,
+        mediaUrl: "http://x.com/a.pdf",
+      }).mediaUrl,
+    ).toBeTruthy();
   });
 });

@@ -77,3 +77,33 @@ export function canManageCourse(check: TeacherCheck): boolean {
 export function lessonDeletable(status: string): boolean {
   return status === "draft";
 }
+
+// A student's progress through a course: the required lessons they have done out of all the required
+// lessons. A course with no required lessons has nothing to finish, so it shows no progress.
+export function progressPercent(done: number, total: number): number {
+  if (total <= 0) return 0;
+  return Math.min(100, Math.round((done / total) * 100));
+}
+
+// Whether the required lessons are all done. Mirrors lms_complete_lesson in the database: a course
+// with no required lessons is never completed by this rule.
+export function courseComplete(done: number, total: number): boolean {
+  return total > 0 && done >= total;
+}
+
+export const LESSON_FILE_TYPES: Record<string, string> = {
+  "application/pdf": "pdf",
+  "application/msword": "doc",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+    "docx",
+  "application/vnd.ms-powerpoint": "ppt",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+    "pptx",
+  "application/vnd.ms-excel": "xls",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  "audio/mpeg": "mp3",
+  "audio/mp4": "m4a",
+  "video/mp4": "mp4",
+};
+
+export const LESSON_FILE_MAX_BYTES = 25 * 1024 * 1024;

@@ -1210,6 +1210,8 @@ export type LmsLesson = {
   is_required: boolean;
   is_free_preview: boolean;
   prerequisite_lesson_id: string | null;
+  file_path: string | null;
+  file_name: string | null;
   status: LmsPublishState;
   created_at: string;
   updated_at: string;
@@ -1229,8 +1231,19 @@ export type LmsEnrollment = {
   enrolled_at: string | null;
   completed_at: string | null;
   withdrawn_at: string | null;
+  last_lesson_id: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type LmsLessonProgress = {
+  id: string;
+  organization_id: string;
+  enrollment_id: string;
+  lesson_id: string;
+  member_id: string;
+  completed_at: string | null;
+  last_opened_at: string;
 };
 
 export type LmsAuditEvent = {
@@ -3657,6 +3670,12 @@ export type Database = {
         Update: Partial<LmsEnrollment>;
         Relationships: [];
       };
+      lms_lesson_progress: {
+        Row: LmsLessonProgress;
+        Insert: Partial<LmsLessonProgress> & Pick<LmsLessonProgress, "organization_id" | "enrollment_id" | "lesson_id" | "member_id">;
+        Update: Partial<LmsLessonProgress>;
+        Relationships: [];
+      };
       lms_audit_events: {
         Row: LmsAuditEvent;
         Insert: Partial<LmsAuditEvent> & Pick<LmsAuditEvent, "organization_id" | "action" | "entity_type">;
@@ -4322,6 +4341,10 @@ export type Database = {
       get_shared_worship_document: {
         Args: { token: string };
         Returns: { title: string; file_path: string; file_type: string }[];
+      };
+      lms_lesson_file_access: {
+        Args: { p_lesson: string };
+        Returns: string | null;
       };
       lms_create_enrollment: {
         Args: { p_organization_id: string; p_course_id: string; p_member_id: string; p_status: string; p_source: string; p_actor: string; p_ignore_window?: boolean };

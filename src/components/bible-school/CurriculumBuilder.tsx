@@ -8,6 +8,8 @@ import {
   deleteModuleAction,
   moveLessonAction,
   moveModuleAction,
+  removeLessonFileAction,
+  uploadLessonFileAction,
   saveLessonAction,
   saveModuleAction,
   setLessonStatusAction,
@@ -514,6 +516,9 @@ function LessonForm({
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [fileName, setFileName] = useState<string | null>(
+    lesson?.file_name ?? null,
+  );
   const type = LESSON_TYPES.find((t) => t.value === form.contentType);
 
   function submit(e: React.FormEvent) {
@@ -608,6 +613,68 @@ function LessonForm({
           <FieldError id="lesson-link-error" message={errors.mediaUrl} />
         </div>
       ) : null}
+
+      {type?.needsLink && (
+        <div className="space-y-1.5">
+          <Label htmlFor="lesson-file">
+            Or upload a file (PDF, Word, PowerPoint, Excel, MP3, M4A or MP4, up
+            to 25 MB)
+          </Label>
+          {lesson ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {fileName && <span className="text-sm">{fileName}</span>}
+              <Input
+                id="lesson-file"
+                type="file"
+                className="max-w-xs"
+                disabled={pending}
+                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.mp3,.m4a,.mp4"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const data = new FormData();
+                  data.set("organizationId", organizationId);
+                  data.set("courseId", courseId);
+                  data.set("lessonId", lesson.id);
+                  data.set("file", file);
+                  setError(null);
+                  startTransition(async () => {
+                    const result = await uploadLessonFileAction(data);
+                    if (result.error) setError(result.error);
+                    else setFileName(file.name);
+                  });
+                }}
+              />
+              {fileName && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={pending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      const result = await removeLessonFileAction(
+                        organizationId,
+                        courseId,
+                        lesson.id,
+                      );
+                      if (result.error) setError(result.error);
+                      else setFileName(null);
+                    })
+                  }
+                >
+                  Remove file
+                </Button>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Save the lesson first, then come back to attach a file. Files are
+              private: only enrolled students can open them.
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="space-y-1.5">
         {form.contentType === "text" && <Label>Lesson text</Label>}

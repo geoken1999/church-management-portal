@@ -79,3 +79,104 @@ describe("0190_lms_foundation.sql", () => {
     );
   });
 });
+
+const learning = readFileSync(
+  "supabase/migrations/0191_lms_learning.sql",
+  "utf8",
+);
+
+describe("0191_lms_learning.sql", () => {
+  const STUDENT_FUNCTIONS = [
+    "lms_catalog",
+    "lms_my_courses",
+    "lms_course_outline",
+    "lms_request_enrollment",
+    "lms_get_lesson",
+    "lms_complete_lesson",
+    "lms_save_note",
+    "lms_lesson_file_access",
+  ];
+
+  it.each(["lms_lesson_progress", "lms_lesson_notes"])(
+    "%s has row level security and a church id",
+    (name) => {
+      expect(learning).toContain(
+        `alter table public.${name} enable row level security;`,
+      );
+      const start = learning.indexOf(
+        `create table if not exists public.${name} (`,
+      );
+      expect(learning.slice(start, learning.indexOf("\n);", start))).toContain(
+        "organization_id uuid not null references public.organizations",
+      );
+    },
+  );
+
+  it("gives students no write policy on progress or notes", () => {
+    const policies = learning
+      .split("\n")
+      .filter((line) => line.includes("create policy"));
+    expect(policies.length).toBeGreaterThan(0);
+    for (const policy of policies)
+      expect(policy).not.toMatch(/for (insert|update|delete)/);
+  });
+
+  it.each(STUDENT_FUNCTIONS)(
+    "%s is closed to anonymous callers and open to signed-in users",
+    (fn) => {
+      expect(learning).toMatch(
+        new RegExp(
+          `revoke all on function public\\.${fn}\\([^)]*\\) from public, anon;`,
+        ),
+      );
+      expect(learning).toMatch(
+        new RegExp(
+          `grant execute on function public\\.${fn}\\([^)]*\\) to authenticated;`,
+        ),
+      );
+    },
+  );
+
+  it.each([
+    "lms_feature_available",
+    "lms_my_member_in_org",
+    "lms_required_lessons",
+  ])("%s is internal only", (fn) => {
+    expect(learning).toMatch(
+      new RegExp(
+        `revoke all on function public\\.${fn}\\([^)]*\\) from public, anon, authenticated;`,
+      ),
+    );
+  });
+
+  it("works out who the student is from the session, never from an argument", () => {
+    for (const fn of [
+      "lms_get_lesson",
+      "lms_complete_lesson",
+      "lms_save_note",
+      "lms_request_enrollment",
+    ]) {
+      const start = learning.indexOf(
+        `create or replace function public.${fn}(`,
+      );
+      const signature = learning.slice(
+        start,
+        learning.indexOf("returns", start),
+      );
+      expect(signature).not.toMatch(/member/i);
+    }
+    expect(learning).toContain("auth.uid()");
+  });
+
+  it("never deletes student progress when a lesson is deleted", () => {
+    expect(learning).toMatch(
+      /lesson_id uuid not null references public\.lms_lessons \(id\) on delete restrict/,
+    );
+  });
+
+  it("keeps lesson files in a private bucket", () => {
+    expect(learning).toMatch(
+      /values \('lms-lesson-files', 'lms-lesson-files', false/,
+    );
+  });
+});

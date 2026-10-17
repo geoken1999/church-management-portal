@@ -85,12 +85,69 @@ They have no write policy anywhere. The four transactional functions are revoked
 No new environment variables. Apply `supabase/migrations/0190_lms_foundation.sql` in Supabase, then move the module out of
 *testing* in Super Admin → Feature Flags when ready.
 
-## 3. Tests
+## 3. Phase 2: the learning experience (migration `0191_lms_learning.sql`)
+
+Students use the **mobile app** (Space tab, "Bible School" card). The card appears only when Bible School is
+switched on for the church (Beta or Live in Super Admin → Feature Flags, and not switched off by the plan) and the
+church has a published course visible to the member.
+
+### What a student can do
+
+- Browse the catalogue (published courses of their church; unlisted ones only once joined), see seats left,
+  dates and unmet prerequisites.
+- Ask to join a course. The church's rules apply on the server: self-enrollment allowed, enrollment open,
+  seats left, prerequisites completed. The result is *pending* (waits for an administrator) or *approved*,
+  per the school setting "Enrollment requests wait for an administrator".
+- Open the outline and lessons (reading, video, audio, document, resource, external link). Direct media links
+  (mp4, m3u8, mp3, m4a ...) play inside the app; other links (YouTube etc.) open outside it. Uploaded files are private.
+- Mark lessons complete (and undo), keep a private note, bookmark, resume where they stopped, and move to the
+  previous / next unlocked lesson.
+- See progress: required lessons done out of required lessons.
+
+### Rules (explicit)
+
+- **Completion.** A course is complete when every *required* lesson that is published, in a published module of a
+  published course, is completed. Optional lessons never block it. A course with no required lessons is never
+  completed by this rule. Completing is one-way: lessons added later do not reopen a finished course.
+- **Access.** A lesson opens for an *approved, active or completed* enrollment, or as a free preview for any member
+  of the church. A lesson with an earlier-lesson prerequisite stays locked until that lesson is completed.
+- **Starting.** Approved enrollments become *active* the first time a lesson is opened.
+- **History.** A lesson that students have opened cannot be deleted (database `restrict`); archive it instead.
+
+### How it is secured
+
+- Every student call is a Postgres function (`lms_catalog`, `lms_my_courses`, `lms_course_outline`,
+  `lms_request_enrollment`, `lms_get_lesson`, `lms_complete_lesson`, `lms_save_note`, `lms_lesson_file_access`)
+  that works out the member from `auth.uid()`. None takes a member id; none is callable without signing in.
+- Progress writes are idempotent and serialised per enrollment (row lock), so two devices or a double tap cannot
+  double count or complete a course twice.
+- Lesson files are in the private bucket `lms-lesson-files`. The app calls `GET /api/mobile/lms/lesson-file?lessonId=`
+  with its session; the route asks the database whether the member may open the lesson (using the member's own
+  token) and only then returns a 5-minute signed link. The storage path is never sent to the app.
+- Notes are readable only by their author (not even staff). Progress is readable by the student and church staff.
+- Reading text is sanitized on the server (allow-list) and drawn by the app from the same small tag set.
+
+### Administrators
+
+- Attach a private file to a lesson (PDF, Word, PowerPoint, Excel, MP3, M4A, MP4; up to 25 MB; counts against storage).
+- A course's Enrollments tab and the Enrollments page show each student's progress (required lessons done).
+
+### Phase 2 acceptance checklist (staging, as a member signed in on the app)
+
+1. Bible School at *Testing*: the card is hidden. Move it to Beta: the card appears for a church with a published course.
+2. Join a course (pending / approved per the setting); a full or closed course says so; unmet prerequisites block it.
+3. Open lessons, mark done, kill and reopen the app on another phone: progress is the same.
+4. Finish all required lessons: the course shows Completed; add a new required lesson: it stays Completed.
+5. Open a file lesson: the file opens; the same link requested after unenrolling is refused.
+6. A member of another church sees nothing; a non-enrolled member cannot open a non-preview lesson.
+
+## 4. Tests
 
 - `src/lib/lms/lms.test.ts`: validation, the enrollment state machine, capacity, enrollment window, who can manage a course.
 - `src/lib/lms/migration.test.ts`: structural checks on the migration (RLS on every table, church id on every table,
   students never get write policies, transactional functions locked down, additive only).
-- **Not covered**: running the migration and the RLS policies against a real database, and clicking through the screens.
+- Phase 2: `0191` structure tests (RLS, no student writes, functions closed to anonymous callers, no member-id arguments, progress restrict, private bucket); progress and file-type rules; app tests for progress, course navigation (next / previous / resume), catalogue seats and dates, media link detection and the reading-lesson renderer.
+- **Not covered**: running the migrations and the RLS policies against a real database, and clicking through the screens.
   There is no database in the development environment; this must be done on staging before rollout (checklist below).
 
 ### Staging checklist (run as each role)
@@ -101,19 +158,21 @@ No new environment variables. Apply `supabase/migrations/0190_lms_foundation.sql
 4. As a signed-in member (app login), a direct query for `lms_lessons` returns rows only for courses they are enrolled in.
 5. As a login from another church: no row of this church is readable.
 
-## 4. Known limitations (phase 1)
+## 5. Known limitations
 
-- No student-facing screens yet (phase 2); self-enrollment requests are not created by anything yet.
-- Prerequisites are stored but not enforced until the student portal exists.
+- Students use the mobile app only; there is no web student portal.
+- Prerequisites are enforced when a member asks to join; an administrator enrolling directly can override them.
+- YouTube / Vimeo links open outside the app; only direct media files and uploaded files play inside it.
+- Notifications to students (approval, new lessons) arrive with phase 3.
 - Lesson types quiz, assignment and live session are reserved in the database but cannot be created yet.
 - Member pickers load up to 2,000 active members and filter in the browser.
 - Instructor edit rights need a linked team login; instructors without one cannot edit from the web.
 - Plan limits (courses, students, storage) and course fees are not wired in (phase 5).
 
-## 5. Phases
+## 6. Phases
 
-1. **Foundation** (this change).
-2. Learning experience: student portal in the mobile app, catalogue, lesson player, progress, completion rules, secure files.
+1. **Foundation** (done).
+2. **Learning experience** (done): student portal in the mobile app, catalogue, lesson player, progress, completion rules, secure files.
 3. Teaching operations: live classes (K-Connect), attendance, assignments, submissions, grading, notifications.
 4. Assessments and certification: quizzes and exams, gradebook, PDF certificates and verification.
 5. Reporting and commercial readiness: dashboards, plan entitlements, usage limits, audit coverage, performance and accessibility review.

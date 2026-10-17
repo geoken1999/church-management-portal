@@ -7,7 +7,11 @@ import { authorizeCurriculum, authorizeTab } from "@/lib/lms/authz";
 import { logLmsEvent } from "@/lib/lms/audit";
 import { sanitizeLessonHtml } from "@/lib/lms/sanitize";
 import { LMS_BASE_PATH, type EnrollmentAction } from "@/lib/lms/constants";
-import { lessonDeletable } from "@/lib/lms/rules";
+import {
+  LESSON_FILE_MAX_BYTES,
+  LESSON_FILE_TYPES,
+  lessonDeletable,
+} from "@/lib/lms/rules";
 import {
   hasErrors,
   validateCourse,
@@ -246,16 +250,14 @@ export async function setProgramCoursesAction(
   if (clearError)
     return fail("Couldn't update the program's courses. Please try again.");
   if (unique.length > 0) {
-    const { error } = await admin
-      .from("lms_program_courses")
-      .insert(
-        unique.map((courseId, position) => ({
-          program_id: programId,
-          course_id: courseId,
-          organization_id: organizationId,
-          position,
-        })),
-      );
+    const { error } = await admin.from("lms_program_courses").insert(
+      unique.map((courseId, position) => ({
+        program_id: programId,
+        course_id: courseId,
+        organization_id: organizationId,
+        position,
+      })),
+    );
     if (error)
       return fail("Couldn't update the program's courses. Please try again.");
   }
@@ -518,15 +520,13 @@ export async function setPrerequisitesAction(
     .eq("course_id", courseId)
     .eq("organization_id", organizationId);
   if (unique.length > 0) {
-    const { error } = await admin
-      .from("lms_course_prerequisites")
-      .insert(
-        unique.map((id) => ({
-          course_id: courseId,
-          prerequisite_course_id: id,
-          organization_id: organizationId,
-        })),
-      );
+    const { error } = await admin.from("lms_course_prerequisites").insert(
+      unique.map((id) => ({
+        course_id: courseId,
+        prerequisite_course_id: id,
+        organization_id: organizationId,
+      })),
+    );
     if (error)
       return fail("Couldn't save the prerequisites. Please try again.");
   }
@@ -569,15 +569,13 @@ export async function addInstructorAction(
       .maybeSingle();
     if (!login) return fail("That team login could not be found.");
   }
-  const { error } = await admin
-    .from("lms_course_instructors")
-    .insert({
-      course_id: courseId,
-      organization_id: organizationId,
-      member_id: memberId,
-      auth_user_id: authUserId || null,
-      role,
-    });
+  const { error } = await admin.from("lms_course_instructors").insert({
+    course_id: courseId,
+    organization_id: organizationId,
+    member_id: memberId,
+    auth_user_id: authUserId || null,
+    role,
+  });
   if (error?.code === "23505")
     return fail("That person already teaches this course.");
   if (error) return fail("Couldn't add the instructor. Please try again.");
@@ -657,14 +655,12 @@ export async function saveModuleAction(
       .from("lms_modules")
       .select("id", { count: "exact", head: true })
       .eq("course_id", courseId);
-    const { error } = await admin
-      .from("lms_modules")
-      .insert({
-        ...row,
-        course_id: courseId,
-        organization_id: organizationId,
-        position: count ?? 0,
-      });
+    const { error } = await admin.from("lms_modules").insert({
+      ...row,
+      course_id: courseId,
+      organization_id: organizationId,
+      position: count ?? 0,
+    });
     if (error) return fail("Couldn't add the module. Please try again.");
   }
   refresh(`/courses/${courseId}`);
@@ -754,9 +750,24 @@ export async function saveLessonAction(
 ): Promise<LmsResult> {
   const access = await authorizeCurriculum(organizationId, courseId);
   if (!access.ok) return fail(access.message);
-  const fieldErrors = validateLesson(input);
-  if (hasErrors(fieldErrors)) return { fieldErrors };
   const admin = createAdminClient();
+  // A lesson that already has an uploaded file doesn't need a link.
+  const existing = lessonId
+    ? (
+        await admin
+          .from("lms_lessons")
+          .select("file_path")
+          .eq("id", lessonId)
+          .eq("course_id", courseId)
+          .eq("organization_id", organizationId)
+          .maybeSingle()
+      ).data
+    : null;
+  const fieldErrors = validateLesson({
+    ...input,
+    hasFile: Boolean(existing?.file_path),
+  });
+  if (hasErrors(fieldErrors)) return { fieldErrors };
   const { data: module_ } = await admin
     .from("lms_modules")
     .select("id")
@@ -772,7 +783,7 @@ export async function saveLessonAction(
     title: input.title.trim(),
     content_type: type,
     body: type === "text" ? sanitizeLessonHtml(input.body) : null,
-    media_url: type === "text" ? null : input.mediaUrl.trim(),
+    media_url: type === "text" ? null : input.mediaUrl.trim() || null,
     duration_minutes: input.durationMinutes.trim()
       ? Number(input.durationMinutes)
       : null,
@@ -792,15 +803,13 @@ export async function saveLessonAction(
       .from("lms_lessons")
       .select("id", { count: "exact", head: true })
       .eq("module_id", moduleId);
-    const { error } = await admin
-      .from("lms_lessons")
-      .insert({
-        ...row,
-        module_id: moduleId,
-        course_id: courseId,
-        organization_id: organizationId,
-        position: count ?? 0,
-      });
+    const { error } = await admin.from("lms_lessons").insert({
+      ...row,
+      module_id: moduleId,
+      course_id: courseId,
+      organization_id: organizationId,
+      position: count ?? 0,
+    });
     if (error) return fail("Couldn't add the lesson. Please try again.");
   }
   refresh(`/courses/${courseId}`);
@@ -845,6 +854,14 @@ export async function deleteLessonAction(
   if (!lesson) return fail("That lesson could not be found.");
   if (!lessonDeletable(lesson.status))
     return fail("Archive a published lesson instead of deleting it.");
+  const { count: progressRows } = await admin
+    .from("lms_lesson_progress")
+    .select("id", { count: "exact", head: true })
+    .eq("lesson_id", lessonId);
+  if (progressRows)
+    return fail(
+      "Students have already opened this lesson. Archive it instead of deleting it.",
+    );
   const { error } = await admin
     .from("lms_lessons")
     .delete()
@@ -963,5 +980,98 @@ export async function decideEnrollmentAction(
     metadata: { status: data },
   });
   refresh("/enrollments");
+  return { success: true };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Lesson files (private)
+// ---------------------------------------------------------------------------------------------
+
+const LESSON_BUCKET = "lms-lesson-files";
+
+// Attaches a private file to a lesson. Students never get the storage path: the server hands out a
+// short-lived link after checking that they may open the lesson (/api/mobile/lms/lesson-file).
+export async function uploadLessonFileAction(
+  formData: FormData,
+): Promise<LmsResult> {
+  const organizationId = String(formData.get("organizationId") ?? "");
+  const courseId = String(formData.get("courseId") ?? "");
+  const lessonId = String(formData.get("lessonId") ?? "");
+  const access = await authorizeCurriculum(organizationId, courseId);
+  if (!access.ok) return fail(access.message);
+  const admin = createAdminClient();
+  const { data: lesson } = await admin
+    .from("lms_lessons")
+    .select("file_path, content_type")
+    .eq("id", lessonId)
+    .eq("course_id", courseId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (!lesson) return fail("Save the lesson first, then attach a file to it.");
+  if (lesson.content_type === "text")
+    return fail(
+      "A reading lesson has no file. Use a document, audio, video or resource lesson.",
+    );
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0)
+    return fail("Choose a file to upload.");
+  const ext = LESSON_FILE_TYPES[file.type];
+  if (!ext)
+    return fail("Use a PDF, Word, PowerPoint, Excel, MP3, M4A or MP4 file.");
+  if (file.size > LESSON_FILE_MAX_BYTES)
+    return fail("That file is over 25 MB.");
+  const quota = await checkStorageQuota(organizationId, file.size);
+  if (quota) return fail(quota);
+
+  const path = `${organizationId}/${courseId}/${lessonId}-${crypto.randomUUID()}.${ext}`;
+  const { error } = await admin.storage
+    .from(LESSON_BUCKET)
+    .upload(path, new Uint8Array(await file.arrayBuffer()), {
+      contentType: file.type,
+    });
+  if (error) return fail("Couldn't upload that file. Try again.");
+  const { error: saveError } = await admin
+    .from("lms_lessons")
+    .update({ file_path: path, file_name: file.name.slice(0, 200) })
+    .eq("id", lessonId)
+    .eq("organization_id", organizationId);
+  if (saveError) {
+    await admin.storage.from(LESSON_BUCKET).remove([path]);
+    return fail("Couldn't save the file. Try again.");
+  }
+  if (lesson.file_path)
+    await admin.storage.from(LESSON_BUCKET).remove([lesson.file_path]);
+  refresh(`/courses/${courseId}`);
+  return { success: true };
+}
+
+export async function removeLessonFileAction(
+  organizationId: string,
+  courseId: string,
+  lessonId: string,
+): Promise<LmsResult> {
+  const access = await authorizeCurriculum(organizationId, courseId);
+  if (!access.ok) return fail(access.message);
+  const admin = createAdminClient();
+  const { data: lesson } = await admin
+    .from("lms_lessons")
+    .select("file_path, media_url")
+    .eq("id", lessonId)
+    .eq("course_id", courseId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (!lesson?.file_path) return fail("This lesson has no file.");
+  if (!lesson.media_url)
+    return fail(
+      "Add a link to this lesson before removing its file, so it isn't left empty.",
+    );
+  const { error } = await admin
+    .from("lms_lessons")
+    .update({ file_path: null, file_name: null })
+    .eq("id", lessonId)
+    .eq("organization_id", organizationId);
+  if (error) return fail("Couldn't remove the file. Try again.");
+  await admin.storage.from(LESSON_BUCKET).remove([lesson.file_path]);
+  refresh(`/courses/${courseId}`);
   return { success: true };
 }

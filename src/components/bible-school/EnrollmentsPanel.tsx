@@ -8,7 +8,7 @@ import {
   type LmsResult,
 } from "@/lib/lms/actions";
 import { ENROLLMENT_LABELS, type EnrollmentAction } from "@/lib/lms/constants";
-import { availableEnrollmentActions } from "@/lib/lms/rules";
+import { availableEnrollmentActions, progressPercent } from "@/lib/lms/rules";
 import type { EnrollmentRow, MemberOption } from "@/lib/lms/dal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -219,6 +219,10 @@ export function EnrollmentsPanel({
                       : "Enrolled by an admin"}{" "}
                     on {new Date(row.requested_at).toLocaleDateString()}
                     {row.studentPhone ? ` · ${row.studentPhone}` : ""}
+                    {row.requiredTotal > 0 &&
+                    ["approved", "active", "completed"].includes(row.status)
+                      ? ` · ${row.requiredDone}/${row.requiredTotal} required lessons (${progressPercent(row.requiredDone, row.requiredTotal)}%)`
+                      : ""}
                   </p>
                 </div>
                 {canManage && (

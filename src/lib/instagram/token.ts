@@ -1,4 +1,5 @@
 import "server-only";
+import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { refreshLongLivedToken } from "@/lib/instagram/client";
@@ -20,13 +21,14 @@ export async function getValidAccessToken(connection: InstagramConnection): Prom
     return connection.access_token;
   }
 
+  // connection.access_token is already the plain token (the readers open it).
   const refreshed = await refreshLongLivedToken(connection.access_token);
   const tokenExpiresAt = new Date(Date.now() + refreshed.expiresInSeconds * 1000).toISOString();
 
   const supabase = createAdminClient();
   await supabase
     .from("instagram_connections")
-    .update({ access_token: refreshed.accessToken, token_expires_at: tokenExpiresAt })
+    .update({ access_token: sealSecret(refreshed.accessToken), token_expires_at: tokenExpiresAt })
     .eq("id", connection.id);
 
   return refreshed.accessToken;

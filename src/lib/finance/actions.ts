@@ -1,6 +1,7 @@
 "use server";
 
 import { connectedGateways, getOwnGatewayChoice } from "@/lib/payments/own-accounts";
+import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
 import { GATEWAY_LABELS } from "@/lib/payments/gateways";
 import { dateKeyInTimezone } from "@/lib/organizations/timezone";
 import { getOrganizationTimezone } from "@/lib/organizations/org-timezone";
@@ -523,7 +524,7 @@ export async function saveOwnRazorpayAccount(
   const admin = createAdminClient();
   const { error } = await admin
     .from("organization_razorpay_accounts")
-    .upsert({ organization_id: organizationId, key_id: keyId, key_secret: keySecret, connected_by: user.id }, { onConflict: "organization_id" });
+    .upsert({ organization_id: organizationId, key_id: keyId, key_secret: sealSecret(keySecret), connected_by: user.id }, { onConflict: "organization_id" });
 
   if (error) {
     return { error: "Couldn't save that Razorpay account. Please try again." };

@@ -1,4 +1,5 @@
 import "server-only";
+import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
 
 import { cache } from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -22,7 +23,7 @@ export const getFacebookConnection = cache(async (organizationId: string) => {
     .eq("organization_id", organizationId)
     .maybeSingle();
 
-  return data;
+  return data ? { ...data, access_token: openSecret(data.access_token) } : data;
 });
 
 export interface FacebookConnectionSummary {

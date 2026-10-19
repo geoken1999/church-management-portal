@@ -1,4 +1,5 @@
 import "server-only";
+import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -117,7 +118,7 @@ export async function findConnectionByMessagingId(messagingUserId: string): Prom
     .select("*")
     .eq("messaging_user_id", messagingUserId)
     .maybeSingle();
-  return data;
+  return data ? { ...data, access_token: openSecret(data.access_token) } : data;
 }
 
 export async function getAiModeForWebhook(organizationId: string, participantId: string): Promise<boolean> {

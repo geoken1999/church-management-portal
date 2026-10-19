@@ -1,4 +1,5 @@
 import "server-only";
+import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Gateway } from "@/lib/payments/gateways";
@@ -15,7 +16,7 @@ export async function getOwnAccount(organizationId: string, gateway: Gateway): P
   const admin = createAdminClient();
   if (gateway === "razorpay") {
     const { data } = await admin.from("organization_razorpay_accounts").select("key_id, key_secret").eq("organization_id", organizationId).maybeSingle();
-    return data ? { keyId: data.key_id, keySecret: data.key_secret, environment: "live" } : null;
+    return data ? { keyId: data.key_id, keySecret: openSecret(data.key_secret), environment: "live" } : null;
   }
   const { data } = await admin
     .from("organization_gateway_accounts")
@@ -23,7 +24,7 @@ export async function getOwnAccount(organizationId: string, gateway: Gateway): P
     .eq("organization_id", organizationId)
     .eq("gateway", gateway)
     .maybeSingle();
-  return data ? { keyId: data.key_id, keySecret: data.key_secret, environment: data.environment as "live" | "test" } : null;
+  return data ? { keyId: data.key_id, keySecret: openSecret(data.key_secret), environment: data.environment as "live" | "test" } : null;
 }
 
 export async function getOwnGatewayChoice(organizationId: string): Promise<Gateway> {

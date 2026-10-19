@@ -1,4 +1,5 @@
 import "server-only";
+import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
 
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
@@ -31,7 +32,9 @@ export const getYouTubeConnection = cache(async (organizationId: string) => {
     .eq("is_active", true)
     .maybeSingle();
 
-  return data;
+  return data
+    ? { ...data, access_token: openSecret(data.access_token), refresh_token: openSecret(data.refresh_token) }
+    : data;
 });
 
 export interface YouTubeChannelOption {

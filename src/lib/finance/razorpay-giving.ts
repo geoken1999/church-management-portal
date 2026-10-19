@@ -1,4 +1,5 @@
 import "server-only";
+import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
 
 import crypto from "node:crypto";
 import { Razorpay } from "@/lib/billing/razorpay";
@@ -36,7 +37,7 @@ export async function getGivingCredentials(
     .maybeSingle();
 
   if (!data) return null;
-  return { keyId: data.key_id, keySecret: data.key_secret };
+  return { keyId: data.key_id, keySecret: openSecret(data.key_secret) };
 }
 
 export function createGivingRazorpayClient(credentials: GivingCredentials): Razorpay {

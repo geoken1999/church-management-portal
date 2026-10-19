@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { refreshLongLivedToken } from "@/lib/instagram/client";
 import { withCronLogging } from "@/lib/cron/run-logger";
@@ -36,11 +37,11 @@ async function run(request: Request) {
 
   for (const connection of connections ?? []) {
     try {
-      const result = await refreshLongLivedToken(connection.access_token);
+      const result = await refreshLongLivedToken(openSecret(connection.access_token));
       const tokenExpiresAt = new Date(Date.now() + result.expiresInSeconds * 1000).toISOString();
       await supabase
         .from("instagram_connections")
-        .update({ access_token: result.accessToken, token_expires_at: tokenExpiresAt })
+        .update({ access_token: sealSecret(result.accessToken), token_expires_at: tokenExpiresAt })
         .eq("id", connection.id);
       refreshed += 1;
     } catch {

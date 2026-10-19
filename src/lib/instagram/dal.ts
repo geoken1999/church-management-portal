@@ -1,4 +1,5 @@
 import "server-only";
+import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
 
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
@@ -42,10 +43,10 @@ export const getInstagramConnection = cache(async (organizationId: string) => {
       .select("*")
       .eq("organization_id", organizationId)
       .maybeSingle();
-    return fallback;
+    return fallback ? { ...fallback, access_token: openSecret(fallback.access_token) } : fallback;
   }
 
-  return data;
+  return data ? { ...data, access_token: openSecret(data.access_token) } : data;
 });
 
 export interface InstagramAccountOption {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
 import { cookies } from "next/headers";
 import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
@@ -66,7 +67,7 @@ export async function GET(request: Request) {
           page_name: profile.name,
           page_picture_url: profile.pictureUrl,
           fan_count: profile.fanCount,
-          access_token: page.accessToken,
+          access_token: sealSecret(page.accessToken),
           connected_by: user.id,
         },
         { onConflict: "organization_id" },
@@ -82,7 +83,8 @@ export async function GET(request: Request) {
     // More than one Page — stage the list (minus nothing hidden from the
     // server, but the picker UI only ever sees id/name/picture) so the
     // admin can pick which one to connect.
-    cookieStore.set(PENDING_PAGES_COOKIE, JSON.stringify(pages), {
+    // The list carries each Page's access token, so it is encrypted even inside this short-lived cookie.
+    cookieStore.set(PENDING_PAGES_COOKIE, sealSecret(JSON.stringify(pages)), {
       httpOnly: true,
       secure: true,
       sameSite: "lax",

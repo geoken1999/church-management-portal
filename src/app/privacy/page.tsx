@@ -192,10 +192,7 @@ export default function PrivacyPolicyPage() {
           </li>
           <li>
             <strong>Encryption.</strong> Data is encrypted in transit (TLS) and at rest in our hosting and database
-            providers. Passwords are stored only as salted hashes, and the sign-in on the mobile app is kept in your phone&apos;s secure storage (the Keychain on iPhone, the Keystore on Android). A church&apos;s WhatsApp access credentials are
-            additionally encrypted by us (AES-256-GCM) before they are stored. Other connection credentials, such as
-            social media or payment-gateway keys, are kept in access-restricted tables and are used only on our
-            servers.
+            providers. Passwords are stored only as salted hashes, and the sign-in on the mobile app is kept in your phone&apos;s secure storage (the Keychain on iPhone, the Keystore on Android). The secrets a church connects to KingdomFlow (WhatsApp, Instagram, YouTube and Facebook access tokens, the church&apos;s own payment-gateway keys and its email server password) are additionally encrypted by us (AES-256-GCM) before they are stored, and are decrypted only on our servers when needed.
           </li>
           <li>
             <strong>Signing in.</strong> We limit repeated sign-in and password-reset attempts for each email address

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
 import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -49,9 +50,9 @@ export async function saveGatewayAccountAction(gatewayRaw: string, keyId: string
     gateway === "razorpay"
       ? await admin
           .from("organization_razorpay_accounts")
-          .upsert({ organization_id: auth.organizationId, key_id: checked.keyId, key_secret: checked.keySecret, connected_by: auth.userId }, { onConflict: "organization_id" })
+          .upsert({ organization_id: auth.organizationId, key_id: checked.keyId, key_secret: sealSecret(checked.keySecret), connected_by: auth.userId }, { onConflict: "organization_id" })
       : await admin.from("organization_gateway_accounts").upsert(
-          { organization_id: auth.organizationId, gateway, key_id: checked.keyId, key_secret: checked.keySecret, environment: checked.environment, connected_by: auth.userId },
+          { organization_id: auth.organizationId, gateway, key_id: checked.keyId, key_secret: sealSecret(checked.keySecret), environment: checked.environment, connected_by: auth.userId },
           { onConflict: "organization_id,gateway" },
         );
   if (error) return { error: `Couldn't save that ${GATEWAY_LABELS[gateway]} account. Please try again.` };

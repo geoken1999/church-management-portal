@@ -1,4 +1,5 @@
 import "server-only";
+import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
 
 import { createClient } from "@/lib/supabase/server";
 import { refreshAccessToken } from "@/lib/youtube/client";
@@ -23,7 +24,7 @@ export async function getValidAccessToken(connection: YouTubeConnection): Promis
   const supabase = await createClient();
   await supabase
     .from("youtube_connections")
-    .update({ access_token: refreshed.accessToken, token_expires_at: tokenExpiresAt })
+    .update({ access_token: sealSecret(refreshed.accessToken), token_expires_at: tokenExpiresAt })
     .eq("id", connection.id);
 
   return refreshed.accessToken;

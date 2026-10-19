@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
@@ -186,7 +187,7 @@ export async function saveEmailSmtpSettings(formData: FormData): Promise<SmtpSet
       port: form.port,
       secure: form.secure,
       username: form.username,
-      password,
+      password: sealSecret(password),
       from_email: form.fromEmail,
       from_name: form.fromName || null,
       created_by: user.id,

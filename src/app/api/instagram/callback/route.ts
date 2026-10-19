@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
 import { cookies } from "next/headers";
 import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
@@ -66,7 +67,7 @@ export async function GET(request: Request) {
         profile_picture_url: profile.profilePictureUrl,
         media_count: profile.mediaCount,
         followers_count: profile.followersCount,
-        access_token: longLived.accessToken,
+        access_token: sealSecret(longLived.accessToken),
         token_expires_at: tokenExpiresAt,
         is_active: true,
         connected_by: user.id,

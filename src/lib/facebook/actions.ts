@@ -1,6 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -57,7 +58,7 @@ export async function getPendingFacebookPages(): Promise<PendingFacebookPage[]> 
   if (!raw) return [];
 
   try {
-    const pages = JSON.parse(raw) as { id: string; name: string; pictureUrl: string | null }[];
+    const pages = JSON.parse(openSecret(raw)) as { id: string; name: string; pictureUrl: string | null }[];
     return pages.map((p) => ({ id: p.id, name: p.name, pictureUrl: p.pictureUrl }));
   } catch {
     return [];
@@ -82,7 +83,7 @@ export async function selectFacebookPage(organizationId: string, pageId: string)
 
   let pages: { id: string; name: string; accessToken: string; pictureUrl: string | null }[];
   try {
-    pages = JSON.parse(raw);
+    pages = JSON.parse(openSecret(raw));
   } catch {
     return { error: "That selection expired. Please reconnect Facebook." };
   }
@@ -103,7 +104,7 @@ export async function selectFacebookPage(organizationId: string, pageId: string)
         page_name: profile.name,
         page_picture_url: profile.pictureUrl,
         fan_count: profile.fanCount,
-        access_token: selected.accessToken,
+        access_token: sealSecret(selected.accessToken),
         connected_by: user.id,
       },
       { onConflict: "organization_id" },

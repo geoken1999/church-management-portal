@@ -1,4 +1,5 @@
 import "server-only";
+import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendBulkEmail } from "@/lib/email/client";
@@ -38,7 +39,7 @@ export async function sendMembershipEmail(params: {
             port: smtp.port,
             secure: smtp.secure,
             username: smtp.username,
-            password: smtp.password,
+            password: openSecret(smtp.password),
             fromEmail: smtp.from_email,
             fromName: smtp.from_name || params.organizationName,
           },

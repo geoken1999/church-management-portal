@@ -1,4 +1,5 @@
 import "server-only";
+import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
 
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
@@ -28,7 +29,7 @@ export const getEmailSmtpSettings = cache(async (organizationId: string) => {
     .eq("organization_id", organizationId)
     .maybeSingle();
 
-  return data;
+  return data ? { ...data, password: openSecret(data.password) } : data;
 });
 
 export interface EmailSmtpSummary {

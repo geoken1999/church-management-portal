@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
 import { cookies } from "next/headers";
 import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
@@ -72,8 +73,8 @@ export async function GET(request: Request) {
         subscriber_count: channel.subscriberCount,
         video_count: channel.videoCount,
         view_count: channel.viewCount,
-        access_token: tokens.accessToken,
-        refresh_token: tokens.refreshToken,
+        access_token: sealSecret(tokens.accessToken),
+        refresh_token: tokens.refreshToken ? sealSecret(tokens.refreshToken) : tokens.refreshToken,
         token_expires_at: tokenExpiresAt,
         is_active: true,
         connected_by: user.id,

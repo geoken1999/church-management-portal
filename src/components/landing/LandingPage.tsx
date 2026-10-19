@@ -34,6 +34,9 @@ import {
   ClipboardList,
   Radio,
   BadgeCheck,
+  GraduationCap,
+  Cake,
+  Megaphone,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -48,7 +51,7 @@ import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/app-links";
 
 const STATS = [
   { value: "30+", label: "built-in modules" },
-  { value: "Android app", label: "on Google Play for your team and members" },
+  { value: "Android app", label: "on Google Play for your team and members, iPhone coming soon" },
   { value: "14-day", label: "free trial, no card" },
   { value: "Multi-branch", label: "ready from day one" },
 ];
@@ -145,6 +148,11 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
         description: "Broadcast your service and let members watch live inside the app, with chat and a viewer count. Go live from a camera or from OBS with a stream key, send to YouTube and Facebook too, and record it. Set up for your church on request.",
       },
       {
+        icon: GraduationCap,
+        title: "Bible School",
+        description: "Run courses with modules and lessons, upload video and audio that members watch inside the app with progress tracked, hold live classes in K-Connect with attendance, and open selected courses to people outside your church who apply and are approved by your team.",
+      },
+      {
         icon: HandHeart,
         title: "Prayer requests",
         description: "Members send prayer requests from the app and your team is notified straight away, with every request kept in one place.",
@@ -233,6 +241,16 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
         description: "Send a notification to your whole church, a branch, a group or one member, with a link and a button — and members choose which kinds they want to receive.",
       },
       {
+        icon: Megaphone,
+        title: "Pop-up announcements",
+        description: "Show members a pop-up in the app with an image and an optional button that opens a link, and let them choose not to see it again.",
+      },
+      {
+        icon: Cake,
+        title: "Birthday & anniversary alerts",
+        description: "Owners and admins get a daily summary of birthdays and wedding anniversaries, and a heads-up the day before. Members with the app get a greeting on their day.",
+      },
+      {
         icon: Share2,
         title: "Social media hub",
         description: "Manage Instagram, YouTube, and Facebook without leaving your dashboard — connect and switch between multiple YouTube channels from one place.",
@@ -251,6 +269,7 @@ const APP_CARDS = [
       "Start and host video and audio calls inside the app, admit people from the waiting room, and end calls for everyone.",
       "A notification center that matches the dashboard bell, plus approvals, payouts, team logins and support tickets.",
       "Choose which features your team sees, and everyone only sees what their permissions allow.",
+      "A daily summary of birthdays and anniversaries, with a heads-up the day before.",
     ],
   },
   {
@@ -261,6 +280,7 @@ const APP_CARDS = [
       "Design the Home screen in the Design Studio: banners, announcements, quick links, videos, upcoming events and a card that appears when a call is live.",
       "Register for events in one tap and keep the pass, check attendance, send prayer requests and show a membership QR code.",
       "Give online from the app, join live calls with one tap, and open documents shared with their group right inside the app.",
+      "Learn in the Bible School: watch lessons in full screen, resume where you stopped, finish courses and join live classes.",
       "Push notifications from the church, with a switch for every kind.",
     ],
   },
@@ -299,7 +319,7 @@ const FAQS = [
   },
   {
     question: "Is there a mobile app?",
-    answer: "Yes — the KingdomFlow app is on Google Play for Android phones. Your team signs in with their dashboard login to manage the church, and members sign in with their phone number to see the Home screen you design, register for events, give, pray and join calls.",
+    answer: "Yes — the KingdomFlow app is on Google Play for Android phones, and the iPhone app is coming soon. Your team signs in with their dashboard login to manage the church, and members sign in with their phone number to see the Home screen you design, register for events, give, pray and join calls.",
   },
   {
     question: "Can we hold video and audio calls without another tool?",

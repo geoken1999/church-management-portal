@@ -1,7 +1,10 @@
 "use server";
 
-import { connectedGateways, getOwnGatewayChoice } from "@/lib/payments/own-accounts";
-import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
+import {
+  connectedGateways,
+  getOwnGatewayChoice,
+} from "@/lib/payments/own-accounts";
+import { sealSecret } from "@/lib/security/connection-secrets";
 import { GATEWAY_LABELS } from "@/lib/payments/gateways";
 import { dateKeyInTimezone } from "@/lib/organizations/timezone";
 import { getOrganizationTimezone } from "@/lib/organizations/org-timezone";
@@ -25,8 +28,16 @@ import {
   type OfferingFieldErrors,
   type DonationFieldErrors,
 } from "@/lib/finance/validation";
-import { validatePayoutDetails, type PayoutDetailsErrors } from "@/lib/organizations/payout-details";
-import type { DonationMethod, FundraiserPaymentMode, FundraiserStatus, PayoutMethod } from "@/types/database";
+import {
+  validatePayoutDetails,
+  type PayoutDetailsErrors,
+} from "@/lib/organizations/payout-details";
+import type {
+  DonationMethod,
+  FundraiserPaymentMode,
+  FundraiserStatus,
+  PayoutMethod,
+} from "@/types/database";
 
 const FUNDRAISERS_PATH = "/dashboard/fundraisers";
 const OFFERINGS_PATH = "/dashboard/offerings";
@@ -43,7 +54,11 @@ async function organizationIdForRow(
   id: string,
 ): Promise<string | null> {
   const admin = createAdminClient();
-  const { data } = await admin.from(table).select("organization_id").eq("id", id).maybeSingle();
+  const { data } = await admin
+    .from(table)
+    .select("organization_id")
+    .eq("id", id)
+    .maybeSingle();
   return data?.organization_id ?? null;
 }
 
@@ -55,7 +70,10 @@ async function organizationIdForRow(
 // owner/admin specifically — unlike ordinary fundraiser edits, this isn't
 // something the tab-permissions matrix should be able to delegate to a
 // regular staff login, since it controls where real donation money flows.
-async function requireOrgAdmin(organizationId: string, authUserId: string): Promise<boolean> {
+async function requireOrgAdmin(
+  organizationId: string,
+  authUserId: string,
+): Promise<boolean> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("organization_members")
@@ -66,7 +84,9 @@ async function requireOrgAdmin(organizationId: string, authUserId: string): Prom
   return data?.role === "owner" || data?.role === "admin";
 }
 
-export async function requireFinancePlan(organizationId: string): Promise<string | null> {
+export async function requireFinancePlan(
+  organizationId: string,
+): Promise<string | null> {
   const { plan } = await getPlanUsage(organizationId);
   if (!plan.financeEnabled) {
     return `Finance isn't included on the ${plan.name} plan.`;
@@ -77,7 +97,9 @@ export async function requireFinancePlan(organizationId: string): Promise<string
 // Narrower than requireFinancePlan: an org can have Finance (Fundraisers/
 // Donations/Offerings exist) without being allowed to connect its own
 // Razorpay account — restricted to the platform's shared gateway only.
-export async function requireOwnPaymentGateway(organizationId: string): Promise<string | null> {
+export async function requireOwnPaymentGateway(
+  organizationId: string,
+): Promise<string | null> {
   const { plan } = await getPlanUsage(organizationId);
   if (!plan.ownPaymentGatewayEnabled) {
     return `Connecting your own Razorpay account isn't included on the ${plan.name} plan — use the shared gateway, or upgrade your plan.`;
@@ -125,7 +147,11 @@ export async function createFundraiser(
     return { error: access.message };
   }
 
-  const capError = await checkFeatureCap(organizationId, "fundraisers", "fundraisers");
+  const capError = await checkFeatureCap(
+    organizationId,
+    "fundraisers",
+    "fundraisers",
+  );
   if (capError) return { error: capError };
 
   const fields = readFundraiserFields(formData);
@@ -263,7 +289,13 @@ export async function createOffering(
   }
 
   const fields = readOfferingFields(formData);
-  const fieldErrors = validateOffering(fields, dateKeyInTimezone(new Date(), await getOrganizationTimezone(organizationId)));
+  const fieldErrors = validateOffering(
+    fields,
+    dateKeyInTimezone(
+      new Date(),
+      await getOrganizationTimezone(organizationId),
+    ),
+  );
   if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
   }
@@ -308,7 +340,13 @@ export async function updateOffering(
   }
 
   const fields = readOfferingFields(formData);
-  const fieldErrors = validateOffering(fields, dateKeyInTimezone(new Date(), await getOrganizationTimezone(organizationId)));
+  const fieldErrors = validateOffering(
+    fields,
+    dateKeyInTimezone(
+      new Date(),
+      await getOrganizationTimezone(organizationId),
+    ),
+  );
   if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
   }
@@ -389,7 +427,13 @@ export async function createDonation(
   }
 
   const fields = readDonationFields(formData);
-  const fieldErrors = validateDonation(fields, dateKeyInTimezone(new Date(), await getOrganizationTimezone(organizationId)));
+  const fieldErrors = validateDonation(
+    fields,
+    dateKeyInTimezone(
+      new Date(),
+      await getOrganizationTimezone(organizationId),
+    ),
+  );
   if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
   }
@@ -439,7 +483,13 @@ export async function updateDonation(
   }
 
   const fields = readDonationFields(formData);
-  const fieldErrors = validateDonation(fields, dateKeyInTimezone(new Date(), await getOrganizationTimezone(organizationId)));
+  const fieldErrors = validateDonation(
+    fields,
+    dateKeyInTimezone(
+      new Date(),
+      await getOrganizationTimezone(organizationId),
+    ),
+  );
   if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
   }
@@ -524,7 +574,15 @@ export async function saveOwnRazorpayAccount(
   const admin = createAdminClient();
   const { error } = await admin
     .from("organization_razorpay_accounts")
-    .upsert({ organization_id: organizationId, key_id: keyId, key_secret: sealSecret(keySecret), connected_by: user.id }, { onConflict: "organization_id" });
+    .upsert(
+      {
+        organization_id: organizationId,
+        key_id: keyId,
+        key_secret: sealSecret(keySecret),
+        connected_by: user.id,
+      },
+      { onConflict: "organization_id" },
+    );
 
   if (error) {
     return { error: "Couldn't save that Razorpay account. Please try again." };
@@ -542,7 +600,10 @@ export async function removeOwnRazorpayAccount(formData: FormData) {
   if (!(await requireOrgAdmin(organizationId, user.id))) return;
 
   const admin = createAdminClient();
-  await admin.from("organization_razorpay_accounts").delete().eq("organization_id", organizationId);
+  await admin
+    .from("organization_razorpay_accounts")
+    .delete()
+    .eq("organization_id", organizationId);
 
   // Any fundraiser relying on the account that just disappeared would
   // otherwise keep a live public link that can never actually complete a
@@ -568,7 +629,10 @@ export async function updateFundraiserPaymentSettings(
   await requireUser();
   const fundraiserId = String(formData.get("fundraiserId") ?? "");
 
-  const organizationId = await organizationIdForRow("fundraisers", fundraiserId);
+  const organizationId = await organizationIdForRow(
+    "fundraisers",
+    fundraiserId,
+  );
   if (!organizationId) {
     return { error: "That fundraiser could not be found." };
   }
@@ -585,7 +649,10 @@ export async function updateFundraiserPaymentSettings(
 
   if (modeRaw === "none") {
     const admin = createAdminClient();
-    await admin.from("fundraisers").update({ payment_mode: null, payment_link_enabled: false }).eq("id", fundraiserId);
+    await admin
+      .from("fundraisers")
+      .update({ payment_mode: null, payment_link_enabled: false })
+      .eq("id", fundraiserId);
     revalidatePath(FUNDRAISERS_PATH);
     return { success: true };
   }
@@ -599,7 +666,9 @@ export async function updateFundraiserPaymentSettings(
     const ownGateway = await getOwnGatewayChoice(organizationId);
     const connected = await connectedGateways(organizationId);
     if (!connected[ownGateway]) {
-      return { error: `Connect your ${GATEWAY_LABELS[ownGateway]} account first.` };
+      return {
+        error: `Connect your ${GATEWAY_LABELS[ownGateway]} account first.`,
+      };
     }
   }
 
@@ -610,7 +679,9 @@ export async function updateFundraiserPaymentSettings(
     .eq("id", fundraiserId);
 
   if (error) {
-    return { error: "Couldn't save the payment link settings. Please try again." };
+    return {
+      error: "Couldn't save the payment link settings. Please try again.",
+    };
   }
 
   revalidatePath(FUNDRAISERS_PATH);
@@ -634,7 +705,10 @@ export async function requestFundraiserPayout(
   const user = await requireUser();
   const fundraiserId = String(formData.get("fundraiserId") ?? "");
 
-  const organizationId = await organizationIdForRow("fundraisers", fundraiserId);
+  const organizationId = await organizationIdForRow(
+    "fundraisers",
+    fundraiserId,
+  );
   if (!organizationId) {
     return { error: "That fundraiser could not be found." };
   }
@@ -664,18 +738,41 @@ export async function requestFundraiserPayout(
 
   // Computed fresh here rather than trusting a client-submitted amount —
   // this is what actually gets requested from the platform.
-  const [{ data: fundraiser }, { data: donations }, { data: payouts }, { data: existingPending }] = await Promise.all([
-    admin.from("fundraisers").select("payment_mode").eq("id", fundraiserId).maybeSingle(),
-    admin.from("donations").select("amount").eq("fundraiser_id", fundraiserId).eq("payment_mode", "shared"),
-    admin.from("fundraiser_payouts").select("amount").eq("fundraiser_id", fundraiserId),
-    admin.from("fundraiser_payout_requests").select("id").eq("fundraiser_id", fundraiserId).eq("status", "pending").maybeSingle(),
+  const [
+    { data: fundraiser },
+    { data: donations },
+    { data: payouts },
+    { data: existingPending },
+  ] = await Promise.all([
+    admin
+      .from("fundraisers")
+      .select("payment_mode")
+      .eq("id", fundraiserId)
+      .maybeSingle(),
+    admin
+      .from("donations")
+      .select("amount")
+      .eq("fundraiser_id", fundraiserId)
+      .eq("payment_mode", "shared"),
+    admin
+      .from("fundraiser_payouts")
+      .select("amount")
+      .eq("fundraiser_id", fundraiserId),
+    admin
+      .from("fundraiser_payout_requests")
+      .select("id")
+      .eq("fundraiser_id", fundraiserId)
+      .eq("status", "pending")
+      .maybeSingle(),
   ]);
 
   if (!fundraiser || fundraiser.payment_mode !== "shared") {
     return { error: "This fundraiser isn't using the shared service." };
   }
   if (existingPending) {
-    return { error: "A payout request is already pending for this fundraiser." };
+    return {
+      error: "A payout request is already pending for this fundraiser.",
+    };
   }
 
   const collected = (donations ?? []).reduce((sum, row) => sum + row.amount, 0);
@@ -741,10 +838,17 @@ export async function cancelFundraiserPayoutRequest(formData: FormData) {
   if (!request || request.status !== "pending") return;
 
   if (await requireFinancePlan(request.organization_id)) return;
-  const access = await checkTabAccess(request.organization_id, "fundraisers", "write");
+  const access = await checkTabAccess(
+    request.organization_id,
+    "fundraisers",
+    "write",
+  );
   if (!access.ok) return;
 
-  await admin.from("fundraiser_payout_requests").update({ status: "cancelled" }).eq("id", requestId);
+  await admin
+    .from("fundraiser_payout_requests")
+    .update({ status: "cancelled" })
+    .eq("id", requestId);
 
   revalidatePath(FUNDRAISERS_PATH);
 }

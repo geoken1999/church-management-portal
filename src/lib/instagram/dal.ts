@@ -1,5 +1,5 @@
 import "server-only";
-import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
+import { openSecret } from "@/lib/security/connection-secrets";
 
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
@@ -24,7 +24,7 @@ import type { InstagramCommentAutomation } from "@/types/database";
 // several connected accounts (see getInstagramConnections); the dashboard
 // operates on whichever one is active.
 export const getInstagramConnection = cache(async (organizationId: string) => {
-  const supabase = await createAdminClient();  // Callers check tab access themselves; see access.ts.
+  const supabase = await createAdminClient(); // Callers check tab access themselves; see access.ts.
   const { data, error } = await supabase
     .from("instagram_connections")
     .select("*")
@@ -43,7 +43,9 @@ export const getInstagramConnection = cache(async (organizationId: string) => {
       .select("*")
       .eq("organization_id", organizationId)
       .maybeSingle();
-    return fallback ? { ...fallback, access_token: openSecret(fallback.access_token) } : fallback;
+    return fallback
+      ? { ...fallback, access_token: openSecret(fallback.access_token) }
+      : fallback;
   }
 
   return data ? { ...data, access_token: openSecret(data.access_token) } : data;
@@ -60,37 +62,39 @@ export interface InstagramAccountOption {
 // account switcher — deliberately excludes access_token, unlike
 // getInstagramConnection, since this shape is passed down into a Client
 // Component.
-export const getInstagramConnections = cache(async (organizationId: string): Promise<InstagramAccountOption[]> => {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("instagram_connections")
-    .select("id, username, profile_picture_url, is_active")
-    .eq("organization_id", organizationId)
-    .order("created_at", { ascending: true });
-
-  // Same pre-migration fallback as getInstagramConnection above — treats
-  // the one pre-multi-account row (if any) as the active one, matching
-  // reality before is_active existed at all.
-  if (error) {
-    const { data: fallback } = await supabase
+export const getInstagramConnections = cache(
+  async (organizationId: string): Promise<InstagramAccountOption[]> => {
+    const supabase = await createClient();
+    const { data, error } = await supabase
       .from("instagram_connections")
-      .select("id, username, profile_picture_url")
-      .eq("organization_id", organizationId);
-    return (fallback ?? []).map((row) => ({
+      .select("id, username, profile_picture_url, is_active")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: true });
+
+    // Same pre-migration fallback as getInstagramConnection above — treats
+    // the one pre-multi-account row (if any) as the active one, matching
+    // reality before is_active existed at all.
+    if (error) {
+      const { data: fallback } = await supabase
+        .from("instagram_connections")
+        .select("id, username, profile_picture_url")
+        .eq("organization_id", organizationId);
+      return (fallback ?? []).map((row) => ({
+        id: row.id,
+        username: row.username,
+        profilePictureUrl: row.profile_picture_url,
+        isActive: true,
+      }));
+    }
+
+    return (data ?? []).map((row) => ({
       id: row.id,
       username: row.username,
       profilePictureUrl: row.profile_picture_url,
-      isActive: true,
+      isActive: row.is_active,
     }));
-  }
-
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    username: row.username,
-    profilePictureUrl: row.profile_picture_url,
-    isActive: row.is_active,
-  }));
-});
+  },
+);
 
 // Inbound webhook events (messages, comments) carry the business account's
 // messaging-scoped id but nothing that maps to a local organization_id —
@@ -98,12 +102,20 @@ export const getInstagramConnections = cache(async (organizationId: string): Pro
 // conversations), so it's captured here, once, the first time it shows up
 // for a connection that doesn't have it recorded yet.
 export async function ensureMessagingUserId(
-  connection: { id: string; organization_id: string; messaging_user_id: string | null },
+  connection: {
+    id: string;
+    organization_id: string;
+    messaging_user_id: string | null;
+  },
   ownerMessagingId: string | null,
 ): Promise<void> {
-  if (!ownerMessagingId || connection.messaging_user_id === ownerMessagingId) return;
+  if (!ownerMessagingId || connection.messaging_user_id === ownerMessagingId)
+    return;
   const supabase = await createClient();
-  await supabase.from("instagram_connections").update({ messaging_user_id: ownerMessagingId }).eq("id", connection.id);
+  await supabase
+    .from("instagram_connections")
+    .update({ messaging_user_id: ownerMessagingId })
+    .eq("id", connection.id);
 }
 
 // Overlays this app's own read-tracking table onto conversations fetched
@@ -122,12 +134,15 @@ export async function attachReadState(
     .select("conversation_id, last_read_at")
     .eq("organization_id", organizationId);
 
-  const lastReadByConversation = new Map((reads ?? []).map((r) => [r.conversation_id, r.last_read_at]));
+  const lastReadByConversation = new Map(
+    (reads ?? []).map((r) => [r.conversation_id, r.last_read_at]),
+  );
 
   return items.map((item) => {
     if (!item.lastInboundAt) return item;
     const lastReadAt = lastReadByConversation.get(item.id);
-    const unread = !lastReadAt || new Date(item.lastInboundAt) > new Date(lastReadAt);
+    const unread =
+      !lastReadAt || new Date(item.lastInboundAt) > new Date(lastReadAt);
     return { ...item, unread };
   });
 }
@@ -149,7 +164,10 @@ export type InstagramDashboardData =
       media: InstagramMediaPage;
       insights: InstagramInsightValue[];
       dailyInsights: InstagramDailyInsight[];
-      conversations: { items: InstagramConversation[]; nextCursor: string | null };
+      conversations: {
+        items: InstagramConversation[];
+        nextCursor: string | null;
+      };
       automations: InstagramCommentAutomation[];
       // True when the stored connection exists but the live Graph API calls
       // failed (expired/revoked token, Instagram outage, etc.) — the UI
@@ -160,7 +178,9 @@ export type InstagramDashboardData =
 // Not cache()-wrapped: it performs live external calls and can write a
 // refreshed token as a side effect, so it should run at most once per
 // request rather than being memoized against accidental double-invocation.
-export async function getInstagramDashboardData(organizationId: string): Promise<InstagramDashboardData> {
+export async function getInstagramDashboardData(
+  organizationId: string,
+): Promise<InstagramDashboardData> {
   const connection = await getInstagramConnection(organizationId);
   if (!connection) return { connected: false };
 
@@ -180,16 +200,29 @@ export async function getInstagramDashboardData(organizationId: string): Promise
 
   try {
     const accessToken = await getValidAccessToken(connection);
-    const [media, insights, dailyInsights, conversationsPage] = await Promise.all([
-      fetchMedia(accessToken),
-      fetchAccountInsights(accessToken),
-      fetchAccountInsightsTimeSeries(accessToken),
-      fetchConversations(accessToken, connection.username),
-    ]);
-    const items = await attachReadState(organizationId, conversationsPage.items);
+    const [media, insights, dailyInsights, conversationsPage] =
+      await Promise.all([
+        fetchMedia(accessToken),
+        fetchAccountInsights(accessToken),
+        fetchAccountInsightsTimeSeries(accessToken),
+        fetchConversations(accessToken, connection.username),
+      ]);
+    const items = await attachReadState(
+      organizationId,
+      conversationsPage.items,
+    );
     await ensureMessagingUserId(connection, conversationsPage.ownerMessagingId);
     const conversations = { items, nextCursor: conversationsPage.nextCursor };
-    return { connected: true, profile, media, insights, dailyInsights, conversations, automations, syncError: false };
+    return {
+      connected: true,
+      profile,
+      media,
+      insights,
+      dailyInsights,
+      conversations,
+      automations,
+      syncError: false,
+    };
   } catch {
     return {
       connected: true,

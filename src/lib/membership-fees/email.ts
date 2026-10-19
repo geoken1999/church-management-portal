@@ -1,12 +1,13 @@
 import "server-only";
-import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
+import { openSecret } from "@/lib/security/connection-secrets";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendBulkEmail } from "@/lib/email/client";
 import { isEmailConfigured } from "@/lib/email/env";
 import { sendBulkEmailViaSmtp } from "@/lib/email/smtp";
 
-export type MembershipEmailResult = { ok: true; via: "shared" | "own" } | { ok: false; error: string };
+export type MembershipEmailResult =
+  { ok: true; via: "shared" | "own" } | { ok: false; error: string };
 
 // One email per member, because each carries that member's own payment link.
 // Uses the church's own SMTP sender when it has one, otherwise the shared
@@ -43,7 +44,11 @@ export async function sendMembershipEmail(params: {
             fromEmail: smtp.from_email,
             fromName: smtp.from_name || params.organizationName,
           },
-          { subject: params.subject, html: params.html, recipients: [params.to] },
+          {
+            subject: params.subject,
+            html: params.html,
+            recipients: [params.to],
+          },
         )
       : await sendBulkEmail({
           fromName: params.organizationName,
@@ -54,10 +59,16 @@ export async function sendMembershipEmail(params: {
         });
 
     if (result.sentCount === 0) {
-      return { ok: false, error: result.failed[0]?.error ?? "The email wasn't sent." };
+      return {
+        ok: false,
+        error: result.failed[0]?.error ?? "The email wasn't sent.",
+      };
     }
     return { ok: true, via: smtp ? "own" : "shared" };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "The email wasn't sent." };
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "The email wasn't sent.",
+    };
   }
 }

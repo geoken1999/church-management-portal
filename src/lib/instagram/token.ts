@@ -1,8 +1,5 @@
 import "server-only";
-import {
-  sealIfConfigured,
-  openSecret,
-} from "@/lib/security/connection-secrets";
+import { sealIfConfigured } from "@/lib/security/connection-secrets";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { refreshLongLivedToken } from "@/lib/instagram/client";

@@ -1,16 +1,22 @@
 import { NextResponse } from "next/server";
-import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
+import { sealSecret } from "@/lib/security/connection-secrets";
 import { cookies } from "next/headers";
 import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { createClient } from "@/lib/supabase/server";
-import { exchangeCodeForShortLivedToken, exchangeForLongLivedToken, fetchProfile } from "@/lib/instagram/client";
+import {
+  exchangeCodeForShortLivedToken,
+  exchangeForLongLivedToken,
+  fetchProfile,
+} from "@/lib/instagram/client";
 import { getSiteUrl } from "@/lib/site-url";
 
 const STATE_COOKIE = "ig_oauth_state";
 
 function redirectToInstagram(status: string) {
-  return NextResponse.redirect(`${getSiteUrl()}/dashboard/instagram?status=${status}`);
+  return NextResponse.redirect(
+    `${getSiteUrl()}/dashboard/instagram?status=${status}`,
+  );
 }
 
 export async function GET(request: Request) {
@@ -44,7 +50,9 @@ export async function GET(request: Request) {
     const shortLived = await exchangeCodeForShortLivedToken(code, redirectUri);
     const longLived = await exchangeForLongLivedToken(shortLived.accessToken);
     const profile = await fetchProfile(longLived.accessToken);
-    const tokenExpiresAt = new Date(Date.now() + longLived.expiresInSeconds * 1000).toISOString();
+    const tokenExpiresAt = new Date(
+      Date.now() + longLived.expiresInSeconds * 1000,
+    ).toISOString();
 
     const supabase = await createClient();
 

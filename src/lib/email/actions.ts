@@ -1,13 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
+import { sealSecret } from "@/lib/security/connection-secrets";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { sendEmailCampaign } from "@/lib/email/send";
 import { verifySmtpConnection } from "@/lib/email/smtp";
-import { getEmailSmtpSettings, getLatestEmailSetupRequest } from "@/lib/email/dal";
+import {
+  getEmailSmtpSettings,
+  getLatestEmailSetupRequest,
+} from "@/lib/email/dal";
 import {
   ALLOWED_IMAGE_TYPES,
   MAX_IMAGE_BYTES,
@@ -28,7 +31,9 @@ export interface SendEmailState {
   failedCount?: number;
 }
 
-export async function sendBulkEmailAction(formData: FormData): Promise<SendEmailState> {
+export async function sendBulkEmailAction(
+  formData: FormData,
+): Promise<SendEmailState> {
   const user = await requireUser();
   const membership = await requireOrganization();
 
@@ -43,7 +48,9 @@ export async function sendBulkEmailAction(formData: FormData): Promise<SendEmail
     return { error: "Select at least one recipient." };
   }
 
-  const attachmentFiles = formData.getAll("attachments").filter((entry): entry is File => entry instanceof File);
+  const attachmentFiles = formData
+    .getAll("attachments")
+    .filter((entry): entry is File => entry instanceof File);
   if (attachmentFiles.length > MAX_ATTACHMENTS) {
     return { error: `You can attach at most ${MAX_ATTACHMENTS} files.` };
   }
@@ -56,7 +63,9 @@ export async function sendBulkEmailAction(formData: FormData): Promise<SendEmail
     totalAttachmentBytes += file.size;
   }
   if (totalAttachmentBytes > MAX_TOTAL_ATTACHMENT_BYTES) {
-    return { error: "Attachments are too large combined — keep the total under 20MB." };
+    return {
+      error: "Attachments are too large combined — keep the total under 20MB.",
+    };
   }
 
   const attachments: EmailAttachment[] = await Promise.all(
@@ -104,7 +113,9 @@ export interface SmtpSettingsState {
   success?: boolean;
 }
 
-export async function testSmtpConnection(formData: FormData): Promise<SmtpSettingsState> {
+export async function testSmtpConnection(
+  formData: FormData,
+): Promise<SmtpSettingsState> {
   const membership = await requireOrganization();
   if (membership.role !== "owner" && membership.role !== "admin") {
     return { error: "Only owners and admins can manage email settings." };
@@ -137,7 +148,9 @@ export async function testSmtpConnection(formData: FormData): Promise<SmtpSettin
   return result.ok ? { success: true } : { error: result.error };
 }
 
-export async function saveEmailSmtpSettings(formData: FormData): Promise<SmtpSettingsState> {
+export async function saveEmailSmtpSettings(
+  formData: FormData,
+): Promise<SmtpSettingsState> {
   const user = await requireUser();
   const membership = await requireOrganization();
   if (membership.role !== "owner" && membership.role !== "admin") {
@@ -210,7 +223,10 @@ export async function deleteEmailSmtpSettings(): Promise<void> {
   }
 
   const supabase = await createClient();
-  await supabase.from("email_smtp_settings").delete().eq("organization_id", membership.organization.id);
+  await supabase
+    .from("email_smtp_settings")
+    .delete()
+    .eq("organization_id", membership.organization.id);
 
   revalidatePath(EMAIL_SETTINGS_PATH);
 }
@@ -227,7 +243,9 @@ export interface EmailSetupRequestState {
   success?: boolean;
 }
 
-export async function requestEmailSetup(formData: FormData): Promise<EmailSetupRequestState> {
+export async function requestEmailSetup(
+  formData: FormData,
+): Promise<EmailSetupRequestState> {
   const user = await requireUser();
   const membership = await requireOrganization();
 
@@ -266,7 +284,9 @@ export interface UploadImageState {
   url?: string;
 }
 
-export async function uploadEmailImage(formData: FormData): Promise<UploadImageState> {
+export async function uploadEmailImage(
+  formData: FormData,
+): Promise<UploadImageState> {
   await requireUser();
   const membership = await requireOrganization();
 
@@ -285,7 +305,10 @@ export async function uploadEmailImage(formData: FormData): Promise<UploadImageS
     return { error: "Images must be smaller than 5MB." };
   }
 
-  const quotaError = await checkStorageQuota(membership.organization.id, file.size);
+  const quotaError = await checkStorageQuota(
+    membership.organization.id,
+    file.size,
+  );
   if (quotaError) {
     return { error: quotaError };
   }

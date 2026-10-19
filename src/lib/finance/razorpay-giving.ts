@@ -1,5 +1,5 @@
 import "server-only";
-import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
+import { openSecret } from "@/lib/security/connection-secrets";
 
 import crypto from "node:crypto";
 import { Razorpay } from "@/lib/billing/razorpay";
@@ -8,7 +8,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendGivingReceiptEmail } from "@/lib/finance/giving-receipt";
 import { givingTitle, recordGivingPayment } from "@/lib/finance/record-giving";
 import type { FundraiserPaymentMode } from "@/types/database";
-import { DEFAULT_TIMEZONE, dateKeyInTimezone } from "@/lib/organizations/timezone";
+import {
+  DEFAULT_TIMEZONE,
+  dateKeyInTimezone,
+} from "@/lib/organizations/timezone";
 
 export interface GivingCredentials {
   keyId: string;
@@ -40,8 +43,13 @@ export async function getGivingCredentials(
   return { keyId: data.key_id, keySecret: openSecret(data.key_secret) };
 }
 
-export function createGivingRazorpayClient(credentials: GivingCredentials): Razorpay {
-  return new Razorpay({ key_id: credentials.keyId, key_secret: credentials.keySecret });
+export function createGivingRazorpayClient(
+  credentials: GivingCredentials,
+): Razorpay {
+  return new Razorpay({
+    key_id: credentials.keyId,
+    key_secret: credentials.keySecret,
+  });
 }
 
 // Razorpay Checkout's client-side success handler returns
@@ -56,7 +64,10 @@ export function verifyGivingPaymentSignature(
   signature: string,
   keySecret: string,
 ): boolean {
-  const expected = crypto.createHmac("sha256", keySecret).update(`${orderId}|${paymentId}`).digest("hex");
+  const expected = crypto
+    .createHmac("sha256", keySecret)
+    .update(`${orderId}|${paymentId}`)
+    .digest("hex");
   return expected === signature;
 }
 
@@ -73,7 +84,10 @@ export interface FinalizeGivingOrderResult {
 // reachable for 'shared' mode from the webhook, since 'own' mode orders
 // are created against a different Razorpay account with no webhook
 // pointed at this app.
-export async function finalizeGivingOrderPayment(razorpayOrderId: string, razorpayPaymentId: string): Promise<FinalizeGivingOrderResult> {
+export async function finalizeGivingOrderPayment(
+  razorpayOrderId: string,
+  razorpayPaymentId: string,
+): Promise<FinalizeGivingOrderResult> {
   const admin = createAdminClient();
   const { data: order } = await admin
     .from("fundraiser_payment_orders")
@@ -112,8 +126,15 @@ export async function finalizeGivingOrderPayment(razorpayOrderId: string, razorp
 
   // The church's calendar day, not the UTC day, so a gift made just after
   // midnight in India is dated the right day.
-  const { data: org } = await admin.from("organizations").select("timezone").eq("id", order.organization_id).maybeSingle();
-  const donatedOn = dateKeyInTimezone(new Date(), org?.timezone ?? DEFAULT_TIMEZONE);
+  const { data: org } = await admin
+    .from("organizations")
+    .select("timezone")
+    .eq("id", order.organization_id)
+    .maybeSingle();
+  const donatedOn = dateKeyInTimezone(
+    new Date(),
+    org?.timezone ?? DEFAULT_TIMEZONE,
+  );
   const recorded = await recordGivingPayment(
     admin,
     order,
@@ -121,13 +142,20 @@ export async function finalizeGivingOrderPayment(razorpayOrderId: string, razorp
     donatedOn,
   );
   if (!recorded.ok) {
-    return { error: "Payment succeeded but couldn't be recorded. Please contact the church directly." };
+    return {
+      error:
+        "Payment succeeded but couldn't be recorded. Please contact the church directly.",
+    };
   }
 
   await sendGivingReceiptEmail({
     organizationId: order.organization_id,
-    organizationName: (order.organizations as { name: string } | null)?.name ?? "Your church",
-    fundraiserTitle: givingTitle(order, (order.fundraisers as { title: string } | null)?.title ?? null),
+    organizationName:
+      (order.organizations as { name: string } | null)?.name ?? "Your church",
+    fundraiserTitle: givingTitle(
+      order,
+      (order.fundraisers as { title: string } | null)?.title ?? null,
+    ),
     donorEmail: order.donor_email,
     donorName: order.donor_name,
     amount: order.amount,

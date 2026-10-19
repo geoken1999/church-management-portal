@@ -1,5 +1,5 @@
 import "server-only";
-import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
+import { openSecret } from "@/lib/security/connection-secrets";
 
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
@@ -24,7 +24,7 @@ import {
 // org can have several connected channels (see getYouTubeConnections); all
 // the video/comment/broadcast actions operate on whichever one is active.
 export const getYouTubeConnection = cache(async (organizationId: string) => {
-  const supabase = await createAdminClient();  // Callers check tab access themselves; see access.ts.
+  const supabase = await createAdminClient(); // Callers check tab access themselves; see access.ts.
   const { data } = await supabase
     .from("youtube_connections")
     .select("*")
@@ -33,7 +33,11 @@ export const getYouTubeConnection = cache(async (organizationId: string) => {
     .maybeSingle();
 
   return data
-    ? { ...data, access_token: openSecret(data.access_token), refresh_token: openSecret(data.refresh_token) }
+    ? {
+        ...data,
+        access_token: openSecret(data.access_token),
+        refresh_token: openSecret(data.refresh_token),
+      }
     : data;
 });
 
@@ -49,22 +53,24 @@ export interface YouTubeChannelOption {
 // channel switcher — deliberately excludes access_token/refresh_token,
 // unlike getYouTubeConnection, since this shape is passed down into a
 // Client Component.
-export const getYouTubeConnections = cache(async (organizationId: string): Promise<YouTubeChannelOption[]> => {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("youtube_connections")
-    .select("id, channel_id, channel_title, thumbnail_url, is_active")
-    .eq("organization_id", organizationId)
-    .order("created_at", { ascending: true });
+export const getYouTubeConnections = cache(
+  async (organizationId: string): Promise<YouTubeChannelOption[]> => {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("youtube_connections")
+      .select("id, channel_id, channel_title, thumbnail_url, is_active")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: true });
 
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    channelId: row.channel_id,
-    channelTitle: row.channel_title,
-    thumbnailUrl: row.thumbnail_url,
-    isActive: row.is_active,
-  }));
-});
+    return (data ?? []).map((row) => ({
+      id: row.id,
+      channelId: row.channel_id,
+      channelTitle: row.channel_title,
+      thumbnailUrl: row.thumbnail_url,
+      isActive: row.is_active,
+    }));
+  },
+);
 
 export interface YouTubeConnectionSummary {
   id: string;
@@ -85,7 +91,10 @@ export type YouTubeDashboardData =
       videos: YouTubeVideoPage;
       analytics: YouTubeAnalyticsValue[];
       comments: YouTubeCommentPage;
-      liveBroadcasts: { live: YouTubeBroadcast[]; upcoming: YouTubeBroadcast[] };
+      liveBroadcasts: {
+        live: YouTubeBroadcast[];
+        upcoming: YouTubeBroadcast[];
+      };
       topVideos: YouTubeTopVideo[];
       syncError: boolean;
     };
@@ -93,7 +102,9 @@ export type YouTubeDashboardData =
 // Not cache()-wrapped — performs live external calls and can write a
 // refreshed token as a side effect, so it should run at most once per
 // request.
-export async function getYouTubeDashboardData(organizationId: string): Promise<YouTubeDashboardData> {
+export async function getYouTubeDashboardData(
+  organizationId: string,
+): Promise<YouTubeDashboardData> {
   const connection = await getYouTubeConnection(organizationId);
   if (!connection) return { connected: false };
 
@@ -110,16 +121,26 @@ export async function getYouTubeDashboardData(organizationId: string): Promise<Y
 
   try {
     const accessToken = await getValidAccessToken(connection);
-    const [videos, analytics, comments, liveBroadcasts, topVideos] = await Promise.all([
-      // The uploads playlist id is derived from the channel id
-      // (UC... -> UU...) rather than re-fetching the channel every time.
-      fetchVideos(accessToken, `UU${connection.channel_id.slice(2)}`),
-      fetchChannelAnalytics(accessToken),
-      fetchCommentThreads(accessToken, connection.channel_id),
-      fetchLiveBroadcasts(accessToken),
-      fetchTopVideos(accessToken),
-    ]);
-    return { connected: true, channel, videos, analytics, comments, liveBroadcasts, topVideos, syncError: false };
+    const [videos, analytics, comments, liveBroadcasts, topVideos] =
+      await Promise.all([
+        // The uploads playlist id is derived from the channel id
+        // (UC... -> UU...) rather than re-fetching the channel every time.
+        fetchVideos(accessToken, `UU${connection.channel_id.slice(2)}`),
+        fetchChannelAnalytics(accessToken),
+        fetchCommentThreads(accessToken, connection.channel_id),
+        fetchLiveBroadcasts(accessToken),
+        fetchTopVideos(accessToken),
+      ]);
+    return {
+      connected: true,
+      channel,
+      videos,
+      analytics,
+      comments,
+      liveBroadcasts,
+      topVideos,
+      syncError: false,
+    };
   } catch (err) {
     console.error("[youtube] dashboard sync failed:", err);
     return {

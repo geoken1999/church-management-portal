@@ -1,8 +1,5 @@
 import "server-only";
-import {
-  sealIfConfigured,
-  openSecret,
-} from "@/lib/security/connection-secrets";
+import { sealIfConfigured } from "@/lib/security/connection-secrets";
 
 import { createClient } from "@/lib/supabase/server";
 import { refreshAccessToken } from "@/lib/youtube/client";

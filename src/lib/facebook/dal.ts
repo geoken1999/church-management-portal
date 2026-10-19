@@ -1,5 +1,5 @@
 import "server-only";
-import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
+import { openSecret } from "@/lib/security/connection-secrets";
 
 import { cache } from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -16,7 +16,7 @@ import {
 // and every caller must be careful never to forward that field into a
 // Client Component prop.
 export const getFacebookConnection = cache(async (organizationId: string) => {
-  const supabase = await createAdminClient();  // Callers check tab access themselves; see access.ts.
+  const supabase = await createAdminClient(); // Callers check tab access themselves; see access.ts.
   const { data } = await supabase
     .from("facebook_connections")
     .select("*")
@@ -41,14 +41,19 @@ export type FacebookDashboardData =
       page: FacebookConnectionSummary;
       posts: FacebookPostPage;
       insights: FacebookInsightValue[];
-      conversations: { items: FacebookConversation[]; nextCursor: string | null };
+      conversations: {
+        items: FacebookConversation[];
+        nextCursor: string | null;
+      };
       syncError: boolean;
     };
 
 // Not cache()-wrapped — performs live external calls, so it should run at
 // most once per request rather than being memoized against accidental
 // double-invocation.
-export async function getFacebookDashboardData(organizationId: string): Promise<FacebookDashboardData> {
+export async function getFacebookDashboardData(
+  organizationId: string,
+): Promise<FacebookDashboardData> {
   const connection = await getFacebookConnection(organizationId);
   if (!connection) return { connected: false };
 
@@ -66,7 +71,14 @@ export async function getFacebookDashboardData(organizationId: string): Promise<
       fetchPageInsights(connection.access_token, connection.page_id),
       fetchConversations(connection.access_token, connection.page_id),
     ]);
-    return { connected: true, page, posts, insights, conversations, syncError: false };
+    return {
+      connected: true,
+      page,
+      posts,
+      insights,
+      conversations,
+      syncError: false,
+    };
   } catch {
     return {
       connected: true,

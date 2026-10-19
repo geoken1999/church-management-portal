@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
+import { sealSecret } from "@/lib/security/connection-secrets";
 import { cookies } from "next/headers";
 import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
@@ -10,7 +10,9 @@ import { getSiteUrl } from "@/lib/site-url";
 const STATE_COOKIE = "yt_oauth_state";
 
 function redirectToYouTube(status: string) {
-  return NextResponse.redirect(`${getSiteUrl()}/dashboard/youtube?status=${status}`);
+  return NextResponse.redirect(
+    `${getSiteUrl()}/dashboard/youtube?status=${status}`,
+  );
 }
 
 export async function GET(request: Request) {
@@ -50,7 +52,9 @@ export async function GET(request: Request) {
     }
 
     const channel = await fetchChannel(tokens.accessToken);
-    const tokenExpiresAt = new Date(Date.now() + tokens.expiresInSeconds * 1000).toISOString();
+    const tokenExpiresAt = new Date(
+      Date.now() + tokens.expiresInSeconds * 1000,
+    ).toISOString();
 
     const supabase = await createClient();
 
@@ -74,7 +78,9 @@ export async function GET(request: Request) {
         video_count: channel.videoCount,
         view_count: channel.viewCount,
         access_token: sealSecret(tokens.accessToken),
-        refresh_token: tokens.refreshToken ? sealSecret(tokens.refreshToken) : tokens.refreshToken,
+        refresh_token: tokens.refreshToken
+          ? sealSecret(tokens.refreshToken)
+          : tokens.refreshToken,
         token_expires_at: tokenExpiresAt,
         is_active: true,
         connected_by: user.id,

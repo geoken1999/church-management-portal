@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
+import { sealSecret } from "@/lib/security/connection-secrets";
 import { cookies } from "next/headers";
 import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
@@ -16,7 +16,9 @@ import { getSiteUrl } from "@/lib/site-url";
 const STATE_COOKIE = "fb_oauth_state";
 
 function redirectToFacebook(status: string) {
-  return NextResponse.redirect(`${getSiteUrl()}/dashboard/facebook?status=${status}`);
+  return NextResponse.redirect(
+    `${getSiteUrl()}/dashboard/facebook?status=${status}`,
+  );
 }
 
 export async function GET(request: Request) {
@@ -48,7 +50,9 @@ export async function GET(request: Request) {
   try {
     const redirectUri = `${getSiteUrl()}/api/facebook/callback`;
     const shortLived = await exchangeCodeForUserToken(code, redirectUri);
-    const longLived = await exchangeForLongLivedUserToken(shortLived.accessToken);
+    const longLived = await exchangeForLongLivedUserToken(
+      shortLived.accessToken,
+    );
     const pages = await fetchManagedPages(longLived.accessToken);
 
     if (pages.length === 0) {

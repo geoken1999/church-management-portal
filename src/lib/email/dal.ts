@@ -1,5 +1,5 @@
 import "server-only";
-import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
+import { openSecret } from "@/lib/security/connection-secrets";
 
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
@@ -41,24 +41,28 @@ export interface EmailSmtpSummary {
   fromName: string | null;
 }
 
-export const getEmailSmtpSummary = cache(async (organizationId: string): Promise<EmailSmtpSummary | null> => {
-  const settings = await getEmailSmtpSettings(organizationId);
-  if (!settings) return null;
+export const getEmailSmtpSummary = cache(
+  async (organizationId: string): Promise<EmailSmtpSummary | null> => {
+    const settings = await getEmailSmtpSettings(organizationId);
+    if (!settings) return null;
 
-  return {
-    host: settings.host,
-    port: settings.port,
-    secure: settings.secure,
-    username: settings.username,
-    fromEmail: settings.from_email,
-    fromName: settings.from_name,
-  };
-});
+    return {
+      host: settings.host,
+      port: settings.port,
+      secure: settings.secure,
+      username: settings.username,
+      fromEmail: settings.from_email,
+      fromName: settings.from_name,
+    };
+  },
+);
 
 // An org can send either through its own SMTP config (always available,
 // unmetered) or the shared Resend account (available only while this
 // month's plan quota isn't exhausted).
-export async function isEmailAvailable(organizationId: string): Promise<boolean> {
+export async function isEmailAvailable(
+  organizationId: string,
+): Promise<boolean> {
   const settings = await getEmailSmtpSettings(organizationId);
   if (settings) return true;
 
@@ -70,22 +74,28 @@ export async function isEmailAvailable(organizationId: string): Promise<boolean>
 
 // Only the latest request matters for the UI — it decides whether to show
 // "Raise a ticket" or "Request sent, we'll be in touch".
-export const getLatestEmailSetupRequest = cache(async (organizationId: string) => {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("email_setup_requests")
-    .select("*")
-    .eq("organization_id", organizationId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+export const getLatestEmailSetupRequest = cache(
+  async (organizationId: string) => {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("email_setup_requests")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  return data;
-});
+    return data;
+  },
+);
 
 // A church's own saved templates, by name.
 export const getEmailTemplates = cache(async (organizationId: string) => {
   const supabase = await createClient();
-  const { data } = await supabase.from("email_templates").select("*").eq("organization_id", organizationId).order("name", { ascending: true });
+  const { data } = await supabase
+    .from("email_templates")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .order("name", { ascending: true });
   return data ?? [];
 });

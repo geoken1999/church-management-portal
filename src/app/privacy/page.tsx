@@ -67,6 +67,12 @@ export default function PrivacyPolicyPage() {
           are used only for that session, after you grant permission.
         </p>
         <p>
+          <strong>Voice prayer requests.</strong> A member can record a short voice message (up to 90 seconds) with a
+          prayer request. It is stored privately and played only through short-lived links: to the member who made
+          it, to the Organization&apos;s team, and, if the member chose to share the request on the prayer wall, to
+          other members of the same church. It is deleted when the member removes the request or their account.
+        </p>
+        <p>
           <strong>AI features.</strong> When an Organization uses AI features (such as Ask Aura, AI-written report
           summaries, or automatic replies), the text needed for that request — for example report figures or a
           message to answer — is sent to our AI provider, OpenAI, to produce a response. Organizations control what
@@ -74,7 +80,7 @@ export default function PrivacyPolicyPage() {
         </p>
         <p>
           <strong>Mobile app data.</strong> The app asks for permission to use the <strong>camera</strong> (scanning
-          QR codes for check-in and volunteer verification, video calls), the <strong>microphone</strong> (calls) and
+          QR codes for check-in and volunteer verification, video calls), the <strong>microphone</strong> (calls and voice prayer requests) and
           <strong> notifications</strong>. Each is optional and can be turned off in your phone&apos;s settings. The app
           also sends us a device identifier, platform, app and operating-system version, device model, the screen you
           were on, and error or crash reports, so we can find and fix problems. If you save an offline check-in, it is

@@ -199,17 +199,52 @@ and plan limits. Nothing about calls was duplicated.
 - Students can learn on the web as well as in the app: see section 3d.
 - Paid courses: see section 3d.
 
-## 3d. Paid courses and the web student portal (migration `0197_lms_paid_courses.sql`)
+## 3d. Program-level enrollment and payment, and the web portal (migrations `0197` and `0198`)
 
-**Paid courses.**
-- A course can carry a fee (course form, "Course fee in ₹", 1 to 100000). Blank means free. Fees need the church's Finance plan, like paid events.
-- Payment is on KingdomFlow's shared PayU account, like paid events. The church is paid out from **Payouts** (stream "Course fees", one balance per church, 2.5% service fee), recorded in Super Admin → Payouts like membership fees.
-- A fee course cannot be joined through the free request path (`lms_request_enrollment` refuses it). Instead the person opens `/bible-school/checkout/<order>`, which posts to PayU. On the PayU return (`/api/payu/bible-school/return`, hash verified) the order is claimed once ("created" to "paid") and the person is enrolled automatically (`source = 'payment'`).
-- Outsiders: applying for a fee course creates the application as "waiting for payment" and goes straight to checkout; paying approves it and enrols them. An unpaid application cannot be approved by hand. A church member or student pays from the app ("Pay and join", opens the browser) or the portal.
-- A course that is full is refused before payment starts. If enrolment fails after money was taken (for example the number belongs to another church), the order stays paid and an error is logged to platform events for the team to settle by hand. There is no automatic refund.
-- Students from outside the church can only pay for public courses.
+**Hierarchy.** Bible School, Program, Course, Module, Lesson. Students enroll in, and pay for, a **program**
+(table `lms_program_enrollments`); that gives them one `lms_enrollments` row (source `program`, linked by
+`program_enrollment_id`) in every published course of the program. Course completion rules are unchanged.
+A program is completed when every required published course in it is completed (computed in `lms_my_programs`).
 
-**Web student portal.** `/bible-school/learn`: sign in with a mobile number (a code is texted, as in the app) and learn on the web: My courses, All courses (join or pay), course outline with progress, lessons (reading, video and audio with resume and tracked watch time, documents and links), notes and bookmarks, mark complete, and live classes (opens the K-Connect room). It uses the same database functions and rules as the app, with the student's own session. A phone-only sign-in is kept out of the team dashboard and onboarding (the proxy sends it back to the portal).
+**Programs** gained `price_amount` (1 to 100000), `capacity` (seats, approved and active enrollments) and
+`visibility` (`organization` or `public`). Seats and the enrollment window of single courses do not apply to
+program students (`lms_program_sync_courses` inserts directly). Courses added to a program later are synced to
+the people already enrolled (`setProgramCoursesAction`). A course in a published program cannot be joined
+alone (`lms_request_enrollment` raises "part of the program"); a course in no program still can, free.
+The course-level fee column (`lms_courses.price_amount`, migration 0197) is unused by the screens; a course
+with a fee is still refused by `lms_request_enrollment`.
+
+**Functions** (all `security definer`, member from `auth.uid()` for the student ones): `lms_program_catalog`,
+`lms_program_courses_list`, `lms_my_programs`, `lms_request_program`, `lms_course_program`,
+`lms_program_visible`; server-only: `lms_enroll_program`, `lms_decide_program_enrollment`,
+`lms_program_sync_courses`, and `lms_approve_application(p_org, p_application, p_course, p_actor, p_program)`.
+Students from outside see only public programs; church members see public and church-only ones.
+
+**Payment.**
+- Fees need the church's Finance plan and are collected on KingdomFlow's shared PayU account. The church is
+  paid out from Payouts (stream "Course fees": `course_payouts`, `course_payout_requests`, one balance per
+  church, 2.5% service fee), recorded in Super Admin like membership fees.
+- Flow: `createProgramOrder` writes `lms_payment_orders` (program_id), the person opens
+  `/bible-school/checkout/<order>` which posts to PayU, and `/api/payu/bible-school/return` verifies PayU's
+  hash and calls `finalizeProgramPayment`: the order is claimed once ("created" to "paid"), then the person is
+  enrolled (`lms_enroll_program` with source `payment`, or `lms_approve_application` with the program for
+  an outsider's application).
+- Outsiders: applying for a program with a fee creates the application "waiting for payment" and goes to
+  checkout; paying approves and enrolls them. An application waiting for payment cannot be approved by hand.
+- A full program is refused before payment. If enrollment fails after money was taken, the order stays paid
+  and an error is logged to platform events for the team to settle by hand. There is no automatic refund.
+- The app and the portal call `POST /api/mobile/bible-school/checkout` with `{ programId }`; the payer is
+  worked out from the session.
+
+**Admin screens.** Programs (fee, seats, visibility, courses), Programs → Enrollments
+(`/dashboard/bible-school/programs/<id>`: enroll, approve, reject, withdraw), Applications (approve into a
+program), Guide (`/dashboard/bible-school/guide`, the in-product documentation).
+
+**Web student portal.** `/bible-school/learn`: sign in with a mobile number and a texted code. Programs
+(join or pay), My courses, course outline, lessons (reading, video and audio with resume and tracked watch
+time, documents), notes and bookmarks, mark complete, and live classes (opens the K-Connect room). It uses the
+same database functions and rules as the app, with the student's own session. A phone-only sign-in is sent
+back to the portal from the team dashboard, onboarding and the staff login pages (proxy).
 
 ## 4. Tests
 

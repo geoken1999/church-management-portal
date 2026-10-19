@@ -25,6 +25,24 @@ const TABS = [
     adminOnly: false,
   },
   {
+    href: `${LMS_BASE_PATH}/live-classes`,
+    label: "Live classes",
+    exact: false,
+    adminOnly: false,
+  },
+  {
+    href: `${LMS_BASE_PATH}/applications`,
+    label: "Applications",
+    exact: false,
+    adminOnly: true,
+  },
+  {
+    href: `${LMS_BASE_PATH}/guide`,
+    label: "Guide",
+    exact: false,
+    adminOnly: false,
+  },
+  {
     href: `${LMS_BASE_PATH}/settings`,
     label: "Settings",
     exact: false,

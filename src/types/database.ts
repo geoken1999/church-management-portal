@@ -1169,6 +1169,7 @@ export type LmsCourse = {
   ends_on: string | null;
   estimated_hours: number | null;
   capacity: number | null;
+  price_amount: number | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -1260,11 +1261,50 @@ export type LmsStudentApplication = {
   email: string | null;
   message: string | null;
   status: "pending" | "approved" | "rejected";
+  payment_status: "none" | "awaiting" | "paid";
   member_id: string | null;
   decided_by: string | null;
   decided_at: string | null;
   decision_note: string | null;
   created_at: string;
+};
+
+export type LmsPaymentOrder = {
+  id: string;
+  organization_id: string;
+  course_id: string;
+  member_id: string | null;
+  application_id: string | null;
+  amount: number;
+  status: "created" | "paid" | "failed";
+  payu_txnid: string;
+  payu_mihpayid: string | null;
+  payer_name: string;
+  payer_email: string | null;
+  payer_phone: string | null;
+  enrollment_id: string | null;
+  paid_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CoursePayout = { id: string; organization_id: string; amount: number; note: string | null; paid_by: string | null; created_at: string };
+
+export type CoursePayoutRequest = {
+  id: string;
+  organization_id: string;
+  amount: number;
+  status: "pending" | "paid" | "cancelled";
+  payout_method: "upi" | "bank_transfer";
+  upi_id: string | null;
+  bank_account_holder: string | null;
+  bank_account_number: string | null;
+  bank_ifsc: string | null;
+  bank_name: string | null;
+  requested_by: string | null;
+  resolved_payout_id: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type LmsLiveSession = {
@@ -3734,6 +3774,24 @@ export type Database = {
         Update: Partial<LmsLessonProgress>;
         Relationships: [];
       };
+      lms_payment_orders: {
+        Row: LmsPaymentOrder;
+        Insert: Partial<LmsPaymentOrder> & Pick<LmsPaymentOrder, "organization_id" | "course_id" | "amount" | "payu_txnid" | "payer_name">;
+        Update: Partial<LmsPaymentOrder>;
+        Relationships: [];
+      };
+      course_payouts: {
+        Row: CoursePayout;
+        Insert: Partial<CoursePayout> & Pick<CoursePayout, "organization_id" | "amount">;
+        Update: Partial<CoursePayout>;
+        Relationships: [];
+      };
+      course_payout_requests: {
+        Row: CoursePayoutRequest;
+        Insert: Partial<CoursePayoutRequest> & Pick<CoursePayoutRequest, "organization_id" | "amount" | "payout_method">;
+        Update: Partial<CoursePayoutRequest>;
+        Relationships: [];
+      };
       lms_student_applications: {
         Row: LmsStudentApplication;
         Insert: Partial<LmsStudentApplication> & Pick<LmsStudentApplication, "organization_id" | "first_name" | "last_name" | "phone">;
@@ -4423,11 +4481,11 @@ export type Database = {
         Returns: string | null;
       };
       lms_approve_application: {
-        Args: { p_org: string; p_application: string; p_course: string | null; p_actor: string };
+        Args: { p_org: string; p_application: string; p_course: string | null; p_actor: string | null };
         Returns: { member_id: string; enrolled: boolean };
       };
       lms_create_enrollment: {
-        Args: { p_organization_id: string; p_course_id: string; p_member_id: string; p_status: string; p_source: string; p_actor: string; p_ignore_window?: boolean };
+        Args: { p_organization_id: string; p_course_id: string; p_member_id: string; p_status: string; p_source: string; p_actor: string | null; p_ignore_window?: boolean };
         Returns: string;
       };
       lms_decide_enrollment: {

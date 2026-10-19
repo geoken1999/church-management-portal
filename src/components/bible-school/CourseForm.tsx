@@ -33,6 +33,7 @@ export const EMPTY_COURSE: CourseInput = {
   endsOn: "",
   estimatedHours: "",
   capacity: "",
+  price: "",
 };
 
 export function CourseForm({
@@ -267,6 +268,22 @@ export function CourseForm({
             onChange={set("capacity")}
           />
           <FieldError id="course-capacity-error" message={errors.capacity} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="course-price">Course fee in ₹ (blank = free)</Label>
+          <Input
+            id="course-price"
+            type="number"
+            min={1}
+            step="0.01"
+            value={form.price}
+            onChange={set("price")}
+          />
+          <FieldError id="course-price-error" message={errors.price} />
+          <p className="text-xs text-muted-foreground">
+            Paid online on KingdomFlow; students join as soon as they pay. A 2.5%
+            service fee applies, and you request payouts from the Payouts page.
+          </p>
         </div>
       </div>
 

@@ -279,7 +279,7 @@ function courseRow(input: CourseInput) {
     language: input.language.trim(),
     delivery_mode: input.deliveryMode as
       "self_paced" | "instructor_led" | "blended",
-    visibility: input.visibility as "organization" | "unlisted",
+    visibility: input.visibility as "organization" | "unlisted" | "public",
     enrollment_opens_at: input.enrollmentOpensAt
       ? new Date(input.enrollmentOpensAt).toISOString()
       : null,
@@ -292,6 +292,7 @@ function courseRow(input: CourseInput) {
       ? Number(input.estimatedHours)
       : null,
     capacity: input.capacity.trim() ? Number(input.capacity) : null,
+    price_amount: input.price.trim() ? Number(input.price) : null,
   };
 }
 

@@ -13,6 +13,7 @@ const MIGRATIONS = [
   "0193_lms_live_classes.sql",
   "0194_lms_students.sql",
   "0196_bible_school_access.sql",
+  "0197_lms_paid_courses.sql",
 ];
 const BOOTSTRAP = readFileSync(
   "src/lib/lms/test-support/supabase-stub.sql",
@@ -1030,6 +1031,104 @@ describe("Bible School database", () => {
           uS,
         ])) ?? ""
       ).includes("permission denied"),
+    );
+  }, 60000);
+
+  it("Paid courses", async () => {
+    await q("update organizations set custom_plan_limits = null where id=$1", [
+      orgA,
+    ]);
+    const paid = (
+      await q(
+        "insert into lms_courses (organization_id, title, status, visibility, price_amount) values ($1,'Paid Course','published','public',499) returning id",
+        [orgA],
+      )
+    )[0].id;
+    check(
+      "a fee must be positive",
+      await q("update lms_courses set price_amount=0 where id=$1", [paid]).then(
+        () => false,
+        () => true,
+      ),
+    );
+    check(
+      "the catalogue shows the fee",
+      Number(
+        (
+          await as(
+            u1,
+            "select price_amount from lms_catalog($1) where course_id=$2",
+            [orgA, paid],
+          )
+        )[0].price_amount,
+      ) === 499,
+    );
+    check(
+      "a member cannot ask to join a course with a fee",
+      (
+        (await asErr(u1, "select lms_request_enrollment($1)", [paid])) ?? ""
+      ).includes("has a fee"),
+    );
+    const app = (
+      await q(
+        "insert into lms_student_applications (organization_id, course_id, first_name, last_name, phone, payment_status) values ($1,$2,'Pia','Payer','9123456780','awaiting') returning id",
+        [orgA, paid],
+      )
+    )[0].id;
+    check(
+      "an application waiting for payment cannot be approved by hand",
+      await q("select lms_approve_application($1,$2,$3,$4)", [
+        orgA,
+        app,
+        paid,
+        admin,
+      ]).then(
+        () => false,
+        (e) => String(e.message).includes("waiting for the course fee"),
+      ),
+    );
+    await q(
+      "update lms_student_applications set payment_status='paid' where id=$1",
+      [app],
+    );
+    const result = (
+      await q("select lms_approve_application($1,$2,$3,null) as r", [
+        orgA,
+        app,
+        paid,
+      ])
+    )[0].r;
+    check("once paid, approval enrols the student", result.enrolled === true);
+    const order = (
+      await q(
+        "insert into lms_payment_orders (organization_id, course_id, member_id, amount, payu_txnid, payer_name) values ($1,$2,$3,499,'t1','Pia') returning id",
+        [orgA, paid, result.member_id],
+      )
+    )[0].id;
+    check("an order is recorded", Boolean(order));
+    check(
+      "an order needs a member or an application",
+      await q(
+        "insert into lms_payment_orders (organization_id, course_id, amount, payu_txnid, payer_name) values ($1,$2,10,'t2','X')",
+        [orgA, paid],
+      ).then(
+        () => false,
+        () => true,
+      ),
+    );
+    check(
+      "a payment-source enrollment is allowed",
+      (
+        await q(
+          "select lms_create_enrollment($1,$2,$3,'approved','payment',null,true) as id",
+          [orgA, paid, m1],
+        )
+      )[0].id !== null,
+    );
+    check(
+      "students and members cannot read orders",
+      (await as(u1, "select count(*)::int as n from lms_payment_orders"))[0]
+        .n === 0,
     );
   }, 60000);
 });

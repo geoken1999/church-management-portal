@@ -108,6 +108,14 @@ export async function sendMembershipPayoutProcessedEmail(organizationId: string,
   );
 }
 
+export async function sendCoursePayoutProcessedEmail(organizationId: string, amountRupees: number): Promise<void> {
+  await sendBillingEmail(
+    organizationId,
+    "Course fee payout sent",
+    `<p>A payout of <strong>${formatRupees(amountRupees)}</strong> from Bible School course fees has been processed and wired to you.</p>`,
+  );
+}
+
 // Sent when the platform admin finishes a tenant's onboarding: what was chosen, what it costs, and
 // where to authorize the subscription.
 export async function sendOnboardingReadyEmail(organizationId: string, moduleLabels: string[], creditLabels: string[], totalWithGst: number, billingUrl: string): Promise<void> {

@@ -5,10 +5,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { checkAttemptLimit, recordAttempt } from "@/lib/auth/rate-limit";
 import { STUDENT_APPLICATION_RULE } from "@/lib/auth/rate-limit-rules";
 import { pushToTeam } from "@/lib/push/team";
-import { sendBulkEmail } from "@/lib/email/client";
-import { isEmailConfigured } from "@/lib/email/env";
-import { PLAY_STORE_URL } from "@/lib/app-links";
-import { logPlatformEvent } from "@/lib/platform-events/log";
 import { nationalTail } from "@/lib/whatsapp/phone-match";
 import { authorizeTab } from "@/lib/lms/authz";
 import { logLmsEvent } from "@/lib/lms/audit";
@@ -19,6 +15,8 @@ import {
   type ApplicationErrors,
 } from "@/lib/lms/students";
 import { isBibleSchoolOpen } from "@/lib/lms/public-school";
+import { createCourseOrder, checkoutUrl } from "@/lib/lms/payments";
+import { emailStudentApproved } from "@/lib/lms/student-email";
 import type { LmsResult } from "@/lib/lms/actions";
 
 export interface ApplicationState {
@@ -26,19 +24,13 @@ export interface ApplicationState {
   error?: string;
   success?: boolean;
   message?: string;
+  // Set when the chosen course has a fee: the page opens this to pay.
+  checkoutUrl?: string;
 }
 
 function read(formData: FormData, key: string): string {
   const value = formData.get(key);
   return typeof value === "string" ? value : "";
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 // Public: someone from outside the church applies to the Bible School. No sign-in; a hidden field, a
@@ -80,10 +72,11 @@ export async function submitStudentApplication(
 
   // The course, if one was chosen, must be a public, published course of this church.
   let courseId: string | null = null;
+  let fee = 0;
   if (input.courseId) {
     const { data: course } = await admin
       .from("lms_courses")
-      .select("id")
+      .select("id, price_amount")
       .eq("id", input.courseId)
       .eq("organization_id", org.id)
       .eq("status", "published")
@@ -92,6 +85,7 @@ export async function submitStudentApplication(
     if (!course)
       return { errors: { courseId: "That course isn't available." } };
     courseId = course.id;
+    fee = Number(course.price_amount ?? 0);
   }
 
   // Someone already known to this church by that number.
@@ -107,25 +101,65 @@ export async function submitStudentApplication(
   const explained = explainExistingPerson(known?.status ?? null);
   if (explained) return { error: explained };
 
-  const { error } = await admin.from("lms_student_applications").insert({
-    organization_id: org.id,
-    course_id: courseId,
-    first_name: input.firstName,
-    last_name: input.lastName,
-    phone: input.phone,
-    email: input.email || null,
-    message: input.message || null,
-  });
-  if (error?.code === "23505")
+  const { data: created, error } = await admin
+    .from("lms_student_applications")
+    .insert({
+      organization_id: org.id,
+      course_id: courseId,
+      first_name: input.firstName,
+      last_name: input.lastName,
+      phone: input.phone,
+      email: input.email || null,
+      message: input.message || null,
+      payment_status: fee > 0 ? "awaiting" : "none",
+    })
+    .select("id")
+    .single();
+
+  // A course with a fee is paid for right away: the person goes on to checkout, and is enrolled when
+  // the payment is confirmed.
+  const startPayment = async (applicationId: string): Promise<ApplicationState> => {
+    const order = await createCourseOrder({
+      organizationId: org.id,
+      courseId: courseId!,
+      applicationId,
+      payer: {
+        name: `${input.firstName} ${input.lastName}`.trim(),
+        email: input.email || null,
+        phone: input.phone,
+      },
+    });
+    if (order.error || !order.orderId) return { error: order.error };
+    return { checkoutUrl: checkoutUrl(order.orderId) };
+  };
+
+  if (error?.code === "23505") {
+    // Already waiting: for a course that was not paid yet, offer the payment again.
+    if (fee > 0) {
+      const { data: waiting } = await admin
+        .from("lms_student_applications")
+        .select("id, phone, course_id, payment_status")
+        .eq("organization_id", org.id)
+        .eq("status", "pending");
+      const mine = (waiting ?? []).find(
+        (a) =>
+          nationalTail(a.phone) === tail &&
+          a.payment_status === "awaiting" &&
+          a.course_id === courseId,
+      );
+      if (mine) return startPayment(mine.id);
+    }
     return {
       success: true,
       message:
         "We already have your application. The church will contact you once it is reviewed.",
     };
-  if (error) {
-    console.error("lms_student_applications insert failed:", error.message);
+  }
+  if (error || !created) {
+    console.error("lms_student_applications insert failed:", error?.message);
     return { error: "Something went wrong. Please try again." };
   }
+  if (fee > 0) return startPayment(created.id);
 
   await pushToTeam({
     organizationId: org.id,
@@ -139,33 +173,6 @@ export async function submitStudentApplication(
     message:
       "Thank you. Your application was sent. The church will review it and contact you.",
   };
-}
-
-async function emailApproved(
-  organizationName: string,
-  email: string,
-  firstName: string,
-  courseTitle: string | null,
-): Promise<void> {
-  if (!isEmailConfigured() || !email) return;
-  try {
-    await sendBulkEmail({
-      fromName: organizationName,
-      subject: `You're in: ${organizationName} Bible School`,
-      html: `<div style="font-family:sans-serif;max-width:480px"><p>Hi ${escapeHtml(firstName)},</p><p>Your application to the ${escapeHtml(organizationName)} Bible School was approved${
-        courseTitle
-          ? ` and you're enrolled in <strong>${escapeHtml(courseTitle)}</strong>`
-          : ""
-      }.</p><p>To start, install the KingdomFlow app and sign in with the mobile number you applied with:</p><p><a href="${PLAY_STORE_URL}">Get the app on Google Play</a></p><p>You'll see your courses straight away.</p></div>`,
-      recipients: [email],
-    });
-  } catch (err) {
-    await logPlatformEvent({
-      level: "warning",
-      source: "email_send",
-      message: `Bible School approval email failed: ${err instanceof Error ? err.message : "unknown"}`,
-    });
-  }
 }
 
 // Approves an application: creates the student (or reuses the person), enrolls them in the course the
@@ -239,7 +246,7 @@ export async function approveApplicationAction(
           .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
-  await emailApproved(
+  await emailStudentApproved(
     org?.name ?? "the church",
     application.email ?? "",
     application.first_name,

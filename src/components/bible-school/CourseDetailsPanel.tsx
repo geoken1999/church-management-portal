@@ -42,6 +42,7 @@ export function courseToInput(course: LmsCourse): CourseInput {
     startsOn: course.starts_on ?? "",
     endsOn: course.ends_on ?? "",
     estimatedHours: course.estimated_hours?.toString() ?? "",
+    price: course.price_amount?.toString() ?? "",
     capacity: course.capacity?.toString() ?? "",
   };
 }

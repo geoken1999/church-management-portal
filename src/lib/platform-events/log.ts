@@ -20,6 +20,7 @@ export type PlatformEventSource =
   | "instagram_webhook"
   | "automation_send"
   | "event_registration_payment"
+  | "bible_school_payment"
   | "membership_fee"
   | "subscription_billing"
   | "member_mobile_login"

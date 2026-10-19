@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BookOpen } from "lucide-react";
 import { getPublicSchool } from "@/lib/lms/public-school";
@@ -27,10 +28,13 @@ export async function generateMetadata({
 // church to apply. Applications are reviewed by the church's team.
 export default async function PublicBibleSchoolPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ payment?: string }>;
 }) {
   const { slug } = await params;
+  const { payment } = await searchParams;
   const school = await getPublicSchool(slug);
   if (!school) notFound();
 
@@ -55,6 +59,28 @@ export default async function PublicBibleSchoolPage({
             )}
           </div>
         </div>
+
+        {payment === "success" && (
+          <div className="mt-8 rounded-xl border border-primary/40 bg-primary/5 p-4 text-sm">
+            <p className="font-medium">Payment received. Thank you!</p>
+            <p className="mt-1 text-muted-foreground">
+              You&apos;re enrolled. Sign in with your mobile number to start
+              learning, on the web or in the KingdomFlow app.
+            </p>
+            <Link
+              href="/bible-school/learn"
+              className="mt-2 inline-block font-medium text-primary underline"
+            >
+              Open my courses
+            </Link>
+          </div>
+        )}
+        {payment === "failed" && (
+          <div className="mt-8 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm">
+            The payment didn&apos;t go through, so nothing was charged. You can
+            apply again below to try once more.
+          </div>
+        )}
 
         <section className="mt-10 space-y-4">
           <h2 className="font-heading text-xl font-bold">Courses</h2>
@@ -82,6 +108,13 @@ export default async function PublicBibleSchoolPage({
                       ? ` · ${course.estimated_hours} hours`
                       : ""}
                   </p>
+                  {course.price_amount ? (
+                    <p className="text-sm font-semibold">
+                      Course fee: ₹{course.price_amount}
+                    </p>
+                  ) : (
+                    <p className="text-xs font-medium text-primary">Free</p>
+                  )}
                   {course.description && (
                     <p className="whitespace-pre-wrap text-sm text-muted-foreground">
                       {course.description}
@@ -101,13 +134,26 @@ export default async function PublicBibleSchoolPage({
           </p>
           <StudentApplyForm
             slug={slug}
-            courses={school.courses.map((c) => ({ id: c.id, title: c.title }))}
+            courses={school.courses.map((c) => ({
+              id: c.id,
+              title: c.title,
+              price: c.price_amount,
+            }))}
           />
         </section>
 
         <section className="mt-10 text-center">
+          <p className="mb-3 text-sm">
+            Already a student?{" "}
+            <Link
+              href="/bible-school/learn"
+              className="font-medium text-primary underline"
+            >
+              Sign in to your courses
+            </Link>
+          </p>
           <p className="mb-3 text-sm text-muted-foreground">
-            Get the app to study once you&apos;re approved
+            Or get the app to study once you&apos;re approved
           </p>
           <AppStoreButtons />
         </section>

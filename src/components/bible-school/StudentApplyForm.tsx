@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { CheckCircle2 } from "lucide-react";
 import {
   submitStudentApplication,
@@ -22,12 +22,25 @@ export function StudentApplyForm({
   courses,
 }: {
   slug: string;
-  courses: { id: string; title: string }[];
+  courses: { id: string; title: string; price: number | null }[];
 }) {
   const [state, action, pending] = useActionState(
     submitStudentApplication.bind(null, slug),
     initial,
   );
+
+  // A course with a fee: carry on to the payment page.
+  useEffect(() => {
+    if (state.checkoutUrl) window.location.assign(state.checkoutUrl);
+  }, [state.checkoutUrl]);
+
+  if (state.checkoutUrl) {
+    return (
+      <p className="rounded-xl border border-border bg-muted/30 py-10 text-center text-sm text-muted-foreground">
+        Taking you to the payment page...
+      </p>
+    );
+  }
 
   if (state.success) {
     return (
@@ -119,6 +132,7 @@ export function StudentApplyForm({
             {courses.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.title}
+                {c.price ? ` (₹${c.price})` : ""}
               </option>
             ))}
           </select>
@@ -139,7 +153,7 @@ export function StudentApplyForm({
         <FieldError id="stu-message-error" message={e.message} />
       </div>
       <Button type="submit" disabled={pending} className="w-full sm:w-auto">
-        {pending ? "Sending..." : "Apply to join"}
+        {pending ? "Please wait..." : "Apply to join"}
       </Button>
     </form>
   );

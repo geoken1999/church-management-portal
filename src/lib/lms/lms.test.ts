@@ -39,6 +39,7 @@ const course = {
   endsOn: "",
   estimatedHours: "",
   capacity: "",
+  price: "",
 };
 
 describe("enrollment state machine", () => {
@@ -427,5 +428,18 @@ describe("watch progress", () => {
     expect(watchedEnough(539, 600)).toBe(false);
     expect(watchedEnough(540, 600)).toBe(true);
     expect(watchedEnough(0, 0)).toBe(false);
+  });
+});
+
+describe("course fee", () => {
+  it("is optional, positive, and at most two decimals", () => {
+    expect(validateCourse({ ...course, price: "" }).price).toBeUndefined();
+    expect(validateCourse({ ...course, price: "499" }).price).toBeUndefined();
+    expect(validateCourse({ ...course, price: "499.50" }).price).toBeUndefined();
+    expect(validateCourse({ ...course, price: "0" }).price).toBeDefined();
+    expect(validateCourse({ ...course, price: "-5" }).price).toBeDefined();
+    expect(validateCourse({ ...course, price: "abc" }).price).toBeDefined();
+    expect(validateCourse({ ...course, price: "12.345" }).price).toBeDefined();
+    expect(validateCourse({ ...course, price: "100001" }).price).toBeDefined();
   });
 });

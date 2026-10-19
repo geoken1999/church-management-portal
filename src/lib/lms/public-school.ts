@@ -37,6 +37,7 @@ export interface PublicSchool {
     delivery_mode: string;
     estimated_hours: number | null;
     language: string;
+    price_amount: number | null;
   }[];
 }
 
@@ -61,7 +62,7 @@ export async function getPublicSchool(
     admin
       .from("lms_courses")
       .select(
-        "id, title, code, description, cover_image_url, level, delivery_mode, estimated_hours, language",
+        "id, title, code, description, cover_image_url, level, delivery_mode, estimated_hours, language, price_amount",
       )
       .eq("organization_id", org.id)
       .eq("status", "published")

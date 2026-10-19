@@ -130,11 +130,16 @@ export function ApplicationsPanel({
                       {new Date(application.created_at).toLocaleDateString()}
                     </p>
                   </div>
-                  {application.courseTitle && (
-                    <Badge variant="outline">
-                      Asked for: {application.courseTitle}
-                    </Badge>
-                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {application.payment_status === "awaiting" && (
+                      <Badge variant="secondary">Waiting for payment</Badge>
+                    )}
+                    {application.courseTitle && (
+                      <Badge variant="outline">
+                        Asked for: {application.courseTitle}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 {application.message && (
                   <p className="rounded-md bg-muted/50 p-2 text-sm">
@@ -161,7 +166,7 @@ export function ApplicationsPanel({
                     ))}
                   </select>
                   <Button
-                    disabled={pending}
+                    disabled={pending || application.payment_status === "awaiting"}
                     onClick={() =>
                       run(
                         () =>

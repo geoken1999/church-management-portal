@@ -1,0 +1,53 @@
+import { createClient } from "@supabase/supabase-js";
+const s = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+// [type, area, title, description, status, priority]
+const T = [
+  // ---- done: earlier work
+  ["feature","mobile","Pop-up announcements for members","Web composer for pop-ups in the member app with an image and an optional link button; members can choose not to see one again (0182, 0183).","done","medium"],
+  ["bug","mobile","Semantics assertion error when a pop-up appeared","Fixed the '!semantics.parentDataDirty' exception around the pop-up and language switch.","done","high"],
+  ["feature","mobile","In-app update prompt","The app checks for a newer release and offers the update, with release notes managed from Super Admin.","done","medium"],
+  ["feature","platform","Tenant onboarding screen in Super Admin","Documents, modules, pricing and a subscription link per tenant; package plans need only documents; custom plans add module credits and prices (0184, 0185).","done","high"],
+  ["security","security","Rate limit on sign-in and password reset","5 failures per email and 30 per network address in 15 minutes; resets 3 per hour; attempts stored as hashes (0186).","done","high"],
+  ["feature","web","Account deletion form and privacy policy update","Public form for people who cannot use the app, confirmed by email link, plus an updated privacy policy (0187).","done","medium"],
+  ["improvement","mobile","Faster, smoother live stream playback","Live stream viewing tuned for a better experience.","done","medium"],
+  ["bug","payments","Mid-period subscription cancellation","A cancelled subscription keeps access until the paid period ends, then moves to Basic; notices and a way to undo (0188).","done","high"],
+  ["improvement","platform","Custom plans show usage per module","Admin sees counts for members, branches, forms, K-Connect, social accounts, mobile features, storage, users and campaigns, and AI credits.","done","medium"],
+  ["feature","notifications","Daily special-days summary for admins","Owners and admins get who has a birthday or anniversary today, or that nobody does (0189).","done","medium"],
+  ["feature","landing","Landing page: app links and graphical app views","Google Play link, iOS badge, phone mockups of member and admin screens.","done","low"],
+  ["improvement","mobile","Hindi and Tamil translations","Runtime translations for the member and team app, extended with every new screen.","done","medium"],
+  ["feature","bible-school","Bible School requirements audit and Phase 1","Audit of the existing architecture and the first phase of the learning system.","done","high"],
+  ["bug","bible-school","Bible School menu and app card not visible","Feature switch states (testing, beta, live) and where to find the module explained and corrected.","done","medium"],
+  ["bug","bible-school","Bible School module fixes","Real-database tests for the migrations, upload-only video and audio lessons, lessons need a file or link before publishing, notes on seats and attendance.","done","high"],
+  // ---- done: this stretch
+  ["bug","bible-school","Live classes, Applications and Guide tabs were missing from the Bible School menu","The pages existed but had no link; added to the tab bar.","done","high"],
+  ["improvement","prayer","Prayer voice messages are deleted with the request, member or church","Removing a request, a member record, an account-deletion with record, or a whole church removes the recording files.","done","medium"],
+  ["improvement","security","Playwright smoke tests run in phone and desktop sizes","Read-only tests; phones skip team pages that are closed to them by design.","done","low"],
+  ["improvement","platform","Releasing checklist","docs/releasing.md: when to bump versions, checks, deploy order and rollback.","done","medium"],
+  ["improvement","security","Key rotation procedure for connection secrets","scripts/rotate-connection-secrets.mjs with tests, and the written procedure in docs/security.md.","done","medium"],
+  ["feature","platform","Tickets board in Super Admin","This board: numbered tickets, statuses, comments, filters, and change requests raised by the team (0200).","done","medium"],
+  ["improvement","bible-school","Verify-migrations script","supabase/setup/verify-migrations-0182-0198.sql lists which migrations have been applied.","done","low"],
+  // ---- open: recommendations and pending decisions
+  ["security","security","Scheduled-job routes accept calls when CRON_SECRET is unset","Make /api/cron/* refuse in production when the secret is missing, and set CRON_SECRET in every environment.","open","urgent"],
+  ["improvement","payments","Super Admin list of orders paid but not enrolled","Show paid Bible School orders whose enrolment failed, with a retry button. Today they only appear in platform events.","open","high"],
+  ["task","platform","Test the full paid-program path on staging","Church requests the module, program with a fee through PayU test mode, outsider applies and signs in on the web, voice prayer recorded and played.","open","high"],
+  ["task","mobile","Real-phone test pass","Recording and playback, full screen video, sign-in moving to secure storage, Pay and join returning to the app; Android and iPhone builds.","open","high"],
+  ["task","security","Enforce the content security policy","Review [csp-report] logs for 2 to 4 weeks, then switch to enforcing and drop unsafe-inline.","open","medium"],
+  ["feature","notifications","Task and plan reminders 10 minutes before the start","Planner tasks to the assigned member and to-dos with a due time, via a scheduled job. Defaults were proposed and need a yes.","open","medium"],
+  ["task","landing","Add the App Store link when the iPhone app is live","Set APP_STORE_URL in src/lib/app-links.ts so the coming-soon badge becomes a download button.","open","low"],
+  ["feature","bible-school","Assignments and grading","Phase 3 remainder: assignments, submissions and grading.","open","medium"],
+  ["feature","bible-school","Quizzes, gradebook and certificates","Phase 4 of the Bible School plan.","open","medium"],
+  ["feature","bible-school","Reports and plan limits for the Bible School","Phase 5: dashboards, usage limits per plan, audit coverage.","open","low"],
+  ["feature","payments","Automatic refunds for program fees","Refunds are handled by hand today.","open","low"],
+  ["security","security","Delete voice files when an account (not the member record) is deleted","Files stay if only the sign-in is deleted and the member record is kept; decide whether that is acceptable.","open","low"],
+];
+const { data: existing } = await s.from("change_tickets").select("title");
+const have = new Set((existing ?? []).map((r) => r.title));
+const rows = T.filter((t) => !have.has(t[2])).map(([type, area, title, description, status, priority]) => ({
+  type, area, title, description, status, priority,
+  reported_by: "Platform team", assignee: status === "done" ? "Claude" : null,
+  resolved_at: status === "done" ? new Date().toISOString() : null,
+}));
+const { error } = await s.from("change_tickets").insert(rows);
+console.log(error ? "ERR " + error.message : `Added ${rows.length} tickets (${T.length - rows.length} already existed).`);
+const { count } = await s.from("change_tickets").select("id", { count: "exact", head: true });
+console.log("tickets now:", count);

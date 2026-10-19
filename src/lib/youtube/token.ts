@@ -1,5 +1,8 @@
 import "server-only";
-import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
+import {
+  sealIfConfigured,
+  openSecret,
+} from "@/lib/security/connection-secrets";
 
 import { createClient } from "@/lib/supabase/server";
 import { refreshAccessToken } from "@/lib/youtube/client";
@@ -12,20 +15,27 @@ import type { YouTubeConnection } from "@/types/database";
 // on a schedule the way Instagram's long-lived token does.
 const REFRESH_THRESHOLD_MS = 5 * 60 * 1000;
 
-export async function getValidAccessToken(connection: YouTubeConnection): Promise<string> {
+export async function getValidAccessToken(
+  connection: YouTubeConnection,
+): Promise<string> {
   const expiresAt = new Date(connection.token_expires_at).getTime();
   if (expiresAt - Date.now() > REFRESH_THRESHOLD_MS) {
     return connection.access_token;
   }
 
   const refreshed = await refreshAccessToken(connection.refresh_token);
-  const tokenExpiresAt = new Date(Date.now() + refreshed.expiresInSeconds * 1000).toISOString();
+  const tokenExpiresAt = new Date(
+    Date.now() + refreshed.expiresInSeconds * 1000,
+  ).toISOString();
 
-  const supabase = await createClient();
-  await supabase
-    .from("youtube_connections")
-    .update({ access_token: sealSecret(refreshed.accessToken), token_expires_at: tokenExpiresAt })
-    .eq("id", connection.id);
+  const sealed = sealIfConfigured(refreshed.accessToken);
+  if (sealed) {
+    const supabase = await createClient();
+    await supabase
+      .from("youtube_connections")
+      .update({ access_token: sealed, token_expires_at: tokenExpiresAt })
+      .eq("id", connection.id);
+  }
 
   return refreshed.accessToken;
 }

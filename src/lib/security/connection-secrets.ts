@@ -74,6 +74,15 @@ export function openSecret(stored: string): string {
   ]).toString("utf8");
 }
 
+/**
+ * For refreshing a token that is already stored: the encrypted value, or null when no key is configured
+ * (the caller then keeps using the new token for this call without saving it, rather than failing a
+ * working connection or saving it in plain text).
+ */
+export function sealIfConfigured(plaintext: string): string | null {
+  return isConnectionSecretsConfigured() ? sealSecret(plaintext) : null;
+}
+
 /** Same as openSecret for a nullable column. */
 export function openOptionalSecret(
   stored: string | null | undefined,

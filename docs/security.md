@@ -15,7 +15,7 @@ The secrets a church connects are encrypted with AES-256-GCM before they are sto
 WhatsApp credentials use their own key (`WHATSAPP_CREDENTIALS_KEY`, `src/lib/whatsapp/secret-box.ts`). The Facebook page picker cookie is sealed too.
 
 - Key: `CONNECTION_SECRETS_KEY` (32 bytes, base64: `openssl rand -base64 32`). Set it in every environment that connects accounts. **Back it up.** Losing it makes the stored secrets unreadable and every church has to reconnect.
-- Writing without the key fails with a clear error. A secret is never stored in plain text.
+- Writing without the key fails with a clear error (connecting an account, saving SMTP or gateway keys). A secret is never stored in plain text. Automatic token refreshes (YouTube, Instagram) are the exception that keeps a working connection alive: without the key they use the new token for that call but do not save it. Set the key before you deploy.
 - Reading is tolerant: a value without the `cs1.` prefix is an older plain-text one and is passed through, so the app keeps working during rollout. It becomes encrypted the next time it is saved.
 - Encrypt what is already stored with `node --env-file=.env.local scripts/encrypt-connection-secrets.mjs` (dry run) and then `--apply`. Safe to run again.
 - Rollout order: set the key in the environment, deploy, run the script with `--apply`.

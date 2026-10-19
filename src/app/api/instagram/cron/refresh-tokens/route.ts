@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { sealSecret, openSecret } from "@/lib/security/connection-secrets";
+import {
+  sealIfConfigured,
+  openSecret,
+} from "@/lib/security/connection-secrets";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { refreshLongLivedToken } from "@/lib/instagram/client";
 import { withCronLogging } from "@/lib/cron/run-logger";
@@ -37,11 +40,17 @@ async function run(request: Request) {
 
   for (const connection of connections ?? []) {
     try {
-      const result = await refreshLongLivedToken(openSecret(connection.access_token));
-      const tokenExpiresAt = new Date(Date.now() + result.expiresInSeconds * 1000).toISOString();
+      const result = await refreshLongLivedToken(
+        openSecret(connection.access_token),
+      );
+      const tokenExpiresAt = new Date(
+        Date.now() + result.expiresInSeconds * 1000,
+      ).toISOString();
+      const sealed = sealIfConfigured(result.accessToken);
+      if (!sealed) throw new Error("CONNECTION_SECRETS_KEY is not set");
       await supabase
         .from("instagram_connections")
-        .update({ access_token: sealSecret(result.accessToken), token_expires_at: tokenExpiresAt })
+        .update({ access_token: sealed, token_expires_at: tokenExpiresAt })
         .eq("id", connection.id);
       refreshed += 1;
     } catch {
@@ -52,7 +61,11 @@ async function run(request: Request) {
     }
   }
 
-  return NextResponse.json({ refreshed, failed, checked: connections?.length ?? 0 });
+  return NextResponse.json({
+    refreshed,
+    failed,
+    checked: connections?.length ?? 0,
+  });
 }
 
 export const GET = withCronLogging("refresh-tokens", run);

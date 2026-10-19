@@ -20,7 +20,22 @@ WhatsApp credentials use their own key (`WHATSAPP_CREDENTIALS_KEY`, `src/lib/wha
 - Encrypt what is already stored with `node --env-file=.env.local scripts/encrypt-connection-secrets.mjs` (dry run) and then `--apply`. Safe to run again.
 - Rollout order: set the key in the environment, deploy, run the script with `--apply`.
 - Church admins can still select these rows through their own session, but now only see ciphertext. Reads and writes go through the data-access functions that open and seal values: add new readers there.
-- Rotating the key is not automated. To rotate: decrypt with the old key and re-seal with a new one using a variant of the script.
+- Rotating the key: see "Key ownership and rotation" below.
+
+## Key ownership and rotation
+
+**Who holds the key.** `CONNECTION_SECRETS_KEY` lives in two places only: the hosting environment variables (Vercel, one copy per environment) and a password manager entry the owner of the platform controls, with at least one other trusted person able to open it. It is never in git, chat or email. Write down in that entry who has access and when it was last rotated. WhatsApp credentials use a different key (`WHATSAPP_CREDENTIALS_KEY`); rotating that one is a separate job and is not covered by the script.
+
+**When to rotate.** Every 12 months, when anyone with access to the key leaves, or at once if it may have leaked (for example pasted in a ticket or shown on a screen share).
+
+**How.**
+1. Generate a new key: `openssl rand -base64 32`. Save it in the password manager next to the current one, labelled "new".
+2. Dry run: `CONNECTION_SECRETS_KEY_OLD=<current> CONNECTION_SECRETS_KEY=<new> node --env-file=.env.local scripts/rotate-connection-secrets.mjs`. It lists how many values it would re-encrypt and fails if any value opens with neither key.
+3. Pick a quiet time. Run the same command with `--apply`, then immediately set the new key as `CONNECTION_SECRETS_KEY` in the hosting environment and redeploy. Between those two steps the running app cannot read re-encrypted rows, so keep the gap to a few minutes.
+4. Check an Instagram post, a YouTube page load, a test email and a gateway test payment. Keep the old key in the password manager, marked "retired", for 30 days, then delete it.
+5. If something goes wrong, put the old key back and run the script the other way round (swap the two variables).
+
+The script never overwrites a value that opens with neither key, so a mistake in the key variables cannot destroy data. Run it again after a failure: rows already moved are skipped.
 
 ## Browser security headers (`next.config.ts`)
 

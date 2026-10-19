@@ -31,6 +31,18 @@ const TABS = [
     adminOnly: false,
   },
   {
+    href: `${LMS_BASE_PATH}/grading`,
+    label: "Grading",
+    exact: false,
+    adminOnly: false,
+  },
+  {
+    href: `${LMS_BASE_PATH}/certificates`,
+    label: "Certificates",
+    exact: false,
+    adminOnly: true,
+  },
+  {
     href: `${LMS_BASE_PATH}/applications`,
     label: "Applications",
     exact: false,

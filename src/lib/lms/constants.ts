@@ -24,8 +24,8 @@ export const VISIBILITIES = [
   },
 ] as const;
 
-// Lesson types a teacher can create now. quiz, assignment and live_session lessons arrive with the
-// phases that build quizzes, assignments and live classes; the database already reserves them.
+// Lesson types a teacher can create. assignment and live_session lessons are reserved in the database for
+// later; live classes are scheduled on the course, not as a lesson.
 export const LESSON_TYPES = [
   // needsLink: the lesson has to have a source (a link or an uploaded file) before it can be published.
   // Videos and audio are upload-only: they play inside the app and their progress is tracked, which a
@@ -64,6 +64,14 @@ export const LESSON_TYPES = [
     needsLink: true,
     allowsLink: true,
     allowsUpload: true,
+  },
+  // A quiz has questions instead of content; passing it is what completes the lesson.
+  {
+    value: "quiz",
+    label: "Quiz",
+    needsLink: false,
+    allowsLink: false,
+    allowsUpload: false,
   },
   {
     value: "external",

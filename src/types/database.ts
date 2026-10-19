@@ -1133,6 +1133,9 @@ export type LmsSettings = {
   default_language: string;
   enrollment_requires_approval: boolean;
   allow_self_enrollment: boolean;
+  issue_certificates: boolean;
+  certificate_signer_name: string | null;
+  certificate_signer_title: string | null;
   updated_at: string;
 };
 
@@ -1150,6 +1153,70 @@ export type LmsProgram = {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type LmsQuiz = {
+  lesson_id: string;
+  organization_id: string;
+  course_id: string;
+  pass_percent: number;
+  max_attempts: number | null;
+  show_answers: boolean;
+  instructions: string | null;
+  updated_at: string;
+};
+
+export type LmsQuizOption = { id: string; text: string; correct?: boolean };
+
+export type LmsQuizQuestion = {
+  id: string;
+  lesson_id: string;
+  organization_id: string;
+  position: number;
+  kind: "single" | "multiple" | "true_false" | "short";
+  prompt: string;
+  points: number;
+  options: LmsQuizOption[];
+  explanation: string | null;
+  created_at: string;
+};
+
+export type LmsQuizAttempt = {
+  id: string;
+  organization_id: string;
+  lesson_id: string;
+  course_id: string;
+  enrollment_id: string;
+  member_id: string;
+  attempt_number: number;
+  answers: Record<string, string[] | string>;
+  per_question: Record<string, { points: number | null; correct: boolean | null }>;
+  auto_score: number;
+  manual_score: number;
+  max_score: number;
+  percent: number;
+  status: "submitted" | "graded";
+  passed: boolean;
+  feedback: string | null;
+  graded_by: string | null;
+  graded_at: string | null;
+  submitted_at: string;
+};
+
+export type LmsCertificate = {
+  id: string;
+  organization_id: string;
+  member_id: string;
+  course_id: string | null;
+  program_id: string | null;
+  code: string;
+  student_name: string;
+  title: string;
+  organization_name: string;
+  percent: number | null;
+  issued_at: string;
+  revoked_at: string | null;
+  revoked_reason: string | null;
 };
 
 export type ChangeTicket = {
@@ -3817,6 +3884,30 @@ export type Database = {
         Update: Partial<LmsLessonProgress>;
         Relationships: [];
       };
+      lms_quizzes: {
+        Row: LmsQuiz;
+        Insert: Partial<LmsQuiz> & Pick<LmsQuiz, "lesson_id" | "organization_id" | "course_id">;
+        Update: Partial<LmsQuiz>;
+        Relationships: [];
+      };
+      lms_quiz_questions: {
+        Row: LmsQuizQuestion;
+        Insert: Partial<LmsQuizQuestion> & Pick<LmsQuizQuestion, "lesson_id" | "organization_id" | "kind" | "prompt">;
+        Update: Partial<LmsQuizQuestion>;
+        Relationships: [];
+      };
+      lms_quiz_attempts: {
+        Row: LmsQuizAttempt;
+        Insert: Partial<LmsQuizAttempt> & Pick<LmsQuizAttempt, "organization_id" | "lesson_id" | "course_id" | "enrollment_id" | "member_id" | "attempt_number">;
+        Update: Partial<LmsQuizAttempt>;
+        Relationships: [];
+      };
+      lms_certificates: {
+        Row: LmsCertificate;
+        Insert: Partial<LmsCertificate> & Pick<LmsCertificate, "organization_id" | "member_id" | "code" | "student_name" | "title" | "organization_name">;
+        Update: Partial<LmsCertificate>;
+        Relationships: [];
+      };
       change_tickets: {
         Row: ChangeTicket;
         Insert: Partial<ChangeTicket> & Pick<ChangeTicket, "title">;
@@ -4560,6 +4651,14 @@ export type Database = {
       lms_program_sync_courses: {
         Args: { p_program_enrollment: string };
         Returns: number;
+      };
+      lms_verify_certificate: {
+        Args: { p_code: string };
+        Returns: { code: string; student_name: string; title: string; kind: string; organization_name: string; percent: number | null; issued_at: string; revoked: boolean }[];
+      };
+      lms_grade_attempt: {
+        Args: { p_org: string; p_attempt: string; p_points: Record<string, number>; p_feedback: string; p_actor: string };
+        Returns: { percent: number; passed: boolean };
       };
       lms_decide_enrollment: {
         Args: { p_organization_id: string; p_enrollment_id: string; p_action: string; p_actor: string };

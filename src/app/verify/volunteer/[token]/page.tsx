@@ -14,9 +14,23 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // What a volunteer's ID card QR code opens: confirms the person is a volunteer of the
 // church, and whether they are still active. Shows only a name, the church and the
 // role; it is open to anyone who scans the card.
-export default async function VerifyVolunteerPage({ params }: { params: Promise<{ token: string }> }) {
+export default async function VerifyVolunteerPage({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}) {
   const { token } = await params;
-  let volunteer: { volunteer_no: string; first_name: string; last_name: string; role: string; team: string | null; status: string; organization_name: string; logo_url: string | null; verified: boolean } | null = null;
+  let volunteer: {
+    volunteer_no: string;
+    first_name: string;
+    last_name: string;
+    role: string;
+    team: string | null;
+    status: string;
+    organization_name: string;
+    logo_url: string | null;
+    verified: boolean;
+  } | null = null;
   if (UUID.test(token)) {
     const supabase = await createClient();
     const { data } = await supabase.rpc("verify_volunteer", { token });
@@ -34,13 +48,24 @@ export default async function VerifyVolunteerPage({ params }: { params: Promise<
           {!volunteer ? (
             <>
               <ShieldAlert className="mx-auto size-12 text-destructive" />
-              <h1 className="font-heading text-xl font-bold">Not a valid volunteer ID</h1>
-              <p className="text-sm text-muted-foreground">This code doesn&apos;t match any volunteer. Please check with the church.</p>
+              <h1 className="font-heading text-xl font-bold">
+                Not a valid volunteer ID
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                This code doesn&apos;t match any volunteer. Please check with
+                the church.
+              </p>
             </>
           ) : (
             <>
-              {active ? <BadgeCheck className="mx-auto size-12 text-emerald-600" /> : <ShieldAlert className="mx-auto size-12 text-amber-600" />}
-              <h1 className="font-heading text-xl font-bold">{active ? "Volunteer" : "No longer an active volunteer"}</h1>
+              {active ? (
+                <BadgeCheck className="mx-auto size-12 text-emerald-600" />
+              ) : (
+                <ShieldAlert className="mx-auto size-12 text-amber-600" />
+              )}
+              <h1 className="font-heading text-xl font-bold">
+                {active ? "Volunteer" : "No longer an active volunteer"}
+              </h1>
               {volunteer.verified && active && (
                 <p className="mx-auto inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
                   <BadgeCheck className="size-4" />
@@ -55,8 +80,12 @@ export default async function VerifyVolunteerPage({ params }: { params: Promise<
                   {volunteer.role}
                   {volunteer.team ? ` · ${volunteer.team}` : ""}
                 </p>
-                <p className="text-sm text-muted-foreground">{volunteer.organization_name}</p>
-                <p className="text-xs text-muted-foreground">ID {volunteer.volunteer_no}</p>
+                <p className="text-sm text-muted-foreground">
+                  {volunteer.organization_name}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  ID {volunteer.volunteer_no}
+                </p>
               </div>
             </>
           )}

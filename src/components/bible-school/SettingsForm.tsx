@@ -23,6 +23,9 @@ export function SettingsForm({
     defaultLanguage: settings.default_language,
     requireApproval: settings.enrollment_requires_approval,
     allowSelfEnrollment: settings.allow_self_enrollment,
+    issueCertificates: settings.issue_certificates,
+    signerName: settings.certificate_signer_name ?? "",
+    signerTitle: settings.certificate_signer_title ?? "",
   });
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [error, setError] = useState<string | null>(null);
@@ -115,9 +118,54 @@ export function SettingsForm({
                 }))
               }
             />
-            Members can ask to join a course themselves (when the student portal
-            arrives)
+            Members can ask to join a program themselves
           </label>
+          <div className="space-y-3 rounded-lg border border-border p-3">
+            <p className="text-sm font-medium">Certificates</p>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={form.issueCertificates}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    issueCertificates: e.target.checked,
+                  }))
+                }
+              />
+              Give a certificate when a student finishes a course or a program
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="lms-signer-name">Signed by</Label>
+                <Input
+                  id="lms-signer-name"
+                  value={form.signerName}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, signerName: e.target.value }))
+                  }
+                  maxLength={120}
+                  placeholder="Pastor John Mathew"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="lms-signer-title">Their title</Label>
+                <Input
+                  id="lms-signer-title"
+                  value={form.signerTitle}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, signerTitle: e.target.value }))
+                  }
+                  maxLength={120}
+                  placeholder="Senior Pastor"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Printed on every certificate under the school name.
+            </p>
+          </div>
           <div className="flex items-center gap-3">
             <Button type="submit" disabled={pending}>
               {pending ? "Saving..." : "Save settings"}

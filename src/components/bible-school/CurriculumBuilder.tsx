@@ -18,6 +18,7 @@ import {
   type LmsResult,
 } from "@/lib/lms/actions";
 import { LESSON_TYPES } from "@/lib/lms/constants";
+import { QuizEditor } from "@/components/bible-school/QuizEditor";
 import type { ModuleWithLessons } from "@/lib/lms/dal";
 import type { LmsLesson, LmsPublishState } from "@/types/database";
 import { Badge } from "@/components/ui/badge";
@@ -63,6 +64,7 @@ export function CurriculumBuilder({
     title: "",
     description: "",
   });
+  const [quizOpen, setQuizOpen] = useState<string | null>(null);
   const [lessonForm, setLessonForm] = useState<{
     moduleId: string;
     lesson: LmsLesson | null;
@@ -383,6 +385,17 @@ export function CurriculumBuilder({
                     >
                       Edit
                     </Button>
+                    {lesson.content_type === "quiz" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          setQuizOpen(quizOpen === lesson.id ? null : lesson.id)
+                        }
+                      >
+                        Questions
+                      </Button>
+                    )}
                     {lesson.status !== "published" ? (
                       <Button
                         size="sm"
@@ -468,6 +481,18 @@ export function CurriculumBuilder({
                 </p>
               )}
             </div>
+
+            {module_.lessons
+              .filter((l) => l.id === quizOpen)
+              .map((l) => (
+                <QuizEditor
+                  key={l.id}
+                  organizationId={organizationId}
+                  courseId={courseId}
+                  lessonId={l.id}
+                  onClose={() => setQuizOpen(null)}
+                />
+              ))}
 
             {lessonForm?.moduleId === module_.id ? (
               <LessonForm
@@ -843,6 +868,12 @@ function LessonForm({
             value={form.body}
             onChange={(html) => setForm((f) => ({ ...f, body: html }))}
           />
+        ) : form.contentType === "quiz" ? (
+          <p className="text-xs text-muted-foreground">
+            Save the lesson, then press Questions on it to write the quiz.
+            Students pass the quiz to complete the lesson, so a required quiz
+            counts towards finishing the course.
+          </p>
         ) : (
           <p className="text-xs text-muted-foreground">
             This lesson type shows its link. Add reading notes by creating a

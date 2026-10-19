@@ -78,6 +78,9 @@ export async function saveSettingsAction(
   input: SettingsInput & {
     requireApproval: boolean;
     allowSelfEnrollment: boolean;
+    issueCertificates: boolean;
+    signerName: string;
+    signerTitle: string;
   },
 ): Promise<LmsResult> {
   const access = await authorizeTab(organizationId, "write");
@@ -94,6 +97,10 @@ export async function saveSettingsAction(
         default_language: input.defaultLanguage.trim(),
         enrollment_requires_approval: input.requireApproval,
         allow_self_enrollment: input.allowSelfEnrollment,
+        issue_certificates: input.issueCertificates,
+        certificate_signer_name: input.signerName.trim().slice(0, 120) || null,
+        certificate_signer_title:
+          input.signerTitle.trim().slice(0, 120) || null,
       },
       { onConflict: "organization_id" },
     );
@@ -946,7 +953,14 @@ export async function setLessonStatusAction(
       .eq("organization_id", organizationId)
       .maybeSingle();
     if (!lesson) return fail("That lesson could not be found.");
-    if (
+    if (lesson.content_type === "quiz") {
+      const { count } = await admin
+        .from("lms_quiz_questions")
+        .select("id", { count: "exact", head: true })
+        .eq("lesson_id", lessonId);
+      if ((count ?? 0) === 0)
+        return fail("Add the quiz questions before publishing this lesson.");
+    } else if (
       lesson.content_type !== "text" &&
       !lesson.file_path &&
       !lesson.media_url

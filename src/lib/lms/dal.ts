@@ -12,6 +12,8 @@ import type {
   LmsSettings,
   LmsStudentApplication,
   LmsProgramEnrollment,
+  LmsQuizAttempt,
+  LmsCertificate,
 } from "@/types/database";
 
 // Reads for the Bible School screens. They use the service role, so every function takes the church
@@ -36,6 +38,9 @@ export async function getLmsSettings(
       default_language: "en",
       enrollment_requires_approval: true,
       allow_self_enrollment: true,
+      issue_certificates: true,
+      certificate_signer_name: null,
+      certificate_signer_title: null,
       updated_at: new Date(0).toISOString(),
     }
   );
@@ -901,4 +906,220 @@ export async function getPendingProgramRequests(
       requestedAt: r.requested_at,
     };
   });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Grading and certificates
+// ---------------------------------------------------------------------------------------------
+
+export interface WaitingAttempt {
+  id: string;
+  courseId: string;
+  courseTitle: string;
+  lessonTitle: string;
+  studentName: string;
+  studentPhone: string | null;
+  submittedAt: string;
+  attemptNumber: number;
+  autoScore: number;
+  maxScore: number;
+  /** The written questions with what the student typed. */
+  written: { id: string; prompt: string; points: number; answer: string }[];
+}
+
+// Quiz attempts with a written answer that is still waiting for a teacher, oldest first. An instructor
+// sees only the courses they teach.
+export async function getWaitingAttempts(
+  organizationId: string,
+  onlyCourseIds?: string[],
+): Promise<WaitingAttempt[]> {
+  if (onlyCourseIds && onlyCourseIds.length === 0) return [];
+  const admin = createAdminClient();
+  let query = admin
+    .from("lms_quiz_attempts")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("status", "submitted")
+    .order("submitted_at")
+    .limit(200);
+  if (onlyCourseIds) query = query.in("course_id", onlyCourseIds);
+  const { data } = await query;
+  const attempts = (data ?? []) as LmsQuizAttempt[];
+  if (attempts.length === 0) return [];
+  const lessonIds = [...new Set(attempts.map((a) => a.lesson_id))];
+  const [
+    { data: lessons },
+    { data: courses },
+    { data: members },
+    { data: questions },
+  ] = await Promise.all([
+    admin.from("lms_lessons").select("id, title").in("id", lessonIds),
+    admin
+      .from("lms_courses")
+      .select("id, title")
+      .in("id", [...new Set(attempts.map((a) => a.course_id))]),
+    admin
+      .from("members")
+      .select("id, first_name, last_name, phone")
+      .in("id", [...new Set(attempts.map((a) => a.member_id))]),
+    admin
+      .from("lms_quiz_questions")
+      .select("id, lesson_id, prompt, points, position")
+      .in("lesson_id", lessonIds)
+      .eq("kind", "short")
+      .order("position"),
+  ]);
+  return attempts.map((a) => {
+    const member = (members ?? []).find((m) => m.id === a.member_id);
+    return {
+      id: a.id,
+      courseId: a.course_id,
+      courseTitle:
+        (courses ?? []).find((c) => c.id === a.course_id)?.title ?? "Course",
+      lessonTitle:
+        (lessons ?? []).find((l) => l.id === a.lesson_id)?.title ?? "Quiz",
+      studentName: member
+        ? `${member.first_name} ${member.last_name}`.trim()
+        : "A student",
+      studentPhone: member?.phone ?? null,
+      submittedAt: a.submitted_at,
+      attemptNumber: a.attempt_number,
+      autoScore: Number(a.auto_score),
+      maxScore: Number(a.max_score),
+      written: (questions ?? [])
+        .filter((q) => q.lesson_id === a.lesson_id)
+        .map((q) => ({
+          id: q.id,
+          prompt: q.prompt,
+          points: q.points,
+          answer:
+            typeof a.answers[q.id] === "string"
+              ? (a.answers[q.id] as string)
+              : "",
+        })),
+    };
+  });
+}
+
+export interface GradebookRow {
+  memberId: string;
+  name: string;
+  phone: string | null;
+  enrollment: string;
+  /** Best result per quiz lesson id. */
+  quizzes: Record<
+    string,
+    {
+      percent: number | null;
+      passed: boolean;
+      waiting: boolean;
+      attempts: number;
+    }
+  >;
+  /** Average of the best result on each quiz the student has had graded; null if none yet. */
+  overall: number | null;
+}
+
+export interface Gradebook {
+  quizzes: { id: string; title: string; passPercent: number }[];
+  rows: GradebookRow[];
+}
+
+// Every student of a course against every quiz in it.
+export async function getGradebook(
+  organizationId: string,
+  courseId: string,
+): Promise<Gradebook> {
+  const admin = createAdminClient();
+  const [
+    { data: lessons },
+    { data: settings },
+    { data: enrollments },
+    { data: attempts },
+  ] = await Promise.all([
+    admin
+      .from("lms_lessons")
+      .select("id, title, position, module_id")
+      .eq("organization_id", organizationId)
+      .eq("course_id", courseId)
+      .eq("content_type", "quiz")
+      .neq("status", "archived")
+      .order("position"),
+    admin
+      .from("lms_quizzes")
+      .select("lesson_id, pass_percent")
+      .eq("course_id", courseId),
+    admin
+      .from("lms_enrollments")
+      .select("member_id, status")
+      .eq("organization_id", organizationId)
+      .eq("course_id", courseId)
+      .in("status", ["approved", "active", "completed"]),
+    admin
+      .from("lms_quiz_attempts")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .eq("course_id", courseId),
+  ]);
+  const memberIds = [...new Set((enrollments ?? []).map((e) => e.member_id))];
+  const { data: members } = memberIds.length
+    ? await admin
+        .from("members")
+        .select("id, first_name, last_name, phone")
+        .in("id", memberIds)
+    : { data: [] };
+  const quizzes = (lessons ?? []).map((l) => ({
+    id: l.id,
+    title: l.title,
+    passPercent:
+      (settings ?? []).find((s) => s.lesson_id === l.id)?.pass_percent ?? 60,
+  }));
+  const all = (attempts ?? []) as LmsQuizAttempt[];
+  const rows: GradebookRow[] = (enrollments ?? []).map((e) => {
+    const member = (members ?? []).find((m) => m.id === e.member_id);
+    const mine = all.filter((a) => a.member_id === e.member_id);
+    const perQuiz: GradebookRow["quizzes"] = {};
+    const bests: number[] = [];
+    for (const quiz of quizzes) {
+      const tries = mine.filter((a) => a.lesson_id === quiz.id);
+      const graded = tries.filter((a) => a.status === "graded");
+      const best = graded.length
+        ? Math.max(...graded.map((a) => Number(a.percent)))
+        : null;
+      if (best !== null) bests.push(best);
+      perQuiz[quiz.id] = {
+        percent: best,
+        passed: tries.some((a) => a.passed),
+        waiting: tries.some((a) => a.status === "submitted"),
+        attempts: tries.length,
+      };
+    }
+    return {
+      memberId: e.member_id,
+      name: member
+        ? `${member.first_name} ${member.last_name}`.trim()
+        : "A student",
+      phone: member?.phone ?? null,
+      enrollment: e.status,
+      quizzes: perQuiz,
+      overall: bests.length
+        ? Math.round((bests.reduce((a, b) => a + b, 0) / bests.length) * 10) /
+          10
+        : null,
+    };
+  });
+  rows.sort((a, b) => a.name.localeCompare(b.name));
+  return { quizzes, rows };
+}
+
+export async function getCertificates(
+  organizationId: string,
+): Promise<LmsCertificate[]> {
+  const { data } = await createAdminClient()
+    .from("lms_certificates")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .order("issued_at", { ascending: false })
+    .limit(500);
+  return (data ?? []) as LmsCertificate[];
 }

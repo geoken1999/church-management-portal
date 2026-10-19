@@ -16,6 +16,7 @@ const MIGRATIONS = [
   "0197_lms_paid_courses.sql",
   "0198_lms_program_enrollment.sql",
   "0200_change_tickets_and_program_request_notice.sql",
+  "0202_lms_quizzes_certificates.sql",
 ];
 const BOOTSTRAP = readFileSync(
   "src/lib/lms/test-support/supabase-stub.sql",
@@ -1254,6 +1255,18 @@ describe("Bible School database", () => {
       "finishing every course completes the program",
       mine.status === "completed" && mine.courses_done === 2,
     );
+    check(
+      "the finished program is marked completed and a certificate is issued for it",
+      (
+        await q(
+          "select (select status from lms_program_enrollments where id=$1) as st, (select count(*)::int from lms_certificates where program_id=$2 and member_id=$3) as n",
+          [pe, prog, m1],
+        )
+      )[0].st === "completed",
+    );
+    await q("update lms_program_enrollments set status='active' where id=$1", [
+      pe,
+    ]);
     await q(
       "update lms_enrollments set status='active' where program_enrollment_id=$1",
       [pe],
@@ -1333,5 +1346,284 @@ describe("Bible School database", () => {
         )[0].n === 1,
     );
     void stu;
+  }, 60000);
+
+  it("Quizzes, grading and certificates", async () => {
+    await q("update organizations set custom_plan_limits = null where id=$1", [
+      orgA,
+    ]);
+    await q(
+      "update bible_school_access set enabled=true where organization_id=$1",
+      [orgA],
+    );
+    const qc = (
+      await q(
+        "insert into lms_courses (organization_id, title, status, visibility) values ($1,'Quiz Course','published','organization') returning id",
+        [orgA],
+      )
+    )[0].id;
+    const qm = (
+      await q(
+        "insert into lms_modules (course_id, organization_id, title, status, position) values ($1,$2,'Tests','published',0) returning id",
+        [qc, orgA],
+      )
+    )[0].id;
+    const quizLesson = async (
+      title: string,
+      pos: number,
+      maxAttempts: number | null,
+    ) => {
+      const id = (
+        await q(
+          "insert into lms_lessons (module_id, course_id, organization_id, title, content_type, status, position, is_required) values ($1,$2,$3,$4,'quiz','published',$5,true) returning id",
+          [qm, qc, orgA, title, pos],
+        )
+      )[0].id;
+      await q(
+        "insert into lms_quizzes (lesson_id, organization_id, course_id, pass_percent, max_attempts) values ($1,$2,$3,60,$4)",
+        [id, orgA, qc, maxAttempts],
+      );
+      return id as string;
+    };
+    const question = async (
+      lesson: string,
+      pos: number,
+      kind: string,
+      points: number,
+      options: unknown,
+    ) =>
+      (
+        await q(
+          "insert into lms_quiz_questions (lesson_id, organization_id, position, kind, prompt, points, options, explanation) values ($1,$2,$3,$4,'Question',$5,$6::jsonb,'Because.') returning id",
+          [lesson, orgA, pos, kind, points, JSON.stringify(options)],
+        )
+      )[0].id as string;
+
+    // Quiz 1: marked by the database, two attempts allowed.
+    const quiz1 = await quizLesson("Auto quiz", 0, 2);
+    const q1a = await question(quiz1, 0, "single", 2, [
+      { id: "a", text: "Right", correct: true },
+      { id: "b", text: "Wrong", correct: false },
+    ]);
+    const q1b = await question(quiz1, 1, "multiple", 2, [
+      { id: "a", text: "Yes", correct: true },
+      { id: "b", text: "Yes too", correct: true },
+      { id: "c", text: "No", correct: false },
+    ]);
+    const q1c = await question(quiz1, 2, "true_false", 1, [
+      { id: "true", text: "True", correct: true },
+      { id: "false", text: "False", correct: false },
+    ]);
+    // Quiz 2: unlimited attempts.
+    const quiz2 = await quizLesson("Second quiz", 1, null);
+    const q2a = await question(quiz2, 0, "single", 1, [
+      { id: "a", text: "Right", correct: true },
+      { id: "b", text: "Wrong", correct: false },
+    ]);
+    // Quiz 3: has a short answer, so a teacher marks it.
+    const quiz3 = await quizLesson("Written quiz", 2, null);
+    const q3a = await question(quiz3, 0, "single", 1, [
+      { id: "a", text: "Right", correct: true },
+      { id: "b", text: "Wrong", correct: false },
+    ]);
+    const q3b = await question(quiz3, 1, "short", 3, []);
+
+    await q(
+      "select lms_create_enrollment($1,$2,$3,'approved','admin',$4,true)",
+      [orgA, qc, m1, admin],
+    );
+
+    const shown = (await as(u1, "select lms_get_quiz($1) as quiz", [quiz1]))[0]
+      .quiz;
+    check(
+      "the student sees the questions",
+      shown.questions.length === 3 && shown.can_attempt === true,
+    );
+    check(
+      "the right answers are not sent",
+      !JSON.stringify(shown).includes("correct"),
+    );
+    check(
+      "a quiz lesson cannot be ticked off by hand",
+      (
+        (await asErr(u1, "select lms_complete_lesson($1,true)", [quiz1])) ?? ""
+      ).includes("Pass the quiz"),
+    );
+    check(
+      "students cannot read the questions table",
+      (await as(u1, "select count(*)::int as n from lms_quiz_questions"))[0]
+        .n === 0,
+    );
+
+    // Attempt 1: nothing right.
+    const wrong = (
+      await as(u1, "select lms_submit_quiz($1,$2::jsonb) as r", [
+        quiz1,
+        JSON.stringify({ [q1a]: ["b"], [q1b]: ["c"], [q1c]: ["false"] }),
+      ])
+    )[0].r;
+    check(
+      "a wrong attempt fails and is graded at once",
+      wrong.status === "graded" &&
+        wrong.passed === false &&
+        Number(wrong.percent) === 0,
+    );
+    check(
+      "after grading the right answers and explanation are shown",
+      wrong.detail.length === 3 &&
+        wrong.detail[0].correct_option_ids[0] === "a" &&
+        wrong.detail[0].explanation === "Because.",
+    );
+    // Attempt 2: only the single choice right, a multiple choice that is half right earns nothing.
+    const half = (
+      await as(u1, "select lms_submit_quiz($1,$2::jsonb) as r", [
+        quiz1,
+        JSON.stringify({ [q1a]: ["a"], [q1b]: ["a"], [q1c]: ["false"] }),
+      ])
+    )[0].r;
+    check(
+      "a multiple choice must be exactly right",
+      Number(half.percent) === 40 && half.passed === false,
+    );
+    check(
+      "no more attempts than the quiz allows",
+      (
+        (await asErr(u1, "select lms_submit_quiz($1,'{}'::jsonb)", [quiz1])) ??
+        ""
+      ).includes("all 2 attempts"),
+    );
+
+    // Quiz 2: pass at once.
+    const pass2 = (
+      await as(u1, "select lms_submit_quiz($1,$2::jsonb) as r", [
+        quiz2,
+        JSON.stringify({ [q2a]: ["a"] }),
+      ])
+    )[0].r;
+    check(
+      "a passing attempt passes",
+      pass2.passed === true && Number(pass2.percent) === 100,
+    );
+    check(
+      "passing completes the lesson",
+      (
+        await q(
+          "select count(*)::int as n from lms_lesson_progress where lesson_id=$1 and member_id=$2 and completed_at is not null",
+          [quiz2, m1],
+        )
+      )[0].n === 1,
+    );
+    check(
+      "a passed quiz cannot be taken again",
+      (
+        (await asErr(u1, "select lms_submit_quiz($1,'{}'::jsonb)", [quiz2])) ??
+        ""
+      ).includes("already passed"),
+    );
+
+    // Quiz 3: a short answer waits for a teacher.
+    const waiting = (
+      await as(u1, "select lms_submit_quiz($1,$2::jsonb) as r", [
+        quiz3,
+        JSON.stringify({ [q3a]: ["a"], [q3b]: "My written answer" }),
+      ])
+    )[0].r;
+    check(
+      "a short answer waits for the teacher",
+      waiting.status === "submitted" && waiting.passed === false,
+    );
+    check(
+      "no second attempt while it waits",
+      (
+        (await asErr(u1, "select lms_submit_quiz($1,'{}'::jsonb)", [quiz3])) ??
+        ""
+      ).includes("waiting"),
+    );
+    check(
+      "students cannot grade",
+      (
+        (await asErr(u1, "select lms_grade_attempt($1,$2,'{}'::jsonb,'',$3)", [
+          orgA,
+          waiting.id,
+          admin,
+        ])) ?? ""
+      ).includes("permission denied"),
+    );
+    const graded = (
+      await q("select lms_grade_attempt($1,$2,$3::jsonb,'Well done',$4) as r", [
+        orgA,
+        waiting.id,
+        JSON.stringify({ [q3b]: 99 }),
+        admin,
+      ])
+    )[0].r;
+    check(
+      "marks are held to the question's points",
+      Number(graded.percent) === 100 && graded.passed === true,
+    );
+
+    // Quiz 1 was never passed, so the course is not finished yet.
+    check(
+      "a required quiz that is not passed keeps the course open",
+      (
+        await q(
+          "select status from lms_enrollments where course_id=$1 and member_id=$2",
+          [qc, m1],
+        )
+      )[0].status !== "completed",
+    );
+    check(
+      "no certificate yet",
+      (
+        await q(
+          "select count(*)::int as n from lms_certificates where course_id=$1",
+          [qc],
+        )
+      )[0].n === 0,
+    );
+    // Make quiz 1 optional so passing the other two finishes the course.
+    await q("update lms_lessons set is_required=false where id=$1", [quiz1]);
+    await q("update lms_quiz_attempts set status='graded' where id=$1", [
+      graded.id ?? waiting.id,
+    ]);
+    await q("select lms_finish_lesson_for($1,$2)", [m1, quiz3]);
+    const cert = (
+      await q(
+        "select * from lms_certificates where course_id=$1 and member_id=$2",
+        [qc, m1],
+      )
+    )[0];
+    check(
+      "finishing the course issues a certificate",
+      Boolean(cert) && cert.code.length === 12,
+    );
+    check(
+      "it carries the name, the course and the average of the quiz results",
+      cert.title === "Quiz Course" && Number(cert.percent) > 0,
+    );
+    check(
+      "anyone with the code can verify it, and only learns the name and the course",
+      (
+        await q("select * from lms_verify_certificate($1)", [
+          cert.code.toLowerCase(),
+        ])
+      )[0].title === "Quiz Course",
+    );
+    check(
+      "the student sees their certificate",
+      (await as(u1, "select * from lms_my_certificates($1)", [orgA])).some(
+        (c) => c.code === cert.code,
+      ),
+    );
+    check(
+      "another student sees none",
+      (await as(u2, "select * from lms_my_certificates($1)", [orgA])).length ===
+        0,
+    );
+    check(
+      "no second certificate for the same course",
+      (await q("select lms_issue_certificate($1,$2,null) as id", [m1, qc]))[0]
+        .id === null,
+    );
   }, 60000);
 });

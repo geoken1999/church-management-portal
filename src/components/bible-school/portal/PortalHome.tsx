@@ -8,6 +8,8 @@ import {
   portalError,
   type PCourse,
   type PMyCourse,
+  type PMyProgram,
+  type PProgram,
   type PSession,
 } from "@/lib/lms/portal-client";
 import { usePortal } from "@/components/bible-school/portal/PortalShell";
@@ -15,26 +17,38 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-type Tab = "mine" | "all" | "live";
+type Tab = "mine" | "programs" | "live";
 
 export function PortalHome() {
   const { identity } = usePortal();
   const [tab, setTab] = useState<Tab>("mine");
   const [mine, setMine] = useState<PMyCourse[] | null>(null);
   const [all, setAll] = useState<PCourse[] | null>(null);
+  const [programs, setPrograms] = useState<PProgram[] | null>(null);
+  const [myPrograms, setMyPrograms] = useState<PMyProgram[] | null>(null);
+  const [inProgram, setInProgram] = useState<Set<string>>(new Set());
   const [sessions, setSessions] = useState<PSession[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [m, a, s] = await Promise.all([
+      const [m, a, s, p, mp] = await Promise.all([
         portal.myCourses(identity.organizationId),
         portal.catalog(identity.organizationId),
         portal.sessions(identity.organizationId),
+        portal.programs(identity.organizationId),
+        portal.myPrograms(identity.organizationId),
       ]);
+      // A course that belongs to a program is joined through it, so it is not listed on its own.
+      const lists = await Promise.all(
+        p.map((x) => portal.programCourses(x.program_id)),
+      );
+      setInProgram(new Set(lists.flat().map((c) => c.course_id)));
       setMine(m);
       setAll(a);
       setSessions(s);
+      setPrograms(p);
+      setMyPrograms(mp);
     } catch (e) {
       setError(portalError(e, "Couldn't load your courses."));
     }
@@ -58,7 +72,7 @@ export function PortalHome() {
         {(
           [
             ["mine", "My courses"],
-            ["all", "All courses"],
+            ["programs", "Programs"],
             ["live", "Live classes"],
           ] as [Tab, string][]
         ).map(([key, label]) => (
@@ -73,8 +87,13 @@ export function PortalHome() {
         ))}
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
-      {tab === "mine" && <MyCourses courses={mine} />}
-      {tab === "all" && <AllCourses courses={all} />}
+      {tab === "mine" && <MyCourses courses={mine} programs={myPrograms} />}
+      {tab === "programs" && (
+        <Programs
+          programs={programs}
+          courses={all ? all.filter((c) => !inProgram.has(c.course_id)) : null}
+        />
+      )}
       {tab === "live" && (
         <LiveClasses
           sessions={sessions}
@@ -86,18 +105,48 @@ export function PortalHome() {
   );
 }
 
-function MyCourses({ courses }: { courses: PMyCourse[] | null }) {
+function MyCourses({
+  courses,
+  programs,
+}: {
+  courses: PMyCourse[] | null;
+  programs: PMyProgram[] | null;
+}) {
   if (!courses)
     return <p className="text-sm text-muted-foreground">Loading...</p>;
-  if (courses.length === 0)
+  if (courses.length === 0 && (programs ?? []).length === 0)
     return (
       <p className="text-sm text-muted-foreground">
-        You haven&apos;t joined a course yet. Open &quot;All courses&quot; to
-        find one.
+        You haven&apos;t joined a program yet. Open &quot;Programs&quot; to find
+        one.
       </p>
     );
   return (
     <div className="space-y-3">
+      {(programs ?? []).map((p) => (
+        <Link
+          key={p.enrollment_id}
+          href={`/bible-school/learn/program/${p.program_id}`}
+          className="block"
+        >
+          <Card className="border-primary/30 transition-colors hover:bg-muted/40">
+            <CardContent className="flex items-center justify-between gap-2">
+              <div>
+                <p className="font-medium">{p.title}</p>
+                <p className="text-xs text-muted-foreground">
+                  Program · {p.courses_done} of {p.courses_total} required
+                  courses done
+                </p>
+              </div>
+              {p.status === "pending" ? (
+                <Badge variant="secondary">Waiting for approval</Badge>
+              ) : p.status === "completed" ? (
+                <Badge>Completed</Badge>
+              ) : null}
+            </CardContent>
+          </Card>
+        </Link>
+      ))}
       {courses.map((c) => {
         const pct =
           c.status === "completed"
@@ -139,17 +188,56 @@ function MyCourses({ courses }: { courses: PMyCourse[] | null }) {
   );
 }
 
-function AllCourses({ courses }: { courses: PCourse[] | null }) {
-  if (!courses)
+function Programs({
+  programs,
+  courses,
+}: {
+  programs: PProgram[] | null;
+  courses: PCourse[] | null;
+}) {
+  if (!programs || !courses)
     return <p className="text-sm text-muted-foreground">Loading...</p>;
-  if (courses.length === 0)
+  if (programs.length === 0 && courses.length === 0)
     return (
       <p className="text-sm text-muted-foreground">
-        No courses are open right now.
+        Nothing is open right now.
       </p>
     );
   return (
     <div className="space-y-3">
+      {programs.map((p) => (
+        <Link
+          key={p.program_id}
+          href={`/bible-school/learn/program/${p.program_id}`}
+          className="block"
+        >
+          <Card className="transition-colors hover:bg-muted/40">
+            <CardContent className="space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-medium">{p.title}</p>
+                {p.my_status ? (
+                  <Badge variant="outline">{p.my_status}</Badge>
+                ) : p.price_amount ? (
+                  <Badge variant="secondary">₹{p.price_amount}</Badge>
+                ) : (
+                  <Badge variant="outline">Free</Badge>
+                )}
+              </div>
+              {p.description && (
+                <p className="line-clamp-2 text-sm text-muted-foreground">
+                  {p.description}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {p.course_count} courses · {p.lesson_count} lessons
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+      ))}
+      {courses.length > 0 && (
+        <h2 className="pt-2 font-heading text-lg font-bold">Single courses</h2>
+      )}
       {courses.map((c) => (
         <Link
           key={c.course_id}
@@ -162,8 +250,6 @@ function AllCourses({ courses }: { courses: PCourse[] | null }) {
                 <p className="font-medium">{c.title}</p>
                 {c.my_status ? (
                   <Badge variant="outline">{c.my_status}</Badge>
-                ) : c.price_amount ? (
-                  <Badge variant="secondary">₹{c.price_amount}</Badge>
                 ) : (
                   <Badge variant="outline">Free</Badge>
                 )}
@@ -175,7 +261,6 @@ function AllCourses({ courses }: { courses: PCourse[] | null }) {
               )}
               <p className="text-xs text-muted-foreground">
                 {c.lesson_count} lessons
-                {c.instructors ? ` · ${c.instructors}` : ""}
               </p>
             </CardContent>
           </Card>

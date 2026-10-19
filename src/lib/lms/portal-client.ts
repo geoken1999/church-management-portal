@@ -35,6 +35,38 @@ export interface PCourse {
   price_amount: number | null;
 }
 
+export interface PProgram {
+  program_id: string;
+  title: string;
+  description: string | null;
+  objectives: string | null;
+  capacity: number | null;
+  seats_taken: number;
+  course_count: number;
+  lesson_count: number;
+  my_status: string | null;
+  price_amount: number | null;
+}
+
+export interface PProgramCourse {
+  course_id: string;
+  title: string;
+  description: string | null;
+  course_position: number;
+  is_required: boolean;
+  lesson_count: number;
+  my_status: string | null;
+}
+
+export interface PMyProgram {
+  enrollment_id: string;
+  program_id: string;
+  title: string;
+  status: string;
+  courses_total: number;
+  courses_done: number;
+}
+
 export interface PMyCourse {
   enrollment_id: string;
   course_id: string;
@@ -138,6 +170,18 @@ export const portal = {
   catalog: (org: string) => rpc<PCourse[]>("lms_catalog", { p_org: org }),
   myCourses: (org: string) =>
     rpc<PMyCourse[]>("lms_my_courses", { p_org: org }),
+  programs: (org: string) =>
+    rpc<PProgram[]>("lms_program_catalog", { p_org: org }),
+  programCourses: (program: string) =>
+    rpc<PProgramCourse[]>("lms_program_courses_list", { p_program: program }),
+  myPrograms: (org: string) =>
+    rpc<PMyProgram[]>("lms_my_programs", { p_org: org }),
+  requestProgram: (program: string) =>
+    rpc<string>("lms_request_program", { p_program: program }),
+  courseProgram: (course: string) =>
+    rpc<{ program_id: string; title: string }[]>("lms_course_program", {
+      p_course: course,
+    }),
   outline: (course: string) =>
     rpc<POutlineItem[]>("lms_course_outline", { p_course: course }),
   lesson: (lesson: string) =>
@@ -182,7 +226,7 @@ export const portal = {
     return { url: json.url, name: json.name ?? "Lesson file" };
   },
 
-  async checkoutUrl(courseId: string): Promise<string> {
+  async checkoutUrl(programId: string): Promise<string> {
     const t = await token();
     const response = await fetch("/api/mobile/bible-school/checkout", {
       method: "POST",
@@ -190,7 +234,7 @@ export const portal = {
         "Content-Type": "application/json",
         ...(t ? { Authorization: `Bearer ${t}` } : {}),
       },
-      body: JSON.stringify({ courseId }),
+      body: JSON.stringify({ programId }),
     });
     const json = await response.json();
     if (!json.ok) throw new Error(json.error ?? "Couldn't start the payment.");

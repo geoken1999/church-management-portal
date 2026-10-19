@@ -19,6 +19,10 @@ export function PortalCourse({ courseId }: { courseId: string }) {
   const [course, setCourse] = useState<PCourse | null | undefined>(undefined);
   const [mine, setMine] = useState<PMyCourse | null>(null);
   const [outline, setOutline] = useState<POutlineItem[]>([]);
+  const [program, setProgram] = useState<{
+    program_id: string;
+    title: string;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -34,6 +38,7 @@ export function PortalCourse({ courseId }: { courseId: string }) {
       setCourse(catalog.find((c) => c.course_id === courseId) ?? null);
       setMine(my.find((c) => c.course_id === courseId) ?? null);
       setOutline(lessons);
+      setProgram((await portal.courseProgram(courseId))[0] ?? null);
     } catch (e) {
       setError(portalError(e, "Couldn't load this course."));
       setCourse(null);
@@ -49,11 +54,6 @@ export function PortalCourse({ courseId }: { courseId: string }) {
     setBusy(true);
     setError(null);
     try {
-      // A course with a fee is paid for on KingdomFlow's payment page, then you come back here.
-      if ((course.price_amount ?? 0) > 0) {
-        window.location.assign(await portal.checkoutUrl(courseId));
-        return;
-      }
       const status = await portal.request(courseId);
       setNotice(
         status === "pending"
@@ -86,7 +86,6 @@ export function PortalCourse({ courseId }: { courseId: string }) {
   const status = mine?.status ?? course.my_status;
   const joined =
     status === "approved" || status === "active" || status === "completed";
-  const paid = (course.price_amount ?? 0) > 0;
   let blocker: string | null = null;
   if (!course.prerequisites_met)
     blocker = `Finish first: ${course.missing_prerequisites ?? "the prerequisite courses"}`;
@@ -176,27 +175,34 @@ export function PortalCourse({ courseId }: { courseId: string }) {
         </div>
       ) : (
         <div className="space-y-2">
-          {paid && (
-            <p className="text-lg font-semibold">₹{course.price_amount}</p>
-          )}
-          {course.capacity !== null && !blocker && (
-            <p className="text-sm">
-              {Math.max(0, course.capacity - course.seats_taken)} seats left
-            </p>
-          )}
-          <Button
-            type="button"
-            disabled={busy || blocker !== null}
-            onClick={join}
-          >
-            {busy
-              ? "Please wait..."
-              : paid
-                ? `Pay ₹${course.price_amount} and join`
-                : "Join this course"}
-          </Button>
-          {blocker && (
-            <p className="text-xs text-muted-foreground">{blocker}</p>
+          {program ? (
+            <>
+              <p className="text-sm">
+                This course is part of the program{" "}
+                <strong>{program.title}</strong>. Join the program to take it.
+              </p>
+              <Link href={`/bible-school/learn/program/${program.program_id}`}>
+                <Button type="button">See the program</Button>
+              </Link>
+            </>
+          ) : (
+            <>
+              {course.capacity !== null && !blocker && (
+                <p className="text-sm">
+                  {Math.max(0, course.capacity - course.seats_taken)} seats left
+                </p>
+              )}
+              <Button
+                type="button"
+                disabled={busy || blocker !== null}
+                onClick={join}
+              >
+                {busy ? "Please wait..." : "Join this course"}
+              </Button>
+              {blocker && (
+                <p className="text-xs text-muted-foreground">{blocker}</p>
+              )}
+            </>
           )}
         </div>
       )}

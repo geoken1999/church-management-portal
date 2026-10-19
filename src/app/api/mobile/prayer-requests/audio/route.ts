@@ -54,3 +54,46 @@ export async function GET(request: Request) {
     expiresInSeconds: LINK_SECONDS,
   });
 }
+
+// Removes one of the member's own requests together with its voice message file (a plain row delete
+// from the app would leave the recording behind in storage).
+export async function DELETE(request: Request) {
+  const member = await prayerMemberFromRequest(request);
+  if (!member)
+    return NextResponse.json(
+      { ok: false, error: "That session could not be verified." },
+      { status: 401 },
+    );
+  const id = new URL(request.url).searchParams.get("id") ?? "";
+  if (!/^[0-9a-f-]{36}$/i.test(id))
+    return NextResponse.json(
+      { ok: false, error: "That request could not be found." },
+      { status: 404 },
+    );
+
+  const admin = createAdminClient();
+  const { data: row } = await admin
+    .from("prayer_requests")
+    .select("id, audio_path")
+    .eq("id", id)
+    .eq("member_id", member.memberId)
+    .maybeSingle();
+  if (!row)
+    return NextResponse.json(
+      { ok: false, error: "That request could not be found." },
+      { status: 404 },
+    );
+  if (row.audio_path)
+    await admin.storage.from(PRAYER_AUDIO_BUCKET).remove([row.audio_path]);
+  const { error } = await admin
+    .from("prayer_requests")
+    .delete()
+    .eq("id", id)
+    .eq("member_id", member.memberId);
+  if (error)
+    return NextResponse.json(
+      { ok: false, error: "Couldn't remove that request." },
+      { status: 500 },
+    );
+  return NextResponse.json({ ok: true });
+}

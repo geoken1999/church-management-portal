@@ -34,12 +34,15 @@ const MOBILE_BLOCKED_PREFIXES = ["/dashboard", "/onboarding"];
 // specifically relies on. A dedicated mobile app is planned to cover
 // phones properly — this reserves that ground rather than shipping a
 // half-responsive experience there in the meantime.
-const MOBILE_PHONE_UA = /iPhone|iPod|Android.*Mobile|Windows Phone|BlackBerry|Opera Mini|IEMobile/i;
+const MOBILE_PHONE_UA =
+  /iPhone|iPod|Android.*Mobile|Windows Phone|BlackBerry|Opera Mini|IEMobile/i;
 
 function isMobileBlockedPath(pathname: string) {
   return (
     MOBILE_BLOCKED_ROUTES.includes(pathname) ||
-    MOBILE_BLOCKED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+    MOBILE_BLOCKED_PREFIXES.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    )
   );
 }
 
@@ -56,7 +59,10 @@ export async function updateSession(request: NextRequest) {
 
   // Checked first, and before any Supabase call — a blocked phone request
   // never needs a session refresh.
-  if (isMobileBlockedPath(pathname) && isMobilePhone(request.headers.get("user-agent"))) {
+  if (
+    isMobileBlockedPath(pathname) &&
+    isMobilePhone(request.headers.get("user-agent"))
+  ) {
     return NextResponse.redirect(new URL(MOBILE_RESTRICTED_PATH, request.url));
   }
 
@@ -91,6 +97,19 @@ export async function updateSession(request: NextRequest) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // A phone-number sign-in (a Bible School student or member using the web learning portal) has no email
+  // and no church team seat. It belongs only in the portal, so the team dashboard, onboarding and the
+  // sign-in pages send it back there rather than letting it start a church of its own.
+  if (
+    user &&
+    !user.email &&
+    (isProtectedRoute(pathname) ||
+      pathname === "/login" ||
+      pathname === "/signup")
+  ) {
+    return NextResponse.redirect(new URL("/bible-school/learn", request.url));
   }
 
   if (user && isPublicRoute(pathname)) {

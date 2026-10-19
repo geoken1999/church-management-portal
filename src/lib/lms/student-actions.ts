@@ -17,6 +17,7 @@ import {
 import { isBibleSchoolOpen } from "@/lib/lms/public-school";
 import { createCourseOrder, checkoutUrl } from "@/lib/lms/payments";
 import { emailStudentApproved } from "@/lib/lms/student-email";
+import { getSiteUrl } from "@/lib/site-url";
 import type { LmsResult } from "@/lib/lms/actions";
 
 export interface ApplicationState {
@@ -251,6 +252,7 @@ export async function approveApplicationAction(
     application.email ?? "",
     application.first_name,
     course?.title ?? null,
+    { learnUrl: `${getSiteUrl()}/bible-school/learn` },
   );
   revalidatePath(`${LMS_BASE_PATH}/applications`);
   revalidatePath(`${LMS_BASE_PATH}/enrollments`);

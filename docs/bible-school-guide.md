@@ -86,10 +86,16 @@ They see requests in **Enrollments**. Open **Bible School → Enrollments**, fil
 4. Open **Bible School → Applications** (admins only). Review each one and **Approve** or **Reject**.
    - Approving creates a *student*, enrols them in the course, and emails them if they gave an address.
    - A number already used by a member of this or another church, or already waiting, is refused with a clear reason.
-5. The student installs the KingdomFlow app and signs in with their phone number. They see **only** the Bible School.
+5. The student signs in with their phone number, on the web at `yourdomain/bible-school/learn` or in the KingdomFlow app. They see **only** the Bible School.
 6. To remove a student, use **Remove** in Applications. Their progress is kept.
 
 Students are not counted as church members: they do not appear in the members list, member limit, reports, messaging or fees. One phone number belongs to exactly one church.
+
+### Paid courses
+1. In the course form set **Course fee in ₹** (blank = free). Your church needs the Finance plan.
+2. Outsiders who apply for a paid course are taken straight to payment; once they pay they are enrolled automatically (no approval step). Church members and students pay from the course page ("Pay and join").
+3. Collected fees appear under **Payouts → Course fees** (less the 2.5% service fee). Request a payout there as for events and membership fees.
+4. Refunds are handled by hand.
 
 ## Part 4. Live classes
 
@@ -163,4 +169,4 @@ Language is under the profile (members) or the **⋮** menu (outside students). 
 
 ## Part 8. Not available yet
 
-Assignments and grading, quizzes and exams, gradebook, certificates, reports, plan limits for Bible School, and paid courses are planned for later phases.
+Automatic refunds, assignments and grading, quizzes and exams, gradebook, certificates, reports, plan limits for Bible School, and paid courses are planned for later phases.

@@ -50,8 +50,8 @@ export function StudentApplyForm({
           <p className="font-heading text-lg font-bold">Application sent</p>
           <p className="mt-1 text-sm text-muted-foreground">{state.message}</p>
           <p className="mt-3 text-sm text-muted-foreground">
-            Once you&apos;re approved, install the KingdomFlow app and sign in
-            with the mobile number you used here. Your courses will be waiting.
+            Once you&apos;re approved, sign in with the mobile number you used here,
+            on the web or in the KingdomFlow app. Your courses will be waiting.
           </p>
         </div>
       </div>

@@ -196,7 +196,20 @@ and plan limits. Nothing about calls was duplicated.
 - Students are not counted as members: they are left out of the members list, member limit, reports, Aura and platform counts, fees and messaging. They can join live classes they are enrolled in.
 - One phone number belongs to one church. A number already used by an active, pending or student record cannot apply again.
 - Removing a student sets their status to `left`; their progress is kept.
-- Paid courses are not part of this.
+- Students can learn on the web as well as in the app: see section 3d.
+- Paid courses: see section 3d.
+
+## 3d. Paid courses and the web student portal (migration `0197_lms_paid_courses.sql`)
+
+**Paid courses.**
+- A course can carry a fee (course form, "Course fee in ₹", 1 to 100000). Blank means free. Fees need the church's Finance plan, like paid events.
+- Payment is on KingdomFlow's shared PayU account, like paid events. The church is paid out from **Payouts** (stream "Course fees", one balance per church, 2.5% service fee), recorded in Super Admin → Payouts like membership fees.
+- A fee course cannot be joined through the free request path (`lms_request_enrollment` refuses it). Instead the person opens `/bible-school/checkout/<order>`, which posts to PayU. On the PayU return (`/api/payu/bible-school/return`, hash verified) the order is claimed once ("created" to "paid") and the person is enrolled automatically (`source = 'payment'`).
+- Outsiders: applying for a fee course creates the application as "waiting for payment" and goes straight to checkout; paying approves it and enrols them. An unpaid application cannot be approved by hand. A church member or student pays from the app ("Pay and join", opens the browser) or the portal.
+- A course that is full is refused before payment starts. If enrolment fails after money was taken (for example the number belongs to another church), the order stays paid and an error is logged to platform events for the team to settle by hand. There is no automatic refund.
+- Students from outside the church can only pay for public courses.
+
+**Web student portal.** `/bible-school/learn`: sign in with a mobile number (a code is texted, as in the app) and learn on the web: My courses, All courses (join or pay), course outline with progress, lessons (reading, video and audio with resume and tracked watch time, documents and links), notes and bookmarks, mark complete, and live classes (opens the K-Connect room). It uses the same database functions and rules as the app, with the student's own session. A phone-only sign-in is kept out of the team dashboard and onboarding (the proxy sends it back to the portal).
 
 ## 4. Tests
 
@@ -218,7 +231,7 @@ and plan limits. Nothing about calls was duplicated.
 
 ## 5. Known limitations
 
-- Students use the mobile app only; there is no web student portal.
+- Course fee refunds are done by hand; there is no automatic refund or partial payment.
 - Prerequisites are enforced when a member asks to join; an administrator enrolling directly can override them.
 - YouTube / Vimeo links open outside the app; only direct media files and uploaded files play inside it.
 - Notifications to students (approval, new lessons) arrive with phase 3.

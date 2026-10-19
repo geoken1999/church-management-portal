@@ -66,7 +66,7 @@ export function ApplicationsPanel({
         <CardContent className="space-y-2">
           <p className="font-medium">Your public Bible School page</p>
           <p className="text-sm text-muted-foreground">
-            People outside your church apply here. Set a course&apos;s
+            People outside your church apply here. Set a program&apos;s
             visibility to <strong>Open to the public</strong> to list it on this
             page.
           </p>

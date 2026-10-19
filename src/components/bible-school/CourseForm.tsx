@@ -67,7 +67,9 @@ export function CourseForm({
     setError(null);
     setErrors({});
     startTransition(async () => {
-      const result = await onSubmit(form);
+      const result = await onSubmit(form).catch((): LmsResult => ({
+        error: "Something went wrong. Check your connection and try again.",
+      }));
       if (result.error) setError(result.error);
       else if (result.fieldErrors) setErrors(result.fieldErrors);
       else {

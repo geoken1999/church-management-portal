@@ -5,6 +5,18 @@ import { createProgramOrder, checkoutUrl } from "@/lib/lms/payments";
 // The app (or web portal) asks to pay for a course: the signed-in member or student gets a checkout
 // address to open. The person is worked out from the session token, never from the request body.
 export async function POST(request: Request) {
+  try {
+    return await handleCheckout(request);
+  } catch (err) {
+    console.error("mobile/bible-school/checkout/route.ts POST failed:", err);
+    return NextResponse.json(
+      { ok: false, error: "Something went wrong. Please try again." },
+      { status: 500 },
+    );
+  }
+}
+
+async function handleCheckout(request: Request) {
   const token = (request.headers.get("authorization") ?? "").replace(
     /^Bearer /,
     "",

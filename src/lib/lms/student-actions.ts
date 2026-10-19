@@ -140,7 +140,9 @@ export async function submitStudentApplication(
 
   // A program with a fee is paid for right away: the person goes on to checkout, and is enrolled when
   // the payment is confirmed.
-  const startPayment = async (applicationId: string): Promise<ApplicationState> => {
+  const startPayment = async (
+    applicationId: string,
+  ): Promise<ApplicationState> => {
     const order = await createProgramOrder({
       organizationId: org.id,
       programId: programId!,
@@ -183,13 +185,17 @@ export async function submitStudentApplication(
   }
   if (fee > 0) return startPayment(created.id);
 
-  await pushToTeam({
-    organizationId: org.id,
-    tab: "bibleschool",
-    title: "New Bible School application",
-    body: `${input.firstName} ${input.lastName} would like to join the Bible School.`,
-    link: `${LMS_BASE_PATH}/applications`,
-  });
+  try {
+    await pushToTeam({
+      organizationId: org.id,
+      tab: "bibleschool",
+      title: "New Bible School application",
+      body: `${input.firstName} ${input.lastName} would like to join the Bible School.`,
+      link: `${LMS_BASE_PATH}/applications`,
+    });
+  } catch {
+    // The application is saved; telling the team is best effort.
+  }
   return {
     success: true,
     message:

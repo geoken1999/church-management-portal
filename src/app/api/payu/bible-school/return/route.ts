@@ -8,6 +8,19 @@ import { getSiteUrl } from "@/lib/site-url";
 // PayU redirects the browser here with a POST for both success and failure. No session exists, so the
 // hash PayU signs is what is trusted. The order id travels in this URL's own query string.
 export async function POST(request: Request) {
+  try {
+    return await handleReturn(request);
+  } catch (err) {
+    await logPlatformEvent({
+      level: "error",
+      source: "bible_school_payment",
+      message: `PayU course payment return failed unexpectedly: ${err instanceof Error ? err.message : "unknown error"}`,
+    });
+    return NextResponse.redirect(`${getSiteUrl()}/`, { status: 303 });
+  }
+}
+
+async function handleReturn(request: Request) {
   const siteUrl = getSiteUrl();
   const orderId = new URL(request.url).searchParams.get("orderId") ?? "";
 

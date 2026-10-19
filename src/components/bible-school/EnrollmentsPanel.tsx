@@ -68,7 +68,9 @@ export function EnrollmentsPanel({
     setError(null);
     setNotice(null);
     startTransition(async () => {
-      const result = await action();
+      const result = await action().catch((): LmsResult => ({
+        error: "Something went wrong. Check your connection and try again.",
+      }));
       if (result.error) setError(result.error);
       else {
         if (done) setNotice(done);

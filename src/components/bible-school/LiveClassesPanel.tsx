@@ -97,7 +97,9 @@ export function LiveClassesPanel({
     setErrors({});
     setNotice(null);
     startTransition(async () => {
-      const result = await action();
+      const result = await action().catch((): LmsResult => ({
+        error: "Something went wrong. Check your connection and try again.",
+      }));
       if (result.error) setError(result.error);
       else if (result.fieldErrors) setErrors(result.fieldErrors);
       else {

@@ -54,7 +54,9 @@ export function ProgramEnrollmentsPanel({
     setError(null);
     setNotice(null);
     startTransition(async () => {
-      const result = await action();
+      const result = await action().catch((): LmsResult => ({
+        error: "Something went wrong. Check your connection and try again.",
+      }));
       if (result.error) setError(result.error);
       else {
         if (done) setNotice(done);
@@ -95,7 +97,9 @@ export function ProgramEnrollmentsPanel({
             <select
               className={SELECT_CLASS}
               value={status}
-              onChange={(e) => setStatus(e.target.value as "approved" | "pending")}
+              onChange={(e) =>
+                setStatus(e.target.value as "approved" | "pending")
+              }
               aria-label="Start as"
             >
               <option value="approved">Approved now</option>
@@ -165,7 +169,13 @@ export function ProgramEnrollmentsPanel({
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant={row.status === "approved" || row.status === "active" ? "default" : "secondary"}>
+                <Badge
+                  variant={
+                    row.status === "approved" || row.status === "active"
+                      ? "default"
+                      : "secondary"
+                  }
+                >
                   {row.status}
                 </Badge>
                 {row.status === "pending" && (

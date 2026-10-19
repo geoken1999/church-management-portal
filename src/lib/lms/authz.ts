@@ -3,7 +3,10 @@ import "server-only";
 import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { BIBLE_SCHOOL_NOT_ENABLED, isBibleSchoolEnabled } from "@/lib/lms/access";
+import {
+  BIBLE_SCHOOL_NOT_ENABLED,
+  isBibleSchoolEnabled,
+} from "@/lib/lms/access";
 import { canManageCourse } from "@/lib/lms/rules";
 
 export type Authorized =

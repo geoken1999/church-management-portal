@@ -71,7 +71,9 @@ export function CurriculumBuilder({
   function run(action: () => Promise<LmsResult>, after?: () => void) {
     setError(null);
     startTransition(async () => {
-      const result = await action();
+      const result = await action().catch((): LmsResult => ({
+        error: "Something went wrong. Check your connection and try again.",
+      }));
       if (result.error) setError(result.error);
       else if (result.fieldErrors)
         setError(
@@ -536,7 +538,19 @@ function LessonForm({
   const type = LESSON_TYPES.find((t) => t.value === form.contentType);
 
   // Sends a file for a lesson straight to storage and attaches it. Returns a message if it failed.
+  // Any failure on the way (network, a server hiccup) comes back as a message, never an exception.
   async function uploadFile(
+    lessonId: string,
+    file: File,
+  ): Promise<string | null> {
+    try {
+      return await sendFile(lessonId, file);
+    } catch {
+      return "The upload failed. Check your connection and try again.";
+    }
+  }
+
+  async function sendFile(
     lessonId: string,
     file: File,
   ): Promise<string | null> {
@@ -586,7 +600,9 @@ function LessonForm({
           ...form,
           hasFile: Boolean(fileName || pendingFile),
         },
-      );
+      ).catch((): LmsResult => ({
+        error: "Something went wrong. Check your connection and try again.",
+      }));
       if (result.error) {
         setError(result.error);
         return;

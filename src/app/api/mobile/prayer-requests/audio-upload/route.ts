@@ -11,6 +11,21 @@ import {
 // upload link for a path the server chose inside the member's own folder. The recording then goes
 // straight to storage; the prayer request that follows names that path.
 export async function POST(request: Request) {
+  try {
+    return await handleUpload(request);
+  } catch (err) {
+    console.error(
+      "mobile/prayer-requests/audio-upload/route.ts POST failed:",
+      err,
+    );
+    return NextResponse.json(
+      { ok: false, error: "Something went wrong. Please try again." },
+      { status: 500 },
+    );
+  }
+}
+
+async function handleUpload(request: Request) {
   const member = await prayerMemberFromRequest(request);
   if (!member)
     return NextResponse.json(

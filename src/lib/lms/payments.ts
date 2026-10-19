@@ -39,6 +39,15 @@ export function checkoutUrl(orderId: string): string {
 export async function createProgramOrder(
   input: OrderInput,
 ): Promise<OrderResult> {
+  try {
+    return await buildProgramOrder(input);
+  } catch (err) {
+    console.error("createProgramOrder failed:", err);
+    return { error: "Couldn't start the payment. Please try again." };
+  }
+}
+
+async function buildProgramOrder(input: OrderInput): Promise<OrderResult> {
   if (!input.memberId && !input.applicationId)
     return { error: "Something went wrong. Please try again." };
   const admin = createAdminClient();
@@ -257,50 +266,59 @@ export async function finalizeProgramPayment(
     });
   };
 
-  if (order.application_id) {
-    await admin
-      .from("lms_student_applications")
-      .update({ payment_status: "paid" })
-      .eq("id", order.application_id);
-    const { error } = await admin.rpc("lms_approve_application", {
-      p_org: order.organization_id,
-      p_application: order.application_id,
-      p_course: null,
-      p_actor: null,
-      p_program: order.program_id,
-    });
-    if (error) {
-      await problem(error.message);
-      return base;
+  try {
+    if (order.application_id) {
+      await admin
+        .from("lms_student_applications")
+        .update({ payment_status: "paid" })
+        .eq("id", order.application_id);
+      const { error } = await admin.rpc("lms_approve_application", {
+        p_org: order.organization_id,
+        p_application: order.application_id,
+        p_course: null,
+        p_actor: null,
+        p_program: order.program_id,
+      });
+      if (error) {
+        await problem(error.message);
+        return base;
+      }
+      await emailStudentApproved(
+        org?.name ?? "the church",
+        order.payer_email ?? "",
+        order.payer_name.split(" ")[0],
+        program?.title ?? null,
+        { paid: true, learnUrl: `${getSiteUrl()}/bible-school/learn` },
+      );
+    } else if (order.member_id && order.program_id) {
+      const { error } = await admin.rpc("lms_enroll_program", {
+        p_organization_id: order.organization_id,
+        p_program_id: order.program_id,
+        p_member_id: order.member_id,
+        p_status: "approved",
+        p_source: "payment",
+        p_actor: null,
+      });
+      if (error && !error.message.includes("already has an open enrollment")) {
+        await problem(error.message);
+        return base;
+      }
     }
-    await emailStudentApproved(
-      org?.name ?? "the church",
-      order.payer_email ?? "",
-      order.payer_name.split(" ")[0],
-      program?.title ?? null,
-      { paid: true, learnUrl: `${getSiteUrl()}/bible-school/learn` },
-    );
-  } else if (order.member_id && order.program_id) {
-    const { error } = await admin.rpc("lms_enroll_program", {
-      p_organization_id: order.organization_id,
-      p_program_id: order.program_id,
-      p_member_id: order.member_id,
-      p_status: "approved",
-      p_source: "payment",
-      p_actor: null,
-    });
-    if (error && !error.message.includes("already has an open enrollment")) {
-      await problem(error.message);
-      return base;
-    }
-  }
 
-  await pushToTeam({
-    organizationId: order.organization_id,
-    tab: "bibleschool",
-    title: "Program fee received",
-    body: `${order.payer_name} paid for ${program?.title ?? "a program"}.`,
-    link: `${LMS_BASE_PATH}/programs`,
-  });
+    // Telling the team is best effort: the person is enrolled either way.
+    try {
+      await pushToTeam({
+        organizationId: order.organization_id,
+        tab: "bibleschool",
+        title: "Program fee received",
+        body: `${order.payer_name} paid for ${program?.title ?? "a program"}.`,
+        link: `${LMS_BASE_PATH}/programs`,
+      });
+    } catch {
+      /* ignored */
+    }
+  } catch (err) {
+    await problem(err instanceof Error ? err.message : "unexpected error");
+  }
   return base;
 }

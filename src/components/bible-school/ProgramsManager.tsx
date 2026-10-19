@@ -57,7 +57,9 @@ export function ProgramsManager({
     setError(null);
     setErrors({});
     startTransition(async () => {
-      const result = await action();
+      const result = await action().catch((): LmsResult => ({
+        error: "Something went wrong. Check your connection and try again.",
+      }));
       if (result.error) setError(result.error);
       else if (result.fieldErrors) setErrors(result.fieldErrors);
       else {
@@ -144,7 +146,9 @@ export function ProgramsManager({
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="space-y-1.5">
-                <Label htmlFor="program-price">Program fee in ₹ (blank = free)</Label>
+                <Label htmlFor="program-price">
+                  Program fee in ₹ (blank = free)
+                </Label>
                 <Input
                   id="program-price"
                   type="number"
@@ -158,7 +162,9 @@ export function ProgramsManager({
                 <FieldError id="program-price-error" message={errors.price} />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="program-capacity">Seats (blank = no limit)</Label>
+                <Label htmlFor="program-capacity">
+                  Seats (blank = no limit)
+                </Label>
                 <Input
                   id="program-capacity"
                   type="number"
@@ -271,7 +277,9 @@ export function ProgramsManager({
                   variant="outline"
                   nativeButton={false}
                   render={
-                    <Link href={`/dashboard/bible-school/programs/${program.id}`}>
+                    <Link
+                      href={`/dashboard/bible-school/programs/${program.id}`}
+                    >
                       Enrollments
                     </Link>
                   }
@@ -369,7 +377,9 @@ export function ProgramsManager({
             <p className="text-xs text-muted-foreground">
               {program.price_amount ? `Fee ₹${program.price_amount}` : "Free"}
               {program.capacity ? ` · ${program.capacity} seats` : ""} ·{" "}
-              {program.visibility === "public" ? "Open to the public" : "Church members only"}
+              {program.visibility === "public"
+                ? "Open to the public"
+                : "Church members only"}
             </p>
             <p className="text-xs text-muted-foreground">
               {program.courseIds.length === 0

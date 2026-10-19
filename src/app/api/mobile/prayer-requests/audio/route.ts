@@ -11,6 +11,18 @@ const LINK_SECONDS = 300;
 // other members of the same church when the request is shared on the prayer wall. The storage path is
 // never sent to the app.
 export async function GET(request: Request) {
+  try {
+    return await handlePlay(request);
+  } catch (err) {
+    console.error("mobile/prayer-requests/audio/route.ts GET failed:", err);
+    return NextResponse.json(
+      { ok: false, error: "Something went wrong. Please try again." },
+      { status: 500 },
+    );
+  }
+}
+
+async function handlePlay(request: Request) {
   const member = await prayerMemberFromRequest(request);
   if (!member)
     return NextResponse.json(
@@ -58,6 +70,18 @@ export async function GET(request: Request) {
 // Removes one of the member's own requests together with its voice message file (a plain row delete
 // from the app would leave the recording behind in storage).
 export async function DELETE(request: Request) {
+  try {
+    return await handleRemove(request);
+  } catch (err) {
+    console.error("mobile/prayer-requests/audio/route.ts DELETE failed:", err);
+    return NextResponse.json(
+      { ok: false, error: "Something went wrong. Please try again." },
+      { status: 500 },
+    );
+  }
+}
+
+async function handleRemove(request: Request) {
   const member = await prayerMemberFromRequest(request);
   if (!member)
     return NextResponse.json(

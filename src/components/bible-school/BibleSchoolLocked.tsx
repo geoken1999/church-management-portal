@@ -39,7 +39,12 @@ export function BibleSchoolLocked({
   function request() {
     setError(null);
     startTransition(async () => {
-      const result = await requestBibleSchoolAccessAction(message);
+      const result = await requestBibleSchoolAccessAction(message).catch(
+        () => ({
+          error: "Something went wrong. Check your connection and try again.",
+          success: false,
+        }),
+      );
       if (result.error) setError(result.error);
       else setSent(true);
     });

@@ -186,11 +186,25 @@ describe("validateCourse", () => {
 describe("validateProgram, validateModule, validateSettings", () => {
   it("needs a real title", () => {
     expect(
-      validateProgram({ title: "ab", description: "", objectives: "", price: "", capacity: "", visibility: "organization" }).title,
+      validateProgram({
+        title: "ab",
+        description: "",
+        objectives: "",
+        price: "",
+        capacity: "",
+        visibility: "organization",
+      }).title,
     ).toBeTruthy();
     expect(
       hasErrors(
-        validateProgram({ title: "Christian Leadership", description: "", objectives: "", price: "", capacity: "", visibility: "organization" }),
+        validateProgram({
+          title: "Christian Leadership",
+          description: "",
+          objectives: "",
+          price: "",
+          capacity: "",
+          visibility: "organization",
+        }),
       ),
     ).toBe(false);
     expect(validateModule({ title: "", description: "" }).title).toBeTruthy();
@@ -440,17 +454,27 @@ describe("program fee, seats and visibility", () => {
   });
   it("fee is optional, positive, and at most two decimals", () => {
     expect(validateProgram({ ...program, price: "999" }).price).toBeUndefined();
-    expect(validateProgram({ ...program, price: "499.50" }).price).toBeUndefined();
+    expect(
+      validateProgram({ ...program, price: "499.50" }).price,
+    ).toBeUndefined();
     for (const bad of ["0", "-5", "abc", "12.345", "100001"])
       expect(validateProgram({ ...program, price: bad }).price).toBeDefined();
   });
   it("seats are a whole number of at least one", () => {
-    expect(validateProgram({ ...program, capacity: "30" }).capacity).toBeUndefined();
+    expect(
+      validateProgram({ ...program, capacity: "30" }).capacity,
+    ).toBeUndefined();
     for (const bad of ["0", "1.5", "x"])
-      expect(validateProgram({ ...program, capacity: bad }).capacity).toBeDefined();
+      expect(
+        validateProgram({ ...program, capacity: bad }).capacity,
+      ).toBeDefined();
   });
   it("visibility is church-only or public", () => {
-    expect(validateProgram({ ...program, visibility: "public" }).visibility).toBeUndefined();
-    expect(validateProgram({ ...program, visibility: "everyone" }).visibility).toBeDefined();
+    expect(
+      validateProgram({ ...program, visibility: "public" }).visibility,
+    ).toBeUndefined();
+    expect(
+      validateProgram({ ...program, visibility: "everyone" }).visibility,
+    ).toBeDefined();
   });
 });

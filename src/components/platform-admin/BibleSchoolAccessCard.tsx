@@ -32,7 +32,7 @@ export function BibleSchoolAccessCard({
         organizationId,
         next,
         note,
-      );
+      ).catch(() => ({ error: "Couldn't save that. Try again." }));
       if (result.error) setMessage(result.error);
       else {
         setOn(next);

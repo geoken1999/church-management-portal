@@ -23,6 +23,18 @@ import {
 // members who use the app. The member is identified from their own session
 // token, never from anything in the request body.
 export async function POST(request: Request) {
+  try {
+    return await handleCreate(request);
+  } catch (err) {
+    console.error("mobile/prayer-requests/route.ts POST failed:", err);
+    return NextResponse.json(
+      { ok: false, error: "Something went wrong. Please try again." },
+      { status: 500 },
+    );
+  }
+}
+
+async function handleCreate(request: Request) {
   const authHeader = request.headers.get("authorization") ?? "";
   const token = authHeader.startsWith("Bearer ")
     ? authHeader.slice("Bearer ".length)

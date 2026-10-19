@@ -43,7 +43,9 @@ export function ApplicationsPanel({
     setError(null);
     setNotice(null);
     startTransition(async () => {
-      const result = await action();
+      const result = await action().catch((): LmsResult => ({
+        error: "Something went wrong. Check your connection and try again.",
+      }));
       if (result.error) setError(result.error);
       else {
         if (done) setNotice(done);
@@ -173,7 +175,9 @@ export function ApplicationsPanel({
                     ))}
                   </select>
                   <Button
-                    disabled={pending || application.payment_status === "awaiting"}
+                    disabled={
+                      pending || application.payment_status === "awaiting"
+                    }
                     onClick={() =>
                       run(
                         () =>

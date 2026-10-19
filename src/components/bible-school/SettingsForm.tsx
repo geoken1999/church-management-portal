@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { saveSettingsAction } from "@/lib/lms/actions";
+import { saveSettingsAction, type LmsResult } from "@/lib/lms/actions";
 import type { LmsSettings } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -35,7 +35,11 @@ export function SettingsForm({
     setErrors({});
     setSaved(false);
     startTransition(async () => {
-      const result = await saveSettingsAction(organizationId, form);
+      const result = await saveSettingsAction(organizationId, form).catch(
+        (): LmsResult => ({
+          error: "Something went wrong. Check your connection and try again.",
+        }),
+      );
       if (result.error) setError(result.error);
       else if (result.fieldErrors) setErrors(result.fieldErrors);
       else setSaved(true);

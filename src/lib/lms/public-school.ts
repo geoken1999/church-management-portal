@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isBibleSchoolEnabled } from "@/lib/lms/access";
 import { getOrgFeatureState } from "@/lib/plans/dal";
 
 // Whether a church's public Bible School page is open: the module has been moved out of testing by the
@@ -9,6 +10,7 @@ import { getOrgFeatureState } from "@/lib/plans/dal";
 export async function isBibleSchoolOpen(
   organizationId: string,
 ): Promise<boolean> {
+  if (!(await isBibleSchoolEnabled(organizationId))) return false;
   const admin = createAdminClient();
   const { data: flag } = await admin
     .from("platform_feature_flags")

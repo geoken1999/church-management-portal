@@ -3,6 +3,7 @@ import "server-only";
 import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { BIBLE_SCHOOL_NOT_ENABLED, isBibleSchoolEnabled } from "@/lib/lms/access";
 import { canManageCourse } from "@/lib/lms/rules";
 
 export type Authorized =
@@ -17,6 +18,8 @@ export async function authorizeTab(
 ): Promise<Authorized> {
   await requireUser();
   if (!organizationId) return { ok: false, message: "Choose a church first." };
+  if (!(await isBibleSchoolEnabled(organizationId)))
+    return { ok: false, message: BIBLE_SCHOOL_NOT_ENABLED };
   return checkTabAccess(organizationId, "bibleschool", level);
 }
 
@@ -29,6 +32,8 @@ export async function authorizeCurriculum(
   const user = await requireUser();
   if (!organizationId || !courseId)
     return { ok: false, message: "That course could not be found." };
+  if (!(await isBibleSchoolEnabled(organizationId)))
+    return { ok: false, message: BIBLE_SCHOOL_NOT_ENABLED };
   const admin = createAdminClient();
   const { data: course } = await admin
     .from("lms_courses")

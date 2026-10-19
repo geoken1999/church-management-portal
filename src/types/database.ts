@@ -1058,6 +1058,8 @@ export type LiveStream = {
   created_at: string;
   updated_at: string;
 };
+// Whether a church may use the Bible School (migration 0196); the team switches it on after a request.
+export type BibleSchoolAccess = LiveStreamAccess;
 // Whether a church may use live streaming (migration 0172); the team switches it on after a request.
 export type LiveStreamAccess = {
   organization_id: string;
@@ -3640,6 +3642,12 @@ export type Database = {
         Row: LiveStream;
         Insert: Partial<LiveStream> & Pick<LiveStream, "organization_id" | "meeting_id" | "title">;
         Update: Partial<LiveStream>;
+        Relationships: [];
+      };
+      bible_school_access: {
+        Row: BibleSchoolAccess;
+        Insert: Partial<BibleSchoolAccess> & Pick<BibleSchoolAccess, "organization_id">;
+        Update: Partial<BibleSchoolAccess>;
         Relationships: [];
       };
       live_stream_access: {

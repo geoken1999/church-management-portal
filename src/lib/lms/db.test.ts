@@ -12,6 +12,7 @@ const MIGRATIONS = [
   "0192_lms_video_progress.sql",
   "0193_lms_live_classes.sql",
   "0194_lms_students.sql",
+  "0196_bible_school_access.sql",
 ];
 const BOOTSTRAP = readFileSync(
   "src/lib/lms/test-support/supabase-stub.sql",
@@ -116,6 +117,10 @@ describe("Bible School database", () => {
     m3 = await mem(orgA, "Cara", u3);
     await q(
       "insert into platform_feature_flags (tab_key, enabled, status) values ('bibleschool', true, 'beta')",
+    );
+    await q(
+      "insert into bible_school_access (organization_id, enabled) values ($1,true), ($2,true)",
+      [orgA, orgB],
     );
 
     course = (
@@ -729,6 +734,26 @@ describe("Bible School database", () => {
     check(
       "a plan that switches it off hides it",
       (await as(u1, "select * from lms_catalog($1)", [orgA])).length === 0,
+    );
+    // Access is per church, on request: with the plan on again but the church's access off, nothing shows.
+    await q("update organizations set custom_plan_limits = null where id=$1", [
+      orgA,
+    ]);
+    check(
+      "with access on the catalogue shows",
+      (await as(u1, "select * from lms_catalog($1)", [orgA])).length > 0,
+    );
+    await q(
+      "update bible_school_access set enabled=false where organization_id=$1",
+      [orgA],
+    );
+    check(
+      "a church without access sees nothing",
+      (await as(u1, "select * from lms_catalog($1)", [orgA])).length === 0,
+    );
+    await q(
+      "update bible_school_access set enabled=true where organization_id=$1",
+      [orgA],
     );
   }, 60000);
   it("People from outside the church (students)", async () => {

@@ -8,6 +8,8 @@ import { exportTenantReport } from "@/lib/platform-admin/report-actions";
 import { formatBytes } from "@/lib/plans/format";
 import { ReportExportButtons } from "@/components/platform-admin/ReportExportButtons";
 import { LiveStreamAccessCard } from "@/components/platform-admin/LiveStreamAccessCard";
+import { BibleSchoolAccessCard } from "@/components/platform-admin/BibleSchoolAccessCard";
+import { getBibleSchoolAccess } from "@/lib/lms/access";
 import { getLiveStreamAccess } from "@/lib/livestream/access";
 import { CustomPlanDialog } from "@/components/platform-admin/CustomPlanDialog";
 import { Card, CardContent } from "@/components/ui/card";
@@ -34,6 +36,7 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
   }
 
   const liveAccess = await getLiveStreamAccess(usage.id);
+  const schoolAccess = await getBibleSchoolAccess(usage.id);
   const stillTrialing = usage.trialEndsAt ? new Date(usage.trialEndsAt) > new Date() : false;
   const statusLabel = usage.subscriptionStatus === "active" ? "Active" : stillTrialing ? "Trialing" : "Expired";
   const statusVariant = usage.subscriptionStatus === "active" ? "default" : stillTrialing ? "secondary" : "destructive";
@@ -73,6 +76,7 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
       </div>
 
       <LiveStreamAccessCard organizationId={usage.id} enabled={liveAccess.enabled} requestedAt={liveAccess.requestedAt} initialNote={liveAccess.note ?? ""} />
+      <BibleSchoolAccessCard organizationId={usage.id} enabled={schoolAccess.enabled} requestedAt={schoolAccess.requestedAt} initialNote={schoolAccess.note ?? ""} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card>

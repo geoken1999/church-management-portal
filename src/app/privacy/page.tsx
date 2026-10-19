@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: "How KingdomFlow collects, uses, and protects data for churches and their congregations.",
 };
 
-const LAST_UPDATED = "October 16, 2026";
+const LAST_UPDATED = "October 19, 2026";
 
 export default function PrivacyPolicyPage() {
   return (
@@ -173,11 +173,66 @@ export default function PrivacyPolicyPage() {
 
       <LegalSection heading="Data security">
         <p>
-          We use industry-standard safeguards to protect information, including encryption in transit (TLS),
-          encryption at rest for stored data, row-level access controls so an Organization&apos;s data is isolated
-          from every other Organization on the platform, role-based permissions your admins configure for their own
-          team, private storage for sensitive documents, encrypted storage of third-party access tokens, and limits
-          on repeated sign-in attempts. No method of transmission or storage is 100% secure, and we cannot guarantee absolute security.
+          We protect information with technical and organisational safeguards. The main ones are listed below so you
+          can see how your data is handled.
+        </p>
+        <ul>
+          <li>
+            <strong>Isolation between churches.</strong> Every Organization&apos;s data is separated from every
+            other Organization&apos;s by row-level access rules enforced in the database itself, not only in the
+            app. Our server checks your Organization and permissions again on each action instead of trusting what
+            the browser or phone sends.
+          </li>
+          <li>
+            <strong>Access limited to what each person needs.</strong> Organizations give their team members
+            read, write and delete access tab by tab. New areas start read-only for existing team members. A church
+            member signed in on the app sees only their own church&apos;s member features, and a Bible School
+            student from outside the church sees only the Bible School. Access to our platform administration is
+            limited to authorised KingdomFlow staff.
+          </li>
+          <li>
+            <strong>Encryption.</strong> Data is encrypted in transit (TLS) and at rest in our hosting and database
+            providers. Passwords are stored only as salted hashes. A church&apos;s WhatsApp access credentials are
+            additionally encrypted by us (AES-256-GCM) before they are stored. Other connection credentials, such as
+            social media or payment-gateway keys, are kept in access-restricted tables and are used only on our
+            servers.
+          </li>
+          <li>
+            <strong>Signing in.</strong> We limit repeated sign-in and password-reset attempts for each email address
+            and each network address, keeping only one-way hashes of them for a short time. Phone sign-in uses a code
+            sent to the number, and the number must match a record the church has made; a number belongs to one
+            church.
+          </li>
+          <li>
+            <strong>Private files.</strong> Onboarding documents, lesson videos and files, and voice prayer messages
+            are kept in private storage. They are opened only through short-lived links (a few minutes) that our
+            server issues after checking that the person is allowed to see the file. We do not publish their storage
+            addresses.
+          </li>
+          <li>
+            <strong>Payments.</strong> Card, UPI PIN and bank details are handled by the payment gateway and never
+            reach our servers. We credit a payment only after verifying the gateway&apos;s signed response, and we
+            record each payment attempt so it cannot be counted twice.
+          </li>
+          <li>
+            <strong>Public forms and links.</strong> Public forms use hidden anti-spam fields and rate limits.
+            Callbacks from services such as WhatsApp, Instagram and Twilio, and our scheduled jobs, are accepted only
+            when they carry a valid signature or secret. Text that a church publishes in lessons is cleaned of
+            scripts before it is shown to students.
+          </li>
+          <li>
+            <strong>Records of what happened.</strong> We keep operational and error logs, and activity records for
+            sensitive actions such as approving students and changing Bible School settings, so problems and misuse
+            can be investigated.
+          </li>
+          <li>
+            <strong>Retention and deletion.</strong> Data is kept only as described under data retention above.
+            Account deletion requests are verified by email before they are carried out.
+          </li>
+        </ul>
+        <p>
+          No method of transmission or storage is 100% secure, and we cannot guarantee absolute security. If you
+          find a security problem, please tell us at <a href="mailto:admin@kingdomflow.in">admin@kingdomflow.in</a>.
         </p>
       </LegalSection>
 

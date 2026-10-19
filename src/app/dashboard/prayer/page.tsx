@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { createClient } from "@/lib/supabase/server";
-import { PrayerRequestsView, type PrayerRow } from "@/components/prayer/PrayerRequestsView";
+import {
+  PrayerRequestsView,
+  type PrayerRow,
+} from "@/components/prayer/PrayerRequestsView";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
 export const metadata: Metadata = {
@@ -20,7 +23,9 @@ export default async function PrayerPage() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("prayer_requests")
-    .select("id, request, visibility, is_anonymous, status, answered_at, created_at, members(first_name, last_name, phone)")
+    .select(
+      "id, request, visibility, is_anonymous, status, answered_at, created_at, audio_path, audio_seconds, members(first_name, last_name, phone)",
+    )
     .eq("organization_id", membership.organization.id)
     .order("created_at", { ascending: false })
     .limit(500);
@@ -33,20 +38,30 @@ export default async function PrayerPage() {
     status: row.status,
     answeredAt: row.answered_at,
     createdAt: row.created_at,
-    memberName: row.members ? `${row.members.first_name} ${row.members.last_name}` : "A member",
+    memberName: row.members
+      ? `${row.members.first_name} ${row.members.last_name}`
+      : "A member",
     memberPhone: row.members?.phone ?? null,
+    audioSeconds: row.audio_path ? (row.audio_seconds ?? 0) : null,
   }));
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-3xl font-bold tracking-tight">Prayer</h1>
+        <h1 className="font-heading text-3xl font-bold tracking-tight">
+          Prayer
+        </h1>
         <p className="mt-1 text-muted-foreground">
-          Prayer requests your members raise in the mobile app. This is a read-only view: members add and close their own requests, and your team is notified of each new one.
+          Prayer requests your members raise in the mobile app. This is a
+          read-only view: members add and close their own requests, and your
+          team is notified of each new one.
         </p>
       </div>
 
-      <PrayerRequestsView rows={rows} organizationTimezone={membership.organization.timezone} />
+      <PrayerRequestsView
+        rows={rows}
+        organizationTimezone={membership.organization.timezone}
+      />
     </div>
   );
 }

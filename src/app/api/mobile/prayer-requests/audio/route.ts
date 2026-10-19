@@ -1,0 +1,56 @@
+import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { prayerMemberFromRequest } from "@/lib/prayer/member-session";
+import { PRAYER_AUDIO_BUCKET } from "@/lib/prayer/audio";
+
+export const dynamic = "force-dynamic";
+
+const LINK_SECONDS = 300;
+
+// A short-lived link to play a prayer request's voice message. Allowed for the member who made it, and for
+// other members of the same church when the request is shared on the prayer wall. The storage path is
+// never sent to the app.
+export async function GET(request: Request) {
+  const member = await prayerMemberFromRequest(request);
+  if (!member)
+    return NextResponse.json(
+      { ok: false, error: "That session could not be verified." },
+      { status: 401 },
+    );
+  const id = new URL(request.url).searchParams.get("id") ?? "";
+  if (!/^[0-9a-f-]{36}$/i.test(id))
+    return NextResponse.json(
+      { ok: false, error: "That recording could not be found." },
+      { status: 404 },
+    );
+
+  const admin = createAdminClient();
+  const { data: row } = await admin
+    .from("prayer_requests")
+    .select("organization_id, member_id, visibility, audio_path")
+    .eq("id", id)
+    .maybeSingle();
+  const allowed =
+    row?.audio_path &&
+    row.organization_id === member.organizationId &&
+    (row.member_id === member.memberId || row.visibility === "shared");
+  if (!row || !row.audio_path || !allowed)
+    return NextResponse.json(
+      { ok: false, error: "That recording could not be found." },
+      { status: 404 },
+    );
+
+  const { data, error } = await admin.storage
+    .from(PRAYER_AUDIO_BUCKET)
+    .createSignedUrl(row.audio_path, LINK_SECONDS);
+  if (error || !data)
+    return NextResponse.json(
+      { ok: false, error: "Couldn't open that recording." },
+      { status: 500 },
+    );
+  return NextResponse.json({
+    ok: true,
+    url: data.signedUrl,
+    expiresInSeconds: LINK_SECONDS,
+  });
+}

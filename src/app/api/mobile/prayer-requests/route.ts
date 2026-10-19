@@ -11,6 +11,11 @@ import {
 } from "@/lib/prayer/validation";
 import { resolveAudienceAuthIds } from "@/lib/push/audience";
 import { logPlatformEvent } from "@/lib/platform-events/log";
+import {
+  isOwnPrayerAudioPath,
+  MAX_PRAYER_AUDIO_BYTES,
+  PRAYER_AUDIO_BUCKET,
+} from "@/lib/prayer/audio";
 
 // A member raising a prayer request from the mobile app. Goes through the
 // server (not a direct insert from the phone) because it also has to tell
@@ -80,6 +85,35 @@ export async function POST(request: Request) {
     });
   }
 
+  // A voice message must be one this member just uploaded to their own folder, and really be there.
+  if (input.audioPath) {
+    if (
+      !isOwnPrayerAudioPath(input.audioPath, member.organization_id, member.id)
+    )
+      return NextResponse.json({
+        ok: false,
+        error: "That voice message could not be used. Please record it again.",
+      });
+    const slash = input.audioPath.lastIndexOf("/");
+    const { data: found } = await admin.storage
+      .from(PRAYER_AUDIO_BUCKET)
+      .list(input.audioPath.slice(0, slash), {
+        search: input.audioPath.slice(slash + 1),
+        limit: 1,
+      });
+    const object = (found ?? []).find(
+      (f) => f.name === input.audioPath!.slice(slash + 1),
+    );
+    const size = Number(
+      (object?.metadata as { size?: number } | null)?.size ?? 0,
+    );
+    if (!object || size <= 0 || size > MAX_PRAYER_AUDIO_BYTES)
+      return NextResponse.json({
+        ok: false,
+        error: "The voice message did not upload. Please try again.",
+      });
+  }
+
   const { data: created, error: insertError } = await admin
     .from("prayer_requests")
     .insert({
@@ -88,6 +122,8 @@ export async function POST(request: Request) {
       request: input.request,
       visibility: input.visibility,
       is_anonymous: input.isAnonymous,
+      audio_path: input.audioPath,
+      audio_seconds: input.audioSeconds,
     })
     .select("id")
     .single();

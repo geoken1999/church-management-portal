@@ -4776,6 +4776,8 @@ export type PrayerRequest = {
   is_anonymous: boolean;
   status: PrayerRequestStatus;
   answered_at: string | null;
+  audio_path: string | null;
+  audio_seconds: number | null;
   created_at: string;
   updated_at: string;
 };

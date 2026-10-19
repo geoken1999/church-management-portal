@@ -19,10 +19,10 @@ const SELECT_CLASS =
 
 export function StudentApplyForm({
   slug,
-  courses,
+  options,
 }: {
   slug: string;
-  courses: { id: string; title: string; price: number | null }[];
+  options: { value: string; title: string; price: number | null }[];
 }) {
   const [state, action, pending] = useActionState(
     submitStudentApplication.bind(null, slug),
@@ -50,8 +50,9 @@ export function StudentApplyForm({
           <p className="font-heading text-lg font-bold">Application sent</p>
           <p className="mt-1 text-sm text-muted-foreground">{state.message}</p>
           <p className="mt-3 text-sm text-muted-foreground">
-            Once you&apos;re approved, sign in with the mobile number you used here,
-            on the web or in the KingdomFlow app. Your courses will be waiting.
+            Once you&apos;re approved, sign in with the mobile number you used
+            here, on the web or in the KingdomFlow app. Your courses will be
+            waiting.
           </p>
         </div>
       </div>
@@ -119,9 +120,9 @@ export function StudentApplyForm({
           <FieldError id="stu-email-error" message={e.email} />
         </div>
       </div>
-      {courses.length > 0 && (
+      {options.length > 0 && (
         <div className="space-y-2">
-          <Label htmlFor="stu-course">Course you would like to take</Label>
+          <Label htmlFor="stu-course">Program you would like to join</Label>
           <select
             id="stu-course"
             name="courseId"
@@ -129,8 +130,8 @@ export function StudentApplyForm({
             className={SELECT_CLASS}
           >
             <option value="">Not sure yet</option>
-            {courses.map((c) => (
-              <option key={c.id} value={c.id}>
+            {options.map((c) => (
+              <option key={c.value} value={c.value}>
                 {c.title}
                 {c.price ? ` (₹${c.price})` : ""}
               </option>

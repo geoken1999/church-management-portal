@@ -1144,7 +1144,26 @@ export type LmsProgram = {
   description: string | null;
   objectives: string | null;
   status: LmsPublishState;
+  price_amount: number | null;
+  capacity: number | null;
+  visibility: "organization" | "public";
   created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LmsProgramEnrollment = {
+  id: string;
+  organization_id: string;
+  program_id: string;
+  member_id: string;
+  status: "pending" | "approved" | "active" | "completed" | "withdrawn" | "rejected";
+  source: "admin" | "self" | "payment";
+  requested_at: string;
+  decided_at: string | null;
+  decided_by: string | null;
+  enrolled_at: string | null;
+  withdrawn_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -1262,6 +1281,7 @@ export type LmsStudentApplication = {
   message: string | null;
   status: "pending" | "approved" | "rejected";
   payment_status: "none" | "awaiting" | "paid";
+  program_id: string | null;
   member_id: string | null;
   decided_by: string | null;
   decided_at: string | null;
@@ -1272,7 +1292,8 @@ export type LmsStudentApplication = {
 export type LmsPaymentOrder = {
   id: string;
   organization_id: string;
-  course_id: string;
+  course_id: string | null;
+  program_id: string | null;
   member_id: string | null;
   application_id: string | null;
   amount: number;
@@ -3774,9 +3795,15 @@ export type Database = {
         Update: Partial<LmsLessonProgress>;
         Relationships: [];
       };
+      lms_program_enrollments: {
+        Row: LmsProgramEnrollment;
+        Insert: Partial<LmsProgramEnrollment> & Pick<LmsProgramEnrollment, "organization_id" | "program_id" | "member_id">;
+        Update: Partial<LmsProgramEnrollment>;
+        Relationships: [];
+      };
       lms_payment_orders: {
         Row: LmsPaymentOrder;
-        Insert: Partial<LmsPaymentOrder> & Pick<LmsPaymentOrder, "organization_id" | "course_id" | "amount" | "payu_txnid" | "payer_name">;
+        Insert: Partial<LmsPaymentOrder> & Pick<LmsPaymentOrder, "organization_id" | "amount" | "payu_txnid" | "payer_name">;
         Update: Partial<LmsPaymentOrder>;
         Relationships: [];
       };
@@ -4481,12 +4508,24 @@ export type Database = {
         Returns: string | null;
       };
       lms_approve_application: {
-        Args: { p_org: string; p_application: string; p_course: string | null; p_actor: string | null };
+        Args: { p_org: string; p_application: string; p_course: string | null; p_actor: string | null; p_program?: string | null };
         Returns: { member_id: string; enrolled: boolean };
       };
       lms_create_enrollment: {
         Args: { p_organization_id: string; p_course_id: string; p_member_id: string; p_status: string; p_source: string; p_actor: string | null; p_ignore_window?: boolean };
         Returns: string;
+      };
+      lms_enroll_program: {
+        Args: { p_organization_id: string; p_program_id: string; p_member_id: string; p_status: string; p_source: string; p_actor: string | null };
+        Returns: string;
+      };
+      lms_decide_program_enrollment: {
+        Args: { p_organization_id: string; p_enrollment_id: string; p_action: string; p_actor: string };
+        Returns: string;
+      };
+      lms_program_sync_courses: {
+        Args: { p_program_enrollment: string };
+        Returns: number;
       };
       lms_decide_enrollment: {
         Args: { p_organization_id: string; p_enrollment_id: string; p_action: string; p_actor: string };

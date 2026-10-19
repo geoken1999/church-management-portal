@@ -28,6 +28,11 @@ export interface ProgramInput {
   title: string;
   description: string;
   objectives: string;
+  // The program fee in rupees; blank for a free program.
+  price: string;
+  // Seats; blank for no limit.
+  capacity: string;
+  visibility: string;
 }
 
 export function validateProgram(
@@ -43,6 +48,22 @@ export function validateProgram(
     errors.description = "Keep the description under 4000 characters.";
   if (input.objectives.length > 4000)
     errors.objectives = "Keep the objectives under 4000 characters.";
+  if (input.price.trim()) {
+    const price = Number(input.price);
+    if (!Number.isFinite(price) || price <= 0 || price > 100000)
+      errors.price =
+        "Enter the fee in rupees, like 999, or leave it blank for a free program.";
+    else if (Math.round(price * 100) !== price * 100)
+      errors.price = "Use at most two decimal places.";
+  }
+  if (input.capacity.trim()) {
+    const capacity = Number(input.capacity);
+    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 100000)
+      errors.capacity =
+        "Enter a whole number of seats, or leave it blank for no limit.";
+  }
+  if (!["organization", "public"].includes(input.visibility))
+    errors.visibility = "Choose who can see this program.";
   return errors;
 }
 
@@ -63,8 +84,6 @@ export interface CourseInput {
   endsOn: string;
   estimatedHours: string;
   capacity: string;
-  // The course fee in rupees; blank for a free course.
-  price: string;
 }
 
 export function validateCourse(
@@ -128,14 +147,6 @@ export function validateCourse(
     if (!Number.isInteger(capacity) || capacity < 1 || capacity > 100000)
       errors.capacity =
         "Enter a whole number of seats, or leave it blank for no limit.";
-  }
-  if (input.price.trim()) {
-    const price = Number(input.price);
-    if (!Number.isFinite(price) || price <= 0 || price > 100000)
-      errors.price =
-        "Enter the fee in rupees, like 499, or leave it blank for a free course.";
-    else if (Math.round(price * 100) !== price * 100)
-      errors.price = "Use at most two decimal places.";
   }
   return errors;
 }

@@ -55,7 +55,8 @@ async function owned(
     | "lms_courses"
     | "lms_modules"
     | "lms_lessons"
-    | "lms_enrollments",
+    | "lms_enrollments"
+    | "lms_program_enrollments",
   organizationId: string,
   id: string,
 ) {
@@ -126,6 +127,9 @@ export async function saveProgramAction(
     title: input.title.trim(),
     description: input.description.trim() || null,
     objectives: input.objectives.trim() || null,
+    price_amount: input.price.trim() ? Number(input.price) : null,
+    capacity: input.capacity.trim() ? Number(input.capacity) : null,
+    visibility: input.visibility as "organization" | "public",
   };
   if (programId) {
     if (!(await owned("lms_programs", organizationId, programId)))
@@ -261,7 +265,100 @@ export async function setProgramCoursesAction(
     if (error)
       return fail("Couldn't update the program's courses. Please try again.");
   }
+  // People already in the program get the courses that were added to it.
+  const { data: open } = await admin
+    .from("lms_program_enrollments")
+    .select("id")
+    .eq("program_id", programId)
+    .in("status", ["approved", "active"]);
+  for (const enrollment of open ?? []) {
+    await admin.rpc("lms_program_sync_courses", {
+      p_program_enrollment: enrollment.id,
+    });
+  }
   refresh("/programs");
+  return { success: true };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Program enrollments: students join the program, and so every course in it
+// ---------------------------------------------------------------------------------------------
+
+function programEnrollmentMessage(message: string | undefined): string {
+  const known = [
+    "could not be found",
+    "is not open for enrollment",
+    "already has an open enrollment",
+    "This program is full.",
+  ];
+  const hit = known.find((k) => message?.includes(k));
+  if (hit) return message ?? hit;
+  if (message?.includes("is not possible for an enrollment"))
+    return "That change isn't possible for this enrollment.";
+  return "Couldn't update the enrollment. Please try again.";
+}
+
+export async function enrollInProgramAction(
+  organizationId: string,
+  programId: string,
+  memberId: string,
+  status: "pending" | "approved",
+): Promise<LmsResult> {
+  const access = await authorizeTab(organizationId, "write");
+  if (!access.ok) return fail(access.message);
+  if (status !== "pending" && status !== "approved")
+    return fail("Choose pending or approved.");
+  const { data, error } = await createAdminClient().rpc("lms_enroll_program", {
+    p_organization_id: organizationId,
+    p_program_id: programId,
+    p_member_id: memberId,
+    p_status: status,
+    p_source: "admin",
+    p_actor: access.userId,
+  });
+  if (error) return fail(programEnrollmentMessage(error.message));
+  await logLmsEvent({
+    organizationId,
+    actorAuthUserId: access.userId,
+    action: "program_enrollment.created",
+    entityType: "program_enrollment",
+    entityId: data as string,
+    metadata: { programId, memberId, status },
+  });
+  refresh(`/programs/${programId}`, "/enrollments");
+  return { success: true, id: data as string };
+}
+
+export async function decideProgramEnrollmentAction(
+  organizationId: string,
+  enrollmentId: string,
+  action: "approve" | "reject" | "withdraw",
+): Promise<LmsResult> {
+  const access = await authorizeTab(organizationId, "write");
+  if (!access.ok) return fail(access.message);
+  if (!["approve", "reject", "withdraw"].includes(action))
+    return fail("Choose a valid action.");
+  if (!(await owned("lms_program_enrollments", organizationId, enrollmentId)))
+    return fail("That enrollment could not be found.");
+  const { data, error } = await createAdminClient().rpc(
+    "lms_decide_program_enrollment",
+    {
+      p_organization_id: organizationId,
+      p_enrollment_id: enrollmentId,
+      p_action: action,
+      p_actor: access.userId,
+    },
+  );
+  if (error) return fail(programEnrollmentMessage(error.message));
+  await logLmsEvent({
+    organizationId,
+    actorAuthUserId: access.userId,
+    action: `program_enrollment.${action}`,
+    entityType: "program_enrollment",
+    entityId: enrollmentId,
+    metadata: { status: data },
+  });
+  refresh("/programs", "/enrollments");
   return { success: true };
 }
 
@@ -292,7 +389,6 @@ function courseRow(input: CourseInput) {
       ? Number(input.estimatedHours)
       : null,
     capacity: input.capacity.trim() ? Number(input.capacity) : null,
-    price_amount: input.price.trim() ? Number(input.price) : null,
   };
 }
 

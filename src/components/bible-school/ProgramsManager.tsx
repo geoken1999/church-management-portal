@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -45,6 +46,9 @@ export function ProgramsManager({
     title: "",
     description: "",
     objectives: "",
+    price: "",
+    capacity: "",
+    visibility: "organization",
   });
   const [picking, setPicking] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
@@ -72,7 +76,14 @@ export function ProgramsManager({
       {editing === null && (
         <Button
           onClick={() => {
-            setForm({ title: "", description: "", objectives: "" });
+            setForm({
+              title: "",
+              description: "",
+              objectives: "",
+              price: "",
+              capacity: "",
+              visibility: "organization",
+            });
             setEditing("new");
           }}
         >
@@ -131,6 +142,64 @@ export function ProgramsManager({
                 message={errors.objectives}
               />
             </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="program-price">Program fee in ₹ (blank = free)</Label>
+                <Input
+                  id="program-price"
+                  type="number"
+                  min={1}
+                  step="0.01"
+                  value={form.price}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, price: e.target.value }))
+                  }
+                />
+                <FieldError id="program-price-error" message={errors.price} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="program-capacity">Seats (blank = no limit)</Label>
+                <Input
+                  id="program-capacity"
+                  type="number"
+                  min={1}
+                  step="1"
+                  value={form.capacity}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, capacity: e.target.value }))
+                  }
+                />
+                <FieldError
+                  id="program-capacity-error"
+                  message={errors.capacity}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="program-visibility">Who can join</Label>
+                <select
+                  id="program-visibility"
+                  className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+                  value={form.visibility}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, visibility: e.target.value }))
+                  }
+                >
+                  <option value="organization">Church members only</option>
+                  <option value="public">
+                    Open to the public (shown on your Bible School page)
+                  </option>
+                </select>
+                <FieldError
+                  id="program-visibility-error"
+                  message={errors.visibility}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Students join and pay for the whole program, and are enrolled in
+              every course in it. Paid online on KingdomFlow with a 2.5% service
+              fee; you request payouts from the Payouts page.
+            </p>
             <div className="flex gap-2">
               <Button
                 disabled={pending}
@@ -188,12 +257,25 @@ export function ProgramsManager({
                       title: program.title,
                       description: program.description ?? "",
                       objectives: program.objectives ?? "",
+                      price: program.price_amount?.toString() ?? "",
+                      capacity: program.capacity?.toString() ?? "",
+                      visibility: program.visibility,
                     });
                     setEditing(program.id);
                   }}
                 >
                   Edit
                 </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  nativeButton={false}
+                  render={
+                    <Link href={`/dashboard/bible-school/programs/${program.id}`}>
+                      Enrollments
+                    </Link>
+                  }
+                />
                 <Button
                   size="sm"
                   variant="outline"
@@ -284,6 +366,11 @@ export function ProgramsManager({
                 {program.description}
               </p>
             )}
+            <p className="text-xs text-muted-foreground">
+              {program.price_amount ? `Fee ₹${program.price_amount}` : "Free"}
+              {program.capacity ? ` · ${program.capacity} seats` : ""} ·{" "}
+              {program.visibility === "public" ? "Open to the public" : "Church members only"}
+            </p>
             <p className="text-xs text-muted-foreground">
               {program.courseIds.length === 0
                 ? "No courses in this program yet."

@@ -14,6 +14,7 @@ const MIGRATIONS = [
   "0194_lms_students.sql",
   "0196_bible_school_access.sql",
   "0197_lms_paid_courses.sql",
+  "0198_lms_program_enrollment.sql",
 ];
 const BOOTSTRAP = readFileSync(
   "src/lib/lms/test-support/supabase-stub.sql",
@@ -1130,5 +1131,197 @@ describe("Bible School database", () => {
       (await as(u1, "select count(*)::int as n from lms_payment_orders"))[0]
         .n === 0,
     );
+  }, 60000);
+
+  it("Programs: enrollment at program level", async () => {
+    await q("update organizations set custom_plan_limits = null where id=$1", [
+      orgA,
+    ]);
+    const mk = async (title: string) =>
+      (
+        await q(
+          "insert into lms_courses (organization_id, title, status, visibility) values ($1,$2,'published','organization') returning id",
+          [orgA, title],
+        )
+      )[0].id;
+    const cA = await mk("Program Course A");
+    const cB = await mk("Program Course B");
+    const prog = (
+      await q(
+        "insert into lms_programs (organization_id, title, status, visibility, capacity) values ($1,'Discipleship Year','published','organization',1) returning id",
+        [orgA],
+      )
+    )[0].id;
+    await q(
+      "insert into lms_program_courses (program_id, course_id, organization_id, position) values ($1,$2,$3,0), ($1,$4,$3,1)",
+      [prog, cA, orgA, cB],
+    );
+    check(
+      "a member sees the program",
+      (
+        await as(
+          u1,
+          "select * from lms_program_catalog($1) where program_id=$2",
+          [orgA, prog],
+        )
+      ).length === 1,
+    );
+    check(
+      "a course in a program cannot be joined on its own",
+      (
+        (await asErr(u1, "select lms_request_enrollment($1)", [cA])) ?? ""
+      ).includes("part of the program"),
+    );
+    const status = (
+      await as(u1, "select lms_request_program($1) as s", [prog])
+    )[0].s;
+    check("joining asks for approval by default", status === "pending");
+    const pe = (
+      await q(
+        "select id from lms_program_enrollments where program_id=$1 and member_id=$2",
+        [prog, m1],
+      )
+    )[0].id;
+    check(
+      "no course enrollments before approval",
+      (
+        await q(
+          "select count(*)::int as n from lms_enrollments where program_enrollment_id=$1",
+          [pe],
+        )
+      )[0].n === 0,
+    );
+    await q("select lms_decide_program_enrollment($1,$2,'approve',$3)", [
+      orgA,
+      pe,
+      admin,
+    ]);
+    check(
+      "approving enrols the student in every course of the program",
+      (
+        await q(
+          "select count(*)::int as n from lms_enrollments where program_enrollment_id=$1 and status='approved' and source='program'",
+          [pe],
+        )
+      )[0].n === 2,
+    );
+    check(
+      "the course is now open to them",
+      (
+        await as(
+          u1,
+          "select status from lms_my_courses($1) where course_id=$2",
+          [orgA, cA],
+        )
+      )[0]?.status === "approved",
+    );
+    check(
+      "a full program refuses the next student",
+      (
+        await q("select lms_enroll_program($1,$2,$3,'approved','admin',$4)", [
+          orgA,
+          prog,
+          m2,
+          admin,
+        ]).then(
+          () => "",
+          (e) => String(e.message),
+        )
+      ).includes("full"),
+    );
+    // Finishing both required courses completes the program.
+    await q(
+      "update lms_enrollments set status='completed' where program_enrollment_id=$1",
+      [pe],
+    );
+    const mine = (
+      await as(u1, "select * from lms_my_programs($1) where program_id=$2", [
+        orgA,
+        prog,
+      ])
+    )[0];
+    check(
+      "finishing every course completes the program",
+      mine.status === "completed" && mine.courses_done === 2,
+    );
+    await q(
+      "update lms_enrollments set status='active' where program_enrollment_id=$1",
+      [pe],
+    );
+    await q("select lms_decide_program_enrollment($1,$2,'withdraw',$3)", [
+      orgA,
+      pe,
+      admin,
+    ]);
+    check(
+      "leaving the program withdraws its course enrollments",
+      (
+        await q(
+          "select count(*)::int as n from lms_enrollments where program_enrollment_id=$1 and status='withdrawn'",
+          [pe],
+        )
+      )[0].n === 2,
+    );
+
+    // A program with a fee goes through payment.
+    const paidProg = (
+      await q(
+        "insert into lms_programs (organization_id, title, status, visibility, price_amount) values ($1,'Paid Program','published','public',999) returning id",
+        [orgA],
+      )
+    )[0].id;
+    check(
+      "a program with a fee cannot be requested for free",
+      (
+        (await asErr(u2, "select lms_request_program($1)", [paidProg])) ?? ""
+      ).includes("has a fee"),
+    );
+    // A student from outside sees only public programs.
+    const uS2 = await uid();
+    const stu = (
+      await q(
+        "insert into members (organization_id, first_name, last_name, auth_user_id, status) values ($1,'Sam','Student',$2,'student') returning id",
+        [orgA, uS2],
+      )
+    )[0].id;
+    const visible = (
+      await as(uS2, "select program_id from lms_program_catalog($1)", [orgA])
+    ).map((r) => r.program_id);
+    check(
+      "a student sees public programs only",
+      visible.includes(paidProg) && !visible.includes(prog),
+    );
+    // Approving an application can enrol in a program, which enrols in its courses.
+    await q("update lms_programs set price_amount=null where id=$1", [
+      paidProg,
+    ]);
+    await q(
+      "insert into lms_program_courses (program_id, course_id, organization_id) values ($1,$2,$3)",
+      [paidProg, cA, orgA],
+    );
+    const app = (
+      await q(
+        "insert into lms_student_applications (organization_id, program_id, first_name, last_name, phone) values ($1,$2,'Ana','Applicant','9000011122') returning id",
+        [orgA, paidProg],
+      )
+    )[0].id;
+    const result = (
+      await q("select lms_approve_application($1,$2,null,null,$3) as r", [
+        orgA,
+        app,
+        paidProg,
+      ])
+    )[0].r;
+    check(
+      "approving an application enrols in the program",
+      result.enrolled === true &&
+        (
+          await q(
+            "select count(*)::int as n from lms_enrollments where member_id=$1 and course_id=$2 and source='program'",
+            [result.member_id, cA],
+          )
+        )[0].n === 1,
+    );
+    void stu;
   }, 60000);
 });

@@ -15,7 +15,7 @@ import {
   type ApplicationErrors,
 } from "@/lib/lms/students";
 import { isBibleSchoolOpen } from "@/lib/lms/public-school";
-import { createCourseOrder, checkoutUrl } from "@/lib/lms/payments";
+import { createProgramOrder, checkoutUrl } from "@/lib/lms/payments";
 import { emailStudentApproved } from "@/lib/lms/student-email";
 import { getSiteUrl } from "@/lib/site-url";
 import type { LmsResult } from "@/lib/lms/actions";
@@ -71,22 +71,42 @@ export async function submitStudentApplication(
   if (limited) return { error: limited };
   await recordAttempt(STUDENT_APPLICATION_RULE, nationalTail(input.phone));
 
-  // The course, if one was chosen, must be a public, published course of this church.
+  // What they asked for, if anything: a public program (the usual case) or a public course that is not
+  // part of a program. The value looks like "program:<id>" or "course:<id>".
   let courseId: string | null = null;
+  let programId: string | null = null;
   let fee = 0;
   if (input.courseId) {
-    const { data: course } = await admin
-      .from("lms_courses")
-      .select("id, price_amount")
-      .eq("id", input.courseId)
-      .eq("organization_id", org.id)
-      .eq("status", "published")
-      .eq("visibility", "public")
-      .maybeSingle();
-    if (!course)
-      return { errors: { courseId: "That course isn't available." } };
-    courseId = course.id;
-    fee = Number(course.price_amount ?? 0);
+    const [kind, id] = input.courseId.split(":");
+    if (kind === "program" && id) {
+      const { data: program } = await admin
+        .from("lms_programs")
+        .select("id, price_amount")
+        .eq("id", id)
+        .eq("organization_id", org.id)
+        .eq("status", "published")
+        .eq("visibility", "public")
+        .maybeSingle();
+      if (!program)
+        return { errors: { courseId: "That program isn't available." } };
+      programId = program.id;
+      fee = Number(program.price_amount ?? 0);
+    } else if (kind === "course" && id) {
+      const { data: course } = await admin
+        .from("lms_courses")
+        .select("id")
+        .eq("id", id)
+        .eq("organization_id", org.id)
+        .eq("status", "published")
+        .eq("visibility", "public")
+        .is("price_amount", null)
+        .maybeSingle();
+      if (!course)
+        return { errors: { courseId: "That course isn't available." } };
+      courseId = course.id;
+    } else {
+      return { errors: { courseId: "Choose a program from the list." } };
+    }
   }
 
   // Someone already known to this church by that number.
@@ -107,6 +127,7 @@ export async function submitStudentApplication(
     .insert({
       organization_id: org.id,
       course_id: courseId,
+      program_id: programId,
       first_name: input.firstName,
       last_name: input.lastName,
       phone: input.phone,
@@ -117,12 +138,12 @@ export async function submitStudentApplication(
     .select("id")
     .single();
 
-  // A course with a fee is paid for right away: the person goes on to checkout, and is enrolled when
+  // A program with a fee is paid for right away: the person goes on to checkout, and is enrolled when
   // the payment is confirmed.
   const startPayment = async (applicationId: string): Promise<ApplicationState> => {
-    const order = await createCourseOrder({
+    const order = await createProgramOrder({
       organizationId: org.id,
-      courseId: courseId!,
+      programId: programId!,
       applicationId,
       payer: {
         name: `${input.firstName} ${input.lastName}`.trim(),
@@ -135,18 +156,18 @@ export async function submitStudentApplication(
   };
 
   if (error?.code === "23505") {
-    // Already waiting: for a course that was not paid yet, offer the payment again.
+    // Already waiting: for a program that was not paid yet, offer the payment again.
     if (fee > 0) {
       const { data: waiting } = await admin
         .from("lms_student_applications")
-        .select("id, phone, course_id, payment_status")
+        .select("id, phone, program_id, payment_status")
         .eq("organization_id", org.id)
         .eq("status", "pending");
       const mine = (waiting ?? []).find(
         (a) =>
           nationalTail(a.phone) === tail &&
           a.payment_status === "awaiting" &&
-          a.course_id === courseId,
+          a.program_id === programId,
       );
       if (mine) return startPayment(mine.id);
     }
@@ -181,7 +202,7 @@ export async function submitStudentApplication(
 export async function approveApplicationAction(
   organizationId: string,
   applicationId: string,
-  courseId: string,
+  target: string,
 ): Promise<LmsResult> {
   const access = await authorizeTab(organizationId, "write");
   if (!access.ok) return { error: access.message };
@@ -193,21 +214,44 @@ export async function approveApplicationAction(
     .eq("organization_id", organizationId)
     .maybeSingle();
   if (!application) return { error: "That application could not be found." };
-  if (courseId) {
+
+  // The team chooses a program (or a course outside any program), or none.
+  const [kind, id] = target ? target.split(":") : ["", ""];
+  let programId: string | null = null;
+  let courseId: string | null = null;
+  let title: string | null = null;
+  if (kind === "program" && id) {
+    const { data: program } = await admin
+      .from("lms_programs")
+      .select("id, title")
+      .eq("id", id)
+      .eq("organization_id", organizationId)
+      .eq("status", "published")
+      .maybeSingle();
+    if (!program) return { error: "Choose a published program, or none." };
+    programId = program.id;
+    title = program.title;
+  } else if (kind === "course" && id) {
     const { data: course } = await admin
       .from("lms_courses")
-      .select("id")
-      .eq("id", courseId)
+      .select("id, title")
+      .eq("id", id)
       .eq("organization_id", organizationId)
       .eq("status", "published")
       .maybeSingle();
     if (!course) return { error: "Choose a published course, or none." };
+    courseId = course.id;
+    title = course.title;
+  } else if (target) {
+    return { error: "Choose a program, a course, or none." };
   }
+
   const { error } = await admin.rpc("lms_approve_application", {
     p_org: organizationId,
     p_application: applicationId,
-    p_course: courseId || null,
+    p_course: courseId,
     p_actor: access.userId,
+    p_program: programId,
   });
   if (error) {
     const known = [
@@ -216,6 +260,7 @@ export async function approveApplicationAction(
       "10-digit",
       "another church",
       "waiting membership request",
+      "waiting for the course fee",
       "full",
       "closed",
     ];
@@ -231,27 +276,18 @@ export async function approveApplicationAction(
     action: "student.approved",
     entityType: "application",
     entityId: applicationId,
-    metadata: { courseId: courseId || null },
+    metadata: { programId, courseId },
   });
-  const [{ data: org }, { data: course }] = await Promise.all([
-    admin
-      .from("organizations")
-      .select("name")
-      .eq("id", organizationId)
-      .maybeSingle(),
-    courseId
-      ? admin
-          .from("lms_courses")
-          .select("title")
-          .eq("id", courseId)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
+  const { data: org } = await admin
+    .from("organizations")
+    .select("name")
+    .eq("id", organizationId)
+    .maybeSingle();
   await emailStudentApproved(
     org?.name ?? "the church",
     application.email ?? "",
     application.first_name,
-    course?.title ?? null,
+    title,
     { learnUrl: `${getSiteUrl()}/bible-school/learn` },
   );
   revalidatePath(`${LMS_BASE_PATH}/applications`);

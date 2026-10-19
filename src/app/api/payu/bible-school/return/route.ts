@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyPayUReturn } from "@/lib/payu/client";
-import { finalizeCoursePayment } from "@/lib/lms/payments";
+import { finalizeProgramPayment } from "@/lib/lms/payments";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { getSiteUrl } from "@/lib/site-url";
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
   }
   if (status !== "success") return back("failed");
 
-  const result = await finalizeCoursePayment(txnid, get("mihpayid"));
+  const result = await finalizeProgramPayment(txnid, get("mihpayid"));
   if (result.error) {
     await logPlatformEvent({
       level: "error",

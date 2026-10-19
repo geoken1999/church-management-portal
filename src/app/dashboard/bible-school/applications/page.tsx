@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
-import { getApplications, getCourseOptions, getStudents } from "@/lib/lms/dal";
+import { getApplications, getCourseOptions, getPrograms, getStudents } from "@/lib/lms/dal";
 import { publicSchoolPath } from "@/lib/lms/students";
 import { getSiteUrl } from "@/lib/site-url";
 import { ApplicationsPanel } from "@/components/bible-school/ApplicationsPanel";
@@ -24,20 +24,29 @@ export default async function ApplicationsPage() {
       </Card>
     );
   }
-  const [applications, students, courses] = await Promise.all([
+  const [applications, students, courses, programs] = await Promise.all([
     getApplications(organizationId),
     getStudents(organizationId),
     getCourseOptions(organizationId),
+    getPrograms(organizationId),
   ]);
+  // A program, or a course that belongs to no program.
+  const inProgram = new Set(programs.flatMap((p) => p.courseIds));
+  const targets = [
+    ...programs
+      .filter((p) => p.status === "published")
+      .map((p) => ({ value: `program:${p.id}`, label: p.title })),
+    ...courses
+      .filter((c) => c.status === "published" && !inProgram.has(c.id))
+      .map((c) => ({ value: `course:${c.id}`, label: c.title })),
+  ];
   return (
     <ApplicationsPanel
       organizationId={organizationId}
       publicUrl={`${getSiteUrl()}${publicSchoolPath(membership.organization.slug)}`}
       applications={applications}
       students={students}
-      courses={courses
-        .filter((c) => c.status === "published")
-        .map((c) => ({ id: c.id, title: c.title }))}
+      targets={targets}
     />
   );
 }

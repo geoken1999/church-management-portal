@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createCourseOrder, checkoutUrl } from "@/lib/lms/payments";
+import { createProgramOrder, checkoutUrl } from "@/lib/lms/payments";
 
 // The app (or web portal) asks to pay for a course: the signed-in member or student gets a checkout
 // address to open. The person is worked out from the session token, never from the request body.
@@ -22,34 +22,34 @@ export async function POST(request: Request) {
       { status: 401 },
     );
 
-  let courseId = "";
+  let programId = "";
   try {
     const body = await request.json();
-    courseId = typeof body.courseId === "string" ? body.courseId : "";
+    programId = typeof body.programId === "string" ? body.programId : "";
   } catch {
     /* handled below */
   }
-  if (!/^[0-9a-f-]{36}$/i.test(courseId))
+  if (!/^[0-9a-f-]{36}$/i.test(programId))
     return NextResponse.json(
       { ok: false, error: "Invalid request." },
       { status: 400 },
     );
 
-  const { data: course } = await admin
-    .from("lms_courses")
+  const { data: program } = await admin
+    .from("lms_programs")
     .select("organization_id")
-    .eq("id", courseId)
+    .eq("id", programId)
     .maybeSingle();
-  if (!course)
+  if (!program)
     return NextResponse.json({
       ok: false,
-      error: "That course could not be found.",
+      error: "That program could not be found.",
     });
 
   const { data: member } = await admin
     .from("members")
     .select("id, first_name, last_name, email, phone, status")
-    .eq("organization_id", course.organization_id)
+    .eq("organization_id", program.organization_id)
     .eq("auth_user_id", userData.user.id)
     .in("status", ["active", "student"])
     .maybeSingle();
@@ -59,9 +59,9 @@ export async function POST(request: Request) {
       error: "You need to be a member or student of this church.",
     });
 
-  const order = await createCourseOrder({
-    organizationId: course.organization_id,
-    courseId,
+  const order = await createProgramOrder({
+    organizationId: program.organization_id,
+    programId,
     memberId: member.id,
     payer: {
       name: `${member.first_name} ${member.last_name}`.trim(),

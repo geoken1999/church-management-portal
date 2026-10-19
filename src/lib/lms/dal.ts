@@ -11,6 +11,7 @@ import type {
   LmsProgram,
   LmsSettings,
   LmsStudentApplication,
+  LmsProgramEnrollment,
 } from "@/types/database";
 
 // Reads for the Bible School screens. They use the service role, so every function takes the church
@@ -677,6 +678,7 @@ export async function getAttendanceRoster(
 
 export interface ApplicationRow extends LmsStudentApplication {
   courseTitle: string | null;
+  programTitle: string | null;
 }
 
 // Applications from the public page, waiting ones first, then the latest decided.
@@ -708,13 +710,25 @@ export async function getApplications(
       rows.map((r) => r.course_id).filter((id): id is string => Boolean(id)),
     ),
   ];
-  const { data: courses } = courseIds.length
-    ? await admin.from("lms_courses").select("id, title").in("id", courseIds)
-    : { data: [] };
+  const programIds = [
+    ...new Set(
+      rows.map((r) => r.program_id).filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const [{ data: courses }, { data: programs }] = await Promise.all([
+    courseIds.length
+      ? admin.from("lms_courses").select("id, title").in("id", courseIds)
+      : Promise.resolve({ data: [] }),
+    programIds.length
+      ? admin.from("lms_programs").select("id, title").in("id", programIds)
+      : Promise.resolve({ data: [] }),
+  ]);
   return rows.map((row) => ({
     ...row,
     courseTitle:
       (courses ?? []).find((c) => c.id === row.course_id)?.title ?? null,
+    programTitle:
+      (programs ?? []).find((p) => p.id === row.program_id)?.title ?? null,
   }));
 }
 
@@ -754,4 +768,76 @@ export async function getStudents(
     courses: (enrollments ?? []).filter((e) => e.member_id === s.id).length,
     signedIn: Boolean(s.auth_user_id),
   }));
+}
+
+export interface ProgramEnrollmentRow {
+  id: string;
+  status: string;
+  source: string;
+  requestedAt: string;
+  studentName: string;
+  studentPhone: string | null;
+  isStudent: boolean;
+  coursesDone: number;
+  coursesTotal: number;
+}
+
+// The enrollments of one program, newest first, with how many of the program's courses each student has
+// finished.
+export async function getProgramEnrollments(
+  organizationId: string,
+  programId: string,
+): Promise<ProgramEnrollmentRow[]> {
+  const admin = createAdminClient();
+  const [{ data: rows }, { data: links }] = await Promise.all([
+    admin
+      .from("lms_program_enrollments")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .eq("program_id", programId)
+      .order("requested_at", { ascending: false })
+      .limit(500),
+    admin
+      .from("lms_program_courses")
+      .select("course_id, is_required")
+      .eq("program_id", programId),
+  ]);
+  const enrollments = (rows ?? []) as LmsProgramEnrollment[];
+  const memberIds = [...new Set(enrollments.map((r) => r.member_id))];
+  const requiredIds = (links ?? [])
+    .filter((l) => l.is_required)
+    .map((l) => l.course_id);
+  const [{ data: members }, { data: done }] = await Promise.all([
+    memberIds.length
+      ? admin
+          .from("members")
+          .select("id, first_name, last_name, phone, status")
+          .in("id", memberIds)
+      : Promise.resolve({ data: [] }),
+    memberIds.length && requiredIds.length
+      ? admin
+          .from("lms_enrollments")
+          .select("member_id, course_id")
+          .in("member_id", memberIds)
+          .in("course_id", requiredIds)
+          .eq("status", "completed")
+      : Promise.resolve({ data: [] }),
+  ]);
+  return enrollments.map((e) => {
+    const member = (members ?? []).find((m) => m.id === e.member_id);
+    return {
+      id: e.id,
+      status: e.status,
+      source: e.source,
+      requestedAt: e.requested_at,
+      studentName: member
+        ? `${member.first_name} ${member.last_name}`.trim()
+        : "Unknown",
+      studentPhone: member?.phone ?? null,
+      isStudent: member?.status === "student",
+      coursesDone: (done ?? []).filter((d) => d.member_id === e.member_id)
+        .length,
+      coursesTotal: requiredIds.length,
+    };
+  });
 }

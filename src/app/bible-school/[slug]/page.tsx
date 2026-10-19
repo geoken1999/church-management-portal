@@ -83,46 +83,76 @@ export default async function PublicBibleSchoolPage({
         )}
 
         <section className="mt-10 space-y-4">
-          <h2 className="font-heading text-xl font-bold">Courses</h2>
-          {school.courses.length === 0 ? (
+          <h2 className="font-heading text-xl font-bold">Programs</h2>
+          {school.programs.length === 0 && school.courses.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No courses are open to the public right now. You can still apply
-              below and the church will get in touch.
+              Nothing is open to the public right now. You can still apply below
+              and the church will get in touch.
             </p>
           ) : (
-            school.courses.map((course) => (
-              <Card key={course.id}>
+            school.programs.map((program) => (
+              <Card key={program.id}>
                 <CardContent className="space-y-1">
-                  <p className="font-medium">
-                    {course.title}
-                    {course.code ? (
-                      <span className="ml-2 text-xs text-muted-foreground">
-                        {course.code}
-                      </span>
-                    ) : null}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {label(COURSE_LEVELS, course.level)} ·{" "}
-                    {label(DELIVERY_MODES, course.delivery_mode)}
-                    {course.estimated_hours
-                      ? ` · ${course.estimated_hours} hours`
-                      : ""}
-                  </p>
-                  {course.price_amount ? (
+                  <p className="font-medium">{program.title}</p>
+                  {program.price_amount ? (
                     <p className="text-sm font-semibold">
-                      Course fee: ₹{course.price_amount}
+                      Program fee: ₹{program.price_amount}
                     </p>
                   ) : (
                     <p className="text-xs font-medium text-primary">Free</p>
                   )}
-                  {course.description && (
+                  {program.description && (
                     <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-                      {course.description}
+                      {program.description}
+                    </p>
+                  )}
+                  {program.courseTitles.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Includes: {program.courseTitles.join(" · ")}
+                    </p>
+                  )}
+                  {program.capacity && (
+                    <p className="text-xs text-muted-foreground">
+                      {program.capacity} seats
                     </p>
                   )}
                 </CardContent>
               </Card>
             ))
+          )}
+          {school.courses.length > 0 && (
+            <>
+              <h2 className="pt-2 font-heading text-xl font-bold">
+                Single courses
+              </h2>
+              {school.courses.map((course) => (
+                <Card key={course.id}>
+                  <CardContent className="space-y-1">
+                    <p className="font-medium">
+                      {course.title}
+                      {course.code ? (
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          {course.code}
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {label(COURSE_LEVELS, course.level)} ·{" "}
+                      {label(DELIVERY_MODES, course.delivery_mode)}
+                      {course.estimated_hours
+                        ? ` · ${course.estimated_hours} hours`
+                        : ""}
+                    </p>
+                    <p className="text-xs font-medium text-primary">Free</p>
+                    {course.description && (
+                      <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                        {course.description}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </>
           )}
         </section>
 
@@ -134,11 +164,18 @@ export default async function PublicBibleSchoolPage({
           </p>
           <StudentApplyForm
             slug={slug}
-            courses={school.courses.map((c) => ({
-              id: c.id,
-              title: c.title,
-              price: c.price_amount,
-            }))}
+            options={[
+              ...school.programs.map((p) => ({
+                value: `program:${p.id}`,
+                title: p.title,
+                price: p.price_amount,
+              })),
+              ...school.courses.map((c) => ({
+                value: `course:${c.id}`,
+                title: c.title,
+                price: null,
+              })),
+            ]}
           />
         </section>
 

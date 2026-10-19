@@ -23,13 +23,13 @@ export function ApplicationsPanel({
   publicUrl,
   applications,
   students,
-  courses,
+  targets,
 }: {
   organizationId: string;
   publicUrl: string;
   applications: ApplicationRow[];
   students: StudentRow[];
-  courses: { id: string; title: string }[];
+  targets: { value: string; label: string }[];
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -114,7 +114,13 @@ export function ApplicationsPanel({
           </Card>
         )}
         {waiting.map((application) => {
-          const course = choice[application.id] ?? application.course_id ?? "";
+          const course =
+            choice[application.id] ??
+            (application.program_id
+              ? `program:${application.program_id}`
+              : application.course_id
+                ? `course:${application.course_id}`
+                : "");
           return (
             <Card key={application.id}>
               <CardContent className="space-y-3">
@@ -134,9 +140,10 @@ export function ApplicationsPanel({
                     {application.payment_status === "awaiting" && (
                       <Badge variant="secondary">Waiting for payment</Badge>
                     )}
-                    {application.courseTitle && (
+                    {(application.programTitle || application.courseTitle) && (
                       <Badge variant="outline">
-                        Asked for: {application.courseTitle}
+                        Asked for:{" "}
+                        {application.programTitle ?? application.courseTitle}
                       </Badge>
                     )}
                   </div>
@@ -158,10 +165,10 @@ export function ApplicationsPanel({
                     className={SELECT_CLASS}
                     aria-label="Enroll in"
                   >
-                    <option value="">Approve without a course</option>
-                    {courses.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        Enroll in {c.title}
+                    <option value="">Approve without a program</option>
+                    {targets.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        Enroll in {t.label}
                       </option>
                     ))}
                   </select>

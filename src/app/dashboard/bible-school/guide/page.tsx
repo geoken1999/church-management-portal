@@ -115,6 +115,15 @@ const STEPS = [
       "Programs → Enrollments shows each student's courses done. Enrollments shows course progress.",
     ],
   },
+  {
+    title: "10. Quizzes, grading and certificates",
+    body: [
+      "Add a lesson of type Quiz, save it, then press Questions to write it: one correct answer, several correct answers, true or false, or a written answer you mark yourself. Set the pass mark and how many attempts students get.",
+      "Passing the quiz is what completes its lesson, so a required quiz counts towards finishing the course. Once students have taken a quiz its questions are locked.",
+      "Written answers appear under Grading → Waiting to be marked. The Gradebook shows each student's best result on every quiz and their average.",
+      "A certificate is given automatically when a student finishes a course, and another for a whole program. Set who signs them in Settings. The Certificates tab lists them, with a PDF, a public check link (anyone can check a code) and Revoke.",
+    ],
+  },
 ];
 
 export default function GuidePage() {

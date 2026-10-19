@@ -110,6 +110,64 @@ export interface PLesson {
   bookmarked: boolean;
 }
 
+export interface PQuizQuestion {
+  id: string;
+  kind: "single" | "multiple" | "true_false" | "short";
+  prompt: string;
+  points: number;
+  options: { id: string; text: string }[];
+}
+
+export interface PAttempt {
+  id: string;
+  attempt_number: number;
+  status: "submitted" | "graded";
+  percent: number;
+  passed: boolean;
+  score: number;
+  max_score: number;
+  feedback: string | null;
+  submitted_at: string;
+  /** Present once the attempt is marked and the quiz shows answers. */
+  detail:
+    | {
+        question_id: string;
+        prompt: string;
+        points: number;
+        max_points: number;
+        correct: boolean | null;
+        feedback: string | null;
+        correct_option_ids: string[];
+        explanation: string | null;
+      }[]
+    | null;
+}
+
+export interface PQuiz {
+  lesson_id: string;
+  title: string;
+  instructions: string | null;
+  pass_percent: number;
+  max_attempts: number | null;
+  attempts_used: number;
+  passed: boolean;
+  waiting_for_teacher: boolean;
+  best_percent: number | null;
+  can_attempt: boolean;
+  questions: PQuizQuestion[];
+  last_attempt: PAttempt | null;
+}
+
+export interface PCertificate {
+  id: string;
+  code: string;
+  title: string;
+  kind: "course" | "program";
+  percent: number | null;
+  issued_at: string;
+  organization_name: string;
+}
+
 export interface PSession {
   session_id: string;
   course_id: string;
@@ -206,6 +264,11 @@ export const portal = {
       p_note: note,
       p_bookmarked: bookmarked,
     }),
+  quiz: (lesson: string) => rpc<PQuiz>("lms_get_quiz", { p_lesson: lesson }),
+  submitQuiz: (lesson: string, answers: Record<string, string[] | string>) =>
+    rpc<PAttempt>("lms_submit_quiz", { p_lesson: lesson, p_answers: answers }),
+  certificates: (org: string) =>
+    rpc<PCertificate[]>("lms_my_certificates", { p_org: org }),
   sessions: (org: string) => rpc<PSession[]>("lms_my_sessions", { p_org: org }),
   join: (session: string) =>
     rpc<{ meeting_id: string; title: string; mode: string }>(

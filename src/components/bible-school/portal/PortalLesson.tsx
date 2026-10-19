@@ -22,6 +22,7 @@ import {
   isDirectMediaUrl,
   resumePoint,
 } from "@/lib/lms/playback-reporter";
+import { QuizTaker } from "@/components/bible-school/portal/QuizTaker";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -195,7 +196,23 @@ export function PortalLesson({ lessonId }: { lessonId: string }) {
       )}
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <LessonBody lesson={lesson} onReport={onReport} />
+      {lesson.content_type === "quiz" ? (
+        lesson.enrolled ? (
+          <QuizTaker
+            lessonId={lesson.id}
+            onPassed={() => {
+              setCompleted(true);
+              void refreshOutline(lesson.course_id);
+            }}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Join the course to take this quiz.
+          </p>
+        )
+      ) : (
+        <LessonBody lesson={lesson} onReport={onReport} />
+      )}
       {lesson.enrolled &&
         watched !== null &&
         !completed &&
@@ -254,7 +271,13 @@ export function PortalLesson({ lessonId }: { lessonId: string }) {
           </Button>
         )}
         <div className="flex-1">
-          {lesson.enrolled ? (
+          {lesson.enrolled && lesson.content_type === "quiz" ? (
+            <p className="text-center text-sm text-muted-foreground">
+              {completed
+                ? "Completed: you passed the quiz."
+                : "Pass the quiz to complete this lesson."}
+            </p>
+          ) : lesson.enrolled ? (
             <Button
               type="button"
               className="w-full"

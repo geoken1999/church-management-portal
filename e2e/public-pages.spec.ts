@@ -49,6 +49,21 @@ test.describe("public pages", () => {
   });
 });
 
+test.describe("certificates", () => {
+  test("a code nobody holds says so on the check page", async ({ page }) => {
+    await page.goto("/verify/certificate/AAAAAAAAAAAA");
+    await expect(page.getByRole("heading", { name: "Certificate not found" })).toBeVisible();
+  });
+
+  test("the certificate PDF answers 404 as JSON for an unknown or malformed code", async ({ request }) => {
+    for (const code of ["AAAAAAAAAAAA", "not-a-code"]) {
+      const response = await request.get(`/api/certificate/${code}`);
+      expect(response.status(), code).toBe(404);
+      expect((await response.json()).error).toBeTruthy();
+    }
+  });
+});
+
 test.describe("Bible School public pages", () => {
   test("an unknown church has no Bible School page", async ({ request }) => {
     const response = await request.get("/bible-school/no-such-church-e2e");

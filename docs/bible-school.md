@@ -246,13 +246,23 @@ time, documents), notes and bookmarks, mark complete, and live classes (opens th
 same database functions and rules as the app, with the student's own session. A phone-only sign-in is sent
 back to the portal from the team dashboard, onboarding and the staff login pages (proxy).
 
+## 3e. Quizzes, grading and certificates (migration `0202_lms_quizzes_certificates.sql`)
+
+- **Model.** A quiz is a lesson of type `quiz` with a settings row (`lms_quizzes`: pass percent, attempts, show answers, instructions), questions (`lms_quiz_questions`: single, multiple, true_false, short; options with a `correct` flag) and attempts (`lms_quiz_attempts`: answers, per-question marks, scores, status `submitted` while a written answer waits, `graded` when final).
+- **Answers stay on the server.** Students have no policy on the questions table. `lms_get_quiz` returns questions without the `correct` flags; `lms_submit_quiz` marks choice questions in SQL (a multiple choice must be exactly right) and returns the attempt. Right answers and explanations come back only when `show_answers` is set and the attempt is `graded` (`lms_attempt_json`).
+- **Rules enforced in the database.** Enrolled students of a visible course only, the earlier-lesson prerequisite, one open attempt at a time (the enrollment row is locked), attempt limit, no retake after passing, no attempt while one waits.
+- **Completion.** Passing runs the same finishing logic as a manual completion (`lms_finish_lesson_for`), so required quizzes count towards the course. `lms_complete_lesson` refuses a quiz lesson that has not been passed.
+- **Grading.** `lms_grade_attempt` (server only) takes marks for the written questions, clamps them to each question's points, recalculates, and completes the lesson if it now passes.
+- **Certificates.** A trigger on `lms_enrollments` issues a course certificate when a status becomes `completed`, and a program certificate once every required course of an approved program is completed (which also marks the program enrollment `completed`). `lms_certificates` has a unique 12-character `code`, the student name and title as at issue, the average of best quiz results, and `revoked_at`. `lms_verify_certificate` is callable by anyone and returns only name, title, school, date, result and whether it was revoked. Existing completed enrollments were back-filled.
+- **Screens.** Curriculum builder: Questions editor. Grading tab (written answers, gradebook). Certificates tab (list, PDF, check, revoke). Settings: certificates on/off and signer. Public: `/verify/certificate/<code>` and `/api/certificate/<code>` (PDF via jsPDF). Students: quiz inside the lesson and a Certificates tab, in the app and on the web portal.
+
 ## 4. Tests
 
 - `src/lib/lms/lms.test.ts`: validation, the enrollment state machine, capacity, enrollment window, who can manage a course.
 - `src/lib/lms/migration.test.ts`: structural checks on the migration (RLS on every table, church id on every table,
   students never get write policies, transactional functions locked down, additive only).
 - Phase 2: `0191` structure tests (RLS, no student writes, functions closed to anonymous callers, no member-id arguments, progress restrict, private bucket); progress and file-type rules; app tests for progress, course navigation (next / previous / resume), catalogue seats and dates, media link detection and the reading-lesson renderer.
-- `src/lib/lms/db.test.ts` runs migrations 0190 to 0193 in a real Postgres (PGlite, in-process, with a small stand-in for Supabase's `auth.uid()`, roles and buckets) and exercises the student and teacher functions and the row level security as different people: joining, locked lessons, completion, watch-time credit, notes privacy, other-church isolation, seat limits, enrollment windows, reordering, live-class joining and attendance, and the feature switch. Update the stub (`src/lib/lms/test-support/supabase-stub.sql`) if a migration starts to rely on more of Supabase.
+- `src/lib/lms/db.test.ts` runs the migrations in a real Postgres (PGlite, in-process, with a small stand-in for Supabase's `auth.uid()`, roles and buckets) and exercises the student and teacher functions and the row level security as different people: joining, locked lessons, completion, watch-time credit, notes privacy, other-church isolation, seat limits, enrollment windows, reordering, live-class joining and attendance, and the feature switch. Update the stub (`src/lib/lms/test-support/supabase-stub.sql`) if a migration starts to rely on more of Supabase.
 - **Not covered by tests**: the server actions against Supabase itself (storage uploads, signed links), the screens, and the mobile app on a device. Running the migrations and the RLS policies against a real database, and clicking through the screens.
   There is no database in the development environment; this must be done on staging before rollout (checklist below).
 

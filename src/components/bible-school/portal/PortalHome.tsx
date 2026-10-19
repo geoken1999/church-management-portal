@@ -8,6 +8,7 @@ import {
   portalError,
   type PCourse,
   type PMyCourse,
+  type PCertificate,
   type PMyProgram,
   type PProgram,
   type PSession,
@@ -17,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-type Tab = "mine" | "programs" | "live";
+type Tab = "mine" | "programs" | "live" | "certificates";
 
 export function PortalHome() {
   const { identity } = usePortal();
@@ -28,16 +29,20 @@ export function PortalHome() {
   const [myPrograms, setMyPrograms] = useState<PMyProgram[] | null>(null);
   const [inProgram, setInProgram] = useState<Set<string>>(new Set());
   const [sessions, setSessions] = useState<PSession[] | null>(null);
+  const [certificates, setCertificates] = useState<PCertificate[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [m, a, s, p, mp] = await Promise.all([
+      const [m, a, s, p, mp, certs] = await Promise.all([
         portal.myCourses(identity.organizationId),
         portal.catalog(identity.organizationId),
         portal.sessions(identity.organizationId),
         portal.programs(identity.organizationId),
         portal.myPrograms(identity.organizationId),
+        portal
+          .certificates(identity.organizationId)
+          .catch(() => [] as PCertificate[]),
       ]);
       // A course that belongs to a program is joined through it, so it is not listed on its own.
       const lists = await Promise.all(
@@ -49,6 +54,7 @@ export function PortalHome() {
       setSessions(s);
       setPrograms(p);
       setMyPrograms(mp);
+      setCertificates(certs);
     } catch (e) {
       setError(portalError(e, "Couldn't load your courses."));
     }
@@ -74,6 +80,7 @@ export function PortalHome() {
             ["mine", "My courses"],
             ["programs", "Programs"],
             ["live", "Live classes"],
+            ["certificates", "Certificates"],
           ] as [Tab, string][]
         ).map(([key, label]) => (
           <button
@@ -94,6 +101,7 @@ export function PortalHome() {
           courses={all ? all.filter((c) => !inProgram.has(c.course_id)) : null}
         />
       )}
+      {tab === "certificates" && <Certificates certificates={certificates} />}
       {tab === "live" && (
         <LiveClasses
           sessions={sessions}
@@ -366,6 +374,60 @@ function LiveClasses({
         <h2 className="pt-2 font-heading text-lg font-bold">Earlier</h2>
       )}
       {past.map((s) => row(s, true))}
+    </div>
+  );
+}
+
+function Certificates({
+  certificates,
+}: {
+  certificates: PCertificate[] | null;
+}) {
+  if (!certificates)
+    return <p className="text-sm text-muted-foreground">Loading...</p>;
+  if (certificates.length === 0)
+    return (
+      <p className="text-sm text-muted-foreground">
+        You have no certificates yet. You get one when you finish a course or a
+        program.
+      </p>
+    );
+  return (
+    <div className="space-y-3">
+      {certificates.map((c) => (
+        <Card key={c.id}>
+          <CardContent className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-medium">{c.title}</p>
+              <p className="text-xs text-muted-foreground">
+                {c.kind === "program" ? "Program" : "Course"} ·{" "}
+                {new Date(c.issued_at).toLocaleDateString()}
+                {c.percent !== null ? ` · ${c.percent}%` : ""} · code {c.code}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <a
+                href={`/api/certificate/${c.code}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button type="button" size="sm">
+                  Download
+                </Button>
+              </a>
+              <a
+                href={`/verify/certificate/${c.code}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button type="button" size="sm" variant="outline">
+                  Check
+                </Button>
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }

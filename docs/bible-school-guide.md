@@ -136,6 +136,30 @@ You can also **Approve**, **Reject** or **Withdraw** people there.
 4. Afterwards set attendance (present, absent, excused) and add a recording link.
 5. Editing the time notifies students again; cancelling removes the room and notifies them.
 
+## 7b. Quizzes, grading and certificates
+
+### Quizzes
+1. In a module add a lesson of type **Quiz**, save it, then press **Questions** on it.
+2. Set the **pass mark** (percent), the **attempts allowed** (blank = no limit) and whether students see the right answers once an attempt is marked.
+3. Add questions. Kinds: *one correct answer*, *more than one correct answer* (the student must pick exactly the right set), *true or false*, and *written answer* (you mark it). Each has points and an optional explanation.
+4. Save, then **Publish** the lesson. A quiz cannot be published without questions.
+5. A quiz lesson is completed only by **passing** it. A required quiz therefore counts towards finishing the course. Students cannot tick it off by hand.
+6. Once a student has taken the quiz, its questions are locked (the settings can still change), so existing results stay valid.
+
+### Grading
+- Choice questions are marked by the system the moment the student submits.
+- A quiz with a **written answer** waits: it shows under **Grading → Waiting to be marked**. Give marks (0 up to the question's points) and optional feedback; the result, pass or fail, and completion follow when you save.
+- **Grading → Gradebook**: pick a course to see each student's best result on every quiz and their average and grade (A 90+, B 80+, C 70+, D 60+).
+- Instructors see and mark only the courses they teach.
+
+### Certificates
+- A certificate is given **automatically** when a student finishes a course, and another when they finish a whole program. The result on it is the average of their best quiz results (blank for a course with no quizzes).
+- **Settings → Certificates**: turn them on or off, and set who signs them.
+- **Certificates** tab: every certificate with a PDF link, a check link and **Revoke**.
+- Each has a 12-character code. Anyone can check it at `/verify/certificate/CODE`, which shows only the name, what it is for, the date and the result, and says so if it was withdrawn.
+- Students find their certificates under **Certificates** in the app and on the web portal, and can download the PDF.
+- Courses finished before this feature existed were given certificates when it was switched on.
+
 ## 8. Student guide
 
 ### Sign in
@@ -154,6 +178,12 @@ into it) or on the web at `/bible-school/learn`.
 3. Video: play/pause, 10-second skips, speed, full screen, and it resumes where you stopped.
 4. Audio and reading lessons work the same way. Documents open from a private link.
 5. Keep private notes and bookmarks. Previous and Next move between lessons.
+
+### Quizzes
+Open a quiz lesson and press **Start the quiz**. Choice questions are marked at once and you see which were right (if your teacher allows it). A written answer waits for your teacher. Pass the pass mark to complete the lesson; if you fall short you can try again until your attempts run out.
+
+### Certificates
+When you finish a course (or a whole program) you get a certificate: open the **Certificates** tab in the app or the web portal to download it.
 
 ### Finish
 - Video and audio lessons complete by themselves at about 90% watched (skipping ahead does not count).
@@ -195,5 +225,4 @@ The **Live classes** tab: *Join the class* when it opens, *Watch the recording* 
 
 ## 11. Not available yet
 
-Automatic refunds, assignments and grading, quizzes and exams, gradebook, certificates, reports, and plan
-limits for the Bible School.
+Automatic refunds, assignments (file hand-ins), exams with time limits or question banks, reports, and plan limits for the Bible School.

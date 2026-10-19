@@ -3480,9 +3480,9 @@ export type Database = {
         Relationships: [];
       };
       special_day_digests: {
-        Row: { organization_id: string; day: string; created_at: string };
-        Insert: { organization_id: string; day: string; created_at?: string };
-        Update: Partial<{ organization_id: string; day: string; created_at: string }>;
+        Row: { organization_id: string; day: string; kind: string; created_at: string };
+        Insert: { organization_id: string; day: string; kind?: string; created_at?: string };
+        Update: Partial<{ organization_id: string; day: string; kind: string; created_at: string }>;
         Relationships: [];
       };
       special_day_pushes: {

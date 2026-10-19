@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPushToUsers } from "@/lib/push/client";
 import {
   buildSpecialDayDigest,
+  buildTomorrowDigest,
   findSpecialDays,
   specialDayMessage,
 } from "@/lib/push/special-days";
@@ -48,7 +49,11 @@ async function run(request: Request) {
     // nobody is. Claimed first so a re-run never sends it twice.
     const { error: claimError } = await admin
       .from("special_day_digests")
-      .insert({ organization_id: organization.id, day: todayKey });
+      .insert({
+        organization_id: organization.id,
+        day: todayKey,
+        kind: "today",
+      });
     if (!claimError) {
       const { data: everyone } = await admin
         .from("members")
@@ -68,6 +73,37 @@ async function run(request: Request) {
     } else if (claimError.code !== "23505") {
       problems.push(
         `${organization.name}: could not record the special days summary (${claimError.message})`,
+      );
+    }
+
+    // The day-before heads-up: only when somebody is celebrating tomorrow.
+    const { error: tomorrowClaim } = await admin
+      .from("special_day_digests")
+      .insert({
+        organization_id: organization.id,
+        day: todayKey,
+        kind: "tomorrow",
+      });
+    if (!tomorrowClaim) {
+      const { data: everyone } = await admin
+        .from("members")
+        .select("first_name, last_name, date_of_birth, wedding_date")
+        .eq("organization_id", organization.id)
+        .eq("status", "active");
+      const heads = buildTomorrowDigest(everyone ?? [], todayKey);
+      if (heads.hasCelebrations) {
+        await createNotificationForWebhook({
+          organizationId: organization.id,
+          type: "special_days",
+          title: heads.title,
+          body: heads.body,
+          link: "/dashboard/members",
+        });
+        digests += 1;
+      }
+    } else if (tomorrowClaim.code !== "23505") {
+      problems.push(
+        `${organization.name}: could not record the tomorrow summary (${tomorrowClaim.message})`,
       );
     }
 

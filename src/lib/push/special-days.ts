@@ -117,3 +117,33 @@ export function buildSpecialDayDigest(
     hasCelebrations: true,
   };
 }
+
+// The day after a "YYYY-MM-DD" key, in the same form.
+export function nextDayKey(dayKey: string): string {
+  const [year, month, day] = dayKey.split("-").map(Number);
+  const next = new Date(Date.UTC(year, month - 1, day + 1));
+  return next.toISOString().slice(0, 10);
+}
+
+// The heads-up for owners and admins the day before: who has a birthday or wedding anniversary
+// tomorrow. Unlike the daily summary it is only sent when somebody is celebrating, so a quiet day
+// makes no noise.
+export function buildTomorrowDigest(
+  members: DigestMember[],
+  todayKey: string,
+): SpecialDayDigest {
+  const tomorrow = nextDayKey(todayKey);
+  const digest = buildSpecialDayDigest(members, tomorrow);
+  if (!digest.hasCelebrations) {
+    return {
+      title: "No special days tomorrow",
+      body: "None of your members has a birthday or wedding anniversary tomorrow.",
+      hasCelebrations: false,
+    };
+  }
+  return {
+    title: digest.title.replace("today", "tomorrow"),
+    body: digest.body,
+    hasCelebrations: true,
+  };
+}

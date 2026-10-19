@@ -26,7 +26,7 @@ const JOB_DEFINITIONS: Record<string, { label: string; description: string; load
   },
   "special-days": {
     label: "Special-day pushes",
-    description: "Sends app users a birthday or wedding-anniversary notification on their day.",
+    description: "Sends app users a birthday or wedding-anniversary notification on their day, and owners and admins a summary for today plus a heads-up for tomorrow.",
     load: () => import("@/app/api/cron/special-days/route"),
   },
   "todo-reminders": {

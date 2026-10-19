@@ -70,7 +70,7 @@ export default function PrivacyPolicyPage() {
           <strong>Voice prayer requests.</strong> A member can record a short voice message (up to 90 seconds) with a
           prayer request. It is stored privately and played only through short-lived links: to the member who made
           it, to the Organization&apos;s team, and, if the member chose to share the request on the prayer wall, to
-          other members of the same church. The recording is deleted when the member removes the request.
+          other members of the same church. The recording is deleted when the member removes the request, when the member&apos;s record is deleted, and when the Organization&apos;s account and data are deleted.
         </p>
         <p>
           <strong>AI features.</strong> When an Organization uses AI features (such as Ask Aura, AI-written report

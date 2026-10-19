@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { checkMemberQuota } from "@/lib/plans/dal";
+import { removePrayerAudioForMembers } from "@/lib/prayer/cleanup";
 import { notifyMember } from "@/lib/push/member-notice";
 import {
   validateFieldDefinition,
@@ -455,6 +456,7 @@ export async function deleteMember(formData: FormData) {
   if (!access.ok) return;
 
   const admin = createAdminClient();
+  await removePrayerAudioForMembers([memberId]);
   await admin.from("members").delete().eq("id", memberId);
 
   revalidatePath("/dashboard/members");
@@ -517,6 +519,7 @@ export async function bulkDeleteMembers(formData: FormData) {
   if (!access.ok) return;
 
   const admin = createAdminClient();
+  await removePrayerAudioForMembers(memberIds);
   await admin.from("members").delete().in("id", memberIds);
 
   revalidatePath("/dashboard/members");

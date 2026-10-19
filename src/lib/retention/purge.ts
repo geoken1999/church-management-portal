@@ -17,6 +17,8 @@ const BUCKETS = [
   "whatsapp-template-headers",
   "report-images",
   "event-flyers",
+  // Voice prayer messages: kept under <church id>/<member id>/.
+  "prayer-audio",
 ];
 
 /** How much a church is still owed by KingdomFlow (fundraisers, paid events, membership fees). */

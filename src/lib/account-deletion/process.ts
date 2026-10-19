@@ -1,5 +1,6 @@
 import "server-only";
 
+import { removePrayerAudioForMembers } from "@/lib/prayer/cleanup";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import {
@@ -88,6 +89,7 @@ export async function processDeletionRequest(input: {
 
   if (request.requester_kind === "member") {
     if (input.decision === "delete_account_and_record" && request.member_id) {
+      await removePrayerAudioForMembers([request.member_id]);
       const { error } = await admin
         .from("members")
         .delete()

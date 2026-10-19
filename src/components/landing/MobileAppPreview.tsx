@@ -21,6 +21,12 @@ import {
   ScanLine,
   CheckCircle2,
   Send,
+  Video,
+  GraduationCap,
+  Play,
+  Maximize,
+  Rewind,
+  FastForward,
 } from "lucide-react";
 
 // Illustrative, hand-built mockups of the member app's screens: not real screenshots and not any
@@ -279,6 +285,54 @@ function PrayerScreen() {
   );
 }
 
+function BibleSchoolScreen() {
+  return (
+    <>
+      <StatusBar />
+      <div className="flex items-center gap-2 px-4 py-2">
+        <GraduationCap className="size-4 text-primary" />
+        <p className="text-xs font-bold">Bible School</p>
+      </div>
+      <div className="mx-3 overflow-hidden rounded-xl border border-border bg-card">
+        <div className="relative flex h-28 items-center justify-center bg-foreground/90 text-background">
+          <Play className="size-8" />
+          <Maximize className="absolute bottom-1.5 right-1.5 size-3.5 opacity-80" />
+        </div>
+        <div className="h-1 bg-muted">
+          <div className="h-1 w-3/5 bg-primary" />
+        </div>
+        <div className="flex items-center justify-center gap-4 py-1.5 text-muted-foreground">
+          <Rewind className="size-3.5" />
+          <Play className="size-4 text-foreground" />
+          <FastForward className="size-3.5" />
+          <span className="text-[9px]">1.25x</span>
+        </div>
+        <div className="px-3 pb-2.5">
+          <p className="text-[10px] font-semibold">Lesson 3: Faith in action</p>
+          <p className="text-[9px] text-muted-foreground">
+            Watched 62% · finishes at 90%
+          </p>
+        </div>
+      </div>
+      <div className="mx-3 mt-2 flex items-center gap-2 rounded-xl border border-border bg-card p-2.5">
+        <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Video className="size-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold">Live class today</p>
+          <p className="truncate text-[9px] text-muted-foreground">
+            Discipleship · 7:00 PM
+          </p>
+        </div>
+        <span className="rounded-md bg-primary px-2 py-1 text-[9px] font-medium text-primary-foreground">
+          Join
+        </span>
+      </div>
+      <TabBar active={2} />
+    </>
+  );
+}
+
 function ScanScreen() {
   return (
     <>
@@ -457,6 +511,9 @@ export function MobileAppPreview() {
         </Phone>
         <Phone caption="Prayer requests and the prayer wall">
           <PrayerScreen />
+        </Phone>
+        <Phone caption="Bible School: video lessons and live classes">
+          <BibleSchoolScreen />
         </Phone>
         <Phone caption="For your team: scan to check in and verify">
           <ScanScreen />

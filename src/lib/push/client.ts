@@ -122,9 +122,13 @@ async function saveToInboxes(recipients: string[], category: PushCategory, paylo
     const admin = createAdminClient();
     const link = typeof payload.data?.link === "string" && payload.data.link ? payload.data.link : null;
     const buttonLabel = typeof payload.data?.buttonLabel === "string" && payload.data.buttonLabel ? payload.data.buttonLabel : null;
-    await admin.from("member_notifications").insert(
-      recipients.map((authUserId) => ({ auth_user_id: authUserId, category, title: payload.title, body: payload.body, link, button_label: buttonLabel })),
-    );
+    // What the notification is about (type and ids), so tapping it in the notification center opens the
+    // right screen. Only simple values are kept.
+    const data = Object.fromEntries(Object.entries(payload.data ?? {}).filter(([, v]) => typeof v === "string" || typeof v === "number" || typeof v === "boolean"));
+    const rows = recipients.map((authUserId) => ({ auth_user_id: authUserId, category, title: payload.title, body: payload.body, link, button_label: buttonLabel }));
+    const { error } = await admin.from("member_notifications").insert(rows.map((row) => ({ ...row, data })));
+    // Before the target migration is applied the column does not exist: save the notification without it.
+    if (error) await admin.from("member_notifications").insert(rows);
   } catch (error) {
     console.error("saveToInboxes failed", error);
   }

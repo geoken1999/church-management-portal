@@ -1532,6 +1532,7 @@ export type MemberNotification = {
   body: string | null;
   link: string | null;
   button_label: string | null;
+  data: Record<string, string | number | boolean> | null;
   read_at: string | null;
   created_at: string;
 };

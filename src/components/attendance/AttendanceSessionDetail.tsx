@@ -1,5 +1,6 @@
 "use client";
 
+import { matchesPerson } from "@/lib/people/search";
 import { useMemo, useState, useTransition } from "react";
 import { Search, MapPin, CalendarDays, Users, UserPlus, Ticket, IndianRupee } from "lucide-react";
 import { toggleAttendanceRecord, updateSessionHeadcount, toggleEventRegistrationCheckIn, setSessionRecorded } from "@/lib/attendance/actions";
@@ -19,6 +20,7 @@ interface RosterMember {
   id: string;
   first_name: string;
   last_name: string;
+  phone?: string | null;
 }
 
 interface SessionInfo {
@@ -241,7 +243,7 @@ function AddMemberSearch({
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
-    return directory.filter((member) => !presentSet.has(member.id) && `${member.first_name} ${member.last_name}`.toLowerCase().includes(q)).slice(0, 8);
+    return directory.filter((member) => !presentSet.has(member.id) && matchesPerson(query, { firstName: member.first_name, lastName: member.last_name, phone: member.phone })).slice(0, 8);
   }, [directory, presentSet, query]);
 
   function handleAdd(memberId: string) {
@@ -353,7 +355,7 @@ export function AttendanceSessionDetail({
   const filteredRoster = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return displayRoster;
-    return displayRoster.filter((member) => `${member.first_name} ${member.last_name}`.toLowerCase().includes(query));
+    return displayRoster.filter((member) => matchesPerson(search, { firstName: member.first_name, lastName: member.last_name, phone: member.phone }));
   }, [displayRoster, search]);
 
   return (

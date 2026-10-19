@@ -30,3 +30,15 @@ create or replace function public.is_linked_member(target_org_id uuid) returns b
 grant usage on schema public, auth to anon, authenticated, service_role;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
+
+-- The church team's bell (only what the Bible School migrations write to it).
+create table public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null,
+  type text not null default 'member_request',
+  title text not null,
+  body text,
+  link text,
+  read_at timestamptz,
+  created_at timestamptz not null default now()
+);

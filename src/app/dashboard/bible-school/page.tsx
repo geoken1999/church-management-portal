@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { requireUser } from "@/lib/auth/dal";
-import { getOverview, getTaughtCourseIds } from "@/lib/lms/dal";
+import {
+  getOverview,
+  getPendingProgramRequests,
+  getTaughtCourseIds,
+} from "@/lib/lms/dal";
 import { LMS_BASE_PATH } from "@/lib/lms/constants";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -45,6 +49,9 @@ export default async function BibleSchoolOverviewPage() {
     ? undefined
     : await getTaughtCourseIds(organizationId, user.id);
   const overview = await getOverview(organizationId, taught);
+  const programRequests = canManageSchool
+    ? (await getPendingProgramRequests(organizationId)).length
+    : 0;
   const totalCourses =
     overview.courses.draft +
     overview.courses.published +
@@ -59,6 +66,18 @@ export default async function BibleSchoolOverviewPage() {
             administrator to add you as an instructor.
           </CardContent>
         </Card>
+      )}
+
+      {programRequests > 0 && (
+        <Link href={`${LMS_BASE_PATH}/enrollments`}>
+          <Card className="border-primary/50 transition-colors hover:border-primary">
+            <CardContent className="text-sm">
+              <strong>{programRequests}</strong> program request
+              {programRequests === 1 ? "" : "s"} from members waiting for you.
+              Open Enrollments to approve.
+            </CardContent>
+          </Card>
+        </Link>
       )}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

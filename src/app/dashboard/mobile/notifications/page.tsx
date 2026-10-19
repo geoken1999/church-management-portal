@@ -15,7 +15,7 @@ export default async function AppNotificationsPage() {
   const [{ data: members }, { data: history }, { data: branches }] = await Promise.all([
     supabase
       .from("members")
-      .select("id, first_name, last_name")
+      .select("id, first_name, last_name, phone")
       .eq("organization_id", organizationId)
       .eq("status", "active")
       .not("auth_user_id", "is", null)
@@ -25,7 +25,7 @@ export default async function AppNotificationsPage() {
     supabase.from("branches").select("id, name").eq("organization_id", organizationId).order("name"),
   ]);
 
-  const recipients: RecipientOption[] = (members ?? []).map((m) => ({ id: m.id, name: `${m.first_name} ${m.last_name ?? ""}`.trim() }));
+  const recipients: RecipientOption[] = (members ?? []).map((m) => ({ id: m.id, name: `${m.first_name} ${m.last_name ?? ""}`.trim(), phone: m.phone }));
 
   return (
     <div className="space-y-6">

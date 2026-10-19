@@ -15,6 +15,7 @@ const MIGRATIONS = [
   "0196_bible_school_access.sql",
   "0197_lms_paid_courses.sql",
   "0198_lms_program_enrollment.sql",
+  "0200_change_tickets_and_program_request_notice.sql",
 ];
 const BOOTSTRAP = readFileSync(
   "src/lib/lms/test-support/supabase-stub.sql",
@@ -1176,6 +1177,15 @@ describe("Bible School database", () => {
       await as(u1, "select lms_request_program($1) as s", [prog])
     )[0].s;
     check("joining asks for approval by default", status === "pending");
+    check(
+      "the church team is told about the request",
+      (
+        await q(
+          "select count(*)::int as n from notifications where organization_id=$1 and type='bible_school_request'",
+          [orgA],
+        )
+      )[0].n === 1,
+    );
     const pe = (
       await q(
         "select id from lms_program_enrollments where program_id=$1 and member_id=$2",

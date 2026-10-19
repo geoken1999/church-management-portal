@@ -1056,19 +1056,71 @@ export async function enrollStudentAction(
   if (!access.ok) return fail(access.message);
   if (status !== "pending" && status !== "approved")
     return fail("Choose pending or approved.");
-  // An administrator enrolling someone directly may do so outside the open window.
-  const { data, error } = await createAdminClient().rpc(
-    "lms_create_enrollment",
-    {
+  // Joining happens at program level: a course that belongs to a published program is entered through
+  // the program, so the person gets every course of it (and an open request of theirs is approved
+  // rather than left waiting).
+  const admin = createAdminClient();
+  const { data: link } = await admin
+    .from("lms_program_courses")
+    .select("program_id, lms_programs!inner(status)")
+    .eq("course_id", courseId)
+    .eq("organization_id", organizationId);
+  const programId = (link ?? []).find(
+    (l) =>
+      (l.lms_programs as unknown as { status: string } | null)?.status ===
+      "published",
+  )?.program_id;
+  if (programId) {
+    const { data: open } = await admin
+      .from("lms_program_enrollments")
+      .select("id, status")
+      .eq("program_id", programId)
+      .eq("member_id", memberId)
+      .in("status", ["pending", "approved", "active"])
+      .maybeSingle();
+    if (open?.status === "pending" && status === "approved") {
+      const decided = await admin.rpc("lms_decide_program_enrollment", {
+        p_organization_id: organizationId,
+        p_enrollment_id: open.id,
+        p_action: "approve",
+        p_actor: access.userId,
+      });
+      if (decided.error)
+        return fail(programEnrollmentMessage(decided.error.message));
+      refresh("/enrollments", `/courses/${courseId}`, `/programs/${programId}`);
+      return { success: true, id: open.id };
+    }
+    if (open) {
+      // Already in the program: make sure it holds every course, including this one.
+      await admin.rpc("lms_program_sync_courses", {
+        p_program_enrollment: open.id,
+      });
+      refresh("/enrollments", `/courses/${courseId}`, `/programs/${programId}`);
+      return { success: true, id: open.id };
+    }
+    const created = await admin.rpc("lms_enroll_program", {
       p_organization_id: organizationId,
-      p_course_id: courseId,
+      p_program_id: programId,
       p_member_id: memberId,
       p_status: status,
       p_source: "admin",
       p_actor: access.userId,
-      p_ignore_window: true,
-    },
-  );
+    });
+    if (created.error)
+      return fail(programEnrollmentMessage(created.error.message));
+    refresh("/enrollments", `/courses/${courseId}`, `/programs/${programId}`);
+    return { success: true, id: created.data as string };
+  }
+  // A course outside any program: enrolled on its own. An administrator may do so outside the open window.
+  const { data, error } = await admin.rpc("lms_create_enrollment", {
+    p_organization_id: organizationId,
+    p_course_id: courseId,
+    p_member_id: memberId,
+    p_status: status,
+    p_source: "admin",
+    p_actor: access.userId,
+    p_ignore_window: true,
+  });
   if (error) return fail(enrollmentMessage(error.message));
   await logLmsEvent({
     organizationId,

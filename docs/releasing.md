@@ -4,6 +4,13 @@ How a release is cut for the web app, the mobile app and the database. Versions 
 pushes; they change once, on purpose, when a production build is made. That keeps the numbers shown in Super
 Admin → Versions meaning "what is actually released".
 
+## Tickets
+
+Every bug fix, feature and change request has a ticket in **Super Admin → Tickets** (KF-1, KF-2, ...). Raise one
+there for anything you want changed ("Raise a new ticket or change request"). When work is done, move it to Done
+and fill in the release and references. Developers log finished work with `scripts/create-ticket.mjs`. Put the
+ticket keys in the release notes.
+
 ## 1. Decide the version
 
 | Change | Bump |

@@ -5,9 +5,11 @@ import {
   getCourseOptions,
   getEnrollments,
   getMemberOptions,
+  getPendingProgramRequests,
   getTaughtCourseIds,
 } from "@/lib/lms/dal";
 import { LMS_BASE_PATH } from "@/lib/lms/constants";
+import { ProgramRequestsPanel } from "@/components/bible-school/ProgramRequestsPanel";
 import { EnrollmentsPanel } from "@/components/bible-school/EnrollmentsPanel";
 import { EnrollmentFilters } from "@/components/bible-school/EnrollmentFilters";
 import { Pager } from "@/components/bible-school/Pager";
@@ -32,7 +34,7 @@ export default async function EnrollmentsPage({
   const onlyCourseIds = canManageSchool
     ? undefined
     : await getTaughtCourseIds(organizationId, user.id);
-  const [result, courses, members] = await Promise.all([
+  const [result, courses, members, programRequests] = await Promise.all([
     getEnrollments(organizationId, {
       courseId: course || undefined,
       status,
@@ -41,6 +43,9 @@ export default async function EnrollmentsPage({
     }),
     getCourseOptions(organizationId),
     canManageSchool ? getMemberOptions(organizationId) : Promise.resolve([]),
+    canManageSchool
+      ? getPendingProgramRequests(organizationId)
+      : Promise.resolve([]),
   ]);
   const visibleCourses = onlyCourseIds
     ? courses.filter((c) => onlyCourseIds.includes(c.id))
@@ -48,6 +53,10 @@ export default async function EnrollmentsPage({
 
   return (
     <div className="space-y-4">
+      <ProgramRequestsPanel
+        organizationId={organizationId}
+        requests={programRequests}
+      />
       <EnrollmentFilters
         courseId={course}
         status={status}

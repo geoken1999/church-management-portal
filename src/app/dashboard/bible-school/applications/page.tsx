@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
-import { getApplications, getCourseOptions, getPrograms, getStudents } from "@/lib/lms/dal";
+import {
+  getApplications,
+  getCourseOptions,
+  getPrograms,
+  getStudents,
+} from "@/lib/lms/dal";
 import { publicSchoolPath } from "@/lib/lms/students";
 import { getSiteUrl } from "@/lib/site-url";
 import { ApplicationsPanel } from "@/components/bible-school/ApplicationsPanel";

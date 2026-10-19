@@ -398,30 +398,39 @@ export async function getPrerequisites(
 
 export interface ProgramRow extends LmsProgram {
   courseIds: string[];
+  /** Requests from members waiting for an administrator. */
+  pendingCount: number;
 }
 
 export async function getPrograms(
   organizationId: string,
 ): Promise<ProgramRow[]> {
   const admin = createAdminClient();
-  const [{ data: programs }, { data: links }] = await Promise.all([
-    admin
-      .from("lms_programs")
-      .select("*")
-      .eq("organization_id", organizationId)
-      .order("created_at", { ascending: false })
-      .limit(200),
-    admin
-      .from("lms_program_courses")
-      .select("program_id, course_id, position")
-      .eq("organization_id", organizationId)
-      .order("position"),
-  ]);
+  const [{ data: programs }, { data: links }, { data: waiting }] =
+    await Promise.all([
+      admin
+        .from("lms_programs")
+        .select("*")
+        .eq("organization_id", organizationId)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      admin
+        .from("lms_program_courses")
+        .select("program_id, course_id, position")
+        .eq("organization_id", organizationId)
+        .order("position"),
+      admin
+        .from("lms_program_enrollments")
+        .select("program_id")
+        .eq("organization_id", organizationId)
+        .eq("status", "pending"),
+    ]);
   return ((programs ?? []) as LmsProgram[]).map((p) => ({
     ...p,
     courseIds: (links ?? [])
       .filter((l) => l.program_id === p.id)
       .map((l) => l.course_id),
+    pendingCount: (waiting ?? []).filter((w) => w.program_id === p.id).length,
   }));
 }
 
@@ -838,6 +847,58 @@ export async function getProgramEnrollments(
       coursesDone: (done ?? []).filter((d) => d.member_id === e.member_id)
         .length,
       coursesTotal: requiredIds.length,
+    };
+  });
+}
+
+export interface ProgramRequestRow {
+  id: string;
+  programId: string;
+  programTitle: string;
+  studentName: string;
+  studentPhone: string | null;
+  requestedAt: string;
+}
+
+// Members who asked to join a program and are waiting for an administrator, oldest first, across every
+// program. This is what the Enrollments page and the overview show so that a request made in the app is
+// never hidden inside one program's page.
+export async function getPendingProgramRequests(
+  organizationId: string,
+): Promise<ProgramRequestRow[]> {
+  const admin = createAdminClient();
+  const { data: rows } = await admin
+    .from("lms_program_enrollments")
+    .select("id, program_id, member_id, requested_at")
+    .eq("organization_id", organizationId)
+    .eq("status", "pending")
+    .order("requested_at")
+    .limit(200);
+  const waiting = rows ?? [];
+  if (waiting.length === 0) return [];
+  const [{ data: programs }, { data: members }] = await Promise.all([
+    admin
+      .from("lms_programs")
+      .select("id, title")
+      .in("id", [...new Set(waiting.map((r) => r.program_id))]),
+    admin
+      .from("members")
+      .select("id, first_name, last_name, phone")
+      .in("id", [...new Set(waiting.map((r) => r.member_id))]),
+  ]);
+  return waiting.map((r) => {
+    const member = (members ?? []).find((m) => m.id === r.member_id);
+    return {
+      id: r.id,
+      programId: r.program_id,
+      programTitle:
+        (programs ?? []).find((p) => p.id === r.program_id)?.title ??
+        "A program",
+      studentName: member
+        ? `${member.first_name} ${member.last_name}`.trim()
+        : "A member",
+      studentPhone: member?.phone ?? null,
+      requestedAt: r.requested_at,
     };
   });
 }

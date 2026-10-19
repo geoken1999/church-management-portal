@@ -1,5 +1,6 @@
 "use client";
 
+import { matchesPerson } from "@/lib/people/search";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -42,11 +43,7 @@ export function InstructorsPanel({
   const [role, setRole] = useState("lead");
 
   const matches = search.trim()
-    ? members
-        .filter((m) =>
-          m.name.toLowerCase().includes(search.trim().toLowerCase()),
-        )
-        .slice(0, 8)
+    ? members.filter((m) => matchesPerson(search, m)).slice(0, 8)
     : [];
 
   function run(action: () => Promise<LmsResult>, after?: () => void) {

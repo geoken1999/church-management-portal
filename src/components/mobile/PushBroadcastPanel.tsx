@@ -1,5 +1,6 @@
 "use client";
 
+import { matchesPerson } from "@/lib/people/search";
 import { useState, useTransition } from "react";
 import { sendBroadcastAction } from "@/lib/push/broadcast-actions";
 import { BUTTON_PRESETS } from "@/lib/push/button-presets";
@@ -15,6 +16,7 @@ import { ErrorToast } from "@/components/ui/error-toast";
 export interface RecipientOption {
   id: string;
   name: string;
+  phone?: string | null;
 }
 
 export interface BroadcastHistoryRow {
@@ -48,7 +50,7 @@ export function PushBroadcastPanel({ recipients, history, branches }: { recipien
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const matches = search.trim() ? recipients.filter((r) => r.name.toLowerCase().includes(search.trim().toLowerCase())).slice(0, 8) : [];
+  const matches = search.trim() ? recipients.filter((r) => matchesPerson(search, r)).slice(0, 8) : [];
 
   function handleSend(e: React.FormEvent) {
     e.preventDefault();

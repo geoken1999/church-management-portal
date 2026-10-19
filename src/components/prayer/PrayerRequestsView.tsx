@@ -1,5 +1,6 @@
 "use client";
 
+import { matchesPerson } from "@/lib/people/search";
 import { useMemo, useState } from "react";
 import { Search, Phone, EyeOff, Users, Lock, Mic } from "lucide-react";
 import { getPrayerAudioLinkAction } from "@/lib/prayer/actions";
@@ -141,7 +142,7 @@ export function PrayerRequestsView({
     return rows.filter(
       (row) =>
         row.request.toLowerCase().includes(q) ||
-        row.memberName.toLowerCase().includes(q),
+        matchesPerson(query, { name: row.memberName, phone: row.memberPhone }),
     );
   }, [rows, query]);
 

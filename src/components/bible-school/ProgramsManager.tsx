@@ -253,6 +253,11 @@ export function ProgramsManager({
                 >
                   {program.status}
                 </Badge>
+                {program.pendingCount > 0 && (
+                  <Badge variant="destructive">
+                    {program.pendingCount} waiting
+                  </Badge>
+                )}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 <Button

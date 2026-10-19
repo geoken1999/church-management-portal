@@ -1152,6 +1152,26 @@ export type LmsProgram = {
   updated_at: string;
 };
 
+export type ChangeTicket = {
+  id: string;
+  number: number;
+  type: "bug" | "feature" | "improvement" | "change_request" | "security" | "task";
+  title: string;
+  description: string | null;
+  status: "open" | "in_progress" | "in_review" | "done" | "closed" | "wont_do";
+  priority: "low" | "medium" | "high" | "urgent";
+  area: string;
+  reported_by: string | null;
+  assignee: string | null;
+  release: string | null;
+  references_text: string | null;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+};
+
+export type ChangeTicketComment = { id: string; ticket_id: string; author: string; body: string; created_at: string };
+
 export type LmsProgramEnrollment = {
   id: string;
   organization_id: string;
@@ -2106,7 +2126,8 @@ export type NotificationType =
   | "whatsapp_ai_followup"
   | "prayer_request"
   | "account_deletion_request"
-  | "special_days";
+  | "special_days"
+  | "bible_school_request";
 
 export type Notification = {
   id: string;
@@ -3793,6 +3814,18 @@ export type Database = {
         Row: LmsLessonProgress;
         Insert: Partial<LmsLessonProgress> & Pick<LmsLessonProgress, "organization_id" | "enrollment_id" | "lesson_id" | "member_id">;
         Update: Partial<LmsLessonProgress>;
+        Relationships: [];
+      };
+      change_tickets: {
+        Row: ChangeTicket;
+        Insert: Partial<ChangeTicket> & Pick<ChangeTicket, "title">;
+        Update: Partial<ChangeTicket>;
+        Relationships: [];
+      };
+      change_ticket_comments: {
+        Row: ChangeTicketComment;
+        Insert: Partial<ChangeTicketComment> & Pick<ChangeTicketComment, "ticket_id" | "author" | "body">;
+        Update: Partial<ChangeTicketComment>;
         Relationships: [];
       };
       lms_program_enrollments: {

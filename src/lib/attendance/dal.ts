@@ -40,7 +40,7 @@ export const getAttendanceRoster = cache(async (organizationId: string, branchId
   const supabase = await createClient();
   let query = supabase
     .from("members")
-    .select("id, first_name, last_name, branches!members_branch_id_fkey(id, name)")
+    .select("id, first_name, last_name, phone, branches!members_branch_id_fkey(id, name)")
     .eq("organization_id", organizationId)
     .eq("status", "active")
     .order("first_name", { ascending: true });

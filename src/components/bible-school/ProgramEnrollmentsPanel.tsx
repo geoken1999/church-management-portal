@@ -1,5 +1,6 @@
 "use client";
 
+import { matchesPerson } from "@/lib/people/search";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -43,11 +44,7 @@ export function ProgramEnrollmentsPanel({
   const [status, setStatus] = useState<"approved" | "pending">("approved");
 
   const matches = search.trim()
-    ? members
-        .filter((m) =>
-          m.name.toLowerCase().includes(search.trim().toLowerCase()),
-        )
-        .slice(0, 8)
+    ? members.filter((m) => matchesPerson(search, m)).slice(0, 8)
     : [];
 
   function run(action: () => Promise<LmsResult>, done?: string) {
@@ -86,7 +83,7 @@ export function ProgramEnrollmentsPanel({
               <Label htmlFor="pe-search">Member</Label>
               <Input
                 id="pe-search"
-                placeholder="Search by name"
+                placeholder="Search by name or mobile number"
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
@@ -136,6 +133,7 @@ export function ProgramEnrollmentsPanel({
                   }}
                 >
                   {m.name}
+                  {m.phone ? ` · ${m.phone}` : ""}
                 </Button>
               ))}
             </div>

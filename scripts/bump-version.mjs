@@ -1,4 +1,4 @@
-// Raises the web app's version number. Run before every production push:
+// Raises the web app version number. Run once when cutting a release (see docs/releasing.md), not on every push:
 //   npm run version:bump            -> patch (1.0.0 -> 1.0.1)
 //   npm run version:bump -- minor   -> minor (1.0.1 -> 1.1.0)
 //   npm run version:bump -- major   -> major (1.1.0 -> 2.0.0)

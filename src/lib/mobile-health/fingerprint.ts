@@ -3,7 +3,10 @@
 export function errorFingerprint(message: string, screen: string): string {
   const firstLine = message.split("\n")[0] ?? "";
   const cleaned = firstLine
-    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "<id>")
+    .replace(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+      "<id>",
+    )
     .replace(/0x[0-9a-f]+/gi, "<hex>")
     .replace(/\d+/g, "<n>")
     .trim()
@@ -26,7 +29,8 @@ export interface TelemetryInput {
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const cut = (value: unknown, max: number) => (typeof value === "string" ? value.slice(0, max) : "");
+const cut = (value: unknown, max: number) =>
+  typeof value === "string" ? value.slice(0, max) : "";
 
 // Turns whatever the app sent into a clean, size-capped report, or null when it
 // isn't a usable one. Nothing here trusts the app: lengths are capped and kinds
@@ -36,11 +40,24 @@ export function parseTelemetry(raw: unknown): TelemetryInput | null {
   const body = raw as Record<string, unknown>;
   const deviceId = typeof body.deviceId === "string" ? body.deviceId : "";
   if (!UUID.test(deviceId)) return null;
-  const platform = body.platform === "ios" ? "ios" : body.platform === "android" ? "android" : null;
+  const platform =
+    body.platform === "ios"
+      ? "ios"
+      : body.platform === "android"
+        ? "android"
+        : null;
   if (!platform) return null;
-  const kind = body.kind === "error" || body.kind === "crash_suspected" || body.kind === "session" ? body.kind : null;
+  const kind =
+    body.kind === "error" ||
+    body.kind === "crash_suspected" ||
+    body.kind === "session"
+      ? body.kind
+      : null;
   if (!kind) return null;
-  const role = body.role === "team" || body.role === "member" || body.role === "guest" ? body.role : null;
+  const role =
+    body.role === "team" || body.role === "member" || body.role === "guest"
+      ? body.role
+      : null;
   return {
     deviceId,
     platform,
@@ -52,6 +69,6 @@ export function parseTelemetry(raw: unknown): TelemetryInput | null {
     kind,
     screen: cut(body.screen, 60),
     message: cut(body.message, 600),
-    stack: cut(body.stack, 4000),
+    stack: cut(body.stack, 12000),
   };
 }

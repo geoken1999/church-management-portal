@@ -3,16 +3,21 @@
 import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { createMembershipInvoiceOrder } from "@/lib/membership-fees/actions";
-import { redirectToPayU } from "@/lib/payu/browser";
+import { openRazorpayCheckout } from "@/lib/razorpay/browser";
 import { Button } from "@/components/ui/button";
 import { ErrorToast } from "@/components/ui/error-toast";
 
-// Paying means the whole page navigates away to PayU's hosted checkout, then
-// PayU redirects back to /api/payu/membership/return?token=..., which lands
-// back on this same public page — see page.tsx for how a failed attempt is
+// Paying opens Razorpay's payment window; once it succeeds Razorpay sends the browser to
+// /api/razorpay/membership/return?token=..., which lands back on this same public page — see page.tsx for how a failed attempt is
 // shown (the ?payment=failed query param); a successful one just finds the
 // invoice already marked paid on reload, no query param needed for that case.
-export function MembershipPayButton({ token, amount }: { token: string; amount: number }) {
+export function MembershipPayButton({
+  token,
+  amount,
+}: {
+  token: string;
+  amount: number;
+}) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [alreadyPaid, setAlreadyPaid] = useState(false);
@@ -27,20 +32,29 @@ export function MembershipPayButton({ token, amount }: { token: string; amount: 
       setSubmitting(false);
       return;
     }
-    if (result.error || !result.payuFields || !result.payuActionUrl) {
+    if (result.error || !result.checkout) {
       setError(result.error ?? "Couldn't start the payment.");
       setSubmitting(false);
       return;
     }
 
-    redirectToPayU(result.payuActionUrl, result.payuFields);
+    try {
+      await openRazorpayCheckout(result.checkout, () => setSubmitting(false));
+    } catch {
+      setError(
+        "Couldn't open the payment window. Check your connection and try again.",
+      );
+      setSubmitting(false);
+    }
   }
 
   if (alreadyPaid) {
     return (
       <div className="flex flex-col items-center gap-2 py-4 text-center">
         <CheckCircle2 className="size-10 text-primary" />
-        <p className="font-medium">Thank you, your payment has been received.</p>
+        <p className="font-medium">
+          Thank you, your payment has been received.
+        </p>
       </div>
     );
   }
@@ -48,8 +62,15 @@ export function MembershipPayButton({ token, amount }: { token: string; amount: 
   return (
     <div className="space-y-3">
       <ErrorToast message={error} />
-      <Button type="button" className="w-full" disabled={submitting} onClick={handlePay}>
-        {submitting ? "Processing…" : `Pay ₹${amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+      <Button
+        type="button"
+        className="w-full"
+        disabled={submitting}
+        onClick={handlePay}
+      >
+        {submitting
+          ? "Processing…"
+          : `Pay ₹${amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
       </Button>
     </div>
   );

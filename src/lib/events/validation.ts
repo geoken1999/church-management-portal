@@ -1,7 +1,17 @@
 import type { EventRecurrenceFrequency, EventStatus } from "@/types/database";
 
-export const RECURRENCE_FREQUENCIES: EventRecurrenceFrequency[] = ["daily", "weekly", "monthly", "yearly"];
-export const EVENT_STATUSES: EventStatus[] = ["pending", "active", "cancelled", "completed"];
+export const RECURRENCE_FREQUENCIES: EventRecurrenceFrequency[] = [
+  "daily",
+  "weekly",
+  "monthly",
+  "yearly",
+];
+export const EVENT_STATUSES: EventStatus[] = [
+  "pending",
+  "active",
+  "cancelled",
+  "completed",
+];
 
 export interface EventFieldErrors {
   title?: string;
@@ -53,14 +63,22 @@ export function validateEvent(input: {
   }
 
   if (input.isRecurring) {
-    if (!RECURRENCE_FREQUENCIES.includes(input.recurrenceFrequency as EventRecurrenceFrequency)) {
+    if (
+      !RECURRENCE_FREQUENCIES.includes(
+        input.recurrenceFrequency as EventRecurrenceFrequency,
+      )
+    ) {
       errors.recurrenceFrequency = "Choose how often this repeats.";
     }
     if (input.recurrenceEndDate) {
       const recurrenceEnd = new Date(`${input.recurrenceEndDate}T00:00:00`);
       if (Number.isNaN(recurrenceEnd.getTime())) {
         errors.recurrenceEndDate = "That end date isn't valid.";
-      } else if (start && !Number.isNaN(start.getTime()) && recurrenceEnd < start) {
+      } else if (
+        start &&
+        !Number.isNaN(start.getTime()) &&
+        recurrenceEnd < start
+      ) {
         errors.recurrenceEndDate = "Must be on or after the start date.";
       }
     }
@@ -68,7 +86,8 @@ export function validateEvent(input: {
 
   if (input.meetingMode !== "offline" && input.meetingLink) {
     if (!/^https?:\/\//i.test(input.meetingLink.trim())) {
-      errors.meetingLink = "Enter a full link starting with http:// or https://.";
+      errors.meetingLink =
+        "Enter a full link starting with http:// or https://.";
     }
   }
 

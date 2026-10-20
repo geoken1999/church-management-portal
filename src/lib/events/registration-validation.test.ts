@@ -14,7 +14,17 @@ describe("hasEmailField", () => {
   });
 
   it("is false when no field is of type email", () => {
-    expect(hasEmailField([{ key: "name", label: "Name", field_type: "text", options: null, required: true }])).toBe(false);
+    expect(
+      hasEmailField([
+        {
+          key: "name",
+          label: "Name",
+          field_type: "text",
+          options: null,
+          required: true,
+        },
+      ]),
+    ).toBe(false);
   });
 
   it("is false for an empty field list", () => {
@@ -23,37 +33,74 @@ describe("hasEmailField", () => {
 });
 
 describe("validateRegistrationSettings", () => {
-  const valid = { fields: DEFAULT_REGISTRATION_FIELDS, capacity: "", closesAt: "" };
+  const valid = {
+    fields: DEFAULT_REGISTRATION_FIELDS,
+    capacity: "",
+    closesAt: "",
+  };
 
   it("accepts a valid, unlimited-capacity, no-close-date setup", () => {
     expect(validateRegistrationSettings(valid)).toEqual({});
   });
 
   it("requires at least one email field", () => {
-    const errors = validateRegistrationSettings({ ...valid, fields: [{ key: "name", label: "Name", field_type: "text", options: null, required: true }] });
+    const errors = validateRegistrationSettings({
+      ...valid,
+      fields: [
+        {
+          key: "name",
+          label: "Name",
+          field_type: "text",
+          options: null,
+          required: true,
+        },
+      ],
+    });
     expect(errors.fields).toBeDefined();
   });
 
   it("rejects a non-positive capacity", () => {
-    expect(validateRegistrationSettings({ ...valid, capacity: "0" }).capacity).toBeDefined();
-    expect(validateRegistrationSettings({ ...valid, capacity: "-5" }).capacity).toBeDefined();
+    expect(
+      validateRegistrationSettings({ ...valid, capacity: "0" }).capacity,
+    ).toBeDefined();
+    expect(
+      validateRegistrationSettings({ ...valid, capacity: "-5" }).capacity,
+    ).toBeDefined();
   });
 
   it("rejects a non-integer capacity", () => {
-    expect(validateRegistrationSettings({ ...valid, capacity: "10.5" }).capacity).toBeDefined();
+    expect(
+      validateRegistrationSettings({ ...valid, capacity: "10.5" }).capacity,
+    ).toBeDefined();
   });
 
   it("accepts a valid positive integer capacity", () => {
-    expect(validateRegistrationSettings({ ...valid, capacity: "50" }).capacity).toBeUndefined();
+    expect(
+      validateRegistrationSettings({ ...valid, capacity: "50" }).capacity,
+    ).toBeUndefined();
   });
 
   it("rejects an invalid closesAt date", () => {
-    expect(validateRegistrationSettings({ ...valid, closesAt: "not-a-date" }).closesAt).toBeDefined();
+    expect(
+      validateRegistrationSettings({ ...valid, closesAt: "not-a-date" })
+        .closesAt,
+    ).toBeDefined();
   });
 
   it("requires the Name and Phone fields too, not just Email", () => {
-    const emailOnly = [{ key: "email", label: "Email", field_type: "email", options: null, required: true }] as const;
-    const errors = validateRegistrationSettings({ ...valid, fields: [...emailOnly] });
+    const emailOnly = [
+      {
+        key: "email",
+        label: "Email",
+        field_type: "email",
+        options: null,
+        required: true,
+      },
+    ] as const;
+    const errors = validateRegistrationSettings({
+      ...valid,
+      fields: [...emailOnly],
+    });
     expect(errors.fields).toBeDefined();
     expect(errors.fields).toContain("Name");
     expect(errors.fields).toContain("Phone");
@@ -74,8 +121,20 @@ describe("isProtectedField", () => {
 
 describe("sanitizeRegistrationFields", () => {
   it("filters out malformed entries", () => {
-    const result = sanitizeRegistrationFields([{ key: "email", label: "Email", field_type: "email", required: true }, { bogus: true }]);
-    expect(result).toEqual([{ key: "email", label: "Email", field_type: "email", options: null, required: true, unique: false }]);
+    const result = sanitizeRegistrationFields([
+      { key: "email", label: "Email", field_type: "email", required: true },
+      { bogus: true },
+    ]);
+    expect(result).toEqual([
+      {
+        key: "email",
+        label: "Email",
+        field_type: "email",
+        options: null,
+        required: true,
+        unique: false,
+      },
+    ]);
   });
 });
 
@@ -98,7 +157,14 @@ describe("validatePaymentSettings", () => {
   };
 
   it("passes through free registration without checking anything else", () => {
-    expect(validatePaymentSettings({ ...platformValid, paymentRequired: false, paymentGateway: "", paymentAmount: "" })).toEqual({});
+    expect(
+      validatePaymentSettings({
+        ...platformValid,
+        paymentRequired: false,
+        paymentGateway: "",
+        paymentAmount: "",
+      }),
+    ).toEqual({});
   });
 
   it("accepts a valid platform-gateway config", () => {
@@ -110,29 +176,54 @@ describe("validatePaymentSettings", () => {
   });
 
   it("rejects the platform gateway when the org isn't on a Finance-enabled plan", () => {
-    const errors = validatePaymentSettings({ ...platformValid, financeEnabled: false });
+    const errors = validatePaymentSettings({
+      ...platformValid,
+      financeEnabled: false,
+    });
     expect(errors.paymentGateway).toBeDefined();
   });
 
   it("rejects a zero or negative amount", () => {
-    expect(validatePaymentSettings({ ...platformValid, paymentAmount: "0" }).paymentAmount).toBeDefined();
-    expect(validatePaymentSettings({ ...platformValid, paymentAmount: "-5" }).paymentAmount).toBeDefined();
-    expect(validatePaymentSettings({ ...platformValid, paymentAmount: "" }).paymentAmount).toBeDefined();
+    expect(
+      validatePaymentSettings({ ...platformValid, paymentAmount: "0" })
+        .paymentAmount,
+    ).toBeDefined();
+    expect(
+      validatePaymentSettings({ ...platformValid, paymentAmount: "-5" })
+        .paymentAmount,
+    ).toBeDefined();
+    expect(
+      validatePaymentSettings({ ...platformValid, paymentAmount: "" })
+        .paymentAmount,
+    ).toBeDefined();
   });
 
   it("rejects an external gateway with no URL", () => {
-    expect(validatePaymentSettings({ ...externalValid, externalPaymentUrl: "" }).externalPaymentUrl).toBeDefined();
+    expect(
+      validatePaymentSettings({ ...externalValid, externalPaymentUrl: "" })
+        .externalPaymentUrl,
+    ).toBeDefined();
   });
 
   it("rejects an external gateway with a malformed URL", () => {
-    expect(validatePaymentSettings({ ...externalValid, externalPaymentUrl: "not-a-url" }).externalPaymentUrl).toBeDefined();
+    expect(
+      validatePaymentSettings({
+        ...externalValid,
+        externalPaymentUrl: "not-a-url",
+      }).externalPaymentUrl,
+    ).toBeDefined();
   });
 
   it("rejects an invalid timing value", () => {
-    expect(validatePaymentSettings({ ...platformValid, paymentTiming: "whenever" }).paymentTiming).toBeDefined();
+    expect(
+      validatePaymentSettings({ ...platformValid, paymentTiming: "whenever" })
+        .paymentTiming,
+    ).toBeDefined();
   });
 
   it("accepts the 'both' timing — visitor chooses pay-now vs. pay-at-check-in", () => {
-    expect(validatePaymentSettings({ ...platformValid, paymentTiming: "both" })).toEqual({});
+    expect(
+      validatePaymentSettings({ ...platformValid, paymentTiming: "both" }),
+    ).toEqual({});
   });
 });

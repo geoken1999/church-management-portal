@@ -10,7 +10,11 @@ import { formatInTimezone } from "@/lib/organizations/timezone";
 // HTML body, same care as the registration pass email
 // (src/lib/events/registration-pass.ts).
 function escapeHtml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 // A lighter companion to sendRegistrationPassEmail — no QR code or .ics
@@ -35,9 +39,15 @@ export async function sendRegistrationReminderEmail(input: {
 }): Promise<void> {
   if (!isEmailConfigured()) return;
 
-  const startLabel = formatInTimezone(input.startAt, input.organizationTimezone, { dateStyle: "full", timeStyle: "short" });
+  const startLabel = formatInTimezone(
+    input.startAt,
+    input.organizationTimezone,
+    { dateStyle: "full", timeStyle: "short" },
+  );
   const passColor = input.passColor || "#7c3aed";
-  const greeting = input.recipientName ? `Hi ${escapeHtml(input.recipientName)},` : "Hi,";
+  const greeting = input.recipientName
+    ? `Hi ${escapeHtml(input.recipientName)},`
+    : "Hi,";
 
   // venueLabel and joinLink are independent (a hybrid event has both), so
   // each gets its own row when present, same reasoning as

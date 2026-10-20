@@ -6,7 +6,7 @@ import { requireOrganization, getUserOrganizations } from "@/lib/organizations/d
 import { getNotifications } from "@/lib/notifications/dal";
 import { getPlanUsage } from "@/lib/plans/dal";
 import { getOrganizationSubscription } from "@/lib/billing/dal";
-import { isPayUConfigured } from "@/lib/payu/env";
+import { isRazorpayConfigured } from "@/lib/billing/env";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { TrialExpiredScreen } from "@/components/billing/TrialExpiredScreen";
 import { toAppLocale } from "@/lib/i18n/config";
@@ -37,7 +37,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         canManage={canManage}
         currentPlanId={planUsage.plan.id}
         subscription={subscription}
-        payuConfigured={isPayUConfigured()}
+        paymentsConfigured={isRazorpayConfigured()}
         billingDetails={checkout.billingDetails}
         sellerState={checkout.sellerState}
       />

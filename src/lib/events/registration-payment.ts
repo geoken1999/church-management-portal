@@ -2,12 +2,13 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlanUsage } from "@/lib/plans/dal";
-import { buildPaymentRequestFields, type PayUFormFields } from "@/lib/payu/client";
+import { createCheckout } from "@/lib/razorpay/platform";
+import type { RazorpayCheckout } from "@/lib/razorpay/checkout";
 import { getSiteUrl } from "@/lib/site-url";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { sendPassEmailForRegistration } from "@/lib/events/public-registration-actions";
 
-// Event registration only ever uses the platform's own shared PayU
+// Event registration only ever uses the platform's own shared Razorpay
 // account — unlike fundraiser giving, there's no "organizer's own gateway
 // keys" sub-option here (that wasn't asked for; the two gateway choices
 // are "our gateway" vs. "your own external link", not a choice of whose
@@ -17,8 +18,7 @@ import { sendPassEmailForRegistration } from "@/lib/events/public-registration-a
 
 export interface CreateEventRegistrationOrderState {
   error?: string;
-  payuFields?: PayUFormFields;
-  payuActionUrl?: string;
+  checkout?: RazorpayCheckout;
   amount?: number;
   organizationName?: string;
   eventTitle?: string;
@@ -30,16 +30,21 @@ export interface CreateEventRegistrationOrderState {
 // order is attached to a real registration_id from the start. Also called
 // again if an earlier payment attempt failed, to retry without re-creating
 // the registration.
-export async function createEventRegistrationOrder(registrationId: string): Promise<CreateEventRegistrationOrderState> {
+export async function createEventRegistrationOrder(
+  registrationId: string,
+): Promise<CreateEventRegistrationOrderState> {
   const admin = createAdminClient();
   const { data: registration } = await admin
     .from("event_registrations")
-    .select("id, organization_id, event_id, email, payment_status, payment_amount, events(title, payment_required, payment_gateway, organizations(name))")
+    .select(
+      "id, organization_id, event_id, email, payment_status, payment_amount, events(title, payment_required, payment_gateway, organizations(name))",
+    )
     .eq("id", registrationId)
     .maybeSingle();
 
   if (!registration) return { error: "That registration could not be found." };
-  if (registration.payment_status === "paid") return { error: "This registration has already been paid for." };
+  if (registration.payment_status === "paid")
+    return { error: "This registration has already been paid for." };
 
   const event = registration.events as {
     title: string;
@@ -47,7 +52,11 @@ export async function createEventRegistrationOrder(registrationId: string): Prom
     payment_gateway: string | null;
     organizations: { name: string } | null;
   } | null;
-  if (!event || !event.payment_required || event.payment_gateway !== "platform") {
+  if (
+    !event ||
+    !event.payment_required ||
+    event.payment_gateway !== "platform"
+  ) {
     return { error: "This event doesn't use online payment." };
   }
 
@@ -56,7 +65,9 @@ export async function createEventRegistrationOrder(registrationId: string): Prom
   // up and when this visitor registers.
   const { plan } = await getPlanUsage(registration.organization_id);
   if (!plan.financeEnabled) {
-    return { error: "Online payment is temporarily unavailable for this event." };
+    return {
+      error: "Online payment is temporarily unavailable for this event.",
+    };
   }
 
   const amount = registration.payment_amount;
@@ -65,40 +76,40 @@ export async function createEventRegistrationOrder(registrationId: string): Prom
   }
 
   const txnid = `evreg${Date.now()}${registration.id.replace(/-/g, "").slice(0, 8)}`;
-  const { error: insertError } = await admin.from("event_registration_payment_orders").insert({
-    organization_id: registration.organization_id,
-    event_id: registration.event_id,
-    registration_id: registration.id,
-    payu_txnid: txnid,
-    amount,
-  });
+  const { error: insertError } = await admin
+    .from("event_registration_payment_orders")
+    .insert({
+      organization_id: registration.organization_id,
+      event_id: registration.event_id,
+      registration_id: registration.id,
+      payu_txnid: txnid,
+      amount,
+    });
 
   if (insertError) {
-    console.error("event_registration_payment_orders insert failed:", insertError.message);
+    console.error(
+      "event_registration_payment_orders insert failed:",
+      insertError.message,
+    );
     return { error: "Couldn't start the payment. Please try again." };
   }
 
-  const siteUrl = getSiteUrl();
-  const returnUrl = `${siteUrl}/api/payu/event-registration/return?eventId=${registration.event_id}&registrationId=${registration.id}`;
-
-  let built;
+  let checkout;
   try {
-    built = buildPaymentRequestFields({
-      txnid,
+    checkout = await createCheckout({
+      receipt: txnid,
       amountRupees: amount,
-      productinfo: `Registration: ${event.title}`,
-      firstname: "Registrant",
-      email: registration.email,
-      phone: "9999999999",
-      surl: returnUrl,
-      furl: returnUrl,
-      udf1: `evreg:${registration.id}`,
+      name: event.organizations?.name || "KingdomFlow",
+      description: `Registration: ${event.title}`,
+      prefill: { email: registration.email },
+      callbackUrl: `${getSiteUrl()}/api/razorpay/event-registration/return?eventId=${registration.event_id}&registrationId=${registration.id}`,
+      notes: { kind: "event_registration", registration_id: registration.id },
     });
   } catch (err) {
     await logPlatformEvent({
       level: "error",
       source: "event_registration_payment",
-      message: `PayU field build failed: ${err instanceof Error ? err.message : "unknown error"}`,
+      message: `Razorpay order creation failed: ${err instanceof Error ? err.message : "unknown error"}`,
       organizationId: registration.organization_id,
       metadata: { registrationId: registration.id, txnid },
     });
@@ -106,8 +117,7 @@ export async function createEventRegistrationOrder(registrationId: string): Prom
   }
 
   return {
-    payuFields: built.fields,
-    payuActionUrl: built.actionUrl,
+    checkout,
     amount,
     organizationName: event.organizations?.name ?? "",
     eventTitle: event.title,
@@ -125,7 +135,10 @@ export interface FinalizeEventRegistrationPaymentResult {
 // status 'created' -> 'paid' UPDATE only matches once, so a redelivered
 // callback can't mark the registration paid twice or send the pass email
 // twice.
-export async function finalizeEventRegistrationPayment(txnid: string, mihpayid: string): Promise<FinalizeEventRegistrationPaymentResult> {
+export async function finalizeEventRegistrationPayment(
+  txnid: string,
+  mihpayid: string,
+): Promise<FinalizeEventRegistrationPaymentResult> {
   const admin = createAdminClient();
   const { data: order } = await admin
     .from("event_registration_payment_orders")
@@ -159,7 +172,10 @@ export async function finalizeEventRegistrationPayment(txnid: string, mihpayid: 
     .eq("id", order.registration_id);
 
   const event = order.events as { payment_timing: string | null } | null;
-  if (event?.payment_timing === "before_registration" || event?.payment_timing === "both") {
+  if (
+    event?.payment_timing === "before_registration" ||
+    event?.payment_timing === "both"
+  ) {
     await sendPassEmailForRegistration(order.registration_id);
   }
 

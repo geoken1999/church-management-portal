@@ -19,7 +19,10 @@ function downloadBase64(base64: string, mimeType: string, filename: string) {
 // Excel and PDF downloads of an event's registrants, from the Registrants tab.
 export function ExportRegistrantsButtons({ eventId }: { eventId: string }) {
   const [pending, setPending] = useState<"excel" | "pdf" | null>(null);
-  const [message, setMessage] = useState<{ kind: "error" | "info"; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    kind: "error" | "info";
+    text: string;
+  } | null>(null);
   const [, startTransition] = useTransition();
 
   function handleExport(format: "excel" | "pdf") {
@@ -28,8 +31,16 @@ export function ExportRegistrantsButtons({ eventId }: { eventId: string }) {
     startTransition(async () => {
       const result = await exportEventRegistrants(eventId, format);
       setPending(null);
-      if (result.error || !result.base64 || !result.filename || !result.mimeType) {
-        setMessage({ kind: "error", text: result.error ?? "Couldn't generate that file." });
+      if (
+        result.error ||
+        !result.base64 ||
+        !result.filename ||
+        !result.mimeType
+      ) {
+        setMessage({
+          kind: "error",
+          text: result.error ?? "Couldn't generate that file.",
+        });
         return;
       }
       downloadBase64(result.base64, result.mimeType, result.filename);
@@ -40,11 +51,23 @@ export function ExportRegistrantsButtons({ eventId }: { eventId: string }) {
   return (
     <div className="space-y-2">
       <div className="flex gap-2">
-        <Button type="button" size="sm" variant="outline" onClick={() => handleExport("excel")} disabled={pending !== null}>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => handleExport("excel")}
+          disabled={pending !== null}
+        >
           <FileSpreadsheet className="size-3.5" />
           {pending === "excel" ? "Preparing..." : "Export Excel"}
         </Button>
-        <Button type="button" size="sm" variant="outline" onClick={() => handleExport("pdf")} disabled={pending !== null}>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => handleExport("pdf")}
+          disabled={pending !== null}
+        >
           <FileDown className="size-3.5" />
           {pending === "pdf" ? "Preparing..." : "Export PDF"}
         </Button>

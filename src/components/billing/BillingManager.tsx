@@ -72,13 +72,13 @@ const IN_PROGRESS_STATUSES: SubscriptionStatus[] = [
 export function BillingManager({
   currentPlanId,
   subscription,
-  payuConfigured,
+  paymentsConfigured,
   billingDetails,
   sellerState,
 }: {
   currentPlanId: PlanId;
   subscription: OrganizationSubscription | null;
-  payuConfigured: boolean;
+  paymentsConfigured: boolean;
   billingDetails: BillingDetailsInput;
   sellerState: string;
 }) {
@@ -178,7 +178,7 @@ export function BillingManager({
 
   return (
     <div className="space-y-6">
-      {!payuConfigured && (
+      {!paymentsConfigured && (
         <Alert>
           <AlertDescription>
             Billing isn&apos;t configured yet for this app — an admin needs to
@@ -320,7 +320,7 @@ export function BillingManager({
                 <Button
                   className="w-full"
                   variant={isCurrent ? "outline" : "default"}
-                  disabled={isCurrent || blockedBySwitch || !payuConfigured}
+                  disabled={isCurrent || blockedBySwitch || !paymentsConfigured}
                   onClick={() => handleSubscribe(planId)}
                 >
                   {isCurrent

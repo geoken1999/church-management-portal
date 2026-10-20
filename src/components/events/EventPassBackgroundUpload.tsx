@@ -23,7 +23,9 @@ const MAX_MB = Math.round(MAX_PASS_BACKGROUND_BYTES / (1024 * 1024));
 // server re-checks this from the actual file bytes regardless (a browser
 // can't be trusted to have run this at all), so this is purely to give a
 // faster, friendlier error than waiting on the Server Action.
-async function readImageDimensions(file: File): Promise<{ width: number; height: number } | null> {
+async function readImageDimensions(
+  file: File,
+): Promise<{ width: number; height: number } | null> {
   try {
     const bitmap = await createImageBitmap(file);
     const dimensions = { width: bitmap.width, height: bitmap.height };
@@ -48,7 +50,10 @@ export function EventPassBackgroundUpload({
   onChange?: (url: string | null) => void;
 }) {
   const router = useRouter();
-  const [state, formAction, pending] = useActionState(uploadRegistrationPassBackground, initialState);
+  const [state, formAction, pending] = useActionState(
+    uploadRegistrationPassBackground,
+    initialState,
+  );
   const [preview, setPreview] = useState<string | null>(null);
   const [clientError, setClientError] = useState<string | undefined>();
   const [removePending, startRemoveTransition] = useTransition();
@@ -72,9 +77,12 @@ export function EventPassBackgroundUpload({
 
   return (
     <div className="space-y-1.5">
-      <span className="text-sm font-medium leading-none">Pass background image (optional)</span>
+      <span className="text-sm font-medium leading-none">
+        Pass background image (optional)
+      </span>
       <p className="text-xs text-muted-foreground">
-        Must be exactly {PASS_BACKGROUND_WIDTH}x{PASS_BACKGROUND_HEIGHT}px, up to {MAX_MB}MB.
+        Must be exactly {PASS_BACKGROUND_WIDTH}x{PASS_BACKGROUND_HEIGHT}px, up
+        to {MAX_MB}MB.
       </p>
       <form ref={formRef} action={formAction} className="relative">
         <input type="hidden" name="eventId" value={eventId} />
@@ -101,7 +109,11 @@ export function EventPassBackgroundUpload({
             }
 
             const dimensions = await readImageDimensions(file);
-            if (!dimensions || dimensions.width !== PASS_BACKGROUND_WIDTH || dimensions.height !== PASS_BACKGROUND_HEIGHT) {
+            if (
+              !dimensions ||
+              dimensions.width !== PASS_BACKGROUND_WIDTH ||
+              dimensions.height !== PASS_BACKGROUND_HEIGHT
+            ) {
               setClientError(
                 dimensions
                   ? `That image is ${dimensions.width}x${dimensions.height}px — it must be exactly ${PASS_BACKGROUND_WIDTH}x${PASS_BACKGROUND_HEIGHT}px.`
@@ -123,13 +135,26 @@ export function EventPassBackgroundUpload({
           onClick={() => inputRef.current?.click()}
           disabled={busy}
           className="group relative block h-28 w-full overflow-hidden rounded-md border border-dashed border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-          aria-label={displaySrc ? "Change pass background image" : "Upload a pass background image"}
+          aria-label={
+            displaySrc
+              ? "Change pass background image"
+              : "Upload a pass background image"
+          }
         >
           {displaySrc ? (
             // eslint-disable-next-line @next/next/no-img-element -- previewing an arbitrary uploaded/remote image, not a static app asset
-            <img src={displaySrc} alt="" className="h-full w-full object-cover" />
+            <img
+              src={displaySrc}
+              alt=""
+              className="h-full w-full object-cover"
+            />
           ) : (
-            <div className="flex h-full w-full items-center justify-center" style={{ background: `linear-gradient(135deg, ${passColor}, transparent)` }}>
+            <div
+              className="flex h-full w-full items-center justify-center"
+              style={{
+                background: `linear-gradient(135deg, ${passColor}, transparent)`,
+              }}
+            >
               <span className="flex items-center gap-2 text-xs text-muted-foreground">
                 <ImagePlus className="size-4" />
                 Upload a banner image
@@ -142,7 +167,12 @@ export function EventPassBackgroundUpload({
         </button>
       </form>
       {displaySrc && (
-        <button type="button" onClick={handleRemove} disabled={busy} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive">
+        <button
+          type="button"
+          onClick={handleRemove}
+          disabled={busy}
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
+        >
           <X className="size-3" />
           Remove image
         </button>

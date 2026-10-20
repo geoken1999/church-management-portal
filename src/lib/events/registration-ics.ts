@@ -13,7 +13,11 @@ import "server-only";
 // containing any of those characters would produce a malformed .ics file
 // that calendar apps silently fail to import.
 function escapeIcsText(value: string): string {
-  return value.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\n/g, "\\n");
 }
 
 // UTC format: YYYYMMDDTHHMMSSZ.
@@ -48,7 +52,9 @@ export function buildEventRegistrationIcs(input: {
   // A calendar entry needs *some* end time — an hour is a reasonable
   // default for whatever event didn't set one explicitly, same fallback
   // duration used elsewhere for a "no end time given" event.
-  const end = input.endAt ? new Date(input.endAt) : new Date(start.getTime() + 60 * 60 * 1000);
+  const end = input.endAt
+    ? new Date(input.endAt)
+    : new Date(start.getTime() + 60 * 60 * 1000);
 
   const lines = [
     "BEGIN:VCALENDAR",
@@ -62,7 +68,9 @@ export function buildEventRegistrationIcs(input: {
     `DTSTART:${formatIcsDate(start)}`,
     `DTEND:${formatIcsDate(end)}`,
     `SUMMARY:${escapeIcsText(input.title)}`,
-    ...(input.description ? [`DESCRIPTION:${escapeIcsText(input.description)}`] : []),
+    ...(input.description
+      ? [`DESCRIPTION:${escapeIcsText(input.description)}`]
+      : []),
     ...(input.location ? [`LOCATION:${escapeIcsText(input.location)}`] : []),
     "END:VEVENT",
     "END:VCALENDAR",

@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getPlanUsage } from "@/lib/plans/dal";
 import { getOrganizationSubscription } from "@/lib/billing/dal";
-import { isPayUConfigured } from "@/lib/payu/env";
+import { isRazorpayConfigured } from "@/lib/billing/env";
 import { getOrganizationPayoutDetails } from "@/lib/organizations/payout-details-dal";
 import { BillingManager } from "@/components/billing/BillingManager";
 import { AddonsManager } from "@/components/billing/AddonsManager";
@@ -137,14 +137,14 @@ export default async function BillingPage({
             monthlyBase={onboarding.monthly_base}
             billingDetails={checkout.billingDetails}
             sellerState={checkout.sellerState}
-            payuConfigured={isPayUConfigured()}
+            paymentsConfigured={isRazorpayConfigured()}
           />
         )}
 
       <BillingManager
         currentPlanId={planUsage.plan.id}
         subscription={subscription}
-        payuConfigured={isPayUConfigured()}
+        paymentsConfigured={isRazorpayConfigured()}
         billingDetails={checkout.billingDetails}
         sellerState={checkout.sellerState}
       />
@@ -152,7 +152,7 @@ export default async function BillingPage({
       <AddonsManager
         billingDetails={checkout.billingDetails}
         sellerState={checkout.sellerState}
-        payuConfigured={isPayUConfigured()}
+        paymentsConfigured={isRazorpayConfigured()}
         balances={{
           sms: planUsage.addonSmsCredits,
           email: planUsage.addonEmailCredits,

@@ -6,6 +6,7 @@ import { CheckCircle2 } from "lucide-react";
 import { createGivingOrder, createChurchGivingOrder, confirmGivingPayment } from "@/lib/finance/giving-actions";
 import { GIVING_TYPE_LABELS, type GivingType } from "@/lib/finance/giving-types";
 import { redirectToPayU } from "@/lib/payu/browser";
+import { openRazorpayCheckout } from "@/lib/razorpay/browser";
 import { useLocale } from "@/lib/i18n/LocaleContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,14 +14,10 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 
-// Razorpay checkout.js is only still needed for 'own'-mode fundraisers (a
-// church's own gateway keys) — 'shared' mode (the platform's own account)
-// moved to PayU's full-page redirect, which needs no SDK script at all. So
-// unlike before, this is loaded lazily on submit rather than eagerly on
-// mount, since most givers (shared mode) never need it.
+// Razorpay's checkout.js (window.Razorpay is declared in @/lib/razorpay/browser) is loaded when the form is
+// submitted, for both a church's own Razorpay account and KingdomFlow's shared one.
 declare global {
   interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
     Cashfree?: (options: { mode: string }) => { checkout: (options: { paymentSessionId: string; redirectTarget: string }) => Promise<unknown> };
   }
 }
@@ -112,6 +109,16 @@ export function GivingForm({
     if (result.error) {
       setError(result.error);
       setSubmitting(false);
+      return;
+    }
+
+    if (result.checkout) {
+      try {
+        await openRazorpayCheckout(result.checkout, () => setSubmitting(false));
+      } catch {
+        setError(t.publicGive.paymentFormLoadError);
+        setSubmitting(false);
+      }
       return;
     }
 

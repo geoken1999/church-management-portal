@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { verifyPayUReturn } from "@/lib/payu/client";
+import { confirmReturn } from "@/lib/razorpay/platform";
 import { finalizeProgramPayment } from "@/lib/lms/payments";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { getSiteUrl } from "@/lib/site-url";
 
-// PayU redirects the browser here with a POST for both success and failure. No session exists, so the
-// hash PayU signs is what is trusted. The order id travels in this URL's own query string.
+// Razorpay sends the browser here with a POST after a payment. No session exists, so the signed result
+// is what is trusted (see confirmReturn). The order id travels in this URL's own query string.
 export async function POST(request: Request) {
   try {
     return await handleReturn(request);
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     await logPlatformEvent({
       level: "error",
       source: "bible_school_payment",
-      message: `PayU course payment return failed unexpectedly: ${err instanceof Error ? err.message : "unknown error"}`,
+      message: `Razorpay course payment return failed unexpectedly: ${err instanceof Error ? err.message : "unknown error"}`,
     });
     return NextResponse.redirect(`${getSiteUrl()}/`, { status: 303 });
   }
@@ -56,39 +56,30 @@ async function handleReturn(request: Request) {
   } catch {
     return back("failed");
   }
-  const get = (name: string) => String(form.get(name) ?? "");
-  const status = get("status");
-  const txnid = get("txnid");
 
-  const valid = verifyPayUReturn({
-    status,
-    txnid,
-    amount: get("amount"),
-    productinfo: get("productinfo"),
-    firstname: get("firstname"),
-    email: get("email"),
-    udf1: get("udf1"),
-    hash: get("hash"),
-  });
-  if (!valid) {
-    await logPlatformEvent({
-      level: "error",
-      source: "bible_school_payment",
-      message:
-        "PayU course payment return had an invalid hash — treated as unverified, not credited",
-      metadata: { txnid, status, orderId },
-    });
+  const outcome = await confirmReturn(form);
+  if (!outcome.ok) {
+    if (outcome.reason === "unverified")
+      await logPlatformEvent({
+        level: "error",
+        source: "bible_school_payment",
+        message:
+          "Razorpay course payment return could not be verified — not credited",
+        metadata: { orderId },
+      });
     return back("failed");
   }
-  if (status !== "success") return back("failed");
 
-  const result = await finalizeProgramPayment(txnid, get("mihpayid"));
+  const result = await finalizeProgramPayment(
+    outcome.reference,
+    outcome.paymentId,
+  );
   if (result.error) {
     await logPlatformEvent({
       level: "error",
       source: "bible_school_payment",
-      message: `PayU course payment verified but couldn't be finalized: ${result.error}`,
-      metadata: { txnid, orderId },
+      message: `Razorpay course payment verified but couldn't be finalized: ${result.error}`,
+      metadata: { reference: outcome.reference, orderId },
     });
     return back("failed");
   }

@@ -4,7 +4,9 @@
 // integers out of a header would be a lot of weight for what's otherwise a
 // few well-documented byte offsets. Only the three types
 // ALLOWED_PASS_BACKGROUND_TYPES actually allows are implemented.
-export function getImageDimensions(buffer: Buffer): { width: number; height: number } | null {
+export function getImageDimensions(
+  buffer: Buffer,
+): { width: number; height: number } | null {
   if (isPng(buffer)) return readPngDimensions(buffer);
   if (isJpeg(buffer)) return readJpegDimensions(buffer);
   if (isWebp(buffer)) return readWebpDimensions(buffer);
@@ -29,14 +31,21 @@ function isJpeg(buffer: Buffer): boolean {
 
 // JPEG stores dimensions in whichever "start of frame" segment appears —
 // walk the marker segments until one of those is found.
-function readJpegDimensions(buffer: Buffer): { width: number; height: number } | null {
+function readJpegDimensions(
+  buffer: Buffer,
+): { width: number; height: number } | null {
   let offset = 2;
   while (offset + 9 <= buffer.length) {
     if (buffer[offset] !== 0xff) return null;
     const marker = buffer[offset + 1];
 
     // Standalone markers with no length/payload.
-    if (marker === 0xd8 || marker === 0xd9 || (marker >= 0xd0 && marker <= 0xd7) || marker === 0x01) {
+    if (
+      marker === 0xd8 ||
+      marker === 0xd9 ||
+      (marker >= 0xd0 && marker <= 0xd7) ||
+      marker === 0x01
+    ) {
       offset += 2;
       continue;
     }
@@ -50,7 +59,10 @@ function readJpegDimensions(buffer: Buffer): { width: number; height: number } |
       marker !== 0xcc; // DAC
 
     if (isSof) {
-      return { height: buffer.readUInt16BE(offset + 5), width: buffer.readUInt16BE(offset + 7) };
+      return {
+        height: buffer.readUInt16BE(offset + 5),
+        width: buffer.readUInt16BE(offset + 7),
+      };
     }
 
     offset += 2 + segmentLength;
@@ -59,10 +71,16 @@ function readJpegDimensions(buffer: Buffer): { width: number; height: number } |
 }
 
 function isWebp(buffer: Buffer): boolean {
-  return buffer.length >= 16 && buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP";
+  return (
+    buffer.length >= 16 &&
+    buffer.subarray(0, 4).toString("ascii") === "RIFF" &&
+    buffer.subarray(8, 12).toString("ascii") === "WEBP"
+  );
 }
 
-function readWebpDimensions(buffer: Buffer): { width: number; height: number } | null {
+function readWebpDimensions(
+  buffer: Buffer,
+): { width: number; height: number } | null {
   const fourCc = buffer.subarray(12, 16).toString("ascii");
 
   if (fourCc === "VP8X") {
@@ -84,7 +102,8 @@ function readWebpDimensions(buffer: Buffer): { width: number; height: number } |
     // 3-byte frame tag, then a 3-byte start code (0x9d 0x01 0x2a), then
     // 14-bit width + 2-bit horizontal scale, then 14-bit height + 2-bit
     // vertical scale, both little-endian 16-bit.
-    if (buffer[23] !== 0x9d || buffer[24] !== 0x01 || buffer[25] !== 0x2a) return null;
+    if (buffer[23] !== 0x9d || buffer[24] !== 0x01 || buffer[25] !== 0x2a)
+      return null;
     const width = buffer.readUInt16LE(26) & 0x3fff;
     const height = buffer.readUInt16LE(28) & 0x3fff;
     return { width, height };

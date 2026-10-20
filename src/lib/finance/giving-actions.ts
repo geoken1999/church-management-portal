@@ -11,6 +11,8 @@ import {
   finalizeGivingOrderPayment,
 } from "@/lib/finance/razorpay-giving";
 import { buildPaymentRequestFields, type PayUAccount, type PayUFormFields } from "@/lib/payu/client";
+import { createCheckout } from "@/lib/razorpay/platform";
+import type { RazorpayCheckout } from "@/lib/razorpay/checkout";
 import { createCashfreeOrder } from "@/lib/cashfree/client";
 import { getOwnAccount } from "@/lib/payments/own-accounts";
 import { payuBaseUrl, type Gateway } from "@/lib/payments/gateways";
@@ -23,17 +25,16 @@ const FUNDRAISERS_PATH = "/dashboard/fundraisers";
 
 export interface CreateGivingOrderState {
   error?: string;
-  // 'shared' mode (the platform's own account) moved to PayU; 'own' mode (a
-  // church's own Razorpay keys) hasn't — PayU has no equivalent of handing a
-  // church its own merchant-level keys to plug in the way Razorpay Connect
-  // does, so that would need its own, separate product decision later. This
-  // return type carries both shapes and the caller switches on `gateway`.
+  // 'shared' mode uses KingdomFlow's own Razorpay account (`checkout`); 'own' mode uses the church's
+  // own gateway keys. This return type carries every shape and the caller switches on `gateway`.
   gateway?: "payu" | "razorpay" | "cashfree";
   // Cashfree: the session the browser opens checkout with, and its mode.
   cashfreeSessionId?: string;
   cashfreeMode?: "production" | "sandbox";
   payuFields?: PayUFormFields;
   payuActionUrl?: string;
+  // Shared mode: the order on KingdomFlow's own Razorpay account.
+  checkout?: RazorpayCheckout;
   orderId?: string;
   keyId?: string;
   amount?: number;
@@ -45,7 +46,7 @@ interface GivingTarget {
   organizationId: string;
   organizationName: string;
   paymentMode: FundraiserPaymentMode;
-  // The gateway behind 'own' mode (ignored for 'shared', which is always PayU).
+  // The gateway behind 'own' mode (ignored for 'shared', which is always KingdomFlow's Razorpay).
   ownGateway: Gateway;
   // null for a church-wide gift (offering / tithe / donation).
   fundraiserId: string | null;
@@ -58,9 +59,8 @@ interface GivingTarget {
 }
 
 // Starts the payment for a validated gift: records a payment order and returns
-// what the browser needs to take the money — PayU's form ('shared' mode, the
-// platform's own account) or a Razorpay order against the church's own keys
-// ('own' mode). Shared by fundraiser giving and church-wide giving.
+// what the browser needs to take the money — an order on the platform's own
+// Razorpay account ('shared' mode) or one on the church's own gateway ('own' mode). Shared by fundraiser giving and church-wide giving.
 async function startGivingPayment(
   target: GivingTarget,
   amount: number,
@@ -85,17 +85,45 @@ async function startGivingPayment(
     donor_phone: donorPhone.trim() || null,
   };
 
-  const gateway: Gateway = target.paymentMode === "shared" ? "payu" : target.ownGateway;
-  const platformPayU = target.paymentMode === "shared";
+  if (target.paymentMode === "shared") {
+    // Our own reference rides in payu_txnid (a column name from before Razorpay) and as the Razorpay receipt.
+    const txnid = `giving${Date.now()}${target.referenceId.replace(/-/g, "").slice(0, 8)}`;
+    let checkout;
+    try {
+      checkout = await createCheckout({
+        receipt: txnid,
+        amountRupees: amount,
+        name: target.organizationName || "KingdomFlow",
+        description: `Gift: ${target.title}`.slice(0, 100),
+        prefill: { name: donorName, email: donorEmail.trim() || undefined, contact: donorPhone.trim() || undefined },
+        callbackUrl: `${getSiteUrl()}${target.returnPath.replace("/api/payu/giving/return", "/api/razorpay/giving/return")}`,
+        notes: { kind: "giving", giving_type: target.givingType },
+      });
+    } catch (err) {
+      await logPlatformEvent({
+        level: "error",
+        source: "fundraiser_giving",
+        message: `Razorpay order creation failed: ${err instanceof Error ? err.message : "unknown error"}`,
+        organizationId: target.organizationId,
+        metadata: { referenceId: target.referenceId, txnid },
+      });
+      return { error: "Couldn't start the payment. Please try again." };
+    }
+    const { error: insertError } = await admin.from("fundraiser_payment_orders").insert({ ...orderBase, gateway: "razorpay", payu_txnid: txnid });
+    if (insertError) {
+      console.error("fundraiser_payment_orders insert failed:", insertError.message);
+      return { error: "Couldn't start the payment. Please try again." };
+    }
+    return { gateway: "razorpay", checkout, amount, fundraiserTitle: target.title, organizationName: target.organizationName };
+  }
+
+  const gateway: Gateway = target.ownGateway;
 
   if (gateway === "payu") {
-    // Shared mode uses the platform's PayU account; own mode the church's own.
-    let account: PayUAccount | undefined;
-    if (!platformPayU) {
-      const own = await getOwnAccount(target.organizationId, "payu");
-      if (!own) return { error: "This giving link isn't set up correctly yet. Please try again later." };
-      account = { merchantKey: own.keyId, salt: own.keySecret, baseUrl: payuBaseUrl(own.environment) };
-    }
+    // The church's own PayU account.
+    const own = await getOwnAccount(target.organizationId, "payu");
+    if (!own) return { error: "This giving link isn't set up correctly yet. Please try again later." };
+    const account: PayUAccount = { merchantKey: own.keyId, salt: own.keySecret, baseUrl: payuBaseUrl(own.environment) };
 
     const txnid = `giving${Date.now()}${target.referenceId.replace(/-/g, "").slice(0, 8)}`;
     const { error: insertError } = await admin.from("fundraiser_payment_orders").insert({ ...orderBase, gateway: "payu", payu_txnid: txnid });
@@ -104,7 +132,7 @@ async function startGivingPayment(
       return { error: "Couldn't start the payment. Please try again." };
     }
 
-    const returnUrl = `${getSiteUrl()}${target.returnPath}${platformPayU ? "" : "&own=1"}`;
+    const returnUrl = `${getSiteUrl()}${target.returnPath}&own=1`;
 
     let built;
     try {

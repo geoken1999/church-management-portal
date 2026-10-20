@@ -41,7 +41,10 @@ export function EventPassPreview({
   organizationTimezone: string;
 }) {
   const [open, setOpen] = useState(false);
-  const startLabel = formatInTimezone(startAt, organizationTimezone, { dateStyle: "full", timeStyle: "short" });
+  const startLabel = formatInTimezone(startAt, organizationTimezone, {
+    dateStyle: "full",
+    timeStyle: "short",
+  });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -56,20 +59,36 @@ export function EventPassPreview({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Registration pass preview</DialogTitle>
-          <DialogDescription>A rough preview using a sample registrant — the real email also attaches a QR code and calendar invite.</DialogDescription>
+          <DialogDescription>
+            A rough preview using a sample registrant — the real email also
+            attaches a QR code and calendar invite.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="overflow-hidden rounded-2xl border border-border">
           {backgroundUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- previewing an arbitrary uploaded/remote image, not a static app asset
-            <img src={backgroundUrl} alt="" className="h-28 w-full object-cover" />
+            <img
+              src={backgroundUrl}
+              alt=""
+              className="h-28 w-full object-cover"
+            />
           ) : (
-            <div className="h-24" style={{ background: `linear-gradient(135deg, ${passColor}, transparent)` }} />
+            <div
+              className="h-24"
+              style={{
+                background: `linear-gradient(135deg, ${passColor}, transparent)`,
+              }}
+            />
           )}
 
           <div className="space-y-1 bg-background px-5 pt-4 pb-3">
-            <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Your church</p>
-            <h3 className="text-lg font-semibold">{eventTitle || "Event title"}</h3>
+            <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+              Your church
+            </p>
+            <h3 className="text-lg font-semibold">
+              {eventTitle || "Event title"}
+            </h3>
             <p className="text-sm text-muted-foreground">{startLabel}</p>
             <p className="text-sm text-muted-foreground">{locationLabel}</p>
           </div>
@@ -81,25 +100,40 @@ export function EventPassPreview({
 
           <div className="space-y-3 bg-background px-5 pt-4 pb-4">
             <div>
-              <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Registered to</p>
+              <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                Registered to
+              </p>
               <p className="text-sm font-semibold">{SAMPLE_NAME}</p>
             </div>
-            {passMessage && <p className="text-sm text-muted-foreground">{passMessage}</p>}
+            {passMessage && (
+              <p className="text-sm text-muted-foreground">{passMessage}</p>
+            )}
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Confirmation code</p>
-                <p className="text-xl font-bold tracking-widest" style={{ color: passColor }}>
+                <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                  Confirmation code
+                </p>
+                <p
+                  className="text-xl font-bold tracking-widest"
+                  style={{ color: passColor }}
+                >
                   {SAMPLE_CODE}
                 </p>
               </div>
-              <div className="flex size-[72px] shrink-0 items-center justify-center rounded-md border border-border bg-muted/40" aria-hidden>
+              <div
+                className="flex size-[72px] shrink-0 items-center justify-center rounded-md border border-border bg-muted/40"
+                aria-hidden
+              >
                 <QrCode className="size-8 text-muted-foreground" />
               </div>
             </div>
           </div>
 
           <div className="border-t border-border bg-muted/40 px-5 py-2.5">
-            <p className="text-xs text-muted-foreground">Show this pass at check-in — your QR code and a calendar invite are attached.</p>
+            <p className="text-xs text-muted-foreground">
+              Show this pass at check-in — your QR code and a calendar invite
+              are attached.
+            </p>
           </div>
         </div>
       </DialogContent>

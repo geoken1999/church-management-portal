@@ -15,27 +15,46 @@ describe("validateMembershipFeeSettings", () => {
   });
 
   it("won't turn the fee on without an amount", () => {
-    expect(validateMembershipFeeSettings({ ...base, amount: null }).amount).toBeDefined();
+    expect(
+      validateMembershipFeeSettings({ ...base, amount: null }).amount,
+    ).toBeDefined();
   });
 
   it("allows an unset amount while the fee is off", () => {
-    expect(validateMembershipFeeSettings({ ...base, enabled: false, amount: null })).toEqual({});
+    expect(
+      validateMembershipFeeSettings({ ...base, enabled: false, amount: null }),
+    ).toEqual({});
   });
 
   it("rejects zero and negative amounts even when off", () => {
-    expect(validateMembershipFeeSettings({ ...base, enabled: false, amount: 0 }).amount).toBeDefined();
-    expect(validateMembershipFeeSettings({ ...base, amount: -10 }).amount).toBeDefined();
+    expect(
+      validateMembershipFeeSettings({ ...base, enabled: false, amount: 0 })
+        .amount,
+    ).toBeDefined();
+    expect(
+      validateMembershipFeeSettings({ ...base, amount: -10 }).amount,
+    ).toBeDefined();
   });
 
   it("keeps the due day within 1-28 so every month has it", () => {
-    expect(validateMembershipFeeSettings({ ...base, dueDay: 29 }).dueDay).toBeDefined();
-    expect(validateMembershipFeeSettings({ ...base, dueDay: 0 }).dueDay).toBeDefined();
+    expect(
+      validateMembershipFeeSettings({ ...base, dueDay: 29 }).dueDay,
+    ).toBeDefined();
+    expect(
+      validateMembershipFeeSettings({ ...base, dueDay: 0 }).dueDay,
+    ).toBeDefined();
     expect(validateMembershipFeeSettings({ ...base, dueDay: 28 })).toEqual({});
   });
 
   it("checks the reminder window", () => {
-    expect(validateMembershipFeeSettings({ ...base, reminderAfterDays: 0 }).reminderAfterDays).toBeDefined();
-    expect(validateMembershipFeeSettings({ ...base, reminderAfterDays: 29 }).reminderAfterDays).toBeDefined();
+    expect(
+      validateMembershipFeeSettings({ ...base, reminderAfterDays: 0 })
+        .reminderAfterDays,
+    ).toBeDefined();
+    expect(
+      validateMembershipFeeSettings({ ...base, reminderAfterDays: 29 })
+        .reminderAfterDays,
+    ).toBeDefined();
   });
 });
 
@@ -48,8 +67,12 @@ describe("due day and period in the organization's timezone", () => {
   });
 
   it("names the period from local time", () => {
-    expect(membershipPeriodFor(new Date("2026-06-30T20:00:00Z"), "Asia/Kolkata")).toBe("2026-07");
-    expect(membershipPeriodFor(new Date("2026-06-30T20:00:00Z"), "UTC")).toBe("2026-06");
+    expect(
+      membershipPeriodFor(new Date("2026-06-30T20:00:00Z"), "Asia/Kolkata"),
+    ).toBe("2026-07");
+    expect(membershipPeriodFor(new Date("2026-06-30T20:00:00Z"), "UTC")).toBe(
+      "2026-06",
+    );
   });
 });
 

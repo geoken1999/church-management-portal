@@ -16,7 +16,7 @@ export function TrialExpiredScreen({
   canManage,
   currentPlanId,
   subscription,
-  payuConfigured,
+  paymentsConfigured,
   billingDetails,
   sellerState,
 }: {
@@ -26,7 +26,7 @@ export function TrialExpiredScreen({
   canManage: boolean;
   currentPlanId: PlanId;
   subscription: OrganizationSubscription | null;
-  payuConfigured: boolean;
+  paymentsConfigured: boolean;
 }) {
   return (
     <div className="min-h-screen bg-background">
@@ -52,7 +52,7 @@ export function TrialExpiredScreen({
         </div>
 
         {canManage ? (
-          <BillingManager currentPlanId={currentPlanId} subscription={subscription} payuConfigured={payuConfigured} billingDetails={billingDetails} sellerState={sellerState} />
+          <BillingManager currentPlanId={currentPlanId} subscription={subscription} paymentsConfigured={paymentsConfigured} billingDetails={billingDetails} sellerState={sellerState} />
         ) : null}
       </main>
     </div>

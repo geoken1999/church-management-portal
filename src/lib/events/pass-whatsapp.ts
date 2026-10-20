@@ -3,16 +3,32 @@ import "server-only";
 import { logOutboundMessages, senderKeyFor } from "@/lib/whatsapp/message-log";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logPlatformEvent } from "@/lib/platform-events/log";
-import { getWhatsAppCredentials, type WhatsAppCredentials } from "@/lib/whatsapp/credentials";
+import {
+  getWhatsAppCredentials,
+  type WhatsAppCredentials,
+} from "@/lib/whatsapp/credentials";
 import { sendTemplateMessage } from "@/lib/whatsapp/client";
-import { createMetaTemplate, fetchMetaTemplateStatus, findMetaTemplateByName } from "@/lib/whatsapp/templates-client";
+import {
+  createMetaTemplate,
+  fetchMetaTemplateStatus,
+  findMetaTemplateByName,
+} from "@/lib/whatsapp/templates-client";
 import { describeWhatsAppError } from "@/lib/whatsapp/graph-error";
-import { normalizePhoneNumber, resolvePhoneCountry } from "@/lib/whatsapp/validation";
+import {
+  normalizePhoneNumber,
+  resolvePhoneCountry,
+} from "@/lib/whatsapp/validation";
 import { checkWhatsAppQuota } from "@/lib/plans/dal";
-import { formatInTimezone, DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
+import {
+  formatInTimezone,
+  DEFAULT_TIMEZONE,
+} from "@/lib/organizations/timezone";
 import { getSiteUrl } from "@/lib/site-url";
 import { pickWhatsAppNumber } from "@/lib/events/pass-whatsapp-number";
-import type { EventRegistrationField, WhatsAppTemplateButton } from "@/types/database";
+import type {
+  EventRegistrationField,
+  WhatsAppTemplateButton,
+} from "@/types/database";
 
 // The WhatsApp pass is a short confirmation message with a "View pass"
 // button that opens the registrant's pass page (/pass/{token}), which shows
@@ -30,10 +46,19 @@ import type { EventRegistrationField, WhatsAppTemplateButton } from "@/types/dat
 // to WhatsApp's classifier, which refused it with INCORRECT_CATEGORY under
 // both Utility and Marketing. The code is shown on the pass page instead.
 export const PASS_TEMPLATE_NAME = "event_registration_pass_ready";
-const PASS_TEMPLATE_BODY = "Hi {{1}}, your registration for {{2}} on {{3}} is confirmed. Tap the button below to view your pass for check-in.";
-const PASS_TEMPLATE_EXAMPLES = ["Ann", "Sunday Service", "Sat, 21 Nov 2026, 9:00 AM"];
+const PASS_TEMPLATE_BODY =
+  "Hi {{1}}, your registration for {{2}} on {{3}} is confirmed. Tap the button below to view your pass for check-in.";
+const PASS_TEMPLATE_EXAMPLES = [
+  "Ann",
+  "Sunday Service",
+  "Sat, 21 Nov 2026, 9:00 AM",
+];
 // Rejected earlier versions, cleaned out of the Templates list.
-const LEGACY_PASS_TEMPLATE_NAMES = ["event_registration_pass", "event_registration_pass_v2", "event_registration_pass_link"];
+const LEGACY_PASS_TEMPLATE_NAMES = [
+  "event_registration_pass",
+  "event_registration_pass_v2",
+  "event_registration_pass_link",
+];
 
 export function passButtons(siteUrl: string): WhatsAppTemplateButton[] {
   return [{ type: "url", text: "View pass", url: `${siteUrl}/pass/{{1}}` }];
@@ -48,11 +73,19 @@ export interface PassTemplateState {
 // refreshes its approval status. Approval is Meta's, and can take minutes
 // to hours, so a pass sent before then is skipped (and the email still
 // goes). Safe to call repeatedly.
-export async function ensurePassTemplate(organizationId: string, credentials?: WhatsAppCredentials): Promise<PassTemplateState> {
+export async function ensurePassTemplate(
+  organizationId: string,
+  credentials?: WhatsAppCredentials,
+): Promise<PassTemplateState> {
   const admin = createAdminClient();
   const creds = credentials ?? (await getWhatsAppCredentials(organizationId));
 
-  await admin.from("whatsapp_templates").delete().eq("organization_id", organizationId).in("name", LEGACY_PASS_TEMPLATE_NAMES).eq("status", "rejected");
+  await admin
+    .from("whatsapp_templates")
+    .delete()
+    .eq("organization_id", organizationId)
+    .in("name", LEGACY_PASS_TEMPLATE_NAMES)
+    .eq("status", "rejected");
 
   const { data: existing } = await admin
     .from("whatsapp_templates")
@@ -65,10 +98,17 @@ export async function ensurePassTemplate(organizationId: string, credentials?: W
     if (existing.status === "approved") return { status: "approved" };
     if (existing.meta_template_id) {
       try {
-        const { status, rejectedReason } = await fetchMetaTemplateStatus(existing.meta_template_id, creds);
-        await admin.from("whatsapp_templates").update({ status, rejected_reason: rejectedReason }).eq("id", existing.id);
+        const { status, rejectedReason } = await fetchMetaTemplateStatus(
+          existing.meta_template_id,
+          creds,
+        );
+        await admin
+          .from("whatsapp_templates")
+          .update({ status, rejected_reason: rejectedReason })
+          .eq("id", existing.id);
         if (status === "approved") return { status: "approved" };
-        if (status === "rejected") return { status: "rejected", message: rejectedReason ?? undefined };
+        if (status === "rejected")
+          return { status: "rejected", message: rejectedReason ?? undefined };
       } catch {
         // Fall through to "still pending".
       }
@@ -80,7 +120,11 @@ export async function ensurePassTemplate(organizationId: string, credentials?: W
   // live https site, not localhost or a preview URL.
   const siteUrl = getSiteUrl();
   if (!siteUrl.startsWith("https://")) {
-    return { status: "error", message: "The WhatsApp pass needs the live https site address (set NEXT_PUBLIC_SITE_URL)." };
+    return {
+      status: "error",
+      message:
+        "The WhatsApp pass needs the live https site address (set NEXT_PUBLIC_SITE_URL).",
+    };
   }
   const buttons = passButtons(siteUrl);
 
@@ -89,9 +133,17 @@ export async function ensurePassTemplate(organizationId: string, credentials?: W
     // template name can exist only once. If another church already created
     // this one, use it (nothing in it is specific to a church) instead of
     // failing on the duplicate name.
-    const onMeta = await findMetaTemplateByName(PASS_TEMPLATE_NAME, "en_US", creds);
+    const onMeta = await findMetaTemplateByName(
+      PASS_TEMPLATE_NAME,
+      "en_US",
+      creds,
+    );
     const created = onMeta
-      ? { metaTemplateId: onMeta.metaTemplateId, status: onMeta.status, rejectedReason: onMeta.rejectedReason }
+      ? {
+          metaTemplateId: onMeta.metaTemplateId,
+          status: onMeta.status,
+          rejectedReason: onMeta.rejectedReason,
+        }
       : {
           ...(await createMetaTemplate({
             name: PASS_TEMPLATE_NAME,
@@ -120,7 +172,11 @@ export async function ensurePassTemplate(organizationId: string, credentials?: W
       rejected_reason: created.rejectedReason,
     });
     if (created.status === "approved") return { status: "approved" };
-    if (created.status === "rejected") return { status: "rejected", message: created.rejectedReason ?? undefined };
+    if (created.status === "rejected")
+      return {
+        status: "rejected",
+        message: created.rejectedReason ?? undefined,
+      };
     return { status: "pending_review" };
   } catch (err) {
     const detail = describeWhatsAppError(err);
@@ -138,7 +194,9 @@ export async function ensurePassTemplate(organizationId: string, credentials?: W
 // Sends one registrant's pass on WhatsApp, if the event has that turned on.
 // Best-effort and never throws: it runs after the registration (and the
 // email) are already done, so a failure here is logged, not surfaced.
-export async function sendPassWhatsAppForRegistration(registrationId: string): Promise<void> {
+export async function sendPassWhatsAppForRegistration(
+  registrationId: string,
+): Promise<void> {
   try {
     const admin = createAdminClient();
     const { data: registration } = await admin
@@ -156,21 +214,36 @@ export async function sendPassWhatsAppForRegistration(registrationId: string): P
       branch_id: string | null;
       registration_pass_whatsapp: boolean;
       registration_fields: EventRegistrationField[] | null;
-      organizations: { name: string; timezone: string; country: string | null } | null;
+      organizations: {
+        name: string;
+        timezone: string;
+        country: string | null;
+      } | null;
     } | null;
     if (!event?.registration_pass_whatsapp) return;
 
     const organizationId = registration.organization_id;
     const answers = (registration.answers ?? {}) as Record<string, unknown>;
 
-    const rawNumber = pickWhatsAppNumber(answers, event.registration_fields ?? [], registration.phone);
+    const rawNumber = pickWhatsAppNumber(
+      answers,
+      event.registration_fields ?? [],
+      registration.phone,
+    );
     if (!rawNumber) return;
     let branchCountry: string | null = null;
     if (event.branch_id) {
-      const { data: branch } = await admin.from("branches").select("country").eq("id", event.branch_id).maybeSingle();
+      const { data: branch } = await admin
+        .from("branches")
+        .select("country")
+        .eq("id", event.branch_id)
+        .maybeSingle();
       branchCountry = branch?.country ?? null;
     }
-    const phone = normalizePhoneNumber(rawNumber, resolvePhoneCountry(branchCountry, event.organizations?.country));
+    const phone = normalizePhoneNumber(
+      rawNumber,
+      resolvePhoneCountry(branchCountry, event.organizations?.country),
+    );
     if (!phone) return;
 
     const credentials = await getWhatsAppCredentials(organizationId);
@@ -180,8 +253,16 @@ export async function sendPassWhatsAppForRegistration(registrationId: string): P
     const quotaError = await checkWhatsAppQuota(organizationId, 1);
     if (quotaError) return; // logged by checkWhatsAppQuota
 
-    const name = typeof answers.name === "string" && answers.name.trim() ? answers.name.trim() : "there";
-    const startLabel = formatInTimezone(event.start_at, event.organizations?.timezone || DEFAULT_TIMEZONE, { dateStyle: "medium", timeStyle: "short" }, "en-IN");
+    const name =
+      typeof answers.name === "string" && answers.name.trim()
+        ? answers.name.trim()
+        : "there";
+    const startLabel = formatInTimezone(
+      event.start_at,
+      event.organizations?.timezone || DEFAULT_TIMEZONE,
+      { dateStyle: "medium", timeStyle: "short" },
+      "en-IN",
+    );
 
     let failure: string | null = null;
     try {
@@ -194,7 +275,16 @@ export async function sendPassWhatsAppForRegistration(registrationId: string): P
         credentials,
       });
       await logOutboundMessages([
-        { organizationId, kind: "event_pass", refId: null, recipient: phone, wamid: sent.id, templateName: PASS_TEMPLATE_NAME, category: "utility", senderKey: senderKeyFor(credentials) },
+        {
+          organizationId,
+          kind: "event_pass",
+          refId: null,
+          recipient: phone,
+          wamid: sent.id,
+          templateName: PASS_TEMPLATE_NAME,
+          category: "utility",
+          senderKey: senderKeyFor(credentials),
+        },
       ]);
     } catch (err) {
       failure = describeWhatsAppError(err).message;

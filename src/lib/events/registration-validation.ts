@@ -1,14 +1,25 @@
-import type { EventRegistrationField, EventReminderOffset, EventPaymentGateway, EventPaymentTiming, FormFieldType } from "@/types/database";
+import type {
+  EventRegistrationField,
+  EventReminderOffset,
+  EventPaymentGateway,
+  EventPaymentTiming,
+  FormFieldType,
+} from "@/types/database";
 import { FORM_FIELD_TYPES } from "@/lib/forms/validation";
 
 export { FORM_FIELD_TYPES } from "@/lib/forms/validation";
 
-export const EVENT_REMINDER_OFFSETS: EventReminderOffset[] = ["24h", "1h", "morning_of"];
-export const EVENT_REMINDER_OFFSET_LABELS: Record<EventReminderOffset, string> = {
-  "24h": "24 hours before",
-  "1h": "1 hour before",
-  morning_of: "Morning of (8 AM)",
-};
+export const EVENT_REMINDER_OFFSETS: EventReminderOffset[] = [
+  "24h",
+  "1h",
+  "morning_of",
+];
+export const EVENT_REMINDER_OFFSET_LABELS: Record<EventReminderOffset, string> =
+  {
+    "24h": "24 hours before",
+    "1h": "1 hour before",
+    morning_of: "Morning of (8 AM)",
+  };
 
 // A fresh registration form's starting fields — Name, Email, and Phone,
 // the minimum needed to actually run a registration, email a pass, and
@@ -19,9 +30,27 @@ export const EVENT_REMINDER_OFFSET_LABELS: Record<EventReminderOffset, string> =
 // registration, the pass email, and duplicate-prevention all depend on
 // them existing.
 export const DEFAULT_REGISTRATION_FIELDS: EventRegistrationField[] = [
-  { key: "name", label: "Name", field_type: "text", options: null, required: true },
-  { key: "email", label: "Email", field_type: "email", options: null, required: true },
-  { key: "phone", label: "Phone", field_type: "phone", options: null, required: true },
+  {
+    key: "name",
+    label: "Name",
+    field_type: "text",
+    options: null,
+    required: true,
+  },
+  {
+    key: "email",
+    label: "Email",
+    field_type: "email",
+    options: null,
+    required: true,
+  },
+  {
+    key: "phone",
+    label: "Phone",
+    field_type: "phone",
+    options: null,
+    required: true,
+  },
 ];
 
 // Matches DEFAULT_REGISTRATION_FIELDS' own keys — a field editor row for
@@ -56,18 +85,26 @@ export function isTypeLockedField(field: { key: string }): boolean {
 // for protected fields — re-applied server-side right before saving, in
 // case a request ever reaches here with those locks not actually
 // respected (a stale client, a direct API call, etc.).
-export function enforceProtectedFieldRules(fields: EventRegistrationField[]): EventRegistrationField[] {
+export function enforceProtectedFieldRules(
+  fields: EventRegistrationField[],
+): EventRegistrationField[] {
   return fields.map((field) => {
     if (!isProtectedField(field)) return field;
     const lockedType = TYPE_LOCKED_FIELDS[field.key];
-    return { ...field, required: true, field_type: lockedType ?? field.field_type };
+    return {
+      ...field,
+      required: true,
+      field_type: lockedType ?? field.field_type,
+    };
   });
 }
 
 // Same boundary-check shape as Forms' sanitizeFormFields (a form's field
 // set is only ever as trustworthy as what the client sent), plus
 // preserving the `unique` flag Forms/Widget's fields don't have.
-export function sanitizeRegistrationFields(raw: unknown): EventRegistrationField[] {
+export function sanitizeRegistrationFields(
+  raw: unknown,
+): EventRegistrationField[] {
   if (!Array.isArray(raw)) return [];
 
   const seenKeys = new Set<string>();
@@ -75,8 +112,14 @@ export function sanitizeRegistrationFields(raw: unknown): EventRegistrationField
 
   for (const entry of raw) {
     if (!entry || typeof entry !== "object") continue;
-    const { key, label, field_type, options, required, unique } = entry as Record<string, unknown>;
-    if (typeof key !== "string" || typeof label !== "string" || typeof field_type !== "string") continue;
+    const { key, label, field_type, options, required, unique } =
+      entry as Record<string, unknown>;
+    if (
+      typeof key !== "string" ||
+      typeof label !== "string" ||
+      typeof field_type !== "string"
+    )
+      continue;
     if (!FORM_FIELD_TYPES.some((t) => t.value === field_type)) continue;
 
     let uniqueKey = key;
@@ -91,7 +134,10 @@ export function sanitizeRegistrationFields(raw: unknown): EventRegistrationField
       key: uniqueKey,
       label: label.trim(),
       field_type: field_type as FormFieldType,
-      options: field_type === "select" && Array.isArray(options) ? options.filter((o): o is string => typeof o === "string") : null,
+      options:
+        field_type === "select" && Array.isArray(options)
+          ? options.filter((o): o is string => typeof o === "string")
+          : null,
       required: Boolean(required),
       unique: Boolean(unique),
     });
@@ -105,11 +151,17 @@ export function hasEmailField(fields: EventRegistrationField[]): boolean {
 }
 
 function hasPhoneField(fields: EventRegistrationField[]): boolean {
-  return fields.some((field) => field.key === "phone" && field.field_type === "phone");
+  return fields.some(
+    (field) => field.key === "phone" && field.field_type === "phone",
+  );
 }
 
 export const MAX_PASS_BACKGROUND_BYTES = 5 * 1024 * 1024;
-export const ALLOWED_PASS_BACKGROUND_TYPES = ["image/png", "image/jpeg", "image/webp"];
+export const ALLOWED_PASS_BACKGROUND_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+];
 
 // The pass banner is displayed at 480x140 in the email (registration-pass.ts)
 // — this is exactly 2.5x that, for a crisp image on high-DPI screens. A hard
@@ -140,7 +192,12 @@ export function validateRegistrationSettings(input: {
 }): RegistrationSettingsErrors {
   const errors: RegistrationSettingsErrors = {};
 
-  if (input.reminderOffset && !EVENT_REMINDER_OFFSETS.includes(input.reminderOffset as EventReminderOffset)) {
+  if (
+    input.reminderOffset &&
+    !EVENT_REMINDER_OFFSETS.includes(
+      input.reminderOffset as EventReminderOffset,
+    )
+  ) {
     errors.reminderOffset = "Choose a valid reminder timing.";
   }
 
@@ -156,30 +213,46 @@ export function validateRegistrationSettings(input: {
   if (input.capacity.trim()) {
     const capacity = Number(input.capacity);
     if (!Number.isInteger(capacity) || capacity <= 0) {
-      errors.capacity = "Capacity must be a whole number greater than 0, or left blank for unlimited.";
+      errors.capacity =
+        "Capacity must be a whole number greater than 0, or left blank for unlimited.";
     }
   }
 
-  if (input.closesAt.trim() && Number.isNaN(new Date(input.closesAt).getTime())) {
+  if (
+    input.closesAt.trim() &&
+    Number.isNaN(new Date(input.closesAt).getTime())
+  ) {
     errors.closesAt = "That date isn't valid.";
   }
 
-  if (input.passColor !== undefined && !/^#[0-9a-fA-F]{6}$/.test(input.passColor.trim())) {
+  if (
+    input.passColor !== undefined &&
+    !/^#[0-9a-fA-F]{6}$/.test(input.passColor.trim())
+  ) {
     errors.passColor = "Enter a valid hex color, e.g. #7c3aed.";
   }
 
   return errors;
 }
 
-export const EVENT_PAYMENT_GATEWAYS: EventPaymentGateway[] = ["platform", "external"];
-export const EVENT_PAYMENT_GATEWAY_LABELS: Record<EventPaymentGateway, string> = {
-  platform: "Our payment gateway",
-  external: "Your own payment link",
-};
+export const EVENT_PAYMENT_GATEWAYS: EventPaymentGateway[] = [
+  "platform",
+  "external",
+];
+export const EVENT_PAYMENT_GATEWAY_LABELS: Record<EventPaymentGateway, string> =
+  {
+    platform: "Our payment gateway",
+    external: "Your own payment link",
+  };
 
-export const EVENT_PAYMENT_TIMINGS: EventPaymentTiming[] = ["before_registration", "at_checkin", "both"];
+export const EVENT_PAYMENT_TIMINGS: EventPaymentTiming[] = [
+  "before_registration",
+  "at_checkin",
+  "both",
+];
 export const EVENT_PAYMENT_TIMING_LABELS: Record<EventPaymentTiming, string> = {
-  before_registration: "Before registration is confirmed — the pass is held until payment is confirmed",
+  before_registration:
+    "Before registration is confirmed — the pass is held until payment is confirmed",
   at_checkin: "At check-in — the pass is sent now, payment is collected later",
   both: "Visitor's choice — they can pay now, or choose to pay at check-in",
 };
@@ -209,7 +282,8 @@ export function validatePaymentSettings(input: {
   if (!EVENT_PAYMENT_GATEWAYS.includes(gateway)) {
     errors.paymentGateway = "Choose a payment gateway.";
   } else if (gateway === "platform" && !input.financeEnabled) {
-    errors.paymentGateway = "Your plan doesn't include online payments — choose your own payment link instead, or upgrade to Premium or Pro.";
+    errors.paymentGateway =
+      "Your plan doesn't include online payments — choose your own payment link instead, or upgrade to Premium or Pro.";
   }
 
   const amount = Number(input.paymentAmount);
@@ -225,12 +299,15 @@ export function validatePaymentSettings(input: {
       try {
         new URL(url);
       } catch {
-        errors.externalPaymentUrl = "Enter a valid URL, starting with https://.";
+        errors.externalPaymentUrl =
+          "Enter a valid URL, starting with https://.";
       }
     }
   }
 
-  if (!EVENT_PAYMENT_TIMINGS.includes(input.paymentTiming as EventPaymentTiming)) {
+  if (
+    !EVENT_PAYMENT_TIMINGS.includes(input.paymentTiming as EventPaymentTiming)
+  ) {
     errors.paymentTiming = "Choose when payment is required.";
   }
 

@@ -2,9 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { CheckCircle2 } from "lucide-react";
-import { createEventRegistrationOrder } from "@/lib/events/payu-registration";
+import { createEventRegistrationOrder } from "@/lib/events/registration-payment";
 import { deferEventRegistrationToCheckin } from "@/lib/events/public-registration-actions";
-import { redirectToPayU } from "@/lib/payu/browser";
+import { openRazorpayCheckout } from "@/lib/razorpay/browser";
 import { useLocale } from "@/lib/i18n/LocaleContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -47,13 +47,20 @@ export function EventRegistrationPayment({
     setSubmitting(true);
 
     const result = await createEventRegistrationOrder(registrationId);
-    if (result.error || !result.payuFields || !result.payuActionUrl) {
+    if (result.error || !result.checkout) {
       setError(result.error ?? "Couldn't start the payment.");
       setSubmitting(false);
       return;
     }
 
-    redirectToPayU(result.payuActionUrl, result.payuFields);
+    try {
+      await openRazorpayCheckout(result.checkout, () => setSubmitting(false));
+    } catch {
+      setError(
+        "Couldn't open the payment window. Check your connection and try again.",
+      );
+      setSubmitting(false);
+    }
   }
 
   if (deferred) {
@@ -62,8 +69,12 @@ export function EventRegistrationPayment({
         <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
           <CheckCircle2 className="size-10 text-primary" />
           <div>
-            <h3 className="font-heading text-lg font-bold">{t.publicEvent.deferredToCheckinTitle}</h3>
-            <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">{t.publicEvent.deferredToCheckinDescription(amount)}</p>
+            <h3 className="font-heading text-lg font-bold">
+              {t.publicEvent.deferredToCheckinTitle}
+            </h3>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+              {t.publicEvent.deferredToCheckinDescription(amount)}
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -74,12 +85,27 @@ export function EventRegistrationPayment({
     <Card>
       <CardContent className="space-y-4">
         <ErrorToast message={error} />
-        <Button type="button" className="w-full" disabled={submitting} onClick={handlePay}>
-          {submitting ? t.publicEvent.processingPayment : t.publicEvent.payNow(amount)}
+        <Button
+          type="button"
+          className="w-full"
+          disabled={submitting}
+          onClick={handlePay}
+        >
+          {submitting
+            ? t.publicEvent.processingPayment
+            : t.publicEvent.payNow(amount)}
         </Button>
         {allowDeferToCheckin && (
-          <Button type="button" variant="ghost" className="w-full" disabled={submitting || deferring} onClick={handleDeferToCheckin}>
-            {deferring ? t.publicEvent.deferringToCheckin : t.publicEvent.payAtCheckinInstead}
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            disabled={submitting || deferring}
+            onClick={handleDeferToCheckin}
+          >
+            {deferring
+              ? t.publicEvent.deferringToCheckin
+              : t.publicEvent.payAtCheckinInstead}
           </Button>
         )}
       </CardContent>

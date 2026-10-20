@@ -1,7 +1,10 @@
 "use server";
 
 import { ensurePassTemplate } from "@/lib/events/pass-whatsapp";
-import { collectTranslatableStrings, sanitizeBilingual } from "@/lib/bilingual/config";
+import {
+  collectTranslatableStrings,
+  sanitizeBilingual,
+} from "@/lib/bilingual/config";
 import { ensureTranslations } from "@/lib/bilingual/translate";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -11,7 +14,10 @@ import { checkStorageQuota, getPlanUsage } from "@/lib/plans/dal";
 import { requireFinancePlan } from "@/lib/finance/actions";
 import { sharedServiceNetAmount } from "@/lib/finance/fees";
 import { notifyPlatformAdmins } from "@/lib/platform-admin/notify";
-import { validatePayoutDetails, type PayoutDetailsErrors } from "@/lib/organizations/payout-details";
+import {
+  validatePayoutDetails,
+  type PayoutDetailsErrors,
+} from "@/lib/organizations/payout-details";
 import { requireOrgAdmin } from "@/lib/organizations/payout-details-actions";
 import {
   validateRegistrationSettings,
@@ -26,7 +32,14 @@ import {
 } from "@/lib/events/registration-validation";
 import { getImageDimensions } from "@/lib/events/image-dimensions";
 import { sendPassEmailForRegistration } from "@/lib/events/public-registration-actions";
-import type { Event, EventRegistration, EventReminderOffset, EventPaymentGateway, EventPaymentTiming, PayoutMethod } from "@/types/database";
+import type {
+  Event,
+  EventRegistration,
+  EventReminderOffset,
+  EventPaymentGateway,
+  EventPaymentTiming,
+  PayoutMethod,
+} from "@/types/database";
 
 const EVENTS_PATH = "/dashboard/events";
 
@@ -35,7 +48,9 @@ const EVENTS_PATH = "/dashboard/events";
 // Registrants tab — a Client Component, since it's inside an already-open
 // dialog rather than rendered up front with the page — can call it
 // directly and re-fetch after a check-in/cancel action.
-export async function fetchEventRegistrations(eventId: string): Promise<EventRegistration[]> {
+export async function fetchEventRegistrations(
+  eventId: string,
+): Promise<EventRegistration[]> {
   await requireUser();
   const organizationId = await organizationIdForEvent(eventId);
   if (!organizationId) return [];
@@ -44,13 +59,21 @@ export async function fetchEventRegistrations(eventId: string): Promise<EventReg
   if (!access.ok) return [];
 
   const admin = createAdminClient();
-  const { data } = await admin.from("event_registrations").select("*").eq("event_id", eventId).order("created_at", { ascending: false });
+  const { data } = await admin
+    .from("event_registrations")
+    .select("*")
+    .eq("event_id", eventId)
+    .order("created_at", { ascending: false });
   return data ?? [];
 }
 
 async function organizationIdForEvent(eventId: string): Promise<string | null> {
   const admin = createAdminClient();
-  const { data } = await admin.from("events").select("organization_id").eq("id", eventId).maybeSingle();
+  const { data } = await admin
+    .from("events")
+    .select("organization_id")
+    .eq("id", eventId)
+    .maybeSingle();
   return data?.organization_id ?? null;
 }
 
@@ -66,7 +89,9 @@ export interface RegistrationSettingsState {
 // Name/Email fields — a no-op (just re-enables) if it was previously
 // disabled, since the field set/capacity/closes-at already exist on the
 // event row and shouldn't be clobbered back to defaults.
-export async function enableEventRegistration(eventId: string): Promise<RegistrationSettingsState> {
+export async function enableEventRegistration(
+  eventId: string,
+): Promise<RegistrationSettingsState> {
   await requireUser();
   const organizationId = await organizationIdForEvent(eventId);
   if (!organizationId) return { error: "That event could not be found." };
@@ -75,13 +100,26 @@ export async function enableEventRegistration(eventId: string): Promise<Registra
   if (!access.ok) return { error: access.message };
 
   const admin = createAdminClient();
-  const { data: event } = await admin.from("events").select("registration_fields").eq("id", eventId).maybeSingle();
+  const { data: event } = await admin
+    .from("events")
+    .select("registration_fields")
+    .eq("id", eventId)
+    .maybeSingle();
 
-  const needsDefaultFields = !event?.registration_fields || (Array.isArray(event.registration_fields) && event.registration_fields.length === 0);
-  const update = needsDefaultFields ? { registration_enabled: true, registration_fields: DEFAULT_REGISTRATION_FIELDS } : { registration_enabled: true };
+  const needsDefaultFields =
+    !event?.registration_fields ||
+    (Array.isArray(event.registration_fields) &&
+      event.registration_fields.length === 0);
+  const update = needsDefaultFields
+    ? {
+        registration_enabled: true,
+        registration_fields: DEFAULT_REGISTRATION_FIELDS,
+      }
+    : { registration_enabled: true };
 
   const { error } = await admin.from("events").update(update).eq("id", eventId);
-  if (error) return { error: "Couldn't enable registration. Please try again." };
+  if (error)
+    return { error: "Couldn't enable registration. Please try again." };
 
   revalidatePath(EVENTS_PATH);
   return { success: true };
@@ -97,7 +135,10 @@ export async function disableEventRegistration(formData: FormData) {
   if (!access.ok) return;
 
   const admin = createAdminClient();
-  await admin.from("events").update({ registration_enabled: false }).eq("id", eventId);
+  await admin
+    .from("events")
+    .update({ registration_enabled: false })
+    .eq("id", eventId);
 
   revalidatePath(EVENTS_PATH);
 }
@@ -137,10 +178,18 @@ export async function updateEventRegistrationSettings(
   const paymentRequired = formData.get("paymentRequired") === "true";
   const paymentGateway = String(formData.get("paymentGateway") ?? "").trim();
   const paymentAmount = String(formData.get("paymentAmount") ?? "").trim();
-  const externalPaymentUrl = String(formData.get("externalPaymentUrl") ?? "").trim();
+  const externalPaymentUrl = String(
+    formData.get("externalPaymentUrl") ?? "",
+  ).trim();
   const paymentTiming = String(formData.get("paymentTiming") ?? "").trim();
 
-  const fieldErrors = validateRegistrationSettings({ fields, capacity, closesAt, passColor, reminderOffset });
+  const fieldErrors = validateRegistrationSettings({
+    fields,
+    capacity,
+    closesAt,
+    passColor,
+    reminderOffset,
+  });
   if (Object.values(fieldErrors).some(Boolean)) {
     return { fieldErrors };
   }
@@ -175,10 +224,18 @@ export async function updateEventRegistrationSettings(
     wanted = null;
   }
   if (wanted) {
-    const { data: current } = await admin.from("events").select("title, description, registration_bilingual").eq("id", eventId).maybeSingle();
+    const { data: current } = await admin
+      .from("events")
+      .select("title, description, registration_bilingual")
+      .eq("id", eventId)
+      .maybeSingle();
     const outcome = await ensureTranslations(
       wanted,
-      collectTranslatableStrings({ title: current?.title, description: current?.description, fields }),
+      collectTranslatableStrings({
+        title: current?.title,
+        description: current?.description,
+        fields,
+      }),
       sanitizeBilingual(current?.registration_bilingual),
     );
     bilingual = outcome.config;
@@ -191,16 +248,25 @@ export async function updateEventRegistrationSettings(
       registration_bilingual: bilingual,
       registration_fields: fields,
       registration_capacity: capacity.trim() ? Number(capacity) : null,
-      registration_closes_at: closesAt.trim() ? new Date(closesAt).toISOString() : null,
+      registration_closes_at: closesAt.trim()
+        ? new Date(closesAt).toISOString()
+        : null,
       registration_pass_color: passColor.trim(),
       registration_pass_message: passMessage || null,
       registration_pass_whatsapp: passWhatsapp,
       reminder_offset: (reminderOffset || null) as EventReminderOffset | null,
       payment_required: paymentRequired,
-      payment_gateway: paymentRequired ? (paymentGateway as EventPaymentGateway) : null,
+      payment_gateway: paymentRequired
+        ? (paymentGateway as EventPaymentGateway)
+        : null,
       payment_amount: paymentRequired ? Number(paymentAmount) : null,
-      external_payment_url: paymentRequired && paymentGateway === "external" ? externalPaymentUrl : null,
-      payment_timing: paymentRequired ? (paymentTiming as EventPaymentTiming) : null,
+      external_payment_url:
+        paymentRequired && paymentGateway === "external"
+          ? externalPaymentUrl
+          : null,
+      payment_timing: paymentRequired
+        ? (paymentTiming as EventPaymentTiming)
+        : null,
     })
     .eq("id", eventId);
 
@@ -214,7 +280,8 @@ export async function updateEventRegistrationSettings(
   if (passWhatsapp) {
     const template = await ensurePassTemplate(organizationId);
     if (template.status === "pending_review") {
-      whatsappNote = "WhatsApp passes will start going out once WhatsApp approves the pass message (usually minutes to a few hours). Until then registrants get the email pass only.";
+      whatsappNote =
+        "WhatsApp passes will start going out once WhatsApp approves the pass message (usually minutes to a few hours). Until then registrants get the email pass only.";
     } else if (template.status === "rejected") {
       whatsappNote = `WhatsApp rejected the pass message${template.message ? `: ${template.message}` : "."} Passes will keep going by email only.`;
     } else if (template.status === "error") {
@@ -223,7 +290,10 @@ export async function updateEventRegistrationSettings(
   }
 
   revalidatePath(EVENTS_PATH);
-  return { success: true, warning: [warning, whatsappNote].filter(Boolean).join(" ") || undefined };
+  return {
+    success: true,
+    warning: [warning, whatsappNote].filter(Boolean).join(" ") || undefined,
+  };
 }
 
 export async function cancelEventRegistration(formData: FormData) {
@@ -237,7 +307,10 @@ export async function cancelEventRegistration(formData: FormData) {
   if (!access.ok) return;
 
   const admin = createAdminClient();
-  await admin.from("event_registrations").update({ status: "cancelled" }).eq("id", registrationId);
+  await admin
+    .from("event_registrations")
+    .update({ status: "cancelled" })
+    .eq("id", registrationId);
 
   revalidatePath(EVENTS_PATH);
 }
@@ -253,7 +326,10 @@ export async function markRegistrationCheckedIn(formData: FormData) {
   if (!access.ok) return;
 
   const admin = createAdminClient();
-  await admin.from("event_registrations").update({ status: "checked_in", checked_in_at: new Date().toISOString() }).eq("id", registrationId);
+  await admin
+    .from("event_registrations")
+    .update({ status: "checked_in", checked_in_at: new Date().toISOString() })
+    .eq("id", registrationId);
 
   revalidatePath(EVENTS_PATH);
 }
@@ -283,7 +359,10 @@ export async function markRegistrationPaid(formData: FormData) {
 
   if (!registration || registration.payment_status === "paid") return;
 
-  await admin.from("event_registrations").update({ payment_status: "paid", paid_at: new Date().toISOString() }).eq("id", registrationId);
+  await admin
+    .from("event_registrations")
+    .update({ payment_status: "paid", paid_at: new Date().toISOString() })
+    .eq("id", registrationId);
 
   // "before_registration" (and "both", until the visitor resolves their
   // choice) withholds the pass until payment is confirmed — this is the
@@ -292,7 +371,10 @@ export async function markRegistrationPaid(formData: FormData) {
   // registrations already got their pass at registration time, so
   // there's nothing to send here.
   const event = registration.events as { payment_timing: string | null } | null;
-  if (event?.payment_timing === "before_registration" || event?.payment_timing === "both") {
+  if (
+    event?.payment_timing === "before_registration" ||
+    event?.payment_timing === "both"
+  ) {
     await sendPassEmailForRegistration(registrationId);
   }
 
@@ -350,11 +432,29 @@ export async function requestEventPayout(
   // "Collected" is read from event_registration_payment_orders, not
   // event_registrations.payment_status — see getEventPayoutLedger
   // (src/lib/events/dal.ts) for why that distinction matters.
-  const [{ data: event }, { data: orders }, { data: payouts }, { data: existingPending }] = await Promise.all([
-    admin.from("events").select("payment_gateway").eq("id", eventId).maybeSingle(),
-    admin.from("event_registration_payment_orders").select("amount").eq("event_id", eventId).eq("status", "paid"),
+  const [
+    { data: event },
+    { data: orders },
+    { data: payouts },
+    { data: existingPending },
+  ] = await Promise.all([
+    admin
+      .from("events")
+      .select("payment_gateway")
+      .eq("id", eventId)
+      .maybeSingle(),
+    admin
+      .from("event_registration_payment_orders")
+      .select("amount")
+      .eq("event_id", eventId)
+      .eq("status", "paid"),
     admin.from("event_payouts").select("amount").eq("event_id", eventId),
-    admin.from("event_payout_requests").select("id").eq("event_id", eventId).eq("status", "pending").maybeSingle(),
+    admin
+      .from("event_payout_requests")
+      .select("id")
+      .eq("event_id", eventId)
+      .eq("status", "pending")
+      .maybeSingle(),
   ]);
 
   if (!event || event.payment_gateway !== "platform") {
@@ -432,10 +532,17 @@ export async function cancelEventPayoutRequest(formData: FormData) {
   if (!request || request.status !== "pending") return;
 
   if (await requireFinancePlan(request.organization_id)) return;
-  const access = await checkTabAccess(request.organization_id, "events", "write");
+  const access = await checkTabAccess(
+    request.organization_id,
+    "events",
+    "write",
+  );
   if (!access.ok) return;
 
-  await admin.from("event_payout_requests").update({ status: "cancelled" }).eq("id", requestId);
+  await admin
+    .from("event_payout_requests")
+    .update({ status: "cancelled" })
+    .eq("id", requestId);
 
   revalidatePath(EVENTS_PATH);
 }
@@ -471,7 +578,9 @@ export async function uploadRegistrationPassBackground(
     return { error: "Background must be a PNG, JPEG, or WebP image." };
   }
   if (file.size > MAX_PASS_BACKGROUND_BYTES) {
-    return { error: `Background must be smaller than ${Math.round(MAX_PASS_BACKGROUND_BYTES / (1024 * 1024))}MB.` };
+    return {
+      error: `Background must be smaller than ${Math.round(MAX_PASS_BACKGROUND_BYTES / (1024 * 1024))}MB.`,
+    };
   }
 
   // The client already checks this before submitting, but that's only a
@@ -479,7 +588,11 @@ export async function uploadRegistrationPassBackground(
   // stale client could otherwise skip it entirely.
   const bytes = Buffer.from(await file.arrayBuffer());
   const dimensions = getImageDimensions(bytes);
-  if (!dimensions || dimensions.width !== PASS_BACKGROUND_WIDTH || dimensions.height !== PASS_BACKGROUND_HEIGHT) {
+  if (
+    !dimensions ||
+    dimensions.width !== PASS_BACKGROUND_WIDTH ||
+    dimensions.height !== PASS_BACKGROUND_HEIGHT
+  ) {
     return {
       error: dimensions
         ? `That image is ${dimensions.width}x${dimensions.height}px — it must be exactly ${PASS_BACKGROUND_WIDTH}x${PASS_BACKGROUND_HEIGHT}px.`
@@ -509,10 +622,14 @@ export async function uploadRegistrationPassBackground(
   // showing it.
   const { error: updateError } = await admin
     .from("events")
-    .update({ registration_pass_background_url: `${publicUrl}?v=${Date.now()}` })
+    .update({
+      registration_pass_background_url: `${publicUrl}?v=${Date.now()}`,
+    })
     .eq("id", eventId);
   if (updateError) {
-    return { error: "Uploaded the image, but couldn't save it. Please try again." };
+    return {
+      error: "Uploaded the image, but couldn't save it. Please try again.",
+    };
   }
 
   revalidatePath(EVENTS_PATH);
@@ -530,8 +647,13 @@ export async function removeRegistrationPassBackground(formData: FormData) {
   if (!access.ok) return;
 
   const admin = createAdminClient();
-  await admin.storage.from("event-pass-backgrounds").remove([`${organizationId}/${eventId}`]);
-  await admin.from("events").update({ registration_pass_background_url: null }).eq("id", eventId);
+  await admin.storage
+    .from("event-pass-backgrounds")
+    .remove([`${organizationId}/${eventId}`]);
+  await admin
+    .from("events")
+    .update({ registration_pass_background_url: null })
+    .eq("id", eventId);
 
   revalidatePath(EVENTS_PATH);
 }

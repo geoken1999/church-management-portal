@@ -11,24 +11,43 @@ type Admin = ReturnType<typeof createAdminClient>;
 // Emails the member a receipt for a paid membership fee. Sent once, from the
 // payment confirmation. If that send fails, the daily run retries it.
 // Returns true when there's nothing more to send, false when it should be retried.
-export async function sendMembershipReceipt(admin: Admin, invoiceId: string): Promise<boolean> {
+export async function sendMembershipReceipt(
+  admin: Admin,
+  invoiceId: string,
+): Promise<boolean> {
   const { data: invoice } = await admin
     .from("membership_fee_invoices")
-    .select("id, organization_id, member_id, amount, period, paid_at, payu_mihpayid, receipt_sent_at")
+    .select(
+      "id, organization_id, member_id, amount, period, paid_at, payu_mihpayid, receipt_sent_at",
+    )
     .eq("id", invoiceId)
     .maybeSingle();
   if (!invoice?.paid_at || invoice.receipt_sent_at) return true;
 
   const [{ data: member }, { data: org }] = await Promise.all([
-    admin.from("members").select("first_name, email").eq("id", invoice.member_id).maybeSingle(),
-    admin.from("organizations").select("name, timezone").eq("id", invoice.organization_id).maybeSingle(),
+    admin
+      .from("members")
+      .select("first_name, email")
+      .eq("id", invoice.member_id)
+      .maybeSingle(),
+    admin
+      .from("organizations")
+      .select("name, timezone")
+      .eq("id", invoice.organization_id)
+      .maybeSingle(),
   ]);
   if (!org) return false;
   if (!member?.email) return true; // nobody to send to; nothing to retry
 
   const periodLabel = membershipPeriodLabel(invoice.period);
   const amountText = `₹${Number(invoice.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  const paidOn = formatInTimezone(invoice.paid_at, org.timezone, { day: "numeric", month: "long", year: "numeric", hour: "numeric", minute: "2-digit" });
+  const paidOn = formatInTimezone(invoice.paid_at, org.timezone, {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
   const html = `<p>Dear ${escapeHtml(member.first_name)},</p>
 <p>Thank you. We have received your membership fee for <strong>${escapeHtml(periodLabel)}</strong>.</p>
 <table style="border-collapse:collapse" cellpadding="6">
@@ -61,7 +80,10 @@ export async function sendMembershipReceipt(admin: Admin, invoiceId: string): Pr
 
   const { error } = await admin
     .from("membership_fee_invoices")
-    .update({ receipt_sent_at: new Date().toISOString(), receipt_via: sent.via })
+    .update({
+      receipt_sent_at: new Date().toISOString(),
+      receipt_via: sent.via,
+    })
     .eq("id", invoiceId);
   if (error) {
     await logPlatformEvent({
@@ -76,5 +98,11 @@ export async function sendMembershipReceipt(admin: Admin, invoiceId: string): Pr
 }
 
 function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
+  return value.replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ] ?? c,
+  );
 }

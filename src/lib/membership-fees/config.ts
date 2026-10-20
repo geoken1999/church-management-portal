@@ -18,17 +18,36 @@ export interface MembershipFeeSettingsErrors {
   reminderAfterDays?: string;
 }
 
-export function validateMembershipFeeSettings(input: MembershipFeeSettingsInput): MembershipFeeSettingsErrors {
+export function validateMembershipFeeSettings(
+  input: MembershipFeeSettingsInput,
+): MembershipFeeSettingsErrors {
   const errors: MembershipFeeSettingsErrors = {};
-  if (input.enabled && (input.amount === null || !Number.isFinite(input.amount) || input.amount <= 0)) {
-    errors.amount = "Enter the monthly amount, greater than 0, before turning this on.";
-  } else if (input.amount !== null && (!Number.isFinite(input.amount) || input.amount <= 0)) {
+  if (
+    input.enabled &&
+    (input.amount === null ||
+      !Number.isFinite(input.amount) ||
+      input.amount <= 0)
+  ) {
+    errors.amount =
+      "Enter the monthly amount, greater than 0, before turning this on.";
+  } else if (
+    input.amount !== null &&
+    (!Number.isFinite(input.amount) || input.amount <= 0)
+  ) {
     errors.amount = "The monthly amount must be greater than 0.";
   }
-  if (!Number.isInteger(input.dueDay) || input.dueDay < 1 || input.dueDay > 28) {
+  if (
+    !Number.isInteger(input.dueDay) ||
+    input.dueDay < 1 ||
+    input.dueDay > 28
+  ) {
     errors.dueDay = "Choose a day between 1 and 28.";
   }
-  if (!Number.isInteger(input.reminderAfterDays) || input.reminderAfterDays < 1 || input.reminderAfterDays > 28) {
+  if (
+    !Number.isInteger(input.reminderAfterDays) ||
+    input.reminderAfterDays < 1 ||
+    input.reminderAfterDays > 28
+  ) {
     errors.reminderAfterDays = "Choose between 1 and 28 days.";
   }
   return errors;
@@ -40,7 +59,11 @@ export function membershipPeriodFor(now: Date, timeZone: string): string {
 }
 
 // True on the organization's configured day of the month, in its own timezone.
-export function isMembershipDueDay(now: Date, timeZone: string, dueDay: number): boolean {
+export function isMembershipDueDay(
+  now: Date,
+  timeZone: string,
+  dueDay: number,
+): boolean {
   const day = Number(dateKeyInTimezone(now, timeZone).slice(8, 10));
   return day === dueDay;
 }
@@ -55,7 +78,11 @@ export function shiftMembershipPeriod(period: string, delta: number): string {
 // 'July 2026' for a 'YYYY-MM' period.
 export function membershipPeriodLabel(period: string): string {
   const [year, month] = period.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" });
+  return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString("en-IN", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 export function membershipPaymentPath(token: string): string {
@@ -79,7 +106,9 @@ export interface MembershipPeriodSummary {
 }
 
 // Totals for one month's report. Cancelled requests are left out entirely.
-export function summarizeMembershipPeriod(invoices: MembershipInvoiceForSummary[]): MembershipPeriodSummary {
+export function summarizeMembershipPeriod(
+  invoices: MembershipInvoiceForSummary[],
+): MembershipPeriodSummary {
   const live = invoices.filter((i) => i.status !== "cancelled");
   const paid = live.filter((i) => i.status === "paid");
   const due = live.filter((i) => i.status === "due");

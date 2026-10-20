@@ -24,7 +24,11 @@ export async function finalizeMembershipPayment(
 
   const { data: claimed } = await admin
     .from("membership_fee_invoices")
-    .update({ status: "paid", payu_mihpayid: mihpayid, paid_at: new Date().toISOString() })
+    .update({
+      status: "paid",
+      payu_mihpayid: mihpayid,
+      paid_at: new Date().toISOString(),
+    })
     .eq("id", invoice.id)
     .eq("status", "due")
     .select("id")

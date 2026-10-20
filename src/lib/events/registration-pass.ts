@@ -16,7 +16,11 @@ import { formatInTimezone } from "@/lib/organizations/timezone";
 // inject something unexpected, same care as any other user content this
 // app renders.
 function escapeHtml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 // Darkens a "#rrggbb" hex color by a 0-1 fraction — used for the fallback
@@ -29,7 +33,8 @@ function darken(hex: string, amount: number): string {
   const match = /^#([0-9a-fA-F]{6})$/.exec(hex);
   if (!match) return hex;
   const num = parseInt(match[1], 16);
-  const channel = (shift: number) => Math.max(0, Math.round(((num >> shift) & 0xff) * (1 - amount)));
+  const channel = (shift: number) =>
+    Math.max(0, Math.round(((num >> shift) & 0xff) * (1 - amount)));
   return `#${[channel(16), channel(8), channel(0)].map((c) => c.toString(16).padStart(2, "0")).join("")}`;
 }
 
@@ -46,22 +51,40 @@ function darken(hex: string, amount: number): string {
 // Error correction H keeps the code scannable with the middle covered. If
 // the logo can't be fetched or composited, the plain QR is used instead:
 // the pass must always carry a working code.
-export async function buildQrPng(code: string, organizationId: string, width = 400): Promise<Buffer> {
-  const plain = await QRCode.toBuffer(code, { width, margin: 2, errorCorrectionLevel: "H" });
+export async function buildQrPng(
+  code: string,
+  organizationId: string,
+  width = 400,
+): Promise<Buffer> {
+  const plain = await QRCode.toBuffer(code, {
+    width,
+    margin: 2,
+    errorCorrectionLevel: "H",
+  });
   try {
     const admin = createAdminClient();
-    const { data } = await admin.from("organizations").select("qr_logo_url, qr_logo_size").eq("id", organizationId).maybeSingle();
+    const { data } = await admin
+      .from("organizations")
+      .select("qr_logo_url, qr_logo_size")
+      .eq("id", organizationId)
+      .maybeSingle();
     if (!data?.qr_logo_url) return plain;
 
     const response = await fetch(data.qr_logo_url);
     if (!response.ok) return plain;
     const logoSize = Math.round(width * qrLogoRatio(data.qr_logo_size));
     const logo = await sharp(Buffer.from(await response.arrayBuffer()))
-      .resize(logoSize, logoSize, { fit: "contain", background: { r: 255, g: 255, b: 255, alpha: 0 } })
+      .resize(logoSize, logoSize, {
+        fit: "contain",
+        background: { r: 255, g: 255, b: 255, alpha: 0 },
+      })
       .png()
       .toBuffer();
     // Drawn straight onto the code, no backing.
-    return await sharp(plain).composite([{ input: logo, gravity: "center" }]).png().toBuffer();
+    return await sharp(plain)
+      .composite([{ input: logo, gravity: "center" }])
+      .png()
+      .toBuffer();
   } catch {
     return plain;
   }
@@ -109,14 +132,21 @@ export async function sendRegistrationPassEmail(input: {
     description: input.eventDescription,
     startAt: input.startAt,
     endAt: input.endAt,
-    location: [input.venueLabel, input.joinLink].filter(Boolean).join(" · ") || null,
+    location:
+      [input.venueLabel, input.joinLink].filter(Boolean).join(" · ") || null,
   });
 
   // In the org's own timezone, not the Node runtime's (UTC on Vercel) —
   // otherwise the email shows a different clock time than the dashboard.
-  const startLabel = formatInTimezone(input.startAt, input.organizationTimezone, { dateStyle: "full", timeStyle: "short" });
+  const startLabel = formatInTimezone(
+    input.startAt,
+    input.organizationTimezone,
+    { dateStyle: "full", timeStyle: "short" },
+  );
   const passColor = input.passColor || "#7c3aed";
-  const registeredTo = input.recipientName ? escapeHtml(input.recipientName) : escapeHtml(input.to);
+  const registeredTo = input.recipientName
+    ? escapeHtml(input.recipientName)
+    : escapeHtml(input.to);
 
   // A real photo/banner is already a public Storage URL, so it's referenced
   // directly rather than pulled in as another attachment — only the
@@ -141,11 +171,15 @@ export async function sendRegistrationPassEmail(input: {
   const joinHtml = input.joinLink
     ? `<a href="${escapeHtml(input.joinLink)}" style="color: #555; text-decoration: none;">🔗 Join online</a>`
     : "";
-  const locationHtml = [venueHtml, joinHtml].filter(Boolean).join("<br />") || "📍 Location TBA";
+  const locationHtml =
+    [venueHtml, joinHtml].filter(Boolean).join("<br />") || "📍 Location TBA";
 
   const contactParts: string[] = [];
   if (input.contactName) contactParts.push(escapeHtml(input.contactName));
-  if (input.contactPhone) contactParts.push(`<a href="tel:${escapeHtml(input.contactPhone)}" style="color: #777;">${escapeHtml(input.contactPhone)}</a>`);
+  if (input.contactPhone)
+    contactParts.push(
+      `<a href="tel:${escapeHtml(input.contactPhone)}" style="color: #777;">${escapeHtml(input.contactPhone)}</a>`,
+    );
   const contactHtml =
     contactParts.length > 0
       ? `<p style="margin: 8px 0 0; font-size: 13px; color: #777;">Contact: ${contactParts.join(" &middot; ")}</p>`
@@ -200,8 +234,17 @@ export async function sendRegistrationPassEmail(input: {
       html,
       recipients: [input.to],
       attachments: [
-        { filename: "registration-pass-qr.png", content: qrPng, contentType: "image/png", contentId: "registration-pass-qr" },
-        { filename: "event.ics", content: Buffer.from(ics, "utf8"), contentType: "text/calendar" },
+        {
+          filename: "registration-pass-qr.png",
+          content: qrPng,
+          contentType: "image/png",
+          contentId: "registration-pass-qr",
+        },
+        {
+          filename: "event.ics",
+          content: Buffer.from(ics, "utf8"),
+          contentType: "text/calendar",
+        },
       ],
       organizationId: input.organizationId,
     });

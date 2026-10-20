@@ -52,7 +52,7 @@ export async function finalizePayUGivingOrderPayment(txnid: string, mihpayid: st
   // midnight in India is dated the right day.
   const { data: org } = await admin.from("organizations").select("timezone").eq("id", order.organization_id).maybeSingle();
   const donatedOn = dateKeyInTimezone(new Date(), org?.timezone ?? DEFAULT_TIMEZONE);
-  const recorded = await recordGivingPayment(admin, order, order.payment_mode === "own" ? "Online gift via the church's own PayU account." : "Online gift via KingdomFlow's shared PayU account.", donatedOn);
+  const recorded = await recordGivingPayment(admin, order, order.payment_mode === "own" ? "Online gift via the church's own PayU account." : "Online gift via KingdomFlow's shared Razorpay account.", donatedOn);
   if (!recorded.ok) {
     return { error: "Payment succeeded but couldn't be recorded. Please contact the church directly." };
   }

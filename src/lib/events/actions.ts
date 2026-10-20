@@ -9,13 +9,26 @@ import { checkTabAccess } from "@/lib/permissions/dal";
 import { validateEvent, type EventFieldErrors } from "@/lib/events/validation";
 import { sendPushToUsers } from "@/lib/push/client";
 import { notifyEventRegistrants } from "@/lib/push/event-registrants";
-import { describeEventChange, type EventSnapshot } from "@/lib/events/change-summary";
+import {
+  describeEventChange,
+  type EventSnapshot,
+} from "@/lib/events/change-summary";
 import { zonedTimeToUtc, DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
-import type { EventMeetingMode, EventRecurrenceFrequency, EventStatus } from "@/types/database";
+import type {
+  EventMeetingMode,
+  EventRecurrenceFrequency,
+  EventStatus,
+} from "@/types/database";
 
-async function organizationTimezoneFor(organizationId: string): Promise<string> {
+async function organizationTimezoneFor(
+  organizationId: string,
+): Promise<string> {
   const admin = createAdminClient();
-  const { data } = await admin.from("organizations").select("timezone").eq("id", organizationId).maybeSingle();
+  const { data } = await admin
+    .from("organizations")
+    .select("timezone")
+    .eq("id", organizationId)
+    .maybeSingle();
   return data?.timezone ?? DEFAULT_TIMEZONE;
 }
 
@@ -24,7 +37,11 @@ async function organizationTimezoneFor(organizationId: string): Promise<string> 
 // check is possible.
 async function organizationIdForEvent(id: string): Promise<string | null> {
   const admin = createAdminClient();
-  const { data } = await admin.from("events").select("organization_id").eq("id", id).maybeSingle();
+  const { data } = await admin
+    .from("events")
+    .select("organization_id")
+    .eq("id", id)
+    .maybeSingle();
   return data?.organization_id ?? null;
 }
 
@@ -63,7 +80,10 @@ function readEventFields(formData: FormData) {
   };
 }
 
-export async function createEvent(_prevState: EventFormState, formData: FormData): Promise<EventFormState> {
+export async function createEvent(
+  _prevState: EventFormState,
+  formData: FormData,
+): Promise<EventFormState> {
   const user = await requireUser();
   const organizationId = String(formData.get("organizationId") ?? "");
 
@@ -91,14 +111,27 @@ export async function createEvent(_prevState: EventFormState, formData: FormData
       organization_id: organizationId,
       title: fields.title.trim(),
       description: fields.description || null,
-      start_at: zonedTimeToUtc(fields.startAt, organizationTimezone).toISOString(),
-      end_at: fields.endAt ? zonedTimeToUtc(fields.endAt, organizationTimezone).toISOString() : null,
+      start_at: zonedTimeToUtc(
+        fields.startAt,
+        organizationTimezone,
+      ).toISOString(),
+      end_at: fields.endAt
+        ? zonedTimeToUtc(fields.endAt, organizationTimezone).toISOString()
+        : null,
       is_recurring: fields.isRecurring,
-      recurrence_frequency: fields.isRecurring ? (fields.recurrenceFrequency as EventRecurrenceFrequency) : null,
-      recurrence_end_date: fields.isRecurring && fields.recurrenceEndDate ? fields.recurrenceEndDate : null,
+      recurrence_frequency: fields.isRecurring
+        ? (fields.recurrenceFrequency as EventRecurrenceFrequency)
+        : null,
+      recurrence_end_date:
+        fields.isRecurring && fields.recurrenceEndDate
+          ? fields.recurrenceEndDate
+          : null,
       branch_id: fields.branchId || null,
       meeting_mode: fields.meetingMode as EventMeetingMode,
-      meeting_link: fields.meetingMode !== "offline" && fields.meetingLink ? fields.meetingLink : null,
+      meeting_link:
+        fields.meetingMode !== "offline" && fields.meetingLink
+          ? fields.meetingLink
+          : null,
       status: fields.status as EventStatus,
       venue: fields.venue || null,
       map_link: fields.mapLink || null,
@@ -124,7 +157,11 @@ export async function createEvent(_prevState: EventFormState, formData: FormData
 // responded, which would silently drop an un-awaited push). Sending is
 // best-effort and never throws, so a push failure can't turn a successful
 // event creation into an error for the admin who just created it.
-async function notifyOrgOfNewEvent(organizationId: string, creatorAuthUserId: string, eventTitle: string) {
+async function notifyOrgOfNewEvent(
+  organizationId: string,
+  creatorAuthUserId: string,
+  eventTitle: string,
+) {
   const admin = createAdminClient();
   const { data: members } = await admin
     .from("organization_members")
@@ -140,7 +177,10 @@ async function notifyOrgOfNewEvent(organizationId: string, creatorAuthUserId: st
   });
 }
 
-export async function updateEvent(_prevState: EventFormState, formData: FormData): Promise<EventFormState> {
+export async function updateEvent(
+  _prevState: EventFormState,
+  formData: FormData,
+): Promise<EventFormState> {
   await requireUser();
   const id = String(formData.get("id") ?? "");
 
@@ -163,21 +203,39 @@ export async function updateEvent(_prevState: EventFormState, formData: FormData
   const organizationTimezone = await organizationTimezoneFor(organizationId);
 
   const supabase = await createClient();
-  const snapshotColumns = "title, start_at, end_at, venue, meeting_link, status";
-  const { data: before } = await supabase.from("events").select(snapshotColumns).eq("id", id).maybeSingle<EventSnapshot>();
+  const snapshotColumns =
+    "title, start_at, end_at, venue, meeting_link, status";
+  const { data: before } = await supabase
+    .from("events")
+    .select(snapshotColumns)
+    .eq("id", id)
+    .maybeSingle<EventSnapshot>();
   const { error } = await supabase
     .from("events")
     .update({
       title: fields.title.trim(),
       description: fields.description || null,
-      start_at: zonedTimeToUtc(fields.startAt, organizationTimezone).toISOString(),
-      end_at: fields.endAt ? zonedTimeToUtc(fields.endAt, organizationTimezone).toISOString() : null,
+      start_at: zonedTimeToUtc(
+        fields.startAt,
+        organizationTimezone,
+      ).toISOString(),
+      end_at: fields.endAt
+        ? zonedTimeToUtc(fields.endAt, organizationTimezone).toISOString()
+        : null,
       is_recurring: fields.isRecurring,
-      recurrence_frequency: fields.isRecurring ? (fields.recurrenceFrequency as EventRecurrenceFrequency) : null,
-      recurrence_end_date: fields.isRecurring && fields.recurrenceEndDate ? fields.recurrenceEndDate : null,
+      recurrence_frequency: fields.isRecurring
+        ? (fields.recurrenceFrequency as EventRecurrenceFrequency)
+        : null,
+      recurrence_end_date:
+        fields.isRecurring && fields.recurrenceEndDate
+          ? fields.recurrenceEndDate
+          : null,
       branch_id: fields.branchId || null,
       meeting_mode: fields.meetingMode as EventMeetingMode,
-      meeting_link: fields.meetingMode !== "offline" && fields.meetingLink ? fields.meetingLink : null,
+      meeting_link:
+        fields.meetingMode !== "offline" && fields.meetingLink
+          ? fields.meetingLink
+          : null,
       status: fields.status as EventStatus,
       venue: fields.venue || null,
       map_link: fields.mapLink || null,
@@ -193,9 +251,14 @@ export async function updateEvent(_prevState: EventFormState, formData: FormData
 
   // Registrants who use the app hear about a time/venue change or a cancellation.
   if (before) {
-    const { data: after } = await supabase.from("events").select(snapshotColumns).eq("id", id).maybeSingle<EventSnapshot>();
+    const { data: after } = await supabase
+      .from("events")
+      .select(snapshotColumns)
+      .eq("id", id)
+      .maybeSingle<EventSnapshot>();
     const change = after ? describeEventChange(before, after) : null;
-    if (change) await notifyEventRegistrants(id, change.headline, change.detail);
+    if (change)
+      await notifyEventRegistrants(id, change.headline, change.detail);
   }
 
   revalidatePath(EVENTS_PATH);
@@ -217,10 +280,20 @@ export async function deleteEvent(formData: FormData) {
   // perform it.
   const admin = createAdminClient();
   // Registrants are removed with the event, so tell them first.
-  const { data: doomed } = await admin.from("events").select("title, flyer_path").eq("id", id).maybeSingle();
-  if (doomed) await notifyEventRegistrants(id, "Event cancelled", `${doomed.title} has been cancelled.`);
+  const { data: doomed } = await admin
+    .from("events")
+    .select("title, flyer_path")
+    .eq("id", id)
+    .maybeSingle();
+  if (doomed)
+    await notifyEventRegistrants(
+      id,
+      "Event cancelled",
+      `${doomed.title} has been cancelled.`,
+    );
   await admin.from("events").delete().eq("id", id);
-  if (doomed?.flyer_path) await admin.storage.from("event-flyers").remove([doomed.flyer_path]);
+  if (doomed?.flyer_path)
+    await admin.storage.from("event-flyers").remove([doomed.flyer_path]);
 
   revalidatePath(EVENTS_PATH);
 }

@@ -39,15 +39,24 @@ function webpVp8xBuffer(width: number, height: number): Buffer {
 
 describe("getImageDimensions", () => {
   it("reads PNG width/height from the IHDR chunk", () => {
-    expect(getImageDimensions(pngBuffer(1200, 350))).toEqual({ width: 1200, height: 350 });
+    expect(getImageDimensions(pngBuffer(1200, 350))).toEqual({
+      width: 1200,
+      height: 350,
+    });
   });
 
   it("reads JPEG width/height from the SOF0 segment", () => {
-    expect(getImageDimensions(jpegBuffer(1200, 350))).toEqual({ width: 1200, height: 350 });
+    expect(getImageDimensions(jpegBuffer(1200, 350))).toEqual({
+      width: 1200,
+      height: 350,
+    });
   });
 
   it("reads WebP (VP8X) width/height", () => {
-    expect(getImageDimensions(webpVp8xBuffer(1200, 350))).toEqual({ width: 1200, height: 350 });
+    expect(getImageDimensions(webpVp8xBuffer(1200, 350))).toEqual({
+      width: 1200,
+      height: 350,
+    });
   });
 
   it("returns null for an unrecognized format", () => {

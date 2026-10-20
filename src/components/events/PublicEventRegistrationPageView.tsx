@@ -1,9 +1,18 @@
 "use client";
 
 import { Suspense } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { PublicEventRegistrationForm } from "@/components/events/PublicEventRegistrationForm";
-import { PublicBrandHeader, PublicPoweredByFooter } from "@/components/PublicBrandHeader";
+import {
+  PublicBrandHeader,
+  PublicPoweredByFooter,
+} from "@/components/PublicBrandHeader";
 import { PublicLocaleProvider } from "@/lib/i18n/PublicLocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useLocale } from "@/lib/i18n/LocaleContext";
@@ -36,7 +45,10 @@ function NotFoundCard() {
   const { t } = useLocale();
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-background px-4 py-12 sm:px-6">
-      <Card size="lg" className="relative w-full max-w-md rounded-2xl shadow-lg">
+      <Card
+        size="lg"
+        className="relative w-full max-w-md rounded-2xl shadow-lg"
+      >
         <CardHeader>
           <CardTitle className="text-xl">{t.common.linkNotFound}</CardTitle>
           <CardDescription>{t.publicEvent.notFoundDescription}</CardDescription>
@@ -46,7 +58,13 @@ function NotFoundCard() {
   );
 }
 
-function EventContent({ token, data }: { token: string; data: PublicEventRegistrationData }) {
+function EventContent({
+  token,
+  data,
+}: {
+  token: string;
+  data: PublicEventRegistrationData;
+}) {
   const { t } = useLocale();
   const bt = useBilingualLabel(data.bilingual ?? null);
 
@@ -57,7 +75,9 @@ function EventContent({ token, data }: { token: string; data: PublicEventRegistr
   // when it's false, not to decide whether the form itself is allowed to
   // render.
   const isFull = data.spots_remaining !== null && data.spots_remaining <= 0;
-  const isClosed = data.registration_closes_at ? new Date(data.registration_closes_at) < new Date() : false;
+  const isClosed = data.registration_closes_at
+    ? new Date(data.registration_closes_at) < new Date()
+    : false;
   const statusMessage =
     data.status === "cancelled"
       ? bt((d) => d.publicEvent.cancelled)
@@ -66,7 +86,9 @@ function EventContent({ token, data }: { token: string; data: PublicEventRegistr
         : data.status === "pending"
           ? bt((d) => d.publicEvent.pending)
           : null;
-  const hasContact = Boolean(data.contact_name?.trim() || data.contact_phone?.trim());
+  const hasContact = Boolean(
+    data.contact_name?.trim() || data.contact_phone?.trim(),
+  );
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-background px-4 py-12 sm:px-6">
@@ -79,11 +101,19 @@ function EventContent({ token, data }: { token: string; data: PublicEventRegistr
         <div className="mb-2 flex justify-end">
           <LanguageSwitcher />
         </div>
-        <PublicBrandHeader logoUrl={data.organization_logo_url} name={data.organization_name} />
+        <PublicBrandHeader
+          logoUrl={data.organization_logo_url}
+          name={data.organization_name}
+        />
 
-        <Card size="lg" className="rounded-2xl shadow-lg md:[--card-spacing:--spacing(9)]">
+        <Card
+          size="lg"
+          className="rounded-2xl shadow-lg md:[--card-spacing:--spacing(9)]"
+        >
           <CardHeader>
-            <CardTitle className="font-heading text-2xl">{bilingualText(data.title, data.bilingual)}</CardTitle>
+            <CardTitle className="font-heading text-2xl">
+              {bilingualText(data.title, data.bilingual)}
+            </CardTitle>
             <CardDescription className="text-base">
               {/* A fixed locale AND a fixed (the org's own) timeZone, not
                   undefined for either — this renders inside a Client
@@ -93,23 +123,43 @@ function EventContent({ token, data }: { token: string; data: PublicEventRegistr
                   server (Node) vs. the browser and trip a hydration
                   mismatch, on top of just showing the wrong time to anyone
                   not in the org's own timezone. */}
-              {formatInTimezone(data.start_at, data.organization_timezone, { dateStyle: "full", timeStyle: "short" }, "en-US")}
+              {formatInTimezone(
+                data.start_at,
+                data.organization_timezone,
+                { dateStyle: "full", timeStyle: "short" },
+                "en-US",
+              )}
             </CardDescription>
-            {data.description && <p className="text-sm text-muted-foreground">{bilingualText(data.description, data.bilingual)}</p>}
+            {data.description && (
+              <p className="text-sm text-muted-foreground">
+                {bilingualText(data.description, data.bilingual)}
+              </p>
+            )}
           </CardHeader>
           <CardContent>
             {!data.is_open ? (
               <div className="space-y-3 rounded-xl bg-muted/40 p-4 text-center text-sm text-muted-foreground">
                 <p>
                   {statusMessage ??
-                    (isFull ? bt((d) => d.publicEvent.full) : isClosed ? bt((d) => d.publicEvent.closed) : bt((d) => d.publicEvent.closingSoon))}
+                    (isFull
+                      ? bt((d) => d.publicEvent.full)
+                      : isClosed
+                        ? bt((d) => d.publicEvent.closed)
+                        : bt((d) => d.publicEvent.closingSoon))}
                 </p>
                 {hasContact && (
                   <div className="border-t border-border pt-3 text-foreground">
-                    <p className="text-xs text-muted-foreground">{bt((d) => d.publicEvent.contactHeading)}</p>
-                    {data.contact_name?.trim() && <p className="font-medium">{data.contact_name.trim()}</p>}
+                    <p className="text-xs text-muted-foreground">
+                      {bt((d) => d.publicEvent.contactHeading)}
+                    </p>
+                    {data.contact_name?.trim() && (
+                      <p className="font-medium">{data.contact_name.trim()}</p>
+                    )}
                     {data.contact_phone?.trim() && (
-                      <a href={`tel:${data.contact_phone.replace(/[^\d+]/g, "")}`} className="font-medium text-primary hover:underline">
+                      <a
+                        href={`tel:${data.contact_phone.replace(/[^\d+]/g, "")}`}
+                        className="font-medium text-primary hover:underline"
+                      >
                         {data.contact_phone.trim()}
                       </a>
                     )}
@@ -119,13 +169,19 @@ function EventContent({ token, data }: { token: string; data: PublicEventRegistr
             ) : (
               <>
                 {data.spots_remaining !== null && (
-                  <p className="mb-4 text-xs text-muted-foreground">{t.publicEvent.spotsRemaining(data.spots_remaining)}</p>
+                  <p className="mb-4 text-xs text-muted-foreground">
+                    {t.publicEvent.spotsRemaining(data.spots_remaining)}
+                  </p>
                 )}
                 {/* PublicEventRegistrationForm reads ?payment= via useSearchParams
                     (set when PayU redirects back here) — same Suspense
                     requirement as LoginForm/SignupForm. */}
                 <Suspense fallback={null}>
-                  <PublicEventRegistrationForm token={token} fields={data.registration_fields ?? []} bilingual={data.bilingual ?? null} />
+                  <PublicEventRegistrationForm
+                    token={token}
+                    fields={data.registration_fields ?? []}
+                    bilingual={data.bilingual ?? null}
+                  />
                 </Suspense>
               </>
             )}
@@ -145,5 +201,9 @@ export function PublicEventRegistrationPageView({
   token: string;
   data: PublicEventRegistrationData | null;
 }) {
-  return <PublicLocaleProvider>{data ? <EventContent token={token} data={data} /> : <NotFoundCard />}</PublicLocaleProvider>;
+  return (
+    <PublicLocaleProvider>
+      {data ? <EventContent token={token} data={data} /> : <NotFoundCard />}
+    </PublicLocaleProvider>
+  );
 }

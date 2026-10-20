@@ -9,8 +9,8 @@ import {
   type PublicEventRegistrationState,
 } from "@/lib/events/public-registration-actions";
 import { EventRegistrationPayment } from "@/components/events/EventRegistrationPayment";
-import { createEventRegistrationOrder } from "@/lib/events/payu-registration";
-import { redirectToPayU } from "@/lib/payu/browser";
+import { createEventRegistrationOrder } from "@/lib/events/registration-payment";
+import { openRazorpayCheckout } from "@/lib/razorpay/browser";
 import { useLocale } from "@/lib/i18n/LocaleContext";
 import type { FormField } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -18,13 +18,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { CheckCircle2, Send } from "lucide-react";
 import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: PublicEventRegistrationState = {};
 
-function FieldLabel({ field, bilingual }: { field: FormField; bilingual: BilingualConfig | null }) {
+function FieldLabel({
+  field,
+  bilingual,
+}: {
+  field: FormField;
+  bilingual: BilingualConfig | null;
+}) {
   return (
     <Label htmlFor={`field-${field.key}`} className="text-sm font-medium">
       {bilingualText(field.label, bilingual)}
@@ -33,14 +45,24 @@ function FieldLabel({ field, bilingual }: { field: FormField; bilingual: Bilingu
   );
 }
 
-function PublicFieldInput({ field, bilingual }: { field: FormField; bilingual: BilingualConfig | null }) {
+function PublicFieldInput({
+  field,
+  bilingual,
+}: {
+  field: FormField;
+  bilingual: BilingualConfig | null;
+}) {
   const { t } = useLocale();
   const id = `field-${field.key}`;
 
   if (field.field_type === "checkbox") {
     return (
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/30 p-4 text-sm transition-colors hover:bg-muted/60">
-        <Checkbox name={field.key} required={field.required} className="mt-0.5" />
+        <Checkbox
+          name={field.key}
+          required={field.required}
+          className="mt-0.5"
+        />
         <span>
           {bilingualText(field.label, bilingual)}
           {field.required && <span className="text-destructive"> *</span>}
@@ -54,7 +76,10 @@ function PublicFieldInput({ field, bilingual }: { field: FormField; bilingual: B
       <div className="space-y-2">
         <FieldLabel field={field} bilingual={bilingual} />
         <Select name={field.key}>
-          <SelectTrigger id={id} className="h-11 w-full rounded-xl px-3.5 text-base shadow-sm">
+          <SelectTrigger
+            id={id}
+            className="h-11 w-full rounded-xl px-3.5 text-base shadow-sm"
+          >
             <SelectValue placeholder={t.common.selectAnOption} />
           </SelectTrigger>
           <SelectContent>
@@ -73,7 +98,13 @@ function PublicFieldInput({ field, bilingual }: { field: FormField; bilingual: B
     return (
       <div className="space-y-2">
         <FieldLabel field={field} bilingual={bilingual} />
-        <Textarea id={id} name={field.key} required={field.required} rows={3} className="rounded-xl px-3.5 py-3 text-base shadow-sm" />
+        <Textarea
+          id={id}
+          name={field.key}
+          required={field.required}
+          rows={3}
+          className="rounded-xl px-3.5 py-3 text-base shadow-sm"
+        />
       </div>
     );
   }
@@ -92,7 +123,13 @@ function PublicFieldInput({ field, bilingual }: { field: FormField; bilingual: B
   return (
     <div className="space-y-2">
       <FieldLabel field={field} bilingual={bilingual} />
-      <Input id={id} name={field.key} type={inputType} required={field.required} className="h-11 rounded-xl px-3.5 text-base shadow-sm" />
+      <Input
+        id={id}
+        name={field.key}
+        type={inputType}
+        required={field.required}
+        className="h-11 rounded-xl px-3.5 text-base shadow-sm"
+      />
     </div>
   );
 }
@@ -101,7 +138,13 @@ function PublicFieldInput({ field, bilingual }: { field: FormField; bilingual: B
 // "pay at check-in instead" button — the platform-gateway version lives
 // there since it shares state with the PayU checkout flow; this one
 // has nothing else to share state with, so it's local to this file.
-function DeferToCheckinButton({ registrationId, onDeferred }: { registrationId: string; onDeferred: () => void }) {
+function DeferToCheckinButton({
+  registrationId,
+  onDeferred,
+}: {
+  registrationId: string;
+  onDeferred: () => void;
+}) {
   const { t } = useLocale();
   const [pending, startTransition] = useTransition();
 
@@ -113,8 +156,15 @@ function DeferToCheckinButton({ registrationId, onDeferred }: { registrationId: 
   }
 
   return (
-    <Button type="button" variant="ghost" disabled={pending} onClick={handleClick}>
-      {pending ? t.publicEvent.deferringToCheckin : t.publicEvent.payAtCheckinInstead}
+    <Button
+      type="button"
+      variant="ghost"
+      disabled={pending}
+      onClick={handleClick}
+    >
+      {pending
+        ? t.publicEvent.deferringToCheckin
+        : t.publicEvent.payAtCheckinInstead}
     </Button>
   );
 }
@@ -124,7 +174,11 @@ function DeferToCheckinButton({ registrationId, onDeferred }: { registrationId: 
 // useActionState above has already reset to initialState by the time this
 // mounts. payment/registrationId travel as plain query params rather than
 // through state for exactly that reason.
-function PaymentFailedCard({ registrationId }: { registrationId: string | null }) {
+function PaymentFailedCard({
+  registrationId,
+}: {
+  registrationId: string | null;
+}) {
   const { t } = useLocale();
   const [retrying, setRetrying] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,38 +188,64 @@ function PaymentFailedCard({ registrationId }: { registrationId: string | null }
     setError(null);
     setRetrying(true);
     const result = await createEventRegistrationOrder(registrationId);
-    if (result.error || !result.payuFields || !result.payuActionUrl) {
+    if (result.error || !result.checkout) {
       setError(result.error ?? "Couldn't start the payment.");
       setRetrying(false);
       return;
     }
-    redirectToPayU(result.payuActionUrl, result.payuFields);
+    try {
+      await openRazorpayCheckout(result.checkout, () => setRetrying(false));
+    } catch {
+      setError(
+        "Couldn't open the payment window. Check your connection and try again.",
+      );
+      setRetrying(false);
+    }
   }
 
   return (
     <div className="flex flex-col items-center gap-4 py-8 text-center duration-300 animate-in fade-in zoom-in-95">
       <div className="space-y-1">
-        <p className="font-heading text-lg font-bold">{t.publicEvent.paymentFailedTitle}</p>
-        <p className="text-sm text-muted-foreground">{t.publicEvent.paymentFailedDescription}</p>
+        <p className="font-heading text-lg font-bold">
+          {t.publicEvent.paymentFailedTitle}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          {t.publicEvent.paymentFailedDescription}
+        </p>
       </div>
       <ErrorToast message={error} />
       {registrationId && (
         <Button type="button" disabled={retrying} onClick={handleRetry}>
-          {retrying ? t.publicEvent.processingPayment : t.publicEvent.retryPayment}
+          {retrying
+            ? t.publicEvent.processingPayment
+            : t.publicEvent.retryPayment}
         </Button>
       )}
     </div>
   );
 }
 
-export function PublicEventRegistrationForm({ token, fields, bilingual = null }: { token: string; fields: FormField[]; bilingual?: BilingualConfig | null }) {
+export function PublicEventRegistrationForm({
+  token,
+  fields,
+  bilingual = null,
+}: {
+  token: string;
+  fields: FormField[];
+  bilingual?: BilingualConfig | null;
+}) {
   const { t } = useLocale();
   const searchParams = useSearchParams();
   const registerWithToken = registerForEvent.bind(null, token);
-  const [state, formAction, pending] = useActionState(registerWithToken, initialState);
+  const [state, formAction, pending] = useActionState(
+    registerWithToken,
+    initialState,
+  );
   const [deferredToCheckin, setDeferredToCheckin] = useState(false);
 
-  const checkboxKeys = fields.filter((f) => f.field_type === "checkbox").map((f) => f.key);
+  const checkboxKeys = fields
+    .filter((f) => f.field_type === "checkbox")
+    .map((f) => f.key);
 
   // Checked before any state-driven branch below: a PayU return is a full
   // navigation, so state is always back to initialState here, even though
@@ -180,14 +260,20 @@ export function PublicEventRegistrationForm({ token, fields, bilingual = null }:
           <CheckCircle2 className="size-9 text-primary" />
         </div>
         <div className="space-y-1">
-          <p className="font-heading text-lg font-bold">{t.publicEvent.successTitle}</p>
-          <p className="text-sm text-muted-foreground">{t.publicEvent.successDescription}</p>
+          <p className="font-heading text-lg font-bold">
+            {t.publicEvent.successTitle}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {t.publicEvent.successDescription}
+          </p>
         </div>
       </div>
     );
   }
   if (paymentResult === "failed") {
-    return <PaymentFailedCard registrationId={searchParams.get("registrationId")} />;
+    return (
+      <PaymentFailedCard registrationId={searchParams.get("registrationId")} />
+    );
   }
 
   if (state.paymentRequired && state.registrationId) {
@@ -210,8 +296,14 @@ export function PublicEventRegistrationForm({ token, fields, bilingual = null }:
             <CheckCircle2 className="size-9 text-primary" />
           </div>
           <div className="space-y-1">
-            <p className="font-heading text-lg font-bold">{t.publicEvent.deferredToCheckinTitle}</p>
-            <p className="text-sm text-muted-foreground">{t.publicEvent.deferredToCheckinDescription(state.paymentAmount ?? 0)}</p>
+            <p className="font-heading text-lg font-bold">
+              {t.publicEvent.deferredToCheckinTitle}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {t.publicEvent.deferredToCheckinDescription(
+                state.paymentAmount ?? 0,
+              )}
+            </p>
           </div>
         </div>
       );
@@ -223,20 +315,38 @@ export function PublicEventRegistrationForm({ token, fields, bilingual = null }:
           <CheckCircle2 className="size-9 text-primary" />
         </div>
         <div className="space-y-1">
-          <p className="font-heading text-lg font-bold">{t.publicEvent.registeredPaymentPendingTitle}</p>
-          <p className="text-sm text-muted-foreground">{t.publicEvent.registeredPaymentPendingDescription}</p>
+          <p className="font-heading text-lg font-bold">
+            {t.publicEvent.registeredPaymentPendingTitle}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {t.publicEvent.registeredPaymentPendingDescription}
+          </p>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-2">
           {state.externalPaymentUrl && (
-            <Button nativeButton={false} render={<a href={state.externalPaymentUrl} target="_blank" rel="noopener noreferrer" />}>
+            <Button
+              nativeButton={false}
+              render={
+                <a
+                  href={state.externalPaymentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                />
+              }
+            >
               {t.publicEvent.payNow(state.paymentAmount ?? 0)}
             </Button>
           )}
           {allowDefer && (
-            <DeferToCheckinButton registrationId={state.registrationId} onDeferred={() => setDeferredToCheckin(true)} />
+            <DeferToCheckinButton
+              registrationId={state.registrationId}
+              onDeferred={() => setDeferredToCheckin(true)}
+            />
           )}
         </div>
-        <p className="text-xs text-muted-foreground">{t.publicEvent.externalPaymentNote}</p>
+        <p className="text-xs text-muted-foreground">
+          {t.publicEvent.externalPaymentNote}
+        </p>
       </div>
     );
   }
@@ -248,13 +358,22 @@ export function PublicEventRegistrationForm({ token, fields, bilingual = null }:
           <CheckCircle2 className="size-9 text-primary" />
         </div>
         <div className="space-y-1">
-          <p className="font-heading text-lg font-bold">{t.publicEvent.successTitle}</p>
-          <p className="text-sm text-muted-foreground">{t.publicEvent.successDescription}</p>
+          <p className="font-heading text-lg font-bold">
+            {t.publicEvent.successTitle}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {t.publicEvent.successDescription}
+          </p>
         </div>
         {state.paymentAmount != null && (
           <p className="text-sm text-muted-foreground">
             {state.paymentGateway === "external" && state.externalPaymentUrl ? (
-              <a href={state.externalPaymentUrl} target="_blank" rel="noopener noreferrer" className="underline">
+              <a
+                href={state.externalPaymentUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
                 {t.publicEvent.paymentDueAtCheckin(state.paymentAmount)}
               </a>
             ) : (
@@ -268,15 +387,32 @@ export function PublicEventRegistrationForm({ token, fields, bilingual = null }:
 
   return (
     <form action={formAction} className="space-y-5">
-      <input type="hidden" name="__fieldKeys" value={fields.map((f) => f.key).join(",")} />
-      <input type="hidden" name="__checkboxKeys" value={checkboxKeys.join(",")} />
+      <input
+        type="hidden"
+        name="__fieldKeys"
+        value={fields.map((f) => f.key).join(",")}
+      />
+      <input
+        type="hidden"
+        name="__checkboxKeys"
+        value={checkboxKeys.join(",")}
+      />
       <ErrorToast message={state.error} />
       <div className="space-y-4">
         {fields.map((field) => (
-          <PublicFieldInput key={field.key} field={field} bilingual={bilingual} />
+          <PublicFieldInput
+            key={field.key}
+            field={field}
+            bilingual={bilingual}
+          />
         ))}
       </div>
-      <Button type="submit" size="lg" className="w-full rounded-xl shadow-sm" disabled={pending}>
+      <Button
+        type="submit"
+        size="lg"
+        className="w-full rounded-xl shadow-sm"
+        disabled={pending}
+      >
         {pending ? (
           t.publicEvent.registering
         ) : (

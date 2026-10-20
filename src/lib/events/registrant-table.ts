@@ -1,11 +1,18 @@
-import type { EventRegistration, EventRegistrationField } from "@/types/database";
+import type {
+  EventRegistration,
+  EventRegistrationField,
+} from "@/types/database";
 
 export interface RegistrantTable {
   headers: string[];
   rows: string[][];
 }
 
-const STATUS_LABELS: Record<string, string> = { confirmed: "Registered", checked_in: "Checked in", cancelled: "Cancelled" };
+const STATUS_LABELS: Record<string, string> = {
+  confirmed: "Registered",
+  checked_in: "Checked in",
+  cancelled: "Cancelled",
+};
 
 // An event's registrants as a flat table for Excel/PDF, oldest first:
 // a row number, when they registered (date and time in the church's own
@@ -20,12 +27,29 @@ export function buildRegistrantTable(input: {
   paymentRequired: boolean;
 }): RegistrantTable {
   const { fields, timeZone, paymentRequired } = input;
-  const registrations = [...input.registrations].sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const registrations = [...input.registrations].sort((a, b) =>
+    a.created_at.localeCompare(b.created_at),
+  );
   const hasEmailField = fields.some((f) => f.field_type === "email");
 
-  const date = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone });
-  const time = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone });
-  const answer = (registration: EventRegistration, field: EventRegistrationField): string => {
+  const date = (iso: string) =>
+    new Date(iso).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone,
+    });
+  const time = (iso: string) =>
+    new Date(iso).toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+      timeZone,
+    });
+  const answer = (
+    registration: EventRegistration,
+    field: EventRegistrationField,
+  ): string => {
     const value = registration.answers[field.key];
     if (value === undefined || value === null) return "";
     if (typeof value === "boolean") return value ? "Yes" : "No";
@@ -55,7 +79,18 @@ export function buildRegistrantTable(input: {
     STATUS_LABELS[registration.status] ?? registration.status,
     registration.checked_in_at ? date(registration.checked_in_at) : "",
     registration.checked_in_at ? time(registration.checked_in_at) : "",
-    ...(paymentRequired ? [registration.payment_status === "paid" ? "Paid" : registration.payment_status === "pending" ? "Pending" : "", registration.payment_amount != null ? String(registration.payment_amount) : ""] : []),
+    ...(paymentRequired
+      ? [
+          registration.payment_status === "paid"
+            ? "Paid"
+            : registration.payment_status === "pending"
+              ? "Pending"
+              : "",
+          registration.payment_amount != null
+            ? String(registration.payment_amount)
+            : "",
+        ]
+      : []),
   ]);
 
   return { headers, rows };
@@ -66,5 +101,7 @@ export function buildRegistrantTable(input: {
 // silently producing it.
 export function containsNonLatin(table: RegistrantTable): boolean {
   const nonLatin = /[^\u0000-ɏ -⁯₠-⃏]/;
-  return [table.headers, ...table.rows].some((row) => row.some((cell) => nonLatin.test(cell)));
+  return [table.headers, ...table.rows].some((row) =>
+    row.some((cell) => nonLatin.test(cell)),
+  );
 }

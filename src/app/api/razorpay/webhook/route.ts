@@ -2,8 +2,17 @@ import { NextResponse } from "next/server";
 import { Razorpay } from "@/lib/billing/razorpay";
 import { getRazorpayWebhookSecret } from "@/lib/billing/env";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendSubscriptionActivatedEmail, sendSubscriptionChargedEmail, sendSubscriptionCancelledEmail } from "@/lib/billing/receipts";
+import {
+  sendSubscriptionActivatedEmail,
+  sendSubscriptionChargedEmail,
+  sendSubscriptionCancelledEmail,
+} from "@/lib/billing/receipts";
 import { logPlatformEvent } from "@/lib/platform-events/log";
+import { finalizeAddonOrderPayment } from "@/lib/billing/addon-actions";
+import { finalizeEventRegistrationPayment } from "@/lib/events/registration-payment";
+import { finalizeMembershipPayment } from "@/lib/membership-fees/finalize";
+import { finalizeProgramPayment } from "@/lib/lms/payments";
+import { finalizePayUGivingOrderPayment } from "@/lib/finance/payu-giving";
 import { PLANS, isPlanId, isBillingInterval } from "@/lib/plans/config";
 
 // The source of truth for plan changes — startSubscriptionCheckout's DB
@@ -26,11 +35,18 @@ export async function POST(request: Request) {
   try {
     secret = getRazorpayWebhookSecret();
   } catch {
-    return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Webhook not configured" },
+      { status: 500 },
+    );
   }
 
   if (!Razorpay.validateWebhookSignature(rawBody, signature, secret)) {
-    await logPlatformEvent({ level: "warning", source: "razorpay_webhook", message: "Invalid Razorpay webhook signature" });
+    await logPlatformEvent({
+      level: "warning",
+      source: "razorpay_webhook",
+      message: "Invalid Razorpay webhook signature",
+    });
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
@@ -39,23 +55,35 @@ export async function POST(request: Request) {
   const subscriptionEntity = payload.payload?.subscription?.entity;
   const paymentEntity = payload.payload?.payment?.entity;
 
-  // 'shared'-mode fundraiser giving moved to PayU — see
-  // /api/payu/giving/return. 'own' mode (a church's own Razorpay keys)
-  // still relies solely on the Checkout success callback (see
-  // confirmGivingPayment in giving-actions.ts), unchanged — it was never
-  // covered by this webhook in the first place, since it runs against a
-  // different (the church's own) Razorpay account with no webhook pointed
-  // at this app.
-
-  // Add-on pack purchases moved to PayU — see /api/payu/addon/return. PayU
-  // has no equivalent of this Razorpay webhook event, so there's no branch
-  // for it here anymore.
-
-  // Monthly membership fees moved to PayU — see
-  // /api/payu/membership/return. No branch for it here anymore.
-
-  // Paid event registration moved to PayU — see
-  // /api/payu/event-registration/return. No branch for it here anymore.
+  // One-time payments (add-ons, event registrations, membership fees, Bible School programs, shared-mode
+  // giving) normally finish on the browser's return route. This is the safety net for a person who paid
+  // and closed the page before it loaded: the same idempotent finalizers run from Razorpay's own word.
+  if (event === "order.paid") {
+    const receipt: string = payload.payload?.order?.entity?.receipt ?? "";
+    const paymentId: string = paymentEntity?.id ?? "";
+    if (receipt && paymentId) {
+      try {
+        const error = await finalizeByReceipt(receipt, paymentId);
+        if (error)
+          await logPlatformEvent({
+            level: "error",
+            source: "razorpay_webhook",
+            message: `order.paid for ${receipt} could not be finalized: ${error}`,
+            metadata: { receipt, paymentId },
+          });
+      } catch (err) {
+        await logPlatformEvent({
+          level: "error",
+          source: "razorpay_webhook",
+          message: `order.paid for ${receipt} failed: ${err instanceof Error ? err.message : "unknown error"}`,
+          metadata: { receipt, paymentId },
+        });
+        // A 500 makes Razorpay retry the event.
+        return NextResponse.json({ error: "Finalize failed" }, { status: 500 });
+      }
+    }
+    return NextResponse.json({ ok: true });
+  }
 
   if (!subscriptionEntity?.id) {
     // A payment/refund/other event this app doesn't act on — ack so
@@ -89,12 +117,18 @@ export async function POST(request: Request) {
     })
     .eq("razorpay_subscription_id", subscriptionEntity.id);
 
-  const planName = isPlanId(existing.plan_id) ? PLANS[existing.plan_id].name : existing.plan_id;
+  const planName = isPlanId(existing.plan_id)
+    ? PLANS[existing.plan_id].name
+    : existing.plan_id;
 
   // Record what the platform actually collected for this charge. Razorpay
   // reports amounts in paise. Keyed on the payment id, so a redelivered
   // webhook doesn't count the same charge twice.
-  if (event === "subscription.charged" && paymentEntity?.id && paymentEntity.amount > 0) {
+  if (
+    event === "subscription.charged" &&
+    paymentEntity?.id &&
+    paymentEntity.amount > 0
+  ) {
     await admin.from("platform_subscription_payments").upsert(
       {
         organization_id: existing.organization_id,
@@ -110,20 +144,64 @@ export async function POST(request: Request) {
   }
 
   if (event === "subscription.activated" || event === "subscription.charged") {
-    await admin.from("organizations").update({ plan: existing.plan_id }).eq("id", existing.organization_id);
+    await admin
+      .from("organizations")
+      .update({ plan: existing.plan_id })
+      .eq("id", existing.organization_id);
 
     if (event === "subscription.activated") {
-      const interval = isBillingInterval(existing.billing_interval) ? existing.billing_interval : "monthly";
-      await sendSubscriptionActivatedEmail(existing.organization_id, planName, interval);
+      const interval = isBillingInterval(existing.billing_interval)
+        ? existing.billing_interval
+        : "monthly";
+      await sendSubscriptionActivatedEmail(
+        existing.organization_id,
+        planName,
+        interval,
+      );
     } else {
-      await sendSubscriptionChargedEmail(existing.organization_id, planName, paymentEntity?.amount ?? null);
+      await sendSubscriptionChargedEmail(
+        existing.organization_id,
+        planName,
+        paymentEntity?.amount ?? null,
+      );
     }
-  } else if (["subscription.cancelled", "subscription.completed", "subscription.expired"].includes(event)) {
+  } else if (
+    [
+      "subscription.cancelled",
+      "subscription.completed",
+      "subscription.expired",
+    ].includes(event)
+  ) {
     // Basic is the floor plan everyone falls back to — there's no
     // free/suspended tier below it yet.
-    await admin.from("organizations").update({ plan: "basic" }).eq("id", existing.organization_id);
+    await admin
+      .from("organizations")
+      .update({ plan: "basic" })
+      .eq("id", existing.organization_id);
     await sendSubscriptionCancelledEmail(existing.organization_id, planName);
   }
 
   return NextResponse.json({ ok: true });
+}
+
+// The reference each flow puts on its Razorpay order starts with the flow's own prefix. Returns an error
+// message, or null when done (finalizers are idempotent, so a payment the return route already handled is
+// a no-op here).
+async function finalizeByReceipt(
+  receipt: string,
+  paymentId: string,
+): Promise<string | null> {
+  const run = async (fn: () => Promise<{ error?: string }>) =>
+    (await fn()).error ?? null;
+  if (receipt.startsWith("addon"))
+    return run(() => finalizeAddonOrderPayment(receipt, paymentId));
+  if (receipt.startsWith("evreg"))
+    return run(() => finalizeEventRegistrationPayment(receipt, paymentId));
+  if (receipt.startsWith("mship"))
+    return run(() => finalizeMembershipPayment(receipt, paymentId));
+  if (receipt.startsWith("lms"))
+    return run(() => finalizeProgramPayment(receipt, paymentId));
+  if (receipt.startsWith("giving"))
+    return run(() => finalizePayUGivingOrderPayment(receipt, paymentId));
+  return null;
 }

@@ -2,10 +2,8 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlanUsage } from "@/lib/plans/dal";
-import {
-  buildPaymentRequestFields,
-  type PayUFormFields,
-} from "@/lib/payu/client";
+import { createCheckout } from "@/lib/razorpay/platform";
+import type { RazorpayCheckout } from "@/lib/razorpay/checkout";
 import { getSiteUrl } from "@/lib/site-url";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { pushToTeam } from "@/lib/push/team";
@@ -13,10 +11,10 @@ import { isBibleSchoolOpen } from "@/lib/lms/public-school";
 import { emailStudentApproved } from "@/lib/lms/student-email";
 import { LMS_BASE_PATH } from "@/lib/lms/constants";
 
-// Program fees are collected on KingdomFlow's shared PayU account, like paid events, and the church is
+// Program fees are collected on KingdomFlow's shared Razorpay account, like paid events, and the church is
 // paid out from the Payouts page (2.5% service fee). Enrollment and payment are at program level:
 // paying enrolls the person in the program and so in every course of it. The order row is written
-// first and is the only thing the return route trusts, after it has checked PayU's hash.
+// first and is the only thing the return route trusts, after it has verified Razorpay's signature.
 
 export interface OrderResult {
   error?: string;
@@ -31,7 +29,7 @@ interface OrderInput {
   applicationId?: string;
 }
 
-// The address the browser opens to pay: a page that sends the person on to PayU.
+// The address the browser opens to pay: a page that opens the Razorpay payment window.
 export function checkoutUrl(orderId: string): string {
   return `${getSiteUrl()}/bible-school/checkout/${orderId}`;
 }
@@ -133,11 +131,10 @@ export interface CheckoutData {
   title: string;
   organizationName: string;
   amount: number;
-  payuFields: PayUFormFields;
-  payuActionUrl: string;
+  checkout: RazorpayCheckout;
 }
 
-// What the checkout page posts to PayU, built fresh each time it is opened. Null when the order is
+// The Razorpay order the checkout page opens, created fresh each time it is opened. Null when the order is
 // unknown or has already been paid.
 export async function getCheckoutData(
   orderId: string,
@@ -165,31 +162,31 @@ export async function getCheckoutData(
       .eq("id", order.organization_id)
       .maybeSingle(),
   ]);
-  const returnUrl = `${getSiteUrl()}/api/payu/bible-school/return?orderId=${order.id}`;
   try {
-    const built = buildPaymentRequestFields({
-      txnid: order.payu_txnid,
+    const checkout = await createCheckout({
+      receipt: order.payu_txnid,
       amountRupees: Number(order.amount),
-      productinfo: `Program: ${program?.title ?? "Bible School"}`.slice(0, 100),
-      firstname: order.payer_name.split(" ")[0] || "Student",
-      email: order.payer_email || "noreply@kingdomflow.in",
-      phone: order.payer_phone || "9999999999",
-      surl: returnUrl,
-      furl: returnUrl,
-      udf1: `lms:${order.id}`,
+      name: org?.name || "KingdomFlow",
+      description: `Program: ${program?.title ?? "Bible School"}`.slice(0, 100),
+      prefill: {
+        name: order.payer_name,
+        email: order.payer_email ?? undefined,
+        contact: order.payer_phone ?? undefined,
+      },
+      callbackUrl: `${getSiteUrl()}/api/razorpay/bible-school/return?orderId=${order.id}`,
+      notes: { kind: "bible_school_program", order_id: order.id },
     });
     return {
       title: program?.title ?? "Bible School program",
       organizationName: org?.name ?? "",
       amount: Number(order.amount),
-      payuFields: built.fields,
-      payuActionUrl: built.actionUrl,
+      checkout,
     };
   } catch (err) {
     await logPlatformEvent({
       level: "error",
       source: "bible_school_payment",
-      message: `PayU field build failed: ${err instanceof Error ? err.message : "unknown error"}`,
+      message: `Razorpay order creation failed: ${err instanceof Error ? err.message : "unknown error"}`,
       organizationId: order.organization_id,
       metadata: { orderId },
     });
@@ -204,7 +201,7 @@ export interface FinalizeResult {
   kind?: "application" | "member";
 }
 
-// Called by the PayU return route once it has verified PayU's hash. The status claim ("created" to
+// Called by the Razorpay return route once it has verified the signature. The status claim ("created" to
 // "paid") only matches once, so a replayed return cannot enrol twice.
 export async function finalizeProgramPayment(
   txnid: string,

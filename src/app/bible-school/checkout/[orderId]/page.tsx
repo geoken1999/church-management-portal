@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-// Opened from the application form, the web portal or the app: sends the person on to PayU to pay the
+// Opened from the application form, the web portal or the app: opens the Razorpay payment window to pay the
 // course fee. The order id in the address is the only thing identifying the payment, so the page shows
 // nothing but the course, the church and the amount.
 export default async function CourseCheckoutPage({
@@ -26,8 +26,7 @@ export default async function CourseCheckoutPage({
           title={data.title}
           organizationName={data.organizationName}
           amount={data.amount}
-          payuFields={data.payuFields}
-          payuActionUrl={data.payuActionUrl}
+          checkout={data.checkout}
         />
       ) : (
         <p className="max-w-sm text-center text-sm text-muted-foreground">

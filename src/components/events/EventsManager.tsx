@@ -2,19 +2,56 @@
 
 import { effectiveEventStatus } from "@/lib/events/status";
 import { useMemo, useState, useTransition } from "react";
-import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, UserRound, Repeat, Clock, MapPin, Video, Phone, Webcam } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Pencil,
+  Trash2,
+  UserRound,
+  Repeat,
+  Clock,
+  MapPin,
+  Video,
+  Phone,
+  Webcam,
+} from "lucide-react";
 import { cn } from "cn";
-import { createEvent, updateEvent, deleteEvent, type EventFormState } from "@/lib/events/actions";
-import { getOccurrencesInRange, occurrenceLabel } from "@/lib/events/recurrence";
-import { RECURRENCE_FREQUENCIES, EVENT_STATUSES } from "@/lib/events/validation";
+import {
+  createEvent,
+  updateEvent,
+  deleteEvent,
+  type EventFormState,
+} from "@/lib/events/actions";
+import {
+  getOccurrencesInRange,
+  occurrenceLabel,
+} from "@/lib/events/recurrence";
+import {
+  RECURRENCE_FREQUENCIES,
+  EVENT_STATUSES,
+} from "@/lib/events/validation";
 import { EventFlyerUpload } from "@/components/events/EventFlyerUpload";
 import { EventRegistrationDialog } from "@/components/events/EventRegistrationDialog";
-import { EventPayoutDialog, type PayoutHistoryEntry } from "@/components/events/EventPayoutDialog";
+import {
+  EventPayoutDialog,
+  type PayoutHistoryEntry,
+} from "@/components/events/EventPayoutDialog";
 import type { PayoutDetailsDefaultValues } from "@/components/organizations/PayoutDetailsFields";
 import { AddToAttendanceButton } from "@/components/events/AddToAttendanceButton";
 import { MEETING_MODE_LABELS } from "@/lib/events/location";
-import { partsInTimezone, formatInTimezone } from "@/lib/organizations/timezone";
-import type { Branch, Event, EventMeetingMode, EventRecurrenceFrequency, EventStatus, Member } from "@/types/database";
+import {
+  partsInTimezone,
+  formatInTimezone,
+} from "@/lib/organizations/timezone";
+import type {
+  Branch,
+  Event,
+  EventMeetingMode,
+  EventRecurrenceFrequency,
+  EventStatus,
+  Member,
+} from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,8 +59,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { FieldError } from "@/components/auth/FieldError";
 import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTab, TabsIndicator, TabsPanel } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Tabs,
+  TabsList,
+  TabsTab,
+  TabsIndicator,
+  TabsPanel,
+} from "@/components/ui/tabs";
 import {
   Dialog,
   DialogTrigger,
@@ -63,7 +112,10 @@ const EVENT_STATUS_LABELS: Record<EventStatus, string> = {
   completed: "Completed",
 };
 
-const EVENT_STATUS_BADGE_VARIANTS: Record<EventStatus, "default" | "secondary" | "destructive" | "outline"> = {
+const EVENT_STATUS_BADGE_VARIANTS: Record<
+  EventStatus,
+  "default" | "secondary" | "destructive" | "outline"
+> = {
   pending: "outline",
   active: "default",
   cancelled: "destructive",
@@ -86,9 +138,15 @@ function locationName(branch: BranchBasic | null): string {
 // (see createEvent/updateEvent in src/lib/events/actions.ts) rather than
 // the browser converting it before submit — that's what used to cause
 // "7 PM" to mean something different depending on who typed it.
-function toDateTimeLocalValue(iso: string | null, organizationTimezone: string): string {
+function toDateTimeLocalValue(
+  iso: string | null,
+  organizationTimezone: string,
+): string {
   if (!iso) return "";
-  const { year, month, day, hour, minute } = partsInTimezone(new Date(iso), organizationTimezone);
+  const { year, month, day, hour, minute } = partsInTimezone(
+    new Date(iso),
+    organizationTimezone,
+  );
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}`;
 }
@@ -115,7 +173,9 @@ function ManagerSelectField({
       <Select value={value} onValueChange={(v) => onChange(v ?? "")}>
         <SelectTrigger id="managedBy" className="w-full">
           <SelectValue placeholder="Unassigned">
-            {(v: string | null) => personName(members.find((m) => m.id === v) ?? null)}
+            {(v: string | null) =>
+              personName(members.find((m) => m.id === v) ?? null)
+            }
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
@@ -147,7 +207,9 @@ function BranchSelectField({
       <Select value={value} onValueChange={(v) => onChange(v ?? "")}>
         <SelectTrigger id="branchId" className="w-full">
           <SelectValue placeholder={OPEN_MEETING_LABEL}>
-            {(v: string | null) => locationName(branches.find((b) => b.id === v) ?? null)}
+            {(v: string | null) =>
+              locationName(branches.find((b) => b.id === v) ?? null)
+            }
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
@@ -179,14 +241,21 @@ function MeetingModeField({
       <div className="space-y-2">
         <Label htmlFor="meetingMode">Meeting type</Label>
         <input type="hidden" name="meetingMode" value={meetingMode} />
-        <Select value={meetingMode} onValueChange={(v) => onMeetingModeChange(v ?? "offline")}>
+        <Select
+          value={meetingMode}
+          onValueChange={(v) => onMeetingModeChange(v ?? "offline")}
+        >
           <SelectTrigger id="meetingMode" className="w-full">
             <SelectValue>
-              {(v: string | null) => MEETING_MODE_LABELS[(v ?? "offline") as EventMeetingMode]}
+              {(v: string | null) =>
+                MEETING_MODE_LABELS[(v ?? "offline") as EventMeetingMode]
+              }
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="offline">{MEETING_MODE_LABELS.offline}</SelectItem>
+            <SelectItem value="offline">
+              {MEETING_MODE_LABELS.offline}
+            </SelectItem>
             <SelectItem value="online">{MEETING_MODE_LABELS.online}</SelectItem>
             <SelectItem value="hybrid">{MEETING_MODE_LABELS.hybrid}</SelectItem>
           </SelectContent>
@@ -202,7 +271,9 @@ function MeetingModeField({
             defaultValue={event?.meeting_link ?? ""}
             placeholder="https://zoom.us/j/..."
             aria-invalid={Boolean(errors?.meetingLink)}
-            aria-describedby={errors?.meetingLink ? "meetingLink-error" : undefined}
+            aria-describedby={
+              errors?.meetingLink ? "meetingLink-error" : undefined
+            }
           />
           <FieldError id="meetingLink-error" message={errors?.meetingLink} />
         </div>
@@ -293,9 +364,20 @@ function EventFields({
       <div className="space-y-2">
         <Label htmlFor="status">Status</Label>
         <input type="hidden" name="status" value={status} />
-        <Select value={status} onValueChange={(v) => onStatusChange(v ?? "active")}>
-          <SelectTrigger id="status" className="w-full" aria-invalid={Boolean(errors?.status)}>
-            <SelectValue>{(v: string | null) => EVENT_STATUS_LABELS[(v ?? "active") as EventStatus]}</SelectValue>
+        <Select
+          value={status}
+          onValueChange={(v) => onStatusChange(v ?? "active")}
+        >
+          <SelectTrigger
+            id="status"
+            className="w-full"
+            aria-invalid={Boolean(errors?.status)}
+          >
+            <SelectValue>
+              {(v: string | null) =>
+                EVENT_STATUS_LABELS[(v ?? "active") as EventStatus]
+              }
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {EVENT_STATUSES.map((s) => (
@@ -306,7 +388,10 @@ function EventFields({
           </SelectContent>
         </Select>
         <FieldError id="status-error" message={errors?.status} />
-        <p className="text-xs text-muted-foreground">The registration link only accepts registrants while an event is Active.</p>
+        <p className="text-xs text-muted-foreground">
+          The registration link only accepts registrants while an event is
+          Active.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -316,7 +401,10 @@ function EventFields({
             id="startAt"
             name="startAt"
             type="datetime-local"
-            defaultValue={toDateTimeLocalValue(event?.start_at ?? null, organizationTimezone)}
+            defaultValue={toDateTimeLocalValue(
+              event?.start_at ?? null,
+              organizationTimezone,
+            )}
             required
             aria-invalid={Boolean(errors?.startAt)}
             aria-describedby={errors?.startAt ? "startAt-error" : undefined}
@@ -329,7 +417,10 @@ function EventFields({
             id="endAt"
             name="endAt"
             type="datetime-local"
-            defaultValue={toDateTimeLocalValue(event?.end_at ?? null, organizationTimezone)}
+            defaultValue={toDateTimeLocalValue(
+              event?.end_at ?? null,
+              organizationTimezone,
+            )}
             aria-invalid={Boolean(errors?.endAt)}
             aria-describedby={errors?.endAt ? "endAt-error" : undefined}
           />
@@ -337,18 +428,27 @@ function EventFields({
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        Times are in your organization&apos;s timezone ({organizationTimezone}) — change this from the Profile page.
+        Times are in your organization&apos;s timezone ({organizationTimezone})
+        — change this from the Profile page.
       </p>
 
       <div className="space-y-2">
         <Label htmlFor="occurrence">Occurrence</Label>
-        <input type="hidden" name="isRecurring" value={isRecurring ? "true" : "false"} />
+        <input
+          type="hidden"
+          name="isRecurring"
+          value={isRecurring ? "true" : "false"}
+        />
         <Select
           value={isRecurring ? "recurring" : "one_time"}
           onValueChange={(v) => onIsRecurringChange(v === "recurring")}
         >
           <SelectTrigger id="occurrence" className="w-full">
-            <SelectValue>{(v: string | null) => (v === "recurring" ? "Recurring event" : "One-time event")}</SelectValue>
+            <SelectValue>
+              {(v: string | null) =>
+                v === "recurring" ? "Recurring event" : "One-time event"
+              }
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="one_time">One-time event</SelectItem>
@@ -362,14 +462,21 @@ function EventFields({
           <div className="space-y-2">
             <Label htmlFor="recurrenceFrequency">Repeats</Label>
             <input type="hidden" name="recurrenceFrequency" value={frequency} />
-            <Select value={frequency} onValueChange={(v) => onFrequencyChange(v ?? "weekly")}>
+            <Select
+              value={frequency}
+              onValueChange={(v) => onFrequencyChange(v ?? "weekly")}
+            >
               <SelectTrigger
                 id="recurrenceFrequency"
                 className="w-full"
                 aria-invalid={Boolean(errors?.recurrenceFrequency)}
               >
                 <SelectValue>
-                  {(v: string | null) => FREQUENCY_LABELS[(v ?? "weekly") as EventRecurrenceFrequency]}
+                  {(v: string | null) =>
+                    FREQUENCY_LABELS[
+                      (v ?? "weekly") as EventRecurrenceFrequency
+                    ]
+                  }
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -380,7 +487,10 @@ function EventFields({
                 ))}
               </SelectContent>
             </Select>
-            <FieldError id="recurrenceFrequency-error" message={errors?.recurrenceFrequency} />
+            <FieldError
+              id="recurrenceFrequency-error"
+              message={errors?.recurrenceFrequency}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="recurrenceEndDate">Ends on (optional)</Label>
@@ -390,14 +500,25 @@ function EventFields({
               type="date"
               defaultValue={event?.recurrence_end_date ?? ""}
               aria-invalid={Boolean(errors?.recurrenceEndDate)}
-              aria-describedby={errors?.recurrenceEndDate ? "recurrenceEndDate-error" : undefined}
+              aria-describedby={
+                errors?.recurrenceEndDate
+                  ? "recurrenceEndDate-error"
+                  : undefined
+              }
             />
-            <FieldError id="recurrenceEndDate-error" message={errors?.recurrenceEndDate} />
+            <FieldError
+              id="recurrenceEndDate-error"
+              message={errors?.recurrenceEndDate}
+            />
           </div>
         </div>
       )}
 
-      <BranchSelectField branches={branches} value={branchId} onChange={onBranchIdChange} />
+      <BranchSelectField
+        branches={branches}
+        value={branchId}
+        onChange={onBranchIdChange}
+      />
 
       <MeetingModeField
         meetingMode={meetingMode}
@@ -409,15 +530,30 @@ function EventFields({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="contactName">Event contact (optional)</Label>
-          <Input id="contactName" name="contactName" defaultValue={event?.contact_name ?? ""} placeholder="Name" />
+          <Input
+            id="contactName"
+            name="contactName"
+            defaultValue={event?.contact_name ?? ""}
+            placeholder="Name"
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="contactPhone">Contact phone (optional)</Label>
-          <Input id="contactPhone" name="contactPhone" type="tel" defaultValue={event?.contact_phone ?? ""} placeholder="Phone number" />
+          <Input
+            id="contactPhone"
+            name="contactPhone"
+            type="tel"
+            defaultValue={event?.contact_phone ?? ""}
+            placeholder="Phone number"
+          />
         </div>
       </div>
 
-      <ManagerSelectField members={members} value={managedBy} onChange={onManagedByChange} />
+      <ManagerSelectField
+        members={members}
+        value={managedBy}
+        onChange={onManagedByChange}
+      />
 
       <div className="space-y-2">
         <Label htmlFor="description">Description</Label>
@@ -489,7 +625,9 @@ function AddEventDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add an event</DialogTitle>
-          <DialogDescription>Schedule a one-time or recurring event.</DialogDescription>
+          <DialogDescription>
+            Schedule a one-time or recurring event.
+          </DialogDescription>
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
@@ -541,7 +679,9 @@ function EditEventDialog({
   const [meetingMode, setMeetingMode] = useState<string>(event.meeting_mode);
   const [managedBy, setManagedBy] = useState(event.managed_by ?? "");
   const [isRecurring, setIsRecurring] = useState(event.is_recurring);
-  const [frequency, setFrequency] = useState<string>(event.recurrence_frequency ?? "weekly");
+  const [frequency, setFrequency] = useState<string>(
+    event.recurrence_frequency ?? "weekly",
+  );
   // Falls back to "active" if the fetched row has no status yet (e.g. the
   // migration adding it hasn't been run against this database) — without
   // this, Select would start uncontrolled (value=undefined) and Base UI
@@ -583,7 +723,9 @@ function EditEventDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit event</DialogTitle>
-          <DialogDescription>Update this event&apos;s details.</DialogDescription>
+          <DialogDescription>
+            Update this event&apos;s details.
+          </DialogDescription>
         </DialogHeader>
         <EventFlyerUpload eventId={event.id} flyerPath={event.flyer_path} />
         <form action={handleSubmit} className="space-y-4">
@@ -648,15 +790,32 @@ function EventCard({
   // — so a staff member in India and an NRI admin see the same intended
   // wall-clock time for the same event.
   // What the event is now (a past event reads Completed even if it was saved as Active).
-  const shownStatus = effectiveEventStatus(event, new Date(), organizationTimezone);
-  const startParts = partsInTimezone(new Date(event.start_at), organizationTimezone);
-  const endParts = event.end_at ? partsInTimezone(new Date(event.end_at), organizationTimezone) : null;
+  const shownStatus = effectiveEventStatus(
+    event,
+    new Date(),
+    organizationTimezone,
+  );
+  const startParts = partsInTimezone(
+    new Date(event.start_at),
+    organizationTimezone,
+  );
+  const endParts = event.end_at
+    ? partsInTimezone(new Date(event.end_at), organizationTimezone)
+    : null;
   const sameDay = endParts
-    ? endParts.year === startParts.year && endParts.month === startParts.month && endParts.day === startParts.day
+    ? endParts.year === startParts.year &&
+      endParts.month === startParts.month &&
+      endParts.day === startParts.day
     : false;
-  const dateLabel = formatInTimezone(event.start_at, organizationTimezone, { dateStyle: "medium", timeStyle: "short" });
+  const dateLabel = formatInTimezone(event.start_at, organizationTimezone, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
   const endLabel = event.end_at
-    ? formatInTimezone(event.end_at, organizationTimezone, { dateStyle: sameDay ? undefined : "medium", timeStyle: "short" })
+    ? formatInTimezone(event.end_at, organizationTimezone, {
+        dateStyle: sameDay ? undefined : "medium",
+        timeStyle: "short",
+      })
     : null;
 
   return (
@@ -676,7 +835,9 @@ function EventCard({
               {event.is_recurring && <Repeat className="size-3" />}
               {occurrenceLabel(event)}
             </Badge>
-            <Badge variant={EVENT_STATUS_BADGE_VARIANTS[shownStatus]}>{EVENT_STATUS_LABELS[shownStatus]}</Badge>
+            <Badge variant={EVENT_STATUS_BADGE_VARIANTS[shownStatus]}>
+              {EVENT_STATUS_LABELS[shownStatus]}
+            </Badge>
             {event.payment_gateway === "platform" && event.collected > 0 && (
               <EventPayoutDialog
                 eventId={event.id}
@@ -727,7 +888,11 @@ function EventCard({
                   className="font-medium text-primary underline-offset-4 hover:underline"
                 >
                   K-Connect: {meeting.title}
-                  {meeting.status === "live" ? " (live)" : meeting.status === "ended" ? " (ended)" : ""}
+                  {meeting.status === "live"
+                    ? " (live)"
+                    : meeting.status === "ended"
+                      ? " (ended)"
+                      : ""}
                 </a>
               ))}
             </div>
@@ -743,19 +908,34 @@ function EventCard({
                 {event.contact_name}
                 {event.contact_name && event.contact_phone ? " · " : ""}
                 {event.contact_phone && (
-                  <a href={`tel:${event.contact_phone}`} className="font-medium text-primary underline-offset-4 hover:underline">
+                  <a
+                    href={`tel:${event.contact_phone}`}
+                    className="font-medium text-primary underline-offset-4 hover:underline"
+                  >
                     {event.contact_phone}
                   </a>
                 )}
               </span>
             </div>
           )}
-          {event.description && <p className="text-sm text-muted-foreground">{event.description}</p>}
+          {event.description && (
+            <p className="text-sm text-muted-foreground">{event.description}</p>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <AddToAttendanceButton eventId={event.id} />
-          <EventRegistrationDialog event={event} siteUrl={siteUrl} financeEnabled={financeEnabled} organizationTimezone={organizationTimezone} />
-          <EditEventDialog event={event} members={members} branches={branches} organizationTimezone={organizationTimezone} />
+          <EventRegistrationDialog
+            event={event}
+            siteUrl={siteUrl}
+            financeEnabled={financeEnabled}
+            organizationTimezone={organizationTimezone}
+          />
+          <EditEventDialog
+            event={event}
+            members={members}
+            branches={branches}
+            organizationTimezone={organizationTimezone}
+          />
           {canManage && (
             <form action={deleteEvent}>
               <input type="hidden" name="id" value={event.id} />
@@ -803,10 +983,20 @@ function EventsListTab({
     const cancelled: EventRow[] = [];
     for (const event of events) {
       const status = effectiveEventStatus(event, now, organizationTimezone);
-      (status === "cancelled" ? cancelled : status === "completed" ? completed : upcoming).push(event);
+      (status === "cancelled"
+        ? cancelled
+        : status === "completed"
+          ? completed
+          : upcoming
+      ).push(event);
     }
-    const newestFirst = (a: EventRow, b: EventRow) => b.start_at.localeCompare(a.start_at);
-    return { upcoming, completed: completed.sort(newestFirst), cancelled: cancelled.sort(newestFirst) };
+    const newestFirst = (a: EventRow, b: EventRow) =>
+      b.start_at.localeCompare(a.start_at);
+    return {
+      upcoming,
+      completed: completed.sort(newestFirst),
+      cancelled: cancelled.sort(newestFirst),
+    };
   }, [events, organizationTimezone]);
 
   if (events.length === 0) {
@@ -819,10 +1009,31 @@ function EventsListTab({
     );
   }
 
-  const panels: { value: string; label: string; items: EventRow[]; empty: string }[] = [
-    { value: "upcoming", label: "Upcoming", items: groups.upcoming, empty: "No upcoming events." },
-    { value: "completed", label: "Completed", items: groups.completed, empty: "No completed events yet. Events move here on their own once their date has passed." },
-    { value: "cancelled", label: "Cancelled", items: groups.cancelled, empty: "No cancelled events." },
+  const panels: {
+    value: string;
+    label: string;
+    items: EventRow[];
+    empty: string;
+  }[] = [
+    {
+      value: "upcoming",
+      label: "Upcoming",
+      items: groups.upcoming,
+      empty: "No upcoming events.",
+    },
+    {
+      value: "completed",
+      label: "Completed",
+      items: groups.completed,
+      empty:
+        "No completed events yet. Events move here on their own once their date has passed.",
+    },
+    {
+      value: "cancelled",
+      label: "Cancelled",
+      items: groups.cancelled,
+      empty: "No cancelled events.",
+    },
   ];
 
   return (
@@ -839,7 +1050,9 @@ function EventsListTab({
         <TabsPanel key={panel.value} value={panel.value}>
           {panel.items.length === 0 ? (
             <Card>
-              <CardContent className="py-10 text-center text-sm text-muted-foreground">{panel.empty}</CardContent>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                {panel.empty}
+              </CardContent>
             </Card>
           ) : (
             <div className="space-y-4">
@@ -908,7 +1121,10 @@ function EventCalendar({ events }: { events: EventRow[] }) {
     return { days: gridDays, occurrencesByDate: byDate };
   }, [cursor, events]);
 
-  const monthLabel = cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const monthLabel = cursor.toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
   const todayKey = toDateKey(new Date());
 
   return (
@@ -937,7 +1153,10 @@ function EventCalendar({ events }: { events: EventRow[] }) {
         </div>
         <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-border bg-border">
           {WEEKDAY_LABELS.map((label) => (
-            <div key={label} className="bg-muted px-1 py-2 text-center text-xs font-medium text-muted-foreground">
+            <div
+              key={label}
+              className="bg-muted px-1 py-2 text-center text-xs font-medium text-muted-foreground"
+            >
               {label}
             </div>
           ))}
@@ -948,12 +1167,19 @@ function EventCalendar({ events }: { events: EventRow[] }) {
             const isToday = key === todayKey;
 
             return (
-              <div key={key} className={cn("min-h-24 space-y-1 bg-background p-1.5", !inMonth && "bg-muted/30")}>
+              <div
+                key={key}
+                className={cn(
+                  "min-h-24 space-y-1 bg-background p-1.5",
+                  !inMonth && "bg-muted/30",
+                )}
+              >
                 <span
                   className={cn(
                     "inline-flex size-5 items-center justify-center rounded-full text-xs",
                     !inMonth && "text-muted-foreground",
-                    isToday && "bg-primary font-semibold text-primary-foreground",
+                    isToday &&
+                      "bg-primary font-semibold text-primary-foreground",
                   )}
                 >
                   {day.getDate()}
@@ -969,7 +1195,9 @@ function EventCalendar({ events }: { events: EventRow[] }) {
                     </div>
                   ))}
                   {dayOccurrences.length > 3 && (
-                    <div className="text-[0.65rem] text-muted-foreground">+{dayOccurrences.length - 3} more</div>
+                    <div className="text-[0.65rem] text-muted-foreground">
+                      +{dayOccurrences.length - 3} more
+                    </div>
                   )}
                 </div>
               </div>
@@ -1011,7 +1239,12 @@ export function EventsManager({
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <AddEventDialog organizationId={organizationId} members={members} branches={branches} organizationTimezone={organizationTimezone} />
+        <AddEventDialog
+          organizationId={organizationId}
+          members={members}
+          branches={branches}
+          organizationTimezone={organizationTimezone}
+        />
       </div>
       <Tabs defaultValue="calendar">
         <TabsList>

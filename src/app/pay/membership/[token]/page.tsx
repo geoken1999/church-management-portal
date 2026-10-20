@@ -30,45 +30,75 @@ export default async function MembershipPaymentPage({
     .maybeSingle();
 
   if (!invoice) {
-    return <Notice title="Payment link not found" body="This link isn't valid. Ask your church for a new one." />;
+    return (
+      <Notice
+        title="Payment link not found"
+        body="This link isn't valid. Ask your church for a new one."
+      />
+    );
   }
 
-  const { data: org } = await admin.from("organizations").select("name").eq("id", invoice.organization_id).maybeSingle();
+  const { data: org } = await admin
+    .from("organizations")
+    .select("name")
+    .eq("id", invoice.organization_id)
+    .maybeSingle();
   const churchName = org?.name ?? "Your church";
   const periodLabel = membershipPeriodLabel(invoice.period);
   const amount = Number(invoice.amount);
 
   if (invoice.status === "paid") {
-    return <Notice title="Already paid" body={`The ${periodLabel} membership fee for ${churchName} has been paid. Thank you!`} />;
+    return (
+      <Notice
+        title="Already paid"
+        body={`The ${periodLabel} membership fee for ${churchName} has been paid. Thank you!`}
+      />
+    );
   }
   if (invoice.status !== "due") {
-    return <Notice title="No longer open" body="This payment request has been closed. Contact the church if you think this is a mistake." />;
+    return (
+      <Notice
+        title="No longer open"
+        body="This payment request has been closed. Contact the church if you think this is a mistake."
+      />
+    );
   }
 
   return (
     <div className="mx-auto max-w-md space-y-6 px-4 py-12">
       <div className="text-center">
         <p className="text-sm text-muted-foreground">{churchName}</p>
-        <h1 className="font-heading text-2xl font-bold tracking-tight">Membership fee</h1>
+        <h1 className="font-heading text-2xl font-bold tracking-tight">
+          Membership fee
+        </h1>
         <p className="mt-1 text-muted-foreground">{periodLabel}</p>
       </div>
       <Card>
         <CardContent className="space-y-4 py-6">
           {payment === "failed" && (
             <Alert variant="destructive">
-              <AlertDescription>That payment didn&apos;t go through. You haven&apos;t been charged — you can try again below.</AlertDescription>
+              <AlertDescription>
+                That payment didn&apos;t go through. You haven&apos;t been
+                charged — you can try again below.
+              </AlertDescription>
             </Alert>
           )}
           <div className="text-center">
             <p className="text-sm text-muted-foreground">Amount due</p>
             <p className="font-heading text-3xl font-bold tabular-nums">
-              ₹{amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ₹
+              {amount.toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </p>
           </div>
           <MembershipPayButton token={token} amount={amount} />
         </CardContent>
       </Card>
-      <p className="text-center text-xs text-muted-foreground">Payments are processed securely by PayU.</p>
+      <p className="text-center text-xs text-muted-foreground">
+        Payments are processed securely by Razorpay.
+      </p>
     </div>
   );
 }

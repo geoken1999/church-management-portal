@@ -29,14 +29,14 @@ export function OnboardingCheckoutCard({
   monthlyBase,
   billingDetails,
   sellerState,
-  payuConfigured,
+  paymentsConfigured,
 }: {
   moduleLabels: string[];
   creditLabels: string[];
   monthlyBase: number;
   billingDetails: BillingDetailsInput;
   sellerState: string;
-  payuConfigured: boolean;
+  paymentsConfigured: boolean;
 }) {
   const [vpa, setVpa] = useState("");
   const [open, setOpen] = useState(false);
@@ -106,7 +106,7 @@ export function OnboardingCheckoutCard({
             app; nothing is charged until you approve it.
           </p>
         </div>
-        <Button onClick={begin} disabled={!payuConfigured}>
+        <Button onClick={begin} disabled={!paymentsConfigured}>
           Authorize subscription
         </Button>
       </CardContent>

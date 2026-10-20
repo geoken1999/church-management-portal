@@ -16,7 +16,12 @@ export interface EventOccurrence<T extends RecurringEventLike> {
 // day-of-month/day-of-year so e.g. a monthly event starting Jan 31 lands on
 // the next month that actually has a 31st, rather than silently rolling
 // over into March the way `setMonth` would.
-function step(date: Date, frequency: EventRecurrenceFrequency, anchorDay: number, anchorMonth: number): Date {
+function step(
+  date: Date,
+  frequency: EventRecurrenceFrequency,
+  anchorDay: number,
+  anchorMonth: number,
+): Date {
   const time = {
     h: date.getHours(),
     m: date.getMinutes(),
@@ -46,7 +51,15 @@ function step(date: Date, frequency: EventRecurrenceFrequency, anchorDay: number
       const totalMonths = date.getFullYear() * 12 + date.getMonth() + offset;
       const year = Math.floor(totalMonths / 12);
       const month = totalMonths - year * 12;
-      const candidate = new Date(year, month, anchorDay, time.h, time.m, time.s, time.ms);
+      const candidate = new Date(
+        year,
+        month,
+        anchorDay,
+        time.h,
+        time.m,
+        time.s,
+        time.ms,
+      );
       if (candidate.getFullYear() === year && candidate.getMonth() === month) {
         return candidate;
       }
@@ -58,8 +71,19 @@ function step(date: Date, frequency: EventRecurrenceFrequency, anchorDay: number
   let offset = 1;
   while (true) {
     const year = date.getFullYear() + offset;
-    const candidate = new Date(year, anchorMonth, anchorDay, time.h, time.m, time.s, time.ms);
-    if (candidate.getFullYear() === year && candidate.getMonth() === anchorMonth) {
+    const candidate = new Date(
+      year,
+      anchorMonth,
+      anchorDay,
+      time.h,
+      time.m,
+      time.s,
+      time.ms,
+    );
+    if (
+      candidate.getFullYear() === year &&
+      candidate.getMonth() === anchorMonth
+    ) {
       return candidate;
     }
     offset += 1;
@@ -113,7 +137,8 @@ export function getOccurrencesInRange<T extends RecurringEventLike>(
 }
 
 export function occurrenceLabel(event: RecurringEventLike): string {
-  if (!event.is_recurring || !event.recurrence_frequency) return "One-time event";
+  if (!event.is_recurring || !event.recurrence_frequency)
+    return "One-time event";
 
   const labels: Record<EventRecurrenceFrequency, string> = {
     daily: "Repeats daily",

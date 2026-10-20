@@ -7,7 +7,11 @@ import { sendRegistrationPassEmail } from "@/lib/events/registration-pass";
 import { sendPassWhatsAppForRegistration } from "@/lib/events/pass-whatsapp";
 import { eventVenueLabel, eventJoinLink } from "@/lib/events/location";
 import { DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
-import type { EventMeetingMode, EventPaymentGateway, EventPaymentTiming } from "@/types/database";
+import type {
+  EventMeetingMode,
+  EventPaymentGateway,
+  EventPaymentTiming,
+} from "@/types/database";
 
 export interface PublicEventRegistrationState {
   error?: string;
@@ -35,7 +39,9 @@ export interface PublicEventRegistrationState {
 // Best-effort: a failure here is logged inside sendRegistrationPassEmail
 // itself and never thrown, so it never undoes the registration/payment
 // that already committed.
-export async function sendPassEmailForRegistration(registrationId: string): Promise<void> {
+export async function sendPassEmailForRegistration(
+  registrationId: string,
+): Promise<void> {
   const admin = createAdminClient();
   const { data: registration } = await admin
     .from("event_registrations")
@@ -68,11 +74,16 @@ export async function sendPassEmailForRegistration(registrationId: string): Prom
 
   if (!event) return;
 
-  const venueLabel = eventVenueLabel({ meeting_mode: event.meeting_mode, venue: event.venue, branchName: event.branches?.name });
+  const venueLabel = eventVenueLabel({
+    meeting_mode: event.meeting_mode,
+    venue: event.venue,
+    branchName: event.branches?.name,
+  });
   const joinLink = eventJoinLink(event);
 
   const answersRecord = registration.answers as Record<string, unknown>;
-  const recipientName = typeof answersRecord.name === "string" ? answersRecord.name : null;
+  const recipientName =
+    typeof answersRecord.name === "string" ? answersRecord.name : null;
 
   await sendRegistrationPassEmail({
     organizationId: event.organization_id,
@@ -139,10 +150,16 @@ export async function registerForEvent(
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("submit_event_registration", { token, answers }).maybeSingle();
+  const { data, error } = await supabase
+    .rpc("submit_event_registration", { token, answers })
+    .maybeSingle();
 
   if (error) {
-    return { error: error.message || "Couldn't complete your registration. Please try again." };
+    return {
+      error:
+        error.message ||
+        "Couldn't complete your registration. Please try again.",
+    };
   }
   if (!data) {
     return { error: "Couldn't complete your registration. Please try again." };
@@ -151,18 +168,30 @@ export async function registerForEvent(
   const admin = createAdminClient();
   const { data: event } = await admin
     .from("events")
-    .select("id, title, organization_id, payment_required, payment_gateway, payment_amount, external_payment_url, payment_timing")
+    .select(
+      "id, title, organization_id, payment_required, payment_gateway, payment_amount, external_payment_url, payment_timing",
+    )
     .eq("registration_share_token", token)
     .maybeSingle();
 
   if (event) {
-    const registrant = typeof answers.name === "string" && answers.name ? answers.name : "Someone";
-    await pushToTeam({ organizationId: event.organization_id, tab: "events", title: "New event registration", body: `${registrant} registered for ${event.title}.`, link: "/dashboard/events" });
+    const registrant =
+      typeof answers.name === "string" && answers.name
+        ? answers.name
+        : "Someone";
+    await pushToTeam({
+      organizationId: event.organization_id,
+      tab: "events",
+      title: "New event registration",
+      body: `${registrant} registered for ${event.title}.`,
+      link: "/dashboard/events",
+    });
   }
 
   const paymentPending =
     Boolean(event?.payment_required) &&
-    (event?.payment_timing === "before_registration" || event?.payment_timing === "both");
+    (event?.payment_timing === "before_registration" ||
+      event?.payment_timing === "both");
 
   if (paymentPending) {
     return {
@@ -202,7 +231,9 @@ export interface DeferEventRegistrationPaymentState {
 // check-in" resolves to exactly the same end state the plain "at_checkin"
 // timing already produces on its own: the pass goes out now, payment_status
 // stays 'pending' until staff marks it paid later (see markRegistrationPaid).
-export async function deferEventRegistrationToCheckin(registrationId: string): Promise<DeferEventRegistrationPaymentState> {
+export async function deferEventRegistrationToCheckin(
+  registrationId: string,
+): Promise<DeferEventRegistrationPaymentState> {
   const admin = createAdminClient();
   const { data: registration } = await admin
     .from("event_registrations")

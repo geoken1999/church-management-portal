@@ -21,6 +21,9 @@ export function eventVenueLabel(event: {
   return event.venue?.trim() || event.branchName || MEETING_MODE_LABELS.offline;
 }
 
-export function eventJoinLink(event: { meeting_mode: EventMeetingMode; meeting_link: string | null }): string | null {
+export function eventJoinLink(event: {
+  meeting_mode: EventMeetingMode;
+  meeting_link: string | null;
+}): string | null {
   return event.meeting_mode !== "offline" ? event.meeting_link : null;
 }

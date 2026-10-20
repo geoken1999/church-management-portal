@@ -2,7 +2,20 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Ticket, Plus, Trash2, Copy, Check, CheckCircle2, Ban, ArrowUp, ArrowDown, Search, IndianRupee, Lock } from "lucide-react";
+import {
+  Ticket,
+  Plus,
+  Trash2,
+  Copy,
+  Check,
+  CheckCircle2,
+  Ban,
+  ArrowUp,
+  ArrowDown,
+  Search,
+  IndianRupee,
+  Lock,
+} from "lucide-react";
 import {
   enableEventRegistration,
   disableEventRegistration,
@@ -29,10 +42,21 @@ import { slugifyFieldKey, validateFormField } from "@/lib/forms/validation";
 import { MEETING_MODE_LABELS } from "@/lib/events/location";
 import { QrCodeDialog } from "@/components/members/QrCodeDialog";
 import { ExportRegistrantsButtons } from "@/components/events/ExportRegistrantsButtons";
-import { BilingualSettings, bilingualChoiceFrom, bilingualChoiceToField } from "@/components/BilingualSettings";
+import {
+  BilingualSettings,
+  bilingualChoiceFrom,
+  bilingualChoiceToField,
+} from "@/components/BilingualSettings";
 import { EventPassBackgroundUpload } from "@/components/events/EventPassBackgroundUpload";
 import { EventPassPreview } from "@/components/events/EventPassPreview";
-import type { Event, EventRegistration, EventRegistrationField, FormFieldType, EventPaymentGateway, EventPaymentTiming } from "@/types/database";
+import type {
+  Event,
+  EventRegistration,
+  EventRegistrationField,
+  FormFieldType,
+  EventPaymentGateway,
+  EventPaymentTiming,
+} from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,8 +66,20 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/auth/FieldError";
 import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTab, TabsIndicator, TabsPanel } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Tabs,
+  TabsList,
+  TabsTab,
+  TabsIndicator,
+  TabsPanel,
+} from "@/components/ui/tabs";
 import {
   Dialog,
   DialogTrigger,
@@ -98,10 +134,24 @@ function FieldEditorRow({
       <CardContent className="space-y-3">
         <div className="flex items-start gap-3">
           <div className="flex flex-col gap-1">
-            <Button type="button" variant="ghost" size="icon-xs" disabled={index === 0} onClick={() => onMove(-1)} aria-label="Move up">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              disabled={index === 0}
+              onClick={() => onMove(-1)}
+              aria-label="Move up"
+            >
               <ArrowUp className="size-3.5" />
             </Button>
-            <Button type="button" variant="ghost" size="icon-xs" disabled={index === total - 1} onClick={() => onMove(1)} aria-label="Move down">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              disabled={index === total - 1}
+              onClick={() => onMove(1)}
+              aria-label="Move down"
+            >
               <ArrowDown className="size-3.5" />
             </Button>
           </div>
@@ -109,18 +159,38 @@ function FieldEditorRow({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Field label</Label>
-                <Input value={field.label} onChange={(e) => onChange({ ...field, label: e.target.value })} placeholder="Full name" aria-invalid={Boolean(errors?.label)} />
-                <FieldError id={`field-${index}-label-error`} message={errors?.label} />
+                <Input
+                  value={field.label}
+                  onChange={(e) =>
+                    onChange({ ...field, label: e.target.value })
+                  }
+                  placeholder="Full name"
+                  aria-invalid={Boolean(errors?.label)}
+                />
+                <FieldError
+                  id={`field-${index}-label-error`}
+                  message={errors?.label}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Field type</Label>
                 <Select
                   value={field.field_type}
-                  onValueChange={(v) => onChange({ ...field, field_type: (v ?? "text") as FormFieldType })}
+                  onValueChange={(v) =>
+                    onChange({
+                      ...field,
+                      field_type: (v ?? "text") as FormFieldType,
+                    })
+                  }
                   disabled={typeLocked}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue>{(v: string | null) => FORM_FIELD_TYPES.find((t) => t.value === v)?.label ?? "Select a type"}</SelectValue>
+                    <SelectValue>
+                      {(v: string | null) =>
+                        FORM_FIELD_TYPES.find((t) => t.value === v)?.label ??
+                        "Select a type"
+                      }
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {FORM_FIELD_TYPES.map((type) => (
@@ -130,7 +200,12 @@ function FieldEditorRow({
                     ))}
                   </SelectContent>
                 </Select>
-                {typeLocked && <p className="text-xs text-muted-foreground">Locked — the pass email and duplicate check depend on this type.</p>}
+                {typeLocked && (
+                  <p className="text-xs text-muted-foreground">
+                    Locked — the pass email and duplicate check depend on this
+                    type.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -139,12 +214,23 @@ function FieldEditorRow({
                 <Label>Options (one per line)</Label>
                 <Textarea
                   value={field.options?.join("\n") ?? ""}
-                  onChange={(e) => onChange({ ...field, options: e.target.value.split("\n").map((o) => o.trim()).filter(Boolean) })}
+                  onChange={(e) =>
+                    onChange({
+                      ...field,
+                      options: e.target.value
+                        .split("\n")
+                        .map((o) => o.trim())
+                        .filter(Boolean),
+                    })
+                  }
                   placeholder={"Adult\nChild"}
                   rows={3}
                   aria-invalid={Boolean(errors?.options)}
                 />
-                <FieldError id={`field-${index}-options-error`} message={errors?.options} />
+                <FieldError
+                  id={`field-${index}-options-error`}
+                  message={errors?.options}
+                />
               </div>
             )}
 
@@ -153,13 +239,20 @@ function FieldEditorRow({
                 <Checkbox
                   checked={protectedField ? true : field.required}
                   disabled={protectedField}
-                  onCheckedChange={(checked) => onChange({ ...field, required: checked === true })}
+                  onCheckedChange={(checked) =>
+                    onChange({ ...field, required: checked === true })
+                  }
                 />
                 Required
               </label>
               {!protectedField && (
                 <label className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={field.unique ?? false} onCheckedChange={(checked) => onChange({ ...field, unique: checked === true })} />
+                  <Checkbox
+                    checked={field.unique ?? false}
+                    onCheckedChange={(checked) =>
+                      onChange({ ...field, unique: checked === true })
+                    }
+                  />
                   No duplicates allowed
                 </label>
               )}
@@ -168,7 +261,13 @@ function FieldEditorRow({
           {protectedField ? (
             <div className="size-8" aria-hidden />
           ) : (
-            <Button type="button" variant="ghost" size="icon-sm" onClick={onRemove} aria-label="Remove field">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={onRemove}
+              aria-label="Remove field"
+            >
               <Trash2 className="size-3.5" />
             </Button>
           )}
@@ -190,22 +289,51 @@ function SettingsTab({
   organizationTimezone: string;
 }) {
   const router = useRouter();
-  const [fields, setFields] = useState<EventRegistrationField[]>(event.registration_fields);
-  const [bilingual, setBilingual] = useState(bilingualChoiceFrom(event.registration_bilingual));
-  const [capacity, setCapacity] = useState(event.registration_capacity ? String(event.registration_capacity) : "");
-  const [closesAt, setClosesAt] = useState(toDateTimeLocalValue(event.registration_closes_at));
+  const [fields, setFields] = useState<EventRegistrationField[]>(
+    event.registration_fields,
+  );
+  const [bilingual, setBilingual] = useState(
+    bilingualChoiceFrom(event.registration_bilingual),
+  );
+  const [capacity, setCapacity] = useState(
+    event.registration_capacity ? String(event.registration_capacity) : "",
+  );
+  const [closesAt, setClosesAt] = useState(
+    toDateTimeLocalValue(event.registration_closes_at),
+  );
   const [passColor, setPassColor] = useState(event.registration_pass_color);
-  const [passMessage, setPassMessage] = useState(event.registration_pass_message ?? "");
-  const [passWhatsapp, setPassWhatsapp] = useState(event.registration_pass_whatsapp ?? false);
-  const [backgroundPreviewUrl, setBackgroundPreviewUrl] = useState(event.registration_pass_background_url);
-  const [reminderOffset, setReminderOffset] = useState(event.reminder_offset ?? "");
-  const [paymentRequired, setPaymentRequired] = useState(event.payment_required);
-  const [paymentGateway, setPaymentGateway] = useState<EventPaymentGateway>(event.payment_gateway ?? "external");
-  const [paymentAmount, setPaymentAmount] = useState(event.payment_amount ? String(event.payment_amount) : "");
-  const [externalPaymentUrl, setExternalPaymentUrl] = useState(event.external_payment_url ?? "");
-  const [paymentTiming, setPaymentTiming] = useState<EventPaymentTiming>(event.payment_timing ?? "before_registration");
-  const [state, setState] = useState<RegistrationSettingsState>(settingsInitialState);
-  const [fieldErrors, setFieldErrors] = useState<Record<number, { label?: string; options?: string }>>({});
+  const [passMessage, setPassMessage] = useState(
+    event.registration_pass_message ?? "",
+  );
+  const [passWhatsapp, setPassWhatsapp] = useState(
+    event.registration_pass_whatsapp ?? false,
+  );
+  const [backgroundPreviewUrl, setBackgroundPreviewUrl] = useState(
+    event.registration_pass_background_url,
+  );
+  const [reminderOffset, setReminderOffset] = useState(
+    event.reminder_offset ?? "",
+  );
+  const [paymentRequired, setPaymentRequired] = useState(
+    event.payment_required,
+  );
+  const [paymentGateway, setPaymentGateway] = useState<EventPaymentGateway>(
+    event.payment_gateway ?? "external",
+  );
+  const [paymentAmount, setPaymentAmount] = useState(
+    event.payment_amount ? String(event.payment_amount) : "",
+  );
+  const [externalPaymentUrl, setExternalPaymentUrl] = useState(
+    event.external_payment_url ?? "",
+  );
+  const [paymentTiming, setPaymentTiming] = useState<EventPaymentTiming>(
+    event.payment_timing ?? "before_registration",
+  );
+  const [state, setState] =
+    useState<RegistrationSettingsState>(settingsInitialState);
+  const [fieldErrors, setFieldErrors] = useState<
+    Record<number, { label?: string; options?: string }>
+  >({});
   const [pending, startTransition] = useTransition();
   const [togglePending, startToggleTransition] = useTransition();
   const [copied, setCopied] = useState(false);
@@ -214,7 +342,17 @@ function SettingsTab({
 
   function addField() {
     const existing = new Set(fields.map((f) => f.key));
-    setFields([...fields, { key: uniqueKey("field", existing), label: "", field_type: "text", options: null, required: false, unique: false }]);
+    setFields([
+      ...fields,
+      {
+        key: uniqueKey("field", existing),
+        label: "",
+        field_type: "text",
+        options: null,
+        required: false,
+        unique: false,
+      },
+    ]);
   }
 
   function updateField(index: number, next: EventRegistrationField) {
@@ -235,16 +373,26 @@ function SettingsTab({
 
   function handleSubmit(formData: FormData) {
     const seenKeys = new Set<string>();
-    const nextFieldErrors: Record<number, { label?: string; options?: string }> = {};
+    const nextFieldErrors: Record<
+      number,
+      { label?: string; options?: string }
+    > = {};
     let hasErrors = false;
 
     const finalFields = fields.map((field, index) => {
-      const errors = validateFormField({ label: field.label, fieldType: field.field_type, options: field.options ?? [] });
+      const errors = validateFormField({
+        label: field.label,
+        fieldType: field.field_type,
+        options: field.options ?? [],
+      });
       if (Object.values(errors).some(Boolean)) {
         nextFieldErrors[index] = errors;
         hasErrors = true;
       }
-      const key = uniqueKey(slugifyFieldKey(field.label) || field.key, seenKeys);
+      const key = uniqueKey(
+        slugifyFieldKey(field.label) || field.key,
+        seenKeys,
+      );
       seenKeys.add(key);
       return { ...field, key };
     });
@@ -292,7 +440,11 @@ function SettingsTab({
               }}
               aria-label="Copy link"
             >
-              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+              {copied ? (
+                <Check className="size-3.5" />
+              ) : (
+                <Copy className="size-3.5" />
+              )}
             </Button>
             <QrCodeDialog link={registrationUrl} title={event.title} />
           </div>
@@ -329,7 +481,11 @@ function SettingsTab({
           </Alert>
         )}
 
-        <BilingualSettings value={bilingual} onChange={setBilingual} noun="registration form" />
+        <BilingualSettings
+          value={bilingual}
+          onChange={setBilingual}
+          noun="registration form"
+        />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
@@ -344,7 +500,10 @@ function SettingsTab({
               placeholder="Unlimited"
               aria-invalid={Boolean(state.fieldErrors?.capacity)}
             />
-            <FieldError id="capacity-error" message={state.fieldErrors?.capacity} />
+            <FieldError
+              id="capacity-error"
+              message={state.fieldErrors?.capacity}
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="closesAt">Registration closes (optional)</Label>
@@ -356,40 +515,76 @@ function SettingsTab({
               onChange={(e) => setClosesAt(e.target.value)}
               aria-invalid={Boolean(state.fieldErrors?.closesAt)}
             />
-            <FieldError id="closesAt-error" message={state.fieldErrors?.closesAt} />
+            <FieldError
+              id="closesAt-error"
+              message={state.fieldErrors?.closesAt}
+            />
           </div>
         </div>
 
         <div className="space-y-3 rounded-md border border-border p-4">
           <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-            <Checkbox checked={paymentRequired} onCheckedChange={(checked) => setPaymentRequired(checked === true)} />
+            <Checkbox
+              checked={paymentRequired}
+              onCheckedChange={(checked) =>
+                setPaymentRequired(checked === true)
+              }
+            />
             Require payment to register
           </label>
-          <input type="hidden" name="paymentRequired" value={String(paymentRequired)} />
+          <input
+            type="hidden"
+            name="paymentRequired"
+            value={String(paymentRequired)}
+          />
 
           {paymentRequired && (
             <div className="space-y-3 pl-6">
               <div className="space-y-1.5">
                 <Label>Payment gateway</Label>
-                <input type="hidden" name="paymentGateway" value={paymentGateway} />
-                <Select value={paymentGateway} onValueChange={(v) => setPaymentGateway((v ?? "external") as EventPaymentGateway)}>
-                  <SelectTrigger className="w-full" aria-invalid={Boolean(state.fieldErrors?.paymentGateway)}>
-                    <SelectValue>{() => EVENT_PAYMENT_GATEWAY_LABELS[paymentGateway]}</SelectValue>
+                <input
+                  type="hidden"
+                  name="paymentGateway"
+                  value={paymentGateway}
+                />
+                <Select
+                  value={paymentGateway}
+                  onValueChange={(v) =>
+                    setPaymentGateway((v ?? "external") as EventPaymentGateway)
+                  }
+                >
+                  <SelectTrigger
+                    className="w-full"
+                    aria-invalid={Boolean(state.fieldErrors?.paymentGateway)}
+                  >
+                    <SelectValue>
+                      {() => EVENT_PAYMENT_GATEWAY_LABELS[paymentGateway]}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {EVENT_PAYMENT_GATEWAYS.map((gateway) => (
-                      <SelectItem key={gateway} value={gateway} disabled={gateway === "platform" && !financeEnabled}>
+                      <SelectItem
+                        key={gateway}
+                        value={gateway}
+                        disabled={gateway === "platform" && !financeEnabled}
+                      >
                         {EVENT_PAYMENT_GATEWAY_LABELS[gateway]}
-                        {gateway === "platform" && !financeEnabled ? " (needs the Finance plan)" : ""}
+                        {gateway === "platform" && !financeEnabled
+                          ? " (needs the Finance plan)"
+                          : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <FieldError id="paymentGateway-error" message={state.fieldErrors?.paymentGateway} />
+                <FieldError
+                  id="paymentGateway-error"
+                  message={state.fieldErrors?.paymentGateway}
+                />
                 {paymentGateway === "platform" && !financeEnabled && (
                   <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Lock className="size-3" />
-                    Upgrade to Premium or Pro to collect payments through KingdomFlow directly.
+                    Upgrade to Premium or Pro to collect payments through
+                    KingdomFlow directly.
                   </p>
                 )}
               </div>
@@ -411,11 +606,16 @@ function SettingsTab({
                       aria-invalid={Boolean(state.fieldErrors?.paymentAmount)}
                     />
                   </div>
-                  <FieldError id="paymentAmount-error" message={state.fieldErrors?.paymentAmount} />
+                  <FieldError
+                    id="paymentAmount-error"
+                    message={state.fieldErrors?.paymentAmount}
+                  />
                 </div>
                 {paymentGateway === "external" && (
                   <div className="space-y-1.5">
-                    <Label htmlFor="externalPaymentUrl">Your payment link</Label>
+                    <Label htmlFor="externalPaymentUrl">
+                      Your payment link
+                    </Label>
                     <Input
                       id="externalPaymentUrl"
                       name="externalPaymentUrl"
@@ -423,19 +623,40 @@ function SettingsTab({
                       placeholder="https://razorpay.me/your-church"
                       value={externalPaymentUrl}
                       onChange={(e) => setExternalPaymentUrl(e.target.value)}
-                      aria-invalid={Boolean(state.fieldErrors?.externalPaymentUrl)}
+                      aria-invalid={Boolean(
+                        state.fieldErrors?.externalPaymentUrl,
+                      )}
                     />
-                    <FieldError id="externalPaymentUrl-error" message={state.fieldErrors?.externalPaymentUrl} />
+                    <FieldError
+                      id="externalPaymentUrl-error"
+                      message={state.fieldErrors?.externalPaymentUrl}
+                    />
                   </div>
                 )}
               </div>
 
               <div className="space-y-1.5">
                 <Label>When is payment required?</Label>
-                <input type="hidden" name="paymentTiming" value={paymentTiming} />
-                <Select value={paymentTiming} onValueChange={(v) => setPaymentTiming((v ?? "before_registration") as EventPaymentTiming)}>
-                  <SelectTrigger className="w-full" aria-invalid={Boolean(state.fieldErrors?.paymentTiming)}>
-                    <SelectValue>{() => EVENT_PAYMENT_TIMING_LABELS[paymentTiming]}</SelectValue>
+                <input
+                  type="hidden"
+                  name="paymentTiming"
+                  value={paymentTiming}
+                />
+                <Select
+                  value={paymentTiming}
+                  onValueChange={(v) =>
+                    setPaymentTiming(
+                      (v ?? "before_registration") as EventPaymentTiming,
+                    )
+                  }
+                >
+                  <SelectTrigger
+                    className="w-full"
+                    aria-invalid={Boolean(state.fieldErrors?.paymentTiming)}
+                  >
+                    <SelectValue>
+                      {() => EVENT_PAYMENT_TIMING_LABELS[paymentTiming]}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {EVENT_PAYMENT_TIMINGS.map((timing) => (
@@ -445,7 +666,10 @@ function SettingsTab({
                     ))}
                   </SelectContent>
                 </Select>
-                <FieldError id="paymentTiming-error" message={state.fieldErrors?.paymentTiming} />
+                <FieldError
+                  id="paymentTiming-error"
+                  message={state.fieldErrors?.paymentTiming}
+                />
               </div>
             </div>
           )}
@@ -454,10 +678,25 @@ function SettingsTab({
         <div className="space-y-1.5">
           <Label htmlFor="reminderOffset">Reminder email (optional)</Label>
           <input type="hidden" name="reminderOffset" value={reminderOffset} />
-          <Select value={reminderOffset || "none"} onValueChange={(v) => setReminderOffset(v === "none" ? "" : (v ?? ""))}>
-            <SelectTrigger id="reminderOffset" className="w-full" aria-invalid={Boolean(state.fieldErrors?.reminderOffset)}>
+          <Select
+            value={reminderOffset || "none"}
+            onValueChange={(v) =>
+              setReminderOffset(v === "none" ? "" : (v ?? ""))
+            }
+          >
+            <SelectTrigger
+              id="reminderOffset"
+              className="w-full"
+              aria-invalid={Boolean(state.fieldErrors?.reminderOffset)}
+            >
               <SelectValue>
-                {(v: string | null) => (!v || v === "none" ? "No reminder" : EVENT_REMINDER_OFFSET_LABELS[v as keyof typeof EVENT_REMINDER_OFFSET_LABELS])}
+                {(v: string | null) =>
+                  !v || v === "none"
+                    ? "No reminder"
+                    : EVENT_REMINDER_OFFSET_LABELS[
+                        v as keyof typeof EVENT_REMINDER_OFFSET_LABELS
+                      ]
+                }
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -469,16 +708,21 @@ function SettingsTab({
               ))}
             </SelectContent>
           </Select>
-          <FieldError id="reminderOffset-error" message={state.fieldErrors?.reminderOffset} />
+          <FieldError
+            id="reminderOffset-error"
+            message={state.fieldErrors?.reminderOffset}
+          />
           <p className="text-xs text-muted-foreground">
-            Sends a reminder email to every registrant before the event — for a recurring event, before each occurrence.
+            Sends a reminder email to every registrant before the event — for a
+            recurring event, before each occurrence.
           </p>
         </div>
 
         <div className="space-y-3 rounded-md border border-border p-4">
           <p className="text-sm font-medium">Pass color &amp; message</p>
           <p className="text-xs text-muted-foreground">
-            Used with the banner image above on the confirmation email sent to each registrant, alongside their QR code and calendar invite.
+            Used with the banner image above on the confirmation email sent to
+            each registrant, alongside their QR code and calendar invite.
           </p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
@@ -499,7 +743,10 @@ function SettingsTab({
                   aria-invalid={Boolean(state.fieldErrors?.passColor)}
                 />
               </div>
-              <FieldError id="passColor-error" message={state.fieldErrors?.passColor} />
+              <FieldError
+                id="passColor-error"
+                message={state.fieldErrors?.passColor}
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="passMessage">Personal message (optional)</Label>
@@ -513,15 +760,27 @@ function SettingsTab({
               />
             </div>
           </div>
-          <input type="hidden" name="passWhatsapp" value={String(passWhatsapp)} />
+          <input
+            type="hidden"
+            name="passWhatsapp"
+            value={String(passWhatsapp)}
+          />
           <label className="flex items-start gap-2">
-            <Checkbox checked={passWhatsapp} onCheckedChange={(c) => setPassWhatsapp(c === true)} />
+            <Checkbox
+              checked={passWhatsapp}
+              onCheckedChange={(c) => setPassWhatsapp(c === true)}
+            />
             <span className="text-sm">
-              <span className="font-medium">Also send the pass on WhatsApp</span>
+              <span className="font-medium">
+                Also send the pass on WhatsApp
+              </span>
               <br />
               <span className="text-muted-foreground">
-                Sends a WhatsApp message with a &ldquo;View pass&rdquo; button that opens the registrant&apos;s QR pass, as well as the email. The form needs a phone field. Each message counts toward your monthly WhatsApp limit, and
-                uses your own WhatsApp number if you&apos;ve connected one.
+                Sends a WhatsApp message with a &ldquo;View pass&rdquo; button
+                that opens the registrant&apos;s QR pass, as well as the email.
+                The form needs a phone field. Each message counts toward your
+                monthly WhatsApp limit, and uses your own WhatsApp number if
+                you&apos;ve connected one.
               </span>
             </span>
           </label>
@@ -553,7 +812,13 @@ function SettingsTab({
               {pending ? "Saving..." : "Save changes"}
             </Button>
           </div>
-          <Button type="button" variant="ghost" className="text-destructive" disabled={togglePending} onClick={handleDisable}>
+          <Button
+            type="button"
+            variant="ghost"
+            className="text-destructive"
+            disabled={togglePending}
+            onClick={handleDisable}
+          >
             Disable registration
           </Button>
         </div>
@@ -564,7 +829,10 @@ function SettingsTab({
 
 type RegistrationRow = EventRegistration;
 
-const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+const STATUS_VARIANTS: Record<
+  string,
+  "default" | "secondary" | "destructive" | "outline"
+> = {
   confirmed: "secondary",
   checked_in: "default",
   cancelled: "outline",
@@ -584,7 +852,9 @@ function RegistrantsTab({
   // (EventCard renders one per row, keyed by event.id), so eventId never
   // changes under a mounted instance; there's no "loading again for a
   // different event" case to reset back to null for.
-  const [registrations, setRegistrations] = useState<RegistrationRow[] | null>(null);
+  const [registrations, setRegistrations] = useState<RegistrationRow[] | null>(
+    null,
+  );
   const [query, setQuery] = useState("");
   const [pending, startTransition] = useTransition();
   const loading = registrations === null;
@@ -600,7 +870,9 @@ function RegistrantsTab({
       // Covers the registrant's name and any other custom field answer —
       // there's no dedicated "name" column on event_registrations (see
       // registration-validation.ts), it's just another key in answers.
-      return Object.values(r.answers).some((value) => typeof value === "string" && value.toLowerCase().includes(q));
+      return Object.values(r.answers).some(
+        (value) => typeof value === "string" && value.toLowerCase().includes(q),
+      );
     });
   }, [registrations, query]);
 
@@ -614,7 +886,10 @@ function RegistrantsTab({
     };
   }, [eventId]);
 
-  function runAction(action: (formData: FormData) => Promise<void>, registrationId: string) {
+  function runAction(
+    action: (formData: FormData) => Promise<void>,
+    registrationId: string,
+  ) {
     startTransition(async () => {
       const formData = new FormData();
       formData.set("registrationId", registrationId);
@@ -627,13 +902,19 @@ function RegistrantsTab({
   }
 
   if (loading) {
-    return <p className="py-6 text-center text-sm text-muted-foreground">Loading...</p>;
+    return (
+      <p className="py-6 text-center text-sm text-muted-foreground">
+        Loading...
+      </p>
+    );
   }
 
   if (!registrations || registrations.length === 0) {
     return (
       <Card>
-        <CardContent className="py-10 text-center text-sm text-muted-foreground">No one has registered yet.</CardContent>
+        <CardContent className="py-10 text-center text-sm text-muted-foreground">
+          No one has registered yet.
+        </CardContent>
       </Card>
     );
   }
@@ -642,7 +923,9 @@ function RegistrantsTab({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
-          {registrations.length} registered · {registrations.filter((r) => r.status === "checked_in").length} checked in
+          {registrations.length} registered ·{" "}
+          {registrations.filter((r) => r.status === "checked_in").length}{" "}
+          checked in
         </p>
         <ExportRegistrantsButtons eventId={eventId} />
       </div>
@@ -658,7 +941,9 @@ function RegistrantsTab({
       </div>
 
       {filtered.length === 0 && (
-        <p className="py-6 text-center text-sm text-muted-foreground">No registrants match &quot;{query}&quot;.</p>
+        <p className="py-6 text-center text-sm text-muted-foreground">
+          No registrants match &quot;{query}&quot;.
+        </p>
       )}
 
       {filtered.map((registration) => (
@@ -667,44 +952,86 @@ function RegistrantsTab({
             <div className="min-w-0 space-y-1">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm font-medium">{registration.email}</p>
-                <Badge variant={STATUS_VARIANTS[registration.status]} className="capitalize">
+                <Badge
+                  variant={STATUS_VARIANTS[registration.status]}
+                  className="capitalize"
+                >
                   {registration.status.replace("_", " ")}
                 </Badge>
                 {paymentRequired && registration.payment_status === "paid" && (
-                  <Badge className="bg-emerald-600 text-white">Paid{registration.payment_amount ? ` ₹${registration.payment_amount}` : ""}</Badge>
+                  <Badge className="bg-emerald-600 text-white">
+                    Paid
+                    {registration.payment_amount
+                      ? ` ₹${registration.payment_amount}`
+                      : ""}
+                  </Badge>
                 )}
-                {paymentRequired && registration.payment_status === "pending" && (
-                  <Badge className="bg-amber-500 text-white">Pending{registration.payment_amount ? ` ₹${registration.payment_amount}` : ""}</Badge>
-                )}
+                {paymentRequired &&
+                  registration.payment_status === "pending" && (
+                    <Badge className="bg-amber-500 text-white">
+                      Pending
+                      {registration.payment_amount
+                        ? ` ₹${registration.payment_amount}`
+                        : ""}
+                    </Badge>
+                  )}
               </div>
-              <p className="font-mono text-xs text-muted-foreground">{registration.confirmation_code}</p>
+              <p className="font-mono text-xs text-muted-foreground">
+                {registration.confirmation_code}
+              </p>
               {fields
                 .filter((f) => f.field_type !== "email")
                 .map((f) => {
                   const value = registration.answers[f.key];
-                  if (value === undefined || value === null || value === "") return null;
+                  if (value === undefined || value === null || value === "")
+                    return null;
                   return (
                     <p key={f.key} className="text-xs text-muted-foreground">
-                      <span className="font-medium">{f.label}:</span> {String(value)}
+                      <span className="font-medium">{f.label}:</span>{" "}
+                      {String(value)}
                     </p>
                   );
                 })}
             </div>
             <div className="flex shrink-0 items-center gap-1">
               {paymentRequired && registration.payment_status === "pending" && (
-                <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => runAction(markRegistrationPaid, registration.id)}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={pending}
+                  onClick={() =>
+                    runAction(markRegistrationPaid, registration.id)
+                  }
+                >
                   <IndianRupee className="size-3.5" />
                   Mark as paid
                 </Button>
               )}
               {registration.status !== "checked_in" && (
-                <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => runAction(markRegistrationCheckedIn, registration.id)}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={pending}
+                  onClick={() =>
+                    runAction(markRegistrationCheckedIn, registration.id)
+                  }
+                >
                   <CheckCircle2 className="size-3.5" />
                   Check in
                 </Button>
               )}
               {registration.status !== "cancelled" && (
-                <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => runAction(cancelEventRegistration, registration.id)}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={pending}
+                  onClick={() =>
+                    runAction(cancelEventRegistration, registration.id)
+                  }
+                >
                   <Ban className="size-3.5" />
                   Cancel
                 </Button>
@@ -753,7 +1080,9 @@ export function EventRegistrationDialog({
         <DialogHeader>
           <DialogTitle>Registration — {event.title}</DialogTitle>
           <DialogDescription>
-            {event.registration_enabled ? "Manage the form, share link, and registrants." : "Turn on a public registration form for this event."}
+            {event.registration_enabled
+              ? "Manage the form, share link, and registrants."
+              : "Turn on a public registration form for this event."}
           </DialogDescription>
         </DialogHeader>
 
@@ -761,8 +1090,9 @@ export function EventRegistrationDialog({
           <div className="flex flex-col items-center gap-3 py-6 text-center">
             <Ticket className="size-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              Once enabled, visitors can register with a name/email (customizable), and each one gets an emailed pass
-              with a QR code for check-in.
+              Once enabled, visitors can register with a name/email
+              (customizable), and each one gets an emailed pass with a QR code
+              for check-in.
             </p>
             <Button type="button" disabled={enabling} onClick={handleEnable}>
               {enabling ? "Enabling..." : "Enable registration"}
@@ -776,10 +1106,19 @@ export function EventRegistrationDialog({
               <TabsTab value="registrants">Registrants</TabsTab>
             </TabsList>
             <TabsPanel value="settings">
-              <SettingsTab event={event} siteUrl={siteUrl} financeEnabled={financeEnabled} organizationTimezone={organizationTimezone} />
+              <SettingsTab
+                event={event}
+                siteUrl={siteUrl}
+                financeEnabled={financeEnabled}
+                organizationTimezone={organizationTimezone}
+              />
             </TabsPanel>
             <TabsPanel value="registrants">
-              <RegistrantsTab eventId={event.id} fields={event.registration_fields} paymentRequired={event.payment_required} />
+              <RegistrantsTab
+                eventId={event.id}
+                fields={event.registration_fields}
+                paymentRequired={event.payment_required}
+              />
             </TabsPanel>
           </Tabs>
         )}

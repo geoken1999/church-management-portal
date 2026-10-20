@@ -33,7 +33,13 @@ export function AddToAttendanceButton({ eventId }: { eventId: string }) {
 
   return (
     <div className="relative">
-      <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={handleClick}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        disabled={pending}
+        onClick={handleClick}
+      >
         <ClipboardCheck className="size-3.5" />
         {pending ? "Adding..." : "Add to Attendance"}
       </Button>

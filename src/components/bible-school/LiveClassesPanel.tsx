@@ -48,7 +48,7 @@ function stateOf(
   if (session.status === "cancelled")
     return { label: "Cancelled", variant: "destructive" };
   if (now > new Date(session.ends_at).getTime())
-    return { label: "Ended", variant: "outline" };
+    return { label: "Completed", variant: "outline" };
   if (now >= new Date(session.starts_at).getTime())
     return { label: "Live now", variant: "default" };
   return { label: "Upcoming", variant: "secondary" };

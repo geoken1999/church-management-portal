@@ -332,6 +332,9 @@ function LiveClasses({
           {s.status === "cancelled" && (
             <Badge variant="destructive">Cancelled</Badge>
           )}
+          {over && s.status !== "cancelled" && (
+            <Badge variant="outline">Completed</Badge>
+          )}
           {s.my_attendance === "present" && (
             <Badge variant="secondary">You attended</Badge>
           )}

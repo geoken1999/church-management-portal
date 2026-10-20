@@ -658,11 +658,31 @@ function CallView({
   const [chatOpen, setChatOpen] = useState(false);
   const retriedRef = useRef(false);
   const deviceAppliedRef = useRef(false);
+  // Set once this person has chosen to leave or end the call. The page then waits for the call provider to
+  // finish leaving (it releases the camera and microphone and closes the connection) before going back,
+  // instead of tearing the call down mid-way; a short timer covers a provider that never says it is done.
+  const leavingRef = useRef(false);
+  const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function beginLeave() {
+    if (leavingRef.current) return;
+    leavingRef.current = true;
+    leaveTimerRef.current = setTimeout(onLeft, 1500);
+  }
+  useEffect(
+    () => () => {
+      if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
+    },
+    [],
+  );
 
   const { join, leave, end, participants, changeWebcam, changeMic } =
     useMeeting({
       onMeetingJoined: () => setJoined(true),
-      onMeetingLeft: () => setMeetingEnded(true),
+      onMeetingLeft: () => {
+        // Our own leaving finishes here: go back. Otherwise someone else (the host) ended it.
+        if (leavingRef.current) onLeft();
+        else setMeetingEnded(true);
+      },
       onError: (data: { code: string; message: string }) => {
         // code 4002 (INVALID_TOKEN) right at the start is almost always this
         // SDK's own config effect (a parent effect) not having run yet when
@@ -763,7 +783,7 @@ function CallView({
     } else {
       leave();
     }
-    onLeft();
+    beginLeave();
   }
 
   const participantIds = [...participants.keys()];
@@ -902,7 +922,7 @@ function CallView({
             streamId={liveStreamId}
             chatOpen={chatOpen}
             onToggleChat={() => setChatOpen((v) => !v)}
-            onLeft={onLeft}
+            onLeft={beginLeave}
           />
         ) : (
           <CallControls
@@ -914,7 +934,7 @@ function CallView({
             onToggleAdmission={handleToggleAdmission}
             chatOpen={chatOpen}
             onToggleChat={() => setChatOpen((v) => !v)}
-            onLeft={onLeft}
+            onLeft={beginLeave}
           />
         )}
       </div>

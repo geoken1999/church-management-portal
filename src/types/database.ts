@@ -1206,6 +1206,16 @@ export type LmsQuizAttempt = {
   submitted_at: string;
 };
 
+export type PlatformServiceUser = {
+  auth_user_id: string;
+  email: string;
+  display_name: string | null;
+  scopes: string[];
+  active: boolean;
+  created_at: string;
+  created_by: string | null;
+};
+
 export type LmsAssignment = {
   lesson_id: string;
   organization_id: string;
@@ -3935,6 +3945,12 @@ export type Database = {
         Row: LmsQuizAttempt;
         Insert: Partial<LmsQuizAttempt> & Pick<LmsQuizAttempt, "organization_id" | "lesson_id" | "course_id" | "enrollment_id" | "member_id" | "attempt_number">;
         Update: Partial<LmsQuizAttempt>;
+        Relationships: [];
+      };
+      platform_service_users: {
+        Row: PlatformServiceUser;
+        Insert: Partial<PlatformServiceUser> & Pick<PlatformServiceUser, "auth_user_id" | "email">;
+        Update: Partial<PlatformServiceUser>;
         Relationships: [];
       };
       lms_assignments: {

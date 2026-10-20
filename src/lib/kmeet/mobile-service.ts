@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createVideoSdkRoom } from "@/lib/kmeet/client";
 import { isVideoSdkConfigured } from "@/lib/kmeet/env";
 import { dashboardBasePathForMode } from "@/lib/kmeet/mode";
+import { notifyCallStarted } from "@/lib/kmeet/notify";
 import { minutesAvailableFor } from "@/lib/kmeet/minutes-service";
 import { NO_MINUTES_MESSAGE } from "@/lib/kmeet/minutes";
 import { getSiteUrl } from "@/lib/site-url";
@@ -163,9 +164,10 @@ export async function startInstantMeeting(
     })
     .select("id")
     .single();
-  return error || !data
-    ? fail("Couldn't start that meeting. Please try again.")
-    : { ok: true, id: data.id };
+  if (error || !data)
+    return fail("Couldn't start that meeting. Please try again.");
+  await notifyCallStarted(data.id, userId);
+  return { ok: true, id: data.id };
 }
 
 export async function endMeeting(

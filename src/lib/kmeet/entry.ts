@@ -27,19 +27,17 @@ export async function requestEntry(
   if (existing && existing.created_at > freshAfter())
     return existing.status as EntryStatus;
 
-  await admin
-    .from("kmeet_entry_requests")
-    .upsert(
-      {
-        meeting_id: meetingId,
-        user_id: userId,
-        name,
-        status: "pending",
-        created_at: new Date().toISOString(),
-        decided_at: null,
-      },
-      { onConflict: "meeting_id,user_id" },
-    );
+  await admin.from("kmeet_entry_requests").upsert(
+    {
+      meeting_id: meetingId,
+      user_id: userId,
+      name,
+      status: "pending",
+      created_at: new Date().toISOString(),
+      decided_at: null,
+    },
+    { onConflict: "meeting_id,user_id" },
+  );
   return "pending";
 }
 

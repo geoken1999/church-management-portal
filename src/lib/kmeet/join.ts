@@ -5,6 +5,7 @@ import { createVideoSdkRoom } from "@/lib/kmeet/client";
 import { endIdleMeetings } from "@/lib/kmeet/idle";
 import { minutesAvailableFor } from "@/lib/kmeet/minutes-service";
 import { NO_MINUTES_MESSAGE } from "@/lib/kmeet/minutes";
+import { notifyCallStarted } from "@/lib/kmeet/notify";
 import type { KmeetMode } from "@/types/database";
 
 // A moderator (anyone with write access to the kmeet tab — same bar as
@@ -55,6 +56,12 @@ export async function resolveMeetingRoom(
   let maxDurationMinutes = meeting.max_duration_minutes;
 
   if (!roomId) {
+    // The call may run for the minutes the church has left this month; none left means it cannot start.
+    const minutesLeft = await minutesAvailableFor(
+      meeting.organization_id,
+      meeting.mode,
+    );
+    if (minutesLeft === 0) return { error: NO_MINUTES_MESSAGE(meeting.mode) };
     try {
       roomId = await createVideoSdkRoom();
     } catch (err) {
@@ -63,12 +70,6 @@ export async function resolveMeetingRoom(
           err instanceof Error ? err.message : "Couldn't start the meeting.",
       };
     }
-    // The call may run for the minutes the church has left this month; none left means it cannot start.
-    const minutesLeft = await minutesAvailableFor(
-      meeting.organization_id,
-      meeting.mode,
-    );
-    if (minutesLeft === 0) return { error: NO_MINUTES_MESSAGE(meeting.mode) };
     startedAt = new Date().toISOString();
     maxDurationMinutes = minutesLeft;
     await admin
@@ -81,11 +82,13 @@ export async function resolveMeetingRoom(
         last_active_at: startedAt,
       })
       .eq("id", meetingId);
+    await notifyCallStarted(meetingId);
   } else if (meeting.status === "scheduled") {
     await admin
       .from("kmeet_meetings")
       .update({ status: "live", last_active_at: new Date().toISOString() })
       .eq("id", meetingId);
+    await notifyCallStarted(meetingId);
   }
 
   return {

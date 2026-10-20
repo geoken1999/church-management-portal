@@ -15,6 +15,7 @@ import {
   participantPermissionsFor,
   resolveMeetingRoom,
 } from "@/lib/kmeet/join";
+import { notifyCallStarted } from "@/lib/kmeet/notify";
 import { minutesAvailableFor } from "@/lib/kmeet/minutes-service";
 import { NO_MINUTES_MESSAGE } from "@/lib/kmeet/minutes";
 import {
@@ -189,6 +190,8 @@ export async function startInstantMeetingAction(
 
   if (error || !data)
     return { error: "Couldn't start that meeting. Please try again." };
+
+  await notifyCallStarted(data.id, user.id);
 
   revalidatePath(dashboardBasePathForMode(mode));
   revalidatePath(KCONNECT_PATH);

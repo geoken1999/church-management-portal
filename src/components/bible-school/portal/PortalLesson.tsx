@@ -23,6 +23,7 @@ import {
   resumePoint,
 } from "@/lib/lms/playback-reporter";
 import { QuizTaker } from "@/components/bible-school/portal/QuizTaker";
+import { AssignmentTaker } from "@/components/bible-school/portal/AssignmentTaker";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -210,6 +211,20 @@ export function PortalLesson({ lessonId }: { lessonId: string }) {
             Join the course to take this quiz.
           </p>
         )
+      ) : lesson.content_type === "assignment" ? (
+        lesson.enrolled ? (
+          <AssignmentTaker
+            lessonId={lesson.id}
+            onHandedIn={() => {
+              setCompleted(true);
+              void refreshOutline(lesson.course_id);
+            }}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Join the course to hand in this assignment.
+          </p>
+        )
       ) : (
         <LessonBody lesson={lesson} onReport={onReport} />
       )}
@@ -271,7 +286,13 @@ export function PortalLesson({ lessonId }: { lessonId: string }) {
           </Button>
         )}
         <div className="flex-1">
-          {lesson.enrolled && lesson.content_type === "quiz" ? (
+          {lesson.enrolled && lesson.content_type === "assignment" ? (
+            <p className="text-center text-sm text-muted-foreground">
+              {completed
+                ? "Completed: you handed it in."
+                : "Hand in the assignment to complete this lesson."}
+            </p>
+          ) : lesson.enrolled && lesson.content_type === "quiz" ? (
             <p className="text-center text-sm text-muted-foreground">
               {completed
                 ? "Completed: you passed the quiz."

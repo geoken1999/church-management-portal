@@ -30,7 +30,7 @@ Rules that follow from this:
 
 ## 2. Before you start (platform owner, once)
 
-1. Apply the Supabase migrations `0190` to `0198` in `supabase/migrations/`, then deploy the web app, then
+1. Apply the Supabase migrations `0190` to `0203` in `supabase/migrations/`, then deploy the web app, then
    release the mobile app.
 2. **Super Admin → Feature Flags**: move **Bible School** from *Testing* to *Beta* or *Live*.
 3. **Super Admin → the church → Bible School card**: turn it **On** for the church (the church asks with
@@ -147,6 +147,15 @@ You can also **Approve**, **Reject** or **Withdraw** people there.
 5. A quiz lesson is completed only by **passing** it. A required quiz therefore counts towards finishing the course. Students cannot tick it off by hand.
 6. Once a student has taken the quiz, its questions are locked (the settings can still change), so existing results stay valid.
 
+### Assignments
+1. In a module add a lesson of type **Assignment**, save it, then press **Instructions** on it.
+2. Write what students should hand in, set what it is **marked out of**, an optional **due date**, and whether they can hand in **typed text**, **a file** (PDF, Word, PowerPoint, Excel, text, pictures or a zip, up to 25 MB), or both.
+3. Save, then **Publish** the lesson. It cannot be published without instructions.
+4. Handing in **completes the lesson**, so a required assignment counts towards finishing the course without waiting for you to mark it.
+5. A hand-in after the due date is accepted and shown as **Late**. Until you mark it the student can replace their hand-in; after you mark it, they can't.
+6. Hand-ins appear under **Grading → Assignments waiting to be marked**: read the text, open the file, give a mark from 0 to the maximum, add feedback and save. The student gets a notification and sees the mark and feedback on the lesson. The latest marked work stays below, where you can change a mark.
+7. Instructors see and mark only the courses they teach. Students' files are private: only the student and the teachers of that course can open them.
+
 ### Grading
 - Choice questions are marked by the system the moment the student submits.
 - A quiz with a **written answer** waits: it shows under **Grading → Waiting to be marked**. Give marks (0 up to the question's points) and optional feedback; the result, pass or fail, and completion follow when you save.
@@ -179,6 +188,9 @@ into it) or on the web at `/bible-school/learn`.
 3. Video: play/pause, 10-second skips, speed, full screen, and it resumes where you stopped.
 4. Audio and reading lessons work the same way. Documents open from a private link.
 5. Keep private notes and bookmarks. Previous and Next move between lessons.
+
+### Assignments
+Open an assignment lesson, read what to hand in and when it is due. Type your answer, attach a file, or both (as allowed), and press **Hand in**. The lesson is complete at once. You can change your hand-in until your teacher marks it; then your mark and feedback appear on the same screen and you get a notification. A hand-in after the due date still counts but is marked late.
 
 ### Quizzes
 Open a quiz lesson and press **Start the quiz**. Choice questions are marked at once and you see which were right (if your teacher allows it). A written answer waits for your teacher. Pass the pass mark to complete the lesson; if you fall short you can try again until your attempts run out.
@@ -226,4 +238,4 @@ The **Live classes** tab: *Join the class* when it opens, *Watch the recording* 
 
 ## 11. Not available yet
 
-Automatic refunds, assignments (file hand-ins), exams with time limits or question banks, reports, and plan limits for the Bible School.
+Automatic refunds, exams with time limits or question banks, reports, and plan limits for the Bible School.

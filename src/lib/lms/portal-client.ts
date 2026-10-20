@@ -143,6 +143,28 @@ export interface PAttempt {
     | null;
 }
 
+export interface PAssignment {
+  lesson_id: string;
+  title: string;
+  instructions: string;
+  max_points: number;
+  due_at: string | null;
+  allow_text: boolean;
+  allow_file: boolean;
+  can_submit: boolean;
+  submission: {
+    answer_text: string | null;
+    file_name: string | null;
+    file_size: number | null;
+    submitted_at: string;
+    is_late: boolean;
+    status: "submitted" | "graded";
+    score: number | null;
+    feedback: string | null;
+    graded_at: string | null;
+  } | null;
+}
+
 export interface PQuiz {
   lesson_id: string;
   title: string;
@@ -267,6 +289,71 @@ export const portal = {
   quiz: (lesson: string) => rpc<PQuiz>("lms_get_quiz", { p_lesson: lesson }),
   submitQuiz: (lesson: string, answers: Record<string, string[] | string>) =>
     rpc<PAttempt>("lms_submit_quiz", { p_lesson: lesson, p_answers: answers }),
+  assignment: (lesson: string) =>
+    rpc<PAssignment>("lms_get_assignment", { p_lesson: lesson }),
+
+  // Hands in an assignment: a file goes to storage first (through a one-time link the server makes), then the
+  // hand-in names it. Resolves with whether the hand-in was late.
+  async submitAssignment(
+    lesson: string,
+    text: string,
+    file: File | null,
+  ): Promise<{ late: boolean }> {
+    const t = await token();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(t ? { Authorization: `Bearer ${t}` } : {}),
+    };
+    let path: string | null = null;
+    if (file) {
+      const slot = await (
+        await fetch("/api/mobile/lms/assignment-upload", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            lessonId: lesson,
+            name: file.name,
+            size: file.size,
+          }),
+        })
+      ).json();
+      if (!slot.ok) throw new Error(slot.error ?? "Couldn't upload the file.");
+      const { error } = await supabase()
+        .storage.from("lms-submissions")
+        .uploadToSignedUrl(slot.path, slot.token, file);
+      if (error) throw new Error("Couldn't upload the file. Please try again.");
+      path = slot.path;
+    }
+    const done = await (
+      await fetch("/api/mobile/lms/assignment-submit", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          lessonId: lesson,
+          text,
+          path,
+          name: file?.name ?? null,
+          size: file?.size ?? null,
+        }),
+      })
+    ).json();
+    if (!done.ok) throw new Error(done.error ?? "Couldn't hand in.");
+    return { late: Boolean(done.late) };
+  },
+
+  async submissionLink(
+    lessonId: string,
+  ): Promise<{ url: string; name: string }> {
+    const t = await token();
+    const response = await fetch(
+      `/api/mobile/lms/assignment-file?lessonId=${encodeURIComponent(lessonId)}`,
+      { headers: t ? { Authorization: `Bearer ${t}` } : {} },
+    );
+    const json = await response.json();
+    if (!json.ok) throw new Error(json.error ?? "Couldn't open that file.");
+    return { url: json.url, name: json.name ?? "Your file" };
+  },
+
   certificates: (org: string) =>
     rpc<PCertificate[]>("lms_my_certificates", { p_org: org }),
   sessions: (org: string) => rpc<PSession[]>("lms_my_sessions", { p_org: org }),

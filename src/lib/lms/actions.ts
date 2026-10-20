@@ -960,6 +960,16 @@ export async function setLessonStatusAction(
         .eq("lesson_id", lessonId);
       if ((count ?? 0) === 0)
         return fail("Add the quiz questions before publishing this lesson.");
+    } else if (lesson.content_type === "assignment") {
+      const { data: brief } = await admin
+        .from("lms_assignments")
+        .select("instructions")
+        .eq("lesson_id", lessonId)
+        .maybeSingle();
+      if (!brief?.instructions?.trim())
+        return fail(
+          "Write the assignment instructions before publishing this lesson.",
+        );
     } else if (
       lesson.content_type !== "text" &&
       !lesson.file_path &&

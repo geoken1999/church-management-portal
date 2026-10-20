@@ -19,6 +19,7 @@ import {
 } from "@/lib/lms/actions";
 import { LESSON_TYPES } from "@/lib/lms/constants";
 import { QuizEditor } from "@/components/bible-school/QuizEditor";
+import { AssignmentEditor } from "@/components/bible-school/AssignmentEditor";
 import type { ModuleWithLessons } from "@/lib/lms/dal";
 import type { LmsLesson, LmsPublishState } from "@/types/database";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +66,7 @@ export function CurriculumBuilder({
     description: "",
   });
   const [quizOpen, setQuizOpen] = useState<string | null>(null);
+  const [assignmentOpen, setAssignmentOpen] = useState<string | null>(null);
   const [lessonForm, setLessonForm] = useState<{
     moduleId: string;
     lesson: LmsLesson | null;
@@ -396,6 +398,19 @@ export function CurriculumBuilder({
                         Questions
                       </Button>
                     )}
+                    {lesson.content_type === "assignment" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          setAssignmentOpen(
+                            assignmentOpen === lesson.id ? null : lesson.id,
+                          )
+                        }
+                      >
+                        Instructions
+                      </Button>
+                    )}
                     {lesson.status !== "published" ? (
                       <Button
                         size="sm"
@@ -491,6 +506,18 @@ export function CurriculumBuilder({
                   courseId={courseId}
                   lessonId={l.id}
                   onClose={() => setQuizOpen(null)}
+                />
+              ))}
+
+            {module_.lessons
+              .filter((l) => l.id === assignmentOpen)
+              .map((l) => (
+                <AssignmentEditor
+                  key={l.id}
+                  organizationId={organizationId}
+                  courseId={courseId}
+                  lessonId={l.id}
+                  onClose={() => setAssignmentOpen(null)}
                 />
               ))}
 
@@ -873,6 +900,13 @@ function LessonForm({
             Save the lesson, then press Questions on it to write the quiz.
             Students pass the quiz to complete the lesson, so a required quiz
             counts towards finishing the course.
+          </p>
+        ) : form.contentType === "assignment" ? (
+          <p className="text-xs text-muted-foreground">
+            Save the lesson, then press Instructions on it to say what students
+            hand in, how it is marked and when it is due. Handing it in
+            completes the lesson, so a required assignment counts towards
+            finishing the course.
           </p>
         ) : (
           <p className="text-xs text-muted-foreground">

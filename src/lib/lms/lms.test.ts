@@ -309,12 +309,15 @@ describe("validateLesson", () => {
       allowsUpload: false,
     });
   });
-  it("allows a quiz lesson, but not types that are still reserved", () => {
+  it("allows quiz and assignment lessons, but not types that are still reserved", () => {
     expect(
       validateLesson({ ...lesson, contentType: "quiz" }).contentType,
     ).toBeFalsy();
     expect(
       validateLesson({ ...lesson, contentType: "assignment" }).contentType,
+    ).toBeFalsy();
+    expect(
+      validateLesson({ ...lesson, contentType: "live_session" }).contentType,
     ).toBeTruthy();
   });
   it("checks the duration", () => {

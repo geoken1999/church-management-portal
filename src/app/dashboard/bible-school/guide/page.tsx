@@ -124,6 +124,14 @@ const STEPS = [
       "A certificate is given automatically when a student finishes a course, and another for a whole program. Set who signs them in Settings. The Certificates tab lists them, with a PDF, a public check link (anyone can check a code) and Revoke.",
     ],
   },
+  {
+    title: "11. Assignments",
+    body: [
+      "Add a lesson of type Assignment, save it, then press Instructions: say what students hand in, what it is marked out of, an optional due date, and whether they can hand in typed text, a file (PDF, Word, pictures and more, up to 25 MB), or both. Publish the lesson.",
+      "Handing in completes the lesson, so a required assignment counts towards finishing the course without waiting for you. A hand-in after the due date is accepted and shown as Late. Students can replace their hand-in until it is marked.",
+      "Hand-ins appear under Grading → Assignments waiting to be marked: read the text, open the file, give a mark and feedback. The student is notified and sees both on the lesson.",
+    ],
+  },
 ];
 
 export default function GuidePage() {

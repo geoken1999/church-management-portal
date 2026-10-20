@@ -1203,6 +1203,38 @@ export type LmsQuizAttempt = {
   submitted_at: string;
 };
 
+export type LmsAssignment = {
+  lesson_id: string;
+  organization_id: string;
+  course_id: string;
+  instructions: string;
+  max_points: number;
+  due_at: string | null;
+  allow_text: boolean;
+  allow_file: boolean;
+  updated_at: string;
+};
+
+export type LmsAssignmentSubmission = {
+  id: string;
+  organization_id: string;
+  lesson_id: string;
+  course_id: string;
+  enrollment_id: string;
+  member_id: string;
+  answer_text: string | null;
+  file_path: string | null;
+  file_name: string | null;
+  file_size: number | null;
+  submitted_at: string;
+  is_late: boolean;
+  status: "submitted" | "graded";
+  score: number | null;
+  feedback: string | null;
+  graded_by: string | null;
+  graded_at: string | null;
+};
+
 export type LmsCertificate = {
   id: string;
   organization_id: string;
@@ -3902,6 +3934,18 @@ export type Database = {
         Update: Partial<LmsQuizAttempt>;
         Relationships: [];
       };
+      lms_assignments: {
+        Row: LmsAssignment;
+        Insert: Partial<LmsAssignment> & Pick<LmsAssignment, "lesson_id" | "organization_id" | "course_id">;
+        Update: Partial<LmsAssignment>;
+        Relationships: [];
+      };
+      lms_assignment_submissions: {
+        Row: LmsAssignmentSubmission;
+        Insert: Partial<LmsAssignmentSubmission> & Pick<LmsAssignmentSubmission, "organization_id" | "lesson_id" | "course_id" | "enrollment_id" | "member_id">;
+        Update: Partial<LmsAssignmentSubmission>;
+        Relationships: [];
+      };
       lms_certificates: {
         Row: LmsCertificate;
         Insert: Partial<LmsCertificate> & Pick<LmsCertificate, "organization_id" | "member_id" | "code" | "student_name" | "title" | "organization_name">;
@@ -4659,6 +4703,26 @@ export type Database = {
       lms_grade_attempt: {
         Args: { p_org: string; p_attempt: string; p_points: Record<string, number>; p_feedback: string; p_actor: string };
         Returns: { percent: number; passed: boolean };
+      };
+      lms_grade_assignment: {
+        Args: { p_org: string; p_submission: string; p_score: number; p_feedback: string; p_actor: string };
+        Returns: { member_id: string; lesson_id: string; score: number; max_points: number };
+      };
+      lms_get_assignment: {
+        Args: { p_lesson: string };
+        Returns: Record<string, unknown>;
+      };
+      lms_assignment_upload_slot: {
+        Args: { p_lesson: string };
+        Returns: { organization_id: string; member_id: string };
+      };
+      lms_submit_assignment: {
+        Args: { p_lesson: string; p_text: string | null; p_file_path: string | null; p_file_name: string | null; p_file_size: number | null };
+        Returns: { late: boolean; replaced_file: string | null; organization_id: string; course_id: string; member_id: string };
+      };
+      lms_my_submission_file: {
+        Args: { p_lesson: string };
+        Returns: { file_path: string; file_name: string }[];
       };
       lms_decide_enrollment: {
         Args: { p_organization_id: string; p_enrollment_id: string; p_action: string; p_actor: string };

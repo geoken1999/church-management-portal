@@ -24,7 +24,7 @@ export const VISIBILITIES = [
   },
 ] as const;
 
-// Lesson types a teacher can create. assignment and live_session lessons are reserved in the database for
+// Lesson types a teacher can create. live_session lessons are reserved in the database for
 // later; live classes are scheduled on the course, not as a lesson.
 export const LESSON_TYPES = [
   // needsLink: the lesson has to have a source (a link or an uploaded file) before it can be published.
@@ -69,6 +69,14 @@ export const LESSON_TYPES = [
   {
     value: "quiz",
     label: "Quiz",
+    needsLink: false,
+    allowsLink: false,
+    allowsUpload: false,
+  },
+  // An assignment is handed in as text and/or a file and marked by a teacher; handing it in completes the lesson.
+  {
+    value: "assignment",
+    label: "Assignment",
     needsLink: false,
     allowsLink: false,
     allowsUpload: false,

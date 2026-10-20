@@ -17,6 +17,7 @@ const MIGRATIONS = [
   "0198_lms_program_enrollment.sql",
   "0200_change_tickets_and_program_request_notice.sql",
   "0202_lms_quizzes_certificates.sql",
+  "0203_lms_assignments.sql",
 ];
 const BOOTSTRAP = readFileSync(
   "src/lib/lms/test-support/supabase-stub.sql",
@@ -1624,6 +1625,219 @@ describe("Bible School database", () => {
       "no second certificate for the same course",
       (await q("select lms_issue_certificate($1,$2,null) as id", [m1, qc]))[0]
         .id === null,
+    );
+  }, 60000);
+
+  it("assignments: hand in, replace, late, mark", async () => {
+    const ac = (
+      await q(
+        "insert into lms_courses (organization_id, title, status, visibility) values ($1,'Assignment Course','published','organization') returning id",
+        [orgA],
+      )
+    )[0].id;
+    const am = (
+      await q(
+        "insert into lms_modules (course_id, organization_id, title, status, position) values ($1,$2,'Work','published',0) returning id",
+        [ac, orgA],
+      )
+    )[0].id;
+    const lesson = async (due: string | null, text: boolean, file: boolean) => {
+      const id = (
+        await q(
+          "insert into lms_lessons (module_id, course_id, organization_id, title, content_type, status, position, is_required) values ($1,$2,$3,'Essay','assignment','published',0,true) returning id",
+          [am, ac, orgA],
+        )
+      )[0].id as string;
+      await q(
+        "insert into lms_assignments (lesson_id, organization_id, course_id, instructions, max_points, due_at, allow_text, allow_file) values ($1,$2,$3,'Write about grace',20,$4,$5,$6)",
+        [id, orgA, ac, due, text, file],
+      );
+      return id;
+    };
+    const open = await lesson(null, true, true);
+    await q(
+      "select lms_create_enrollment($1,$2,$3,'approved','admin',$4,true)",
+      [orgA, ac, m1, admin],
+    );
+
+    const brief = (
+      await as(u1, "select lms_get_assignment($1) as a", [open])
+    )[0].a;
+    check(
+      "the student sees the brief and no hand-in yet",
+      brief.max_points === 20 && brief.submission === null && brief.can_submit,
+    );
+    check(
+      "a student not on the course cannot see it",
+      (await asErr(u2, "select lms_get_assignment($1)", [open])) !== null,
+    );
+    check(
+      "it cannot be ticked off by hand",
+      (
+        (await asErr(u1, "select lms_complete_lesson($1,true)", [open])) ?? ""
+      ).includes("Hand in the assignment"),
+    );
+    check(
+      "an empty hand-in is refused",
+      (
+        (await asErr(
+          u1,
+          "select lms_submit_assignment($1,'  ',null,null,null)",
+          [open],
+        )) ?? ""
+      ).includes("Add your answer"),
+    );
+    check(
+      "a file that was never uploaded is refused",
+      (
+        (await asErr(
+          u1,
+          "select lms_submit_assignment($1,null,$2,'a.pdf',10)",
+          [open, `${orgA}/${m1}/${open}/ghost.pdf`],
+        )) ?? ""
+      ).includes("did not upload"),
+    );
+    check(
+      "another student's folder is refused even if the file exists",
+      await (async () => {
+        const other = `${orgA}/${m2}/${open}/x.pdf`;
+        await q(
+          "insert into storage.objects (bucket_id, name) values ('lms-submissions', $1)",
+          [other],
+        );
+        return (
+          (await asErr(
+            u1,
+            "select lms_submit_assignment($1,null,$2,'x.pdf',10)",
+            [open, other],
+          )) ?? ""
+        ).includes("did not upload");
+      })(),
+    );
+
+    const first = `${orgA}/${m1}/${open}/one.pdf`;
+    await q(
+      "insert into storage.objects (bucket_id, name) values ('lms-submissions', $1)",
+      [first],
+    );
+    const done = (
+      await as(
+        u1,
+        "select lms_submit_assignment($1,'My essay',$2,'one.pdf',1234) as r",
+        [open, first],
+      )
+    )[0].r;
+    check("handing in is on time with no due date", done.late === false);
+    check(
+      "handing in completes the lesson",
+      (
+        await q(
+          "select 1 from lms_lesson_progress where lesson_id = $1 and member_id = $2 and completed_at is not null",
+          [open, m1],
+        )
+      ).length === 1,
+    );
+    const shown = (
+      await as(u1, "select lms_get_assignment($1) as a", [open])
+    )[0].a;
+    check(
+      "the hand-in is returned with its file name only",
+      shown.submission.file_name === "one.pdf" &&
+        !JSON.stringify(shown).includes(first),
+    );
+
+    const second = `${orgA}/${m1}/${open}/two.pdf`;
+    await q(
+      "insert into storage.objects (bucket_id, name) values ('lms-submissions', $1)",
+      [second],
+    );
+    const replaced = (
+      await as(
+        u1,
+        "select lms_submit_assignment($1,null,$2,'two.pdf',99) as r",
+        [open, second],
+      )
+    )[0].r;
+    check(
+      "replacing before marking tells the server which file to delete",
+      replaced.replaced_file === first,
+    );
+
+    const sub = (
+      await q(
+        "select id from lms_assignment_submissions where lesson_id = $1",
+        [open],
+      )
+    )[0].id;
+    let tooMuch = "";
+    try {
+      await q("select lms_grade_assignment($1,$2,21,'x',$3)", [
+        orgA,
+        sub,
+        admin,
+      ]);
+    } catch (e) {
+      tooMuch = (e as Error).message;
+    }
+    check(
+      "marks cannot exceed the maximum",
+      tooMuch.includes("between 0 and 20"),
+    );
+    const graded = (
+      await q("select lms_grade_assignment($1,$2,17.5,'Well argued',$3) as r", [
+        orgA,
+        sub,
+        admin,
+      ])
+    )[0].r;
+    check("a teacher can mark it", Number(graded.score) === 17.5);
+    check(
+      "the student sees the mark and feedback",
+      (await as(u1, "select lms_get_assignment($1) as a", [open]))[0].a
+        .submission.feedback === "Well argued",
+    );
+    check(
+      "after marking it can no longer be replaced",
+      (
+        (await asErr(
+          u1,
+          "select lms_submit_assignment($1,'again',null,null,null)",
+          [open],
+        )) ?? ""
+      ).includes("already been marked"),
+    );
+    check(
+      "students cannot write the table directly",
+      (await asErr(u1, "update lms_assignment_submissions set score = 20")) !==
+        null ||
+        (
+          await q(
+            "select score from lms_assignment_submissions where id = $1",
+            [sub],
+          )
+        )[0].score == 17.5,
+    );
+
+    const late = await lesson("2000-01-01T00:00:00Z", true, false);
+    const lateRes = (
+      await as(
+        u1,
+        "select lms_submit_assignment($1,'Late work',null,null,null) as r",
+        [late],
+      )
+    )[0].r;
+    check(
+      "a hand-in after the due date is accepted and flagged late",
+      lateRes.late === true,
+    );
+    check(
+      "a file is refused where only text is allowed",
+      (
+        (await asErr(u1, "select lms_submit_assignment($1,null,$2,'a.pdf',1)", [
+          late,
+          `${orgA}/${m1}/${late}/a.pdf`,
+        ])) ?? ""
+      ).length > 0,
     );
   }, 60000);
 });

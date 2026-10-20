@@ -10,6 +10,11 @@ import {
 } from "@/lib/lms/dal";
 import { gradeLetter } from "@/lib/lms/quiz";
 import { LMS_BASE_PATH } from "@/lib/lms/constants";
+import {
+  getMarkedSubmissions,
+  getWaitingSubmissions,
+} from "@/lib/lms/assignment-dal";
+import { SubmissionsPanel } from "@/components/bible-school/SubmissionsPanel";
 import { GradingPanel } from "@/components/bible-school/GradingPanel";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,9 +37,11 @@ export default async function GradingPage({
   const onlyCourseIds = membership.tabAccess.bibleschool.write
     ? undefined
     : await getTaughtCourseIds(organizationId, user.id);
-  const [waiting, courses] = await Promise.all([
+  const [waiting, courses, waitingWork, markedWork] = await Promise.all([
     getWaitingAttempts(organizationId, onlyCourseIds),
     getCourseOptions(organizationId),
+    getWaitingSubmissions(organizationId, onlyCourseIds),
+    getMarkedSubmissions(organizationId, onlyCourseIds),
   ]);
   const visible = onlyCourseIds
     ? courses.filter((c) => onlyCourseIds.includes(c.id))
@@ -55,6 +62,23 @@ export default async function GradingPage({
           </p>
         </div>
         <GradingPanel organizationId={organizationId} attempts={waiting} />
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="font-heading text-xl font-bold">
+            Assignments waiting to be marked ({waitingWork.length})
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Typed answers and files students have handed in. They are told when
+            you save the mark.
+          </p>
+        </div>
+        <SubmissionsPanel
+          organizationId={organizationId}
+          waiting={waitingWork}
+          marked={markedWork}
+        />
       </section>
 
       <section className="space-y-3">

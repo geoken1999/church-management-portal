@@ -118,6 +118,7 @@ You can also **Approve**, **Reject** or **Withdraw** people there.
 
 1. Set the program to **Open to the public** and publish it.
 2. Share your Bible School page (**Applications** shows the link): `yourdomain/bible-school/<church slug>`.
+   To share one program, press **Copy share link** or **Share on WhatsApp** on it under **Programs** (public, published programs only). The link opens your page with that program shown first and pre-selected in the form: `yourdomain/bible-school/<church slug>?program=<id>`.
 3. A visitor picks a program and applies with name, mobile number, optional email and message.
 4. **Free program**: you review under **Applications** and approve or reject.
    **Program with a fee**: they pay first and are approved and enrolled automatically.

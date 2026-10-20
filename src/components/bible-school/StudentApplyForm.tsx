@@ -20,8 +20,11 @@ const SELECT_CLASS =
 export function StudentApplyForm({
   slug,
   options,
+  selected,
 }: {
   slug: string;
+  // Pre-picked from a shared program link.
+  selected?: string;
   options: { value: string; title: string; price: number | null }[];
 }) {
   const [state, action, pending] = useActionState(
@@ -126,7 +129,9 @@ export function StudentApplyForm({
           <select
             id="stu-course"
             name="courseId"
-            defaultValue=""
+            defaultValue={
+              options.some((o) => o.value === selected) ? selected : ""
+            }
             className={SELECT_CLASS}
           >
             <option value="">Not sure yet</option>

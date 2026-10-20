@@ -31,10 +31,10 @@ export default async function PublicBibleSchoolPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ payment?: string }>;
+  searchParams: Promise<{ payment?: string; program?: string }>;
 }) {
   const { slug } = await params;
-  const { payment } = await searchParams;
+  const { payment, program: sharedProgram } = await searchParams;
   const school = await getPublicSchool(slug);
   if (!school) notFound();
 
@@ -90,35 +90,50 @@ export default async function PublicBibleSchoolPage({
               and the church will get in touch.
             </p>
           ) : (
-            school.programs.map((program) => (
-              <Card key={program.id}>
-                <CardContent className="space-y-1">
-                  <p className="font-medium">{program.title}</p>
-                  {program.price_amount ? (
-                    <p className="text-sm font-semibold">
-                      Program fee: ₹{program.price_amount}
-                    </p>
-                  ) : (
-                    <p className="text-xs font-medium text-primary">Free</p>
-                  )}
-                  {program.description && (
-                    <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-                      {program.description}
-                    </p>
-                  )}
-                  {program.courseTitles.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Includes: {program.courseTitles.join(" · ")}
-                    </p>
-                  )}
-                  {program.capacity && (
-                    <p className="text-xs text-muted-foreground">
-                      {program.capacity} seats
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            ))
+            [...school.programs]
+              // A shared link to one program lists it first and marks it.
+              .sort(
+                (a, b) =>
+                  Number(b.id === sharedProgram) -
+                  Number(a.id === sharedProgram),
+              )
+              .map((program) => (
+                <Card
+                  key={program.id}
+                  id={`program-${program.id}`}
+                  className={
+                    program.id === sharedProgram
+                      ? "ring-2 ring-primary"
+                      : undefined
+                  }
+                >
+                  <CardContent className="space-y-1">
+                    <p className="font-medium">{program.title}</p>
+                    {program.price_amount ? (
+                      <p className="text-sm font-semibold">
+                        Program fee: ₹{program.price_amount}
+                      </p>
+                    ) : (
+                      <p className="text-xs font-medium text-primary">Free</p>
+                    )}
+                    {program.description && (
+                      <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                        {program.description}
+                      </p>
+                    )}
+                    {program.courseTitles.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Includes: {program.courseTitles.join(" · ")}
+                      </p>
+                    )}
+                    {program.capacity && (
+                      <p className="text-xs text-muted-foreground">
+                        {program.capacity} seats
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              ))
           )}
           {school.courses.length > 0 && (
             <>
@@ -164,6 +179,7 @@ export default async function PublicBibleSchoolPage({
           </p>
           <StudentApplyForm
             slug={slug}
+            selected={sharedProgram ? `program:${sharedProgram}` : undefined}
             options={[
               ...school.programs.map((p) => ({
                 value: `program:${p.id}`,

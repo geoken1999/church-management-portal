@@ -31,12 +31,15 @@ export function ProgramsManager({
   programs,
   courses,
   canDelete,
+  publicBaseUrl,
 }: {
   organizationId: string;
   programs: ProgramRow[];
   courses: CourseOption[];
   canDelete: boolean;
+  publicBaseUrl: string;
 }) {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
@@ -386,6 +389,43 @@ export function ProgramsManager({
                 ? "Open to the public"
                 : "Church members only"}
             </p>
+            {program.visibility === "public" &&
+              program.status === "published" && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(
+                          `${publicBaseUrl}?program=${program.id}`,
+                        );
+                        setCopiedId(program.id);
+                      } catch {
+                        setCopiedId(null);
+                      }
+                    }}
+                  >
+                    {copiedId === program.id
+                      ? "Link copied"
+                      : "Copy share link"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    nativeButton={false}
+                    render={
+                      <a
+                        href={`https://wa.me/?text=${encodeURIComponent(`Join ${program.title}: ${publicBaseUrl}?program=${program.id}`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Share on WhatsApp
+                      </a>
+                    }
+                  />
+                </div>
+              )}
             <p className="text-xs text-muted-foreground">
               {program.courseIds.length === 0
                 ? "No courses in this program yet."

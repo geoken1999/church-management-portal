@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { getSiteUrl } from "@/lib/site-url";
+import { publicSchoolPath } from "@/lib/lms/students";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getCourseOptions, getPrograms } from "@/lib/lms/dal";
 import { ProgramsManager } from "@/components/bible-school/ProgramsManager";
@@ -32,6 +34,7 @@ export default async function ProgramsPage() {
       programs={programs}
       courses={courses}
       canDelete={membership.tabAccess.bibleschool.delete}
+      publicBaseUrl={`${getSiteUrl()}${publicSchoolPath(membership.organization.slug)}`}
     />
   );
 }

@@ -42,11 +42,11 @@ export default function PrivacyPolicyPage() {
           worship documents, images).
         </p>
         <p>
-          <strong>Payment and billing information.</strong> Subscription and add-on payments are processed by PayU
-          (UPI Autopay), and online giving by the payment gateway your Organization uses (PayU, Cashfree or its own
-          Razorpay account). We do not store your card, UPI PIN, or bank login — the gateway handles that and shares
-          with us only what&apos;s needed to manage the payment (status, amount, reference, and your UPI ID for
-          subscription mandates). We also keep the billing details you give us for tax invoices (organization name,
+          <strong>Payment and billing information.</strong> Subscription, add-on, membership fee, event and Bible School
+          payments are processed by Razorpay, and online giving by Razorpay or by the payment gateway your Organization
+          uses (Razorpay, PayU or Cashfree on its own account). We do not store your card, UPI PIN, or bank login — the gateway handles that and shares
+          with us only what&apos;s needed to manage the payment (status, amount, reference, and your payment method for
+          subscription authorisations). We also keep the billing details you give us for tax invoices (organization name,
           address, state, and GST number if you have one) and the invoices we issue, which include 18% GST.
         </p>
         <p>
@@ -119,7 +119,7 @@ export default function PrivacyPolicyPage() {
         <ul>
           <li><strong>Supabase</strong> — database, authentication, and file storage infrastructure.</li>
           <li><strong>Vercel</strong> — application hosting.</li>
-          <li><strong>PayU, Cashfree and Razorpay</strong> — payment processing for subscriptions, add-ons, giving and event payments.</li>
+          <li><strong>Razorpay, PayU and Cashfree</strong> — payment processing for subscriptions, add-ons, giving and event payments.</li>
           <li><strong>Resend</strong> — transactional and bulk email delivery.</li>
           <li><strong>Twilio</strong> — SMS and WhatsApp message delivery.</li>
           <li><strong>VideoSDK</strong> — video and audio calls and live streaming.</li>

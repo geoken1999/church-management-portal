@@ -3,17 +3,23 @@ import { Razorpay } from "@/lib/billing/razorpay";
 import { getRazorpayWebhookSecret } from "@/lib/billing/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  sendSubscriptionActivatedEmail,
   sendSubscriptionChargedEmail,
-  sendSubscriptionCancelledEmail,
+  sendSubscriptionPaymentFailedEmail,
 } from "@/lib/billing/receipts";
+import {
+  activateRazorpaySubscription,
+  recordSubscriptionCharge,
+} from "@/lib/billing/razorpay-subscription";
+import {
+  finishScheduledCancellation,
+  planNameFor,
+} from "@/lib/billing/cancellation-store";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { finalizeAddonOrderPayment } from "@/lib/billing/addon-actions";
 import { finalizeEventRegistrationPayment } from "@/lib/events/registration-payment";
 import { finalizeMembershipPayment } from "@/lib/membership-fees/finalize";
 import { finalizeProgramPayment } from "@/lib/lms/payments";
 import { finalizePayUGivingOrderPayment } from "@/lib/finance/payu-giving";
-import { PLANS, isPlanId, isBillingInterval } from "@/lib/plans/config";
 
 // The source of truth for plan changes — startSubscriptionCheckout's DB
 // write only records what checkout was *started*; this is what confirms
@@ -94,7 +100,9 @@ export async function POST(request: Request) {
   const admin = createAdminClient();
   const { data: existing } = await admin
     .from("organization_subscriptions")
-    .select("organization_id, plan_id, billing_interval")
+    .select(
+      "id, organization_id, plan_id, billing_interval, status, monthly_amount, cancel_at_period_end",
+    )
     .eq("razorpay_subscription_id", subscriptionEntity.id)
     .maybeSingle();
 
@@ -106,79 +114,110 @@ export async function POST(request: Request) {
 
   const toIso = (unixSeconds: number | null | undefined): string | null =>
     unixSeconds ? new Date(unixSeconds * 1000).toISOString() : null;
+  const planName = planNameFor(existing.plan_id, existing.monthly_amount);
+  const ended = [
+    "subscription.cancelled",
+    "subscription.completed",
+    "subscription.expired",
+  ].includes(event);
 
-  await admin
-    .from("organization_subscriptions")
-    .update({
-      status: subscriptionEntity.status,
-      razorpay_customer_id: subscriptionEntity.customer_id ?? undefined,
-      current_start: toIso(subscriptionEntity.current_start),
-      current_end: toIso(subscriptionEntity.current_end),
-    })
-    .eq("razorpay_subscription_id", subscriptionEntity.id);
-
-  const planName = isPlanId(existing.plan_id)
-    ? PLANS[existing.plan_id].name
-    : existing.plan_id;
-
-  // Record what the platform actually collected for this charge. Razorpay
-  // reports amounts in paise. Keyed on the payment id, so a redelivered
-  // webhook doesn't count the same charge twice.
-  if (
-    event === "subscription.charged" &&
-    paymentEntity?.id &&
-    paymentEntity.amount > 0
-  ) {
-    await admin.from("platform_subscription_payments").upsert(
-      {
-        organization_id: existing.organization_id,
-        razorpay_subscription_id: subscriptionEntity.id,
-        razorpay_payment_id: paymentEntity.id,
-        plan_id: existing.plan_id,
-        amount: paymentEntity.amount / 100,
-        currency: paymentEntity.currency ?? "INR",
-        paid_at: toIso(paymentEntity.created_at) ?? new Date().toISOString(),
-      },
-      { onConflict: "razorpay_payment_id", ignoreDuplicates: true },
-    );
-  }
-
-  if (event === "subscription.activated" || event === "subscription.charged") {
-    await admin
-      .from("organizations")
-      .update({ plan: existing.plan_id })
-      .eq("id", existing.organization_id);
-
-    if (event === "subscription.activated") {
-      const interval = isBillingInterval(existing.billing_interval)
-        ? existing.billing_interval
-        : "monthly";
-      await sendSubscriptionActivatedEmail(
-        existing.organization_id,
-        planName,
-        interval,
-      );
-    } else {
-      await sendSubscriptionChargedEmail(
-        existing.organization_id,
-        planName,
-        paymentEntity?.amount ?? null,
+  try {
+    // The plan switches on once the church has authorised (or the first charge lands).
+    if (
+      event === "subscription.activated" ||
+      event === "subscription.charged"
+    ) {
+      await activateRazorpaySubscription(
+        subscriptionEntity.id,
+        subscriptionEntity,
       );
     }
-  } else if (
-    [
-      "subscription.cancelled",
-      "subscription.completed",
-      "subscription.expired",
-    ].includes(event)
-  ) {
-    // Basic is the floor plan everyone falls back to — there's no
-    // free/suspended tier below it yet.
-    await admin
-      .from("organizations")
-      .update({ plan: "basic" })
-      .eq("id", existing.organization_id);
-    await sendSubscriptionCancelledEmail(existing.organization_id, planName);
+
+    if (ended) {
+      // A subscription already closed on our side (the church cancelled a not-yet-live one, or an earlier
+      // delivery of this event) needs nothing more.
+      if (existing.status !== "cancelled") {
+        await finishScheduledCancellation({
+          id: existing.id,
+          organization_id: existing.organization_id,
+          plan_id: existing.plan_id,
+          monthly_amount:
+            existing.monthly_amount !== null
+              ? Number(existing.monthly_amount)
+              : null,
+        });
+      }
+    } else if (!(
+      event === "subscription.authenticated" && existing.status === "active"
+    )) {
+      // Keeps our copy of Razorpay's state current: status, customer, the period and the next charge date.
+      await admin
+        .from("organization_subscriptions")
+        .update({
+          status: subscriptionEntity.status,
+          razorpay_customer_id: subscriptionEntity.customer_id ?? undefined,
+          current_start: toIso(subscriptionEntity.current_start),
+          current_end: toIso(subscriptionEntity.current_end),
+          next_charge_at: toIso(subscriptionEntity.charge_at),
+        })
+        .eq("id", existing.id);
+    }
+
+    if (
+      event === "subscription.charged" &&
+      paymentEntity?.id &&
+      paymentEntity.amount > 0
+    ) {
+      const first = await recordSubscriptionCharge({
+        subscriptionRowId: existing.id,
+        organizationId: existing.organization_id,
+        planId: existing.plan_id,
+        monthlyAmount:
+          existing.monthly_amount !== null
+            ? Number(existing.monthly_amount)
+            : null,
+        razorpaySubscriptionId: subscriptionEntity.id,
+        paymentId: paymentEntity.id,
+        amountPaise: paymentEntity.amount,
+        paidAt: toIso(paymentEntity.created_at) ?? new Date().toISOString(),
+        raw: paymentEntity,
+      });
+      if (first)
+        await sendSubscriptionChargedEmail(
+          existing.organization_id,
+          planName,
+          paymentEntity.amount,
+        );
+    }
+
+    if (event === "subscription.halted") {
+      // Razorpay gave up retrying: back to the free floor plan until the church authorises again.
+      await admin
+        .from("organizations")
+        .update({ plan: "basic" })
+        .eq("id", existing.organization_id);
+      await sendSubscriptionPaymentFailedEmail(
+        existing.organization_id,
+        planName,
+        false,
+      );
+    } else if (event === "subscription.pending") {
+      await sendSubscriptionPaymentFailedEmail(
+        existing.organization_id,
+        planName,
+        true,
+      );
+    }
+  } catch (err) {
+    await logPlatformEvent({
+      level: "error",
+      source: "razorpay_webhook",
+      message: `${event} could not be processed: ${err instanceof Error ? err.message : "unknown error"}`,
+      organizationId: existing.organization_id,
+      metadata: { subscriptionId: subscriptionEntity.id },
+    });
+    // A 500 makes Razorpay retry the event.
+    return NextResponse.json({ error: "Processing failed" }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });

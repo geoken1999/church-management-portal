@@ -39,4 +39,5 @@ export const INDIAN_STATES: { code: string; name: string }[] = [
   { code: "38", name: "Ladakh" },
 ];
 
-export const stateByName = (name: string) => INDIAN_STATES.find((s) => s.name.toLowerCase() === name.trim().toLowerCase());
+export const stateByName = (name: string) =>
+  INDIAN_STATES.find((s) => s.name.toLowerCase() === name.trim().toLowerCase());

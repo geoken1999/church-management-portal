@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { startOnboardingCheckout } from "@/lib/onboarding/tenant-actions";
-import { redirectToPayU } from "@/lib/payu/browser";
+import { openRazorpaySubscription } from "@/lib/razorpay/browser";
 import { formatPrice, withGst } from "@/lib/billing/gst";
 import type { BillingDetailsInput } from "@/lib/billing/billing-details";
 import {
@@ -17,12 +17,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ErrorToast } from "@/components/ui/error-toast";
 
 // Shown on Billing once KingdomFlow has set up the church's modules: what is included, the monthly
-// total, and the UPI Autopay authorization that starts the subscription.
+// total, and the authorization that starts the subscription.
 export function OnboardingCheckoutCard({
   moduleLabels,
   creditLabels,
@@ -38,34 +35,35 @@ export function OnboardingCheckoutCard({
   sellerState: string;
   paymentsConfigured: boolean;
 }) {
-  const [vpa, setVpa] = useState("");
   const [open, setOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const price = withGst(monthlyBase);
 
   function begin() {
-    setError(null);
-    if (!vpa.trim().includes("@")) {
-      setError("Enter your UPI ID first (e.g. yourname@bank).");
-      return;
-    }
     setOpen(true);
   }
 
   async function start(details: BillingDetailsInput): Promise<CheckoutResult> {
-    const result = await startOnboardingCheckout(vpa, details);
-    if (result.error || !result.payuFields || !result.payuActionUrl)
+    const result = await startOnboardingCheckout(details);
+    if (result.error || !result.checkout)
       return {
         error: result.error ?? "Couldn't start checkout.",
         billingErrors: result.billingErrors,
       };
-    redirectToPayU(result.payuActionUrl, result.payuFields);
+    // Closing the dialog leaves Razorpay's payment window over the page; the return route takes it from there.
+    setOpen(false);
+    try {
+      await openRazorpaySubscription(result.checkout);
+    } catch {
+      return {
+        error:
+          "Couldn't open the payment window. Check your connection and try again.",
+      };
+    }
     return {};
   }
 
   return (
     <Card className="border-primary">
-      <ErrorToast message={error} />
       <CardHeader>
         <CardTitle>Your KingdomFlow plan is ready</CardTitle>
         <CardDescription>
@@ -92,19 +90,6 @@ export function OnboardingCheckoutCard({
             <span>Charged monthly</span>
             <span>{formatPrice(price.total)}</span>
           </div>
-        </div>
-        <div className="max-w-sm space-y-2">
-          <Label htmlFor="onboarding-upi">Your UPI ID</Label>
-          <Input
-            id="onboarding-upi"
-            placeholder="yourname@bank"
-            value={vpa}
-            onChange={(e) => setVpa(e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">
-            Used to set up a UPI Autopay mandate. You confirm it in your own UPI
-            app; nothing is charged until you approve it.
-          </p>
         </div>
         <Button onClick={begin} disabled={!paymentsConfigured}>
           Authorize subscription

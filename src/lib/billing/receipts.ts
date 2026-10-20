@@ -10,14 +10,24 @@ import { getOrgAdminEmails } from "@/lib/organizations/admin-emails";
 // shared email account just skips silently. This is a transactional/
 // system email, not a campaign — it never touches email_campaigns or the
 // shared-email plan quota.
-async function sendBillingEmail(organizationId: string, subject: string, bodyHtml: string): Promise<void> {
+async function sendBillingEmail(
+  organizationId: string,
+  subject: string,
+  bodyHtml: string,
+): Promise<void> {
   if (!isEmailConfigured()) return;
 
   const recipients = await getOrgAdminEmails(organizationId);
   if (recipients.length === 0) return;
 
   try {
-    await sendBulkEmail({ fromName: "KingdomFlow Billing", subject, html: bodyHtml, recipients, organizationId });
+    await sendBulkEmail({
+      fromName: "KingdomFlow Billing",
+      subject,
+      html: bodyHtml,
+      recipients,
+      organizationId,
+    });
   } catch (err) {
     await logPlatformEvent({
       level: "warning",
@@ -33,7 +43,11 @@ function formatRupees(amount: number): string {
   return `₹${amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-export async function sendSubscriptionActivatedEmail(organizationId: string, planName: string, interval: "monthly" | "annual"): Promise<void> {
+export async function sendSubscriptionActivatedEmail(
+  organizationId: string,
+  planName: string,
+  interval: "monthly" | "annual",
+): Promise<void> {
   await sendBillingEmail(
     organizationId,
     `You're now on the ${planName} plan`,
@@ -41,8 +55,15 @@ export async function sendSubscriptionActivatedEmail(organizationId: string, pla
   );
 }
 
-export async function sendSubscriptionChargedEmail(organizationId: string, planName: string, amountPaise: number | null): Promise<void> {
-  const amountLine = amountPaise !== null ? `<p>Amount charged: <strong>${formatRupees(amountPaise / 100)}</strong></p>` : "";
+export async function sendSubscriptionChargedEmail(
+  organizationId: string,
+  planName: string,
+  amountPaise: number | null,
+): Promise<void> {
+  const amountLine =
+    amountPaise !== null
+      ? `<p>Amount charged: <strong>${formatRupees(amountPaise / 100)}</strong></p>`
+      : "";
   await sendBillingEmail(
     organizationId,
     `Payment received — ${planName} plan`,
@@ -50,7 +71,10 @@ export async function sendSubscriptionChargedEmail(organizationId: string, planN
   );
 }
 
-export async function sendSubscriptionCancelledEmail(organizationId: string, planName: string): Promise<void> {
+export async function sendSubscriptionCancelledEmail(
+  organizationId: string,
+  planName: string,
+): Promise<void> {
   await sendBillingEmail(
     organizationId,
     "Your subscription was cancelled",
@@ -61,7 +85,12 @@ export async function sendSubscriptionCancelledEmail(organizationId: string, pla
 // RBI's e-mandate rules require notifying the customer 24-36 hours before
 // every recurring debit — this is that notice, sent by the
 // subscription-billing cron the day before next_charge_at.
-export async function sendUpcomingChargeNoticeEmail(organizationId: string, planName: string, amountRupees: number, chargeDateLabel: string): Promise<void> {
+export async function sendUpcomingChargeNoticeEmail(
+  organizationId: string,
+  planName: string,
+  amountRupees: number,
+  chargeDateLabel: string,
+): Promise<void> {
   await sendBillingEmail(
     organizationId,
     `Upcoming charge for your ${planName} plan`,
@@ -69,17 +98,27 @@ export async function sendUpcomingChargeNoticeEmail(organizationId: string, plan
   );
 }
 
-export async function sendSubscriptionPaymentFailedEmail(organizationId: string, planName: string, willRetry: boolean): Promise<void> {
+export async function sendSubscriptionPaymentFailedEmail(
+  organizationId: string,
+  planName: string,
+  willRetry: boolean,
+): Promise<void> {
   await sendBillingEmail(
     organizationId,
-    willRetry ? `Payment attempt failed — ${planName} plan` : `Subscription halted — ${planName} plan`,
+    willRetry
+      ? `Payment attempt failed — ${planName} plan`
+      : `Subscription halted — ${planName} plan`,
     willRetry
       ? `<p>We couldn't collect this cycle's payment for your <strong>${planName}</strong> plan. We'll try again automatically.</p>`
       : `<p>We couldn't collect payment for your <strong>${planName}</strong> plan after several attempts, so the subscription has been halted. Please update your UPI Autopay mandate from the Billing page to continue.</p>`,
   );
 }
 
-export async function sendAddonPurchaseEmail(organizationId: string, packLabel: string, amountRupees: number): Promise<void> {
+export async function sendAddonPurchaseEmail(
+  organizationId: string,
+  packLabel: string,
+  amountRupees: number,
+): Promise<void> {
   await sendBillingEmail(
     organizationId,
     "Add-on pack purchased",
@@ -92,7 +131,11 @@ export async function sendAddonPurchaseEmail(organizationId: string, packLabel: 
 // platform-admin/actions.ts) — the counterpart to notifyPlatformAdmins
 // (src/lib/platform-admin/notify.ts), which fires when the request is
 // first raised.
-export async function sendEventPayoutProcessedEmail(organizationId: string, eventTitle: string, amountRupees: number): Promise<void> {
+export async function sendEventPayoutProcessedEmail(
+  organizationId: string,
+  eventTitle: string,
+  amountRupees: number,
+): Promise<void> {
   await sendBillingEmail(
     organizationId,
     `Payout sent — ${eventTitle}`,
@@ -100,7 +143,10 @@ export async function sendEventPayoutProcessedEmail(organizationId: string, even
   );
 }
 
-export async function sendMembershipPayoutProcessedEmail(organizationId: string, amountRupees: number): Promise<void> {
+export async function sendMembershipPayoutProcessedEmail(
+  organizationId: string,
+  amountRupees: number,
+): Promise<void> {
   await sendBillingEmail(
     organizationId,
     "Membership fee payout sent",
@@ -108,7 +154,10 @@ export async function sendMembershipPayoutProcessedEmail(organizationId: string,
   );
 }
 
-export async function sendCoursePayoutProcessedEmail(organizationId: string, amountRupees: number): Promise<void> {
+export async function sendCoursePayoutProcessedEmail(
+  organizationId: string,
+  amountRupees: number,
+): Promise<void> {
   await sendBillingEmail(
     organizationId,
     "Course fee payout sent",
@@ -118,8 +167,16 @@ export async function sendCoursePayoutProcessedEmail(organizationId: string, amo
 
 // Sent when the platform admin finishes a tenant's onboarding: what was chosen, what it costs, and
 // where to authorize the subscription.
-export async function sendOnboardingReadyEmail(organizationId: string, moduleLabels: string[], creditLabels: string[], totalWithGst: number, billingUrl: string): Promise<void> {
-  const list = [...moduleLabels, ...creditLabels].map((label) => `<li>${label}</li>`).join("");
+export async function sendOnboardingReadyEmail(
+  organizationId: string,
+  moduleLabels: string[],
+  creditLabels: string[],
+  totalWithGst: number,
+  billingUrl: string,
+): Promise<void> {
+  const list = [...moduleLabels, ...creditLabels]
+    .map((label) => `<li>${label}</li>`)
+    .join("");
   await sendBillingEmail(
     organizationId,
     "Your KingdomFlow plan is ready — one step left",
@@ -128,10 +185,41 @@ export async function sendOnboardingReadyEmail(organizationId: string, moduleLab
 }
 
 // Sent when a church cancels part-way through a period: what happens and until when.
-export async function sendSubscriptionCancellationScheduledEmail(organizationId: string, planName: string, endsOn: string): Promise<void> {
+export async function sendSubscriptionCancellationScheduledEmail(
+  organizationId: string,
+  planName: string,
+  endsOn: string,
+): Promise<void> {
   await sendBillingEmail(
     organizationId,
     "Your subscription will end on " + endsOn,
     `<p>We've received your request to cancel the <strong>${planName}</strong> subscription.</p><p>You keep full access until <strong>${endsOn}</strong>, the end of the period you've already paid for. You won't be charged again. After that your organization moves to the Basic plan.</p><p>Changed your mind? You can keep your subscription from the Billing page any time before ${endsOn}.</p>`,
+  );
+}
+
+// Churches that subscribed while plans were billed through PayU UPI Autopay: that mandate cannot move to
+// Razorpay, so they authorise a new subscription there. They keep their plan until the period they paid for ends.
+export async function sendReauthorisationReminderEmail(
+  organizationId: string,
+  planName: string,
+  endsOn: string,
+  billingUrl: string,
+): Promise<void> {
+  await sendBillingEmail(
+    organizationId,
+    `Action needed: authorise your ${planName} plan before ${endsOn}`,
+    `<p>We have moved subscription billing to Razorpay. Your existing UPI Autopay mandate will not be charged again, so to keep your <strong>${planName}</strong> plan you need to authorise it once on Razorpay.</p><p>Your plan stays fully active until <strong>${endsOn}</strong>, the end of the period you have paid for. Open the <a href="${billingUrl}">Billing page</a>, choose your plan and authorise it before then to carry on without a break.</p>`,
+  );
+}
+
+export async function sendReauthorisationRequiredEmail(
+  organizationId: string,
+  planName: string,
+  billingUrl: string,
+): Promise<void> {
+  await sendBillingEmail(
+    organizationId,
+    `Your ${planName} plan has ended: authorise it on Razorpay to continue`,
+    `<p>The period you paid for has ended and your organization is now on the Basic plan, because subscription billing has moved to Razorpay and your old UPI Autopay mandate is no longer used.</p><p>Open the <a href="${billingUrl}">Billing page</a>, choose <strong>${planName}</strong> again and authorise it on Razorpay to get everything back.</p>`,
   );
 }

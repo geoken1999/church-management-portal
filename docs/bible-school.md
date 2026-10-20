@@ -221,11 +221,11 @@ with a fee is still refused by `lms_request_enrollment`.
 Students from outside see only public programs; church members see public and church-only ones.
 
 **Payment.**
-- Fees need the church's Finance plan and are collected on KingdomFlow's shared PayU account. The church is
+- Fees need the church's Finance plan and are collected on KingdomFlow's own Razorpay account. The church is
   paid out from Payouts (stream "Course fees": `course_payouts`, `course_payout_requests`, one balance per
   church, 2.5% service fee), recorded in Super Admin like membership fees.
 - Flow: `createProgramOrder` writes `lms_payment_orders` (program_id), the person opens
-  `/bible-school/checkout/<order>` which posts to PayU, and `/api/payu/bible-school/return` verifies PayU's
+  `/bible-school/checkout/<order>` which opens the Razorpay payment window, and `/api/razorpay/bible-school/return` verifies Razorpay's signed
   hash and calls `finalizeProgramPayment`: the order is claimed once ("created" to "paid"), then the person is
   enrolled (`lms_enroll_program` with source `payment`, or `lms_approve_application` with the program for
   an outsider's application).

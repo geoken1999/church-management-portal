@@ -1,11 +1,23 @@
 "use client";
 
 import { useActionState } from "react";
-import { savePayoutDetails, type SavePayoutDetailsState } from "@/lib/organizations/payout-details-actions";
-import { PayoutDetailsFields, type PayoutDetailsDefaultValues } from "@/components/organizations/PayoutDetailsFields";
+import {
+  savePayoutDetails,
+  type SavePayoutDetailsState,
+} from "@/lib/organizations/payout-details-actions";
+import {
+  PayoutDetailsFields,
+  type PayoutDetailsDefaultValues,
+} from "@/components/organizations/PayoutDetailsFields";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: SavePayoutDetailsState = {};
@@ -21,15 +33,19 @@ export function PayoutDetailsCard({
   organizationId: string;
   defaultValues: PayoutDetailsDefaultValues | null;
 }) {
-  const [state, formAction, pending] = useActionState(savePayoutDetails, initialState);
+  const [state, formAction, pending] = useActionState(
+    savePayoutDetails,
+    initialState,
+  );
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Payout details</CardTitle>
         <CardDescription>
-          Where KingdomFlow should wire money collected through your Fund Raiser and Event registration payment
-          gateways. Used whenever you request a payout.
+          Where KingdomFlow should wire money collected through your Fund Raiser
+          and Event registration payment gateways. Used whenever you request a
+          payout.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -41,7 +57,10 @@ export function PayoutDetailsCard({
               <AlertDescription>Saved.</AlertDescription>
             </Alert>
           )}
-          <PayoutDetailsFields defaultValues={defaultValues ?? undefined} errors={state.fieldErrors} />
+          <PayoutDetailsFields
+            defaultValues={defaultValues ?? undefined}
+            errors={state.fieldErrors}
+          />
           <Button type="submit" disabled={pending}>
             {pending ? "Saving..." : "Save payout details"}
           </Button>

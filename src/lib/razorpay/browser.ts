@@ -1,6 +1,9 @@
 "use client";
 
-import type { RazorpayCheckout } from "@/lib/razorpay/checkout";
+import type {
+  RazorpayCheckout,
+  RazorpaySubscriptionCheckout,
+} from "@/lib/razorpay/checkout";
 
 // Opens Razorpay's checkout in the browser. On success Razorpay sends the browser to checkout.callbackUrl
 // with the result (a full navigation, like the redirect the old checkout used), so the page that calls this
@@ -54,6 +57,27 @@ export async function openRazorpayCheckout(
     order_id: checkout.orderId,
     amount: checkout.amountPaise,
     currency: checkout.currency,
+    name: checkout.name,
+    description: checkout.description,
+    prefill: checkout.prefill,
+    callback_url: checkout.callbackUrl,
+    redirect: true,
+    theme: { color: "#2d4a7a" },
+    modal: { ondismiss: () => onDismiss?.() },
+  });
+  razorpay.open();
+}
+
+/** Opens the checkout that authorises a subscription. Same behaviour as openRazorpayCheckout. */
+export async function openRazorpaySubscription(
+  checkout: RazorpaySubscriptionCheckout,
+  onDismiss?: () => void,
+): Promise<void> {
+  await loadRazorpay();
+  if (!window.Razorpay) throw new Error("Couldn't load the payment window.");
+  const razorpay = new window.Razorpay({
+    key: checkout.keyId,
+    subscription_id: checkout.subscriptionId,
     name: checkout.name,
     description: checkout.description,
     prefill: checkout.prefill,

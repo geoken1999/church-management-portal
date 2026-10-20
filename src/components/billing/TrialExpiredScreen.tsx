@@ -42,7 +42,9 @@ export function TrialExpiredScreen({
           <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-accent">
             <Clock className="size-6 text-primary" />
           </div>
-          <h1 className="font-heading text-2xl font-bold tracking-tight">Your trial has ended</h1>
+          <h1 className="font-heading text-2xl font-bold tracking-tight">
+            Your trial has ended
+          </h1>
           <p className="mt-2 text-muted-foreground">
             {organizationName}&apos;s 14-day trial is over.{" "}
             {canManage
@@ -52,7 +54,13 @@ export function TrialExpiredScreen({
         </div>
 
         {canManage ? (
-          <BillingManager currentPlanId={currentPlanId} subscription={subscription} paymentsConfigured={paymentsConfigured} billingDetails={billingDetails} sellerState={sellerState} />
+          <BillingManager
+            currentPlanId={currentPlanId}
+            subscription={subscription}
+            paymentsConfigured={paymentsConfigured}
+            billingDetails={billingDetails}
+            sellerState={sellerState}
+          />
         ) : null}
       </main>
     </div>

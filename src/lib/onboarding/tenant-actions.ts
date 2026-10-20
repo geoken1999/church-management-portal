@@ -10,24 +10,21 @@ import type {
   BillingDetailsErrors,
   BillingDetailsInput,
 } from "@/lib/billing/billing-details";
-import {
-  buildMandateRegistrationFields,
-  type MandateRegistrationFields,
-} from "@/lib/billing/payu-subscription";
+import type { RazorpaySubscriptionCheckout } from "@/lib/razorpay/checkout";
+import { createSubscriptionCheckout } from "@/lib/billing/razorpay-subscription";
+import { logPlatformEvent } from "@/lib/platform-events/log";
 import { getSiteUrl } from "@/lib/site-url";
 import { getOnboarding } from "@/lib/onboarding/store";
 
 export interface OnboardingCheckoutState {
   error?: string;
   billingErrors?: BillingDetailsErrors;
-  payuFields?: MandateRegistrationFields;
-  payuActionUrl?: string;
+  checkout?: RazorpaySubscriptionCheckout;
 }
 
-// The tenant authorizes the UPI Autopay subscription for the modules the platform admin set up.
+// The tenant authorizes the monthly Razorpay subscription for the modules the platform admin set up.
 // The amount comes from the saved onboarding, never from the browser.
 export async function startOnboardingCheckout(
-  vpa: string,
   billing: BillingDetailsInput,
 ): Promise<OnboardingCheckoutState> {
   const user = await requireUser();
@@ -46,10 +43,6 @@ export async function startOnboardingCheckout(
     onboarding.status !== "awaiting_payment"
   )
     return { error: "There's no plan waiting for you to start." };
-  const trimmedVpa = vpa.trim();
-  if (!trimmedVpa.includes("@"))
-    return { error: "Enter a valid UPI ID (e.g. yourname@bank)." };
-
   const saved = await saveBillingDetails(organizationId, billing);
   if ("errors" in saved)
     return {
@@ -57,35 +50,28 @@ export async function startOnboardingCheckout(
       billingErrors: saved.errors,
     };
 
-  const txnid = `sub${Date.now()}${organizationId.replace(/-/g, "").slice(0, 8)}`;
-  const returnUrl = `${getSiteUrl()}/api/payu/subscription/mandate-return?organizationId=${organizationId}&planId=pro`;
-  const today = new Date();
-  const endDate = new Date(today);
-  endDate.setFullYear(endDate.getFullYear() + 10);
-
-  let built;
+  let created;
   try {
-    built = buildMandateRegistrationFields({
-      txnid,
-      amountRupees: withGst(onboarding.monthly_base).total,
-      productinfo: "KingdomFlow modules subscription (Monthly)",
-      firstname: profile ? profile.first_name : membership.organization.name,
-      email: profile?.email ?? user.email ?? "",
-      phone: profile?.phone ?? "9999999999",
-      vpa: trimmedVpa,
-      surl: returnUrl,
-      furl: returnUrl,
-      udf1: `sub:${organizationId}`,
-      paymentStartDate: today.toISOString().slice(0, 10),
-      paymentEndDate: endDate.toISOString().slice(0, 10),
+    created = await createSubscriptionCheckout({
+      organizationId,
+      planLabel: "KingdomFlow modules subscription",
+      totalRupees: withGst(onboarding.monthly_base).total,
+      prefill: {
+        name: profile ? profile.first_name : membership.organization.name,
+        email: profile?.email ?? user.email ?? undefined,
+        contact: profile?.phone ?? undefined,
+      },
+      callbackUrl: `${getSiteUrl()}/api/razorpay/subscription/return?organizationId=${organizationId}`,
+      notes: { plan_id: "pro", kind: "onboarding" },
     });
   } catch (err) {
-    return {
-      error:
-        err instanceof Error
-          ? err.message
-          : "Couldn't start checkout. Please try again.",
-    };
+    await logPlatformEvent({
+      level: "error",
+      source: "subscription_billing",
+      message: `Razorpay subscription creation failed: ${err instanceof Error ? err.message : "unknown error"}`,
+      organizationId,
+    });
+    return { error: "Couldn't start checkout. Please try again." };
   }
 
   const { error } = await createAdminClient()
@@ -96,8 +82,10 @@ export async function startOnboardingCheckout(
         plan_id: "pro",
         billing_interval: "monthly",
         status: "created",
-        payu_txnid: txnid,
-        payu_vpa: trimmedVpa,
+        razorpay_subscription_id: created.subscriptionId,
+        short_url: created.shortUrl,
+        cancel_at_period_end: false,
+        cancel_requested_at: null,
         monthly_amount: onboarding.monthly_base,
         onboarding_modules: onboarding.modules,
         onboarding_credits: onboarding.credits as never,
@@ -109,5 +97,5 @@ export async function startOnboardingCheckout(
     return { error: "Couldn't start checkout. Please try again." };
   }
   revalidatePath("/dashboard/billing");
-  return { payuFields: built.fields, payuActionUrl: built.actionUrl };
+  return { checkout: created.checkout };
 }

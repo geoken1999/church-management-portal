@@ -107,7 +107,7 @@ You can also **Approve**, **Reject** or **Withdraw** people there.
 
 ## 5. Payments and payouts (program fees)
 
-1. Program fees go through KingdomFlow's secure payment account (PayU), like paid events.
+1. Program fees go through KingdomFlow's secure payment account (Razorpay), like paid events.
 2. A 2.5% service fee applies. Collected fees appear in **Payouts → Course fees**.
 3. **Payouts**: save your payout details once and press *Request payout*. We pay and record it.
 4. Refunds are by hand: contact us with the payment details. If a payment is taken but the person cannot

@@ -1,43 +1,29 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { triggerRecurringCharge } from "@/lib/billing/payu-subscription";
 import {
-  sendSubscriptionChargedEmail,
-  sendSubscriptionPaymentFailedEmail,
-  sendUpcomingChargeNoticeEmail,
+  sendReauthorisationReminderEmail,
+  sendReauthorisationRequiredEmail,
 } from "@/lib/billing/receipts";
-import { logPlatformEvent } from "@/lib/platform-events/log";
-import { isPlanId, PLANS } from "@/lib/plans/config";
-import { withGst } from "@/lib/billing/gst";
-import { issueAndEmailInvoice } from "@/lib/invoices/issue";
+import {
+  planNameFor,
+  finishScheduledCancellation,
+} from "@/lib/billing/cancellation-store";
 import { cancellationDue } from "@/lib/billing/cancellation";
-import { finishScheduledCancellation } from "@/lib/billing/cancellation-store";
+import { logPlatformEvent } from "@/lib/platform-events/log";
+import { getSiteUrl } from "@/lib/site-url";
 import { withCronLogging } from "@/lib/cron/run-logger";
 
-// Owns the entire recurring side of PayU plan subscriptions — see
-// migration 0119 and payu-subscription.ts's file header for why this cron
-// exists at all: PayU doesn't auto-charge on schedule the way Razorpay
-// Subscriptions did, so this app has to.
-//
-// Runs once daily (Vercel Hobby's cron limit, same as every other cron in
-// this app) at 01:30 UTC = 07:00 IST — inside UPI Autopay's "before 10 AM"
-// processing window (NPCI restricts recurring UPI debits to three daily
-// windows: before 10am, 1-5pm, after 9:30pm). A charge that fails simply
-// stays overdue and gets retried on the NEXT day's run, up to
-// MAX_CONSECUTIVE_FAILURES times — a daily cadence rather than NPCI's
-// exact "up to 3 retries" timing, which would need sub-daily scheduling
-// this plan doesn't have.
-//
-// NONE of this has been exercised against a live PayU account — see the
-// file header on payu-subscription.ts.
-const MAX_CONSECUTIVE_FAILURES = 4;
-
-// RBI's e-mandate rules require notice 24-36 hours before every recurring
-// debit. A once-a-day cron can't hit that window precisely, so this sends
-// the notice on whichever run first finds next_charge_at within 48 hours
-// (at most ~1 run-interval early, never late) — predebit_notice_sent_at
-// stops it being sent again for the same cycle.
-const PREDEBIT_NOTICE_WINDOW_MS = 48 * 60 * 60 * 1000;
+// Razorpay now charges every subscription on its own schedule and tells us through the webhook, so nothing is
+// collected here any more. What is left is the hand-over of churches that subscribed while plans were billed
+// through PayU UPI Autopay (rows with a payu_authpayuid and no Razorpay subscription): that mandate cannot
+// move to Razorpay and is never debited again, so each such church
+//   - keeps its plan until the end of the period it paid for (next_charge_at),
+//   - gets an email REMINDER_DAYS before that date asking it to authorise a Razorpay subscription, and
+//   - on that date moves to the Basic plan (status 'cancelled') with a second email, so it can subscribe
+//     again from the Billing page whenever it likes.
+// A legacy row whose church had already cancelled for the period end is simply closed out on that date.
+const REMINDER_DAYS = 7;
+const REMINDER_WINDOW_MS = REMINDER_DAYS * 24 * 60 * 60 * 1000;
 
 async function run(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
@@ -50,197 +36,140 @@ async function run(request: Request) {
 
   const admin = createAdminClient();
   const now = new Date();
+  const billingUrl = `${getSiteUrl()}/dashboard/billing`;
 
   const { data: subscriptions } = await admin
     .from("organization_subscriptions")
     .select(
-      "id, organization_id, plan_id, monthly_amount, cancel_at_period_end, status, payu_authpayuid, next_charge_at, predebit_notice_sent_at, consecutive_charge_failures",
+      "id, organization_id, plan_id, monthly_amount, cancel_at_period_end, status, next_charge_at, predebit_notice_sent_at",
     )
-    .eq("status", "active")
-    .not("next_charge_at", "is", null)
-    .not("payu_authpayuid", "is", null);
+    .in("status", ["active", "halted", "pending"])
+    .not("payu_authpayuid", "is", null)
+    .is("razorpay_subscription_id", null);
 
-  let noticesSent = 0;
-  let charged = 0;
-  let failed = 0;
-  let halted = 0;
+  let reminded = 0;
   let ended = 0;
 
   for (const sub of subscriptions ?? []) {
-    // A subscription from a tenant onboarding bills its own monthly amount for its modules.
     const customAmount =
       sub.monthly_amount !== null && sub.monthly_amount !== undefined
         ? Number(sub.monthly_amount)
         : null;
-    const planName =
-      customAmount !== null
-        ? "KingdomFlow modules"
-        : isPlanId(sub.plan_id)
-          ? PLANS[sub.plan_id].name
-          : sub.plan_id;
-    // The price is without GST; the customer is charged (and told) the total with 18% GST.
-    const price =
-      customAmount !== null
-        ? withGst(customAmount)
-        : isPlanId(sub.plan_id)
-          ? withGst(PLANS[sub.plan_id].priceInRupees)
-          : null;
-    const amountRupees = price ? price.total : null;
-    const nextChargeAt = new Date(sub.next_charge_at as string);
+    const planName = planNameFor(sub.plan_id, customAmount);
+    const periodEnd = sub.next_charge_at ? new Date(sub.next_charge_at) : null;
 
-    // The church cancelled part-way through the period: no pre-debit notice and no charge. Once the
-    // period they paid for has ended the subscription is closed out.
-    if (sub.cancel_at_period_end) {
-      if (cancellationDue(true, sub.next_charge_at, now)) {
-        await finishScheduledCancellation({
-          id: sub.id,
-          organization_id: sub.organization_id,
-          plan_id: sub.plan_id,
-          monthly_amount: customAmount,
-        });
-        ended++;
-      }
-      continue;
-    }
-
-    // Pre-debit notice — checked before the charge itself so a brand-new
-    // "due today" subscription still gets a (late, best-effort) notice
-    // rather than none at all.
-    const noticeAlreadySent =
-      sub.predebit_notice_sent_at &&
-      new Date(sub.predebit_notice_sent_at) >=
-        new Date(nextChargeAt.getTime() - 30 * 24 * 60 * 60 * 1000);
-    if (
-      !noticeAlreadySent &&
-      nextChargeAt.getTime() - now.getTime() <= PREDEBIT_NOTICE_WINDOW_MS &&
-      amountRupees !== null
-    ) {
-      await sendUpcomingChargeNoticeEmail(
-        sub.organization_id,
-        planName,
-        amountRupees,
-        nextChargeAt.toLocaleDateString("en-IN"),
-      );
-      await admin
-        .from("organization_subscriptions")
-        .update({ predebit_notice_sent_at: now.toISOString() })
-        .eq("id", sub.id);
-      noticesSent++;
-    }
-
-    if (nextChargeAt.getTime() > now.getTime() || amountRupees === null)
-      continue;
-
-    const txnid = `subchg${Date.now()}${sub.id.replace(/-/g, "").slice(0, 8)}`;
-    let result;
     try {
-      result = await triggerRecurringCharge({
-        authpayuid: sub.payu_authpayuid as string,
-        amountRupees,
-        txnid,
-      });
-    } catch (err) {
-      result = {
-        success: false,
-        status: "error",
-        raw: { error: err instanceof Error ? err.message : "unknown error" },
-      };
-    }
+      // Already stopped (failed payments) or no date to wait for: nothing is paid for any more.
+      if (!periodEnd || sub.status !== "active") {
+        await endLegacy(admin, sub, customAmount, planName, billingUrl, false);
+        ended++;
+        continue;
+      }
 
-    await admin.from("subscription_charges").insert({
-      organization_id: sub.organization_id,
-      subscription_id: sub.id,
-      txnid,
-      amount: amountRupees,
-      gst_amount: price?.gst ?? 0,
-      status: result.success ? "charged" : "failed",
-      payu_response: result.raw as never,
-      charged_at: result.success ? now.toISOString() : null,
-    });
+      if (periodEnd.getTime() <= now.getTime()) {
+        if (
+          cancellationDue(sub.cancel_at_period_end, sub.next_charge_at, now)
+        ) {
+          await finishScheduledCancellation({
+            id: sub.id,
+            organization_id: sub.organization_id,
+            plan_id: sub.plan_id,
+            monthly_amount: customAmount,
+          });
+          await admin
+            .from("organization_subscriptions")
+            .update({ payu_authpayuid: null })
+            .eq("id", sub.id);
+        } else {
+          await endLegacy(admin, sub, customAmount, planName, billingUrl, true);
+        }
+        ended++;
+        continue;
+      }
 
-    if (result.success) {
-      charged++;
-      const nextCycle = new Date(nextChargeAt);
-      nextCycle.setMonth(nextCycle.getMonth() + 1);
-      await admin
-        .from("organization_subscriptions")
-        .update({
-          next_charge_at: nextCycle.toISOString(),
-          consecutive_charge_failures: 0,
-          current_start: now.toISOString(),
-        })
-        .eq("id", sub.id);
-      // The tax invoice for this charge, emailed to the church; it never blocks the next cycle.
-      const invoiceId = price
-        ? await issueAndEmailInvoice({
-            organizationId: sub.organization_id,
-            kind: "subscription",
-            reference: txnid,
-            description:
-              customAmount !== null
-                ? "KingdomFlow modules subscription (monthly)"
-                : `${planName} plan subscription (monthly)`,
-            baseAmount: price.base,
-          })
-        : null;
-      if (invoiceId)
+      // A church that already cancelled does not need to be asked to authorise anything.
+      if (sub.cancel_at_period_end) continue;
+
+      const alreadyReminded =
+        sub.predebit_notice_sent_at &&
+        new Date(sub.predebit_notice_sent_at) >=
+          new Date(periodEnd.getTime() - 30 * 24 * 60 * 60 * 1000);
+      if (
+        !alreadyReminded &&
+        periodEnd.getTime() - now.getTime() <= REMINDER_WINDOW_MS
+      ) {
+        await sendReauthorisationReminderEmail(
+          sub.organization_id,
+          planName,
+          periodEnd.toLocaleDateString("en-IN", {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          }),
+          billingUrl,
+        );
         await admin
-          .from("subscription_charges")
-          .update({ invoice_id: invoiceId })
-          .eq("txnid", txnid);
-      await sendSubscriptionChargedEmail(
-        sub.organization_id,
-        planName,
-        Math.round(amountRupees * 100),
-      );
-      continue;
-    }
-
-    failed++;
-    const failures = (sub.consecutive_charge_failures ?? 0) + 1;
-    await logPlatformEvent({
-      level: "warning",
-      source: "subscription_billing",
-      message: `PayU recurring charge failed (attempt ${failures}/${MAX_CONSECUTIVE_FAILURES}): ${result.status}`,
-      organizationId: sub.organization_id,
-      metadata: { txnid, subscriptionId: sub.id },
-    });
-
-    if (failures >= MAX_CONSECUTIVE_FAILURES) {
-      halted++;
-      await admin
-        .from("organization_subscriptions")
-        .update({ status: "halted", consecutive_charge_failures: failures })
-        .eq("id", sub.id);
-      await admin
-        .from("organizations")
-        .update({ plan: "basic" })
-        .eq("id", sub.organization_id);
-      await sendSubscriptionPaymentFailedEmail(
-        sub.organization_id,
-        planName,
-        false,
-      );
-    } else {
-      await admin
-        .from("organization_subscriptions")
-        .update({ consecutive_charge_failures: failures })
-        .eq("id", sub.id);
-      await sendSubscriptionPaymentFailedEmail(
-        sub.organization_id,
-        planName,
-        true,
-      );
+          .from("organization_subscriptions")
+          .update({ predebit_notice_sent_at: now.toISOString() })
+          .eq("id", sub.id);
+        reminded++;
+      }
+    } catch (err) {
+      await logPlatformEvent({
+        level: "error",
+        source: "subscription_billing",
+        message: `Moving a PayU subscription to Razorpay failed: ${err instanceof Error ? err.message : "unknown error"}`,
+        organizationId: sub.organization_id,
+        metadata: { subscriptionId: sub.id },
+      });
     }
   }
 
-  return NextResponse.json({
-    ok: true,
-    noticesSent,
-    charged,
-    failed,
-    halted,
-    ended,
+  return NextResponse.json({ ok: true, reminded, ended });
+}
+
+// The paid period is over (or there never was one): Basic plan, subscription closed, and the church is told
+// how to start again on Razorpay.
+async function endLegacy(
+  admin: ReturnType<typeof createAdminClient>,
+  sub: { id: string; organization_id: string },
+  customAmount: number | null,
+  planName: string,
+  billingUrl: string,
+  email: boolean,
+) {
+  await Promise.all([
+    admin
+      .from("organization_subscriptions")
+      .update({
+        status: "cancelled",
+        next_charge_at: null,
+        cancel_at_period_end: false,
+        payu_authpayuid: null,
+      })
+      .eq("id", sub.id),
+    admin
+      .from("organizations")
+      .update(
+        customAmount !== null
+          ? { plan: "basic", custom_plan_limits: null }
+          : { plan: "basic" },
+      )
+      .eq("id", sub.organization_id),
+  ]);
+  if (email)
+    await sendReauthorisationRequiredEmail(
+      sub.organization_id,
+      planName,
+      billingUrl,
+    );
+  await logPlatformEvent({
+    level: "info",
+    source: "subscription_billing",
+    message:
+      "A PayU-billed subscription ended with its paid period; the church was asked to authorise a Razorpay subscription",
+    organizationId: sub.organization_id,
+    metadata: { subscriptionId: sub.id },
   });
 }
 

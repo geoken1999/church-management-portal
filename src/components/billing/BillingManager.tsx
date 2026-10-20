@@ -4,16 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, X, CreditCard } from "lucide-react";
 import {
-  startPayUSubscriptionCheckout,
-  cancelPayUSubscription,
-  keepPayUSubscription,
-} from "@/lib/billing/payu-subscription-actions";
-// Legacy path: still used for any subscription a church started before
-// this moved to PayU — see handleCancel below. New checkouts never create
-// a razorpay_subscription_id, so this becomes unreachable once no org has
-// one left.
-import { cancelSubscription as cancelRazorpaySubscription } from "@/lib/billing/actions";
-import { redirectToPayU } from "@/lib/payu/browser";
+  startSubscriptionCheckout,
+  cancelSubscription,
+  keepSubscription,
+} from "@/lib/billing/actions";
+import { openRazorpaySubscription } from "@/lib/razorpay/browser";
 import { PLANS, priceForInterval, type PlanId } from "@/lib/plans/config";
 import {
   PLAN_ORDER,
@@ -35,8 +30,6 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ErrorToast } from "@/components/ui/error-toast";
 import {
   BillingDetailsDialog,
@@ -83,7 +76,6 @@ export function BillingManager({
   sellerState: string;
 }) {
   const router = useRouter();
-  const [vpa, setVpa] = useState("");
   // The plan being bought: asks for billing details first.
   const [checkoutPlanId, setCheckoutPlanId] = useState<PlanId | null>(null);
   const [cancelling, setCancelling] = useState(false);
@@ -93,40 +85,33 @@ export function BillingManager({
     subscription && IN_PROGRESS_STATUSES.includes(subscription.status),
   );
 
-  // PayU subscriptions here are via UPI Autopay, which NPCI caps at
-  // ₹15,000 per recurring debit without extra per-charge authentication —
-  // Starter/Growth/Pro's monthly prices are all comfortably under that,
-  // but two of the three annual prices aren't, and there's no annual-
-  // capable mandate method (cards/e-NACH) built yet. Only monthly billing
-  // is offered for new subscriptions; an existing annual Razorpay
-  // subscription (if any) still just displays as-is below.
+  // Monthly billing only for new subscriptions (an older annual one, if any, still displays below).
   function handleSubscribe(planId: PlanId) {
     setError(null);
-    if (!vpa.trim().includes("@")) {
-      setError(
-        "Enter your UPI ID first (e.g. yourname@bank) — it's needed to set up the Autopay mandate.",
-      );
-      return;
-    }
     setCheckoutPlanId(planId);
   }
 
-  // Called by the billing details dialog. On success the page leaves for PayU, so only a problem comes back.
+  // Called by the billing details dialog. On success Razorpay's payment window opens over the page and, once the
+  // church has authorised, sends the browser to the return route, so only a problem comes back here.
   async function startCheckout(
     details: BillingDetailsInput,
   ): Promise<CheckoutResult> {
     if (!checkoutPlanId) return { error: "Choose a plan." };
-    const result = await startPayUSubscriptionCheckout(
-      checkoutPlanId,
-      vpa,
-      details,
-    );
-    if (result.error || !result.payuFields || !result.payuActionUrl)
+    const result = await startSubscriptionCheckout(checkoutPlanId, details);
+    if (result.error || !result.checkout)
       return {
         error: result.error ?? "Couldn't start checkout.",
         billingErrors: result.billingErrors,
       };
-    redirectToPayU(result.payuActionUrl, result.payuFields);
+    setCheckoutPlanId(null);
+    try {
+      await openRazorpaySubscription(result.checkout);
+    } catch {
+      return {
+        error:
+          "Couldn't open the payment window. Check your connection and try again.",
+      };
+    }
     return {};
   }
 
@@ -144,7 +129,7 @@ export function BillingManager({
   async function handleKeep() {
     setError(null);
     setCancelling(true);
-    const result = await keepPayUSubscription();
+    const result = await keepSubscription();
     setCancelling(false);
     if (result.error) {
       setError(result.error);
@@ -161,13 +146,7 @@ export function BillingManager({
       : "Cancel this subscription?";
     if (!window.confirm(question)) return;
     setCancelling(true);
-    // A subscription started before this moved to PayU still has
-    // razorpay_subscription_id (and no payu_txnid) — route it to the
-    // matching cancel action rather than the new one, which wouldn't
-    // recognize it.
-    const result = subscription?.razorpay_subscription_id
-      ? await cancelRazorpaySubscription()
-      : await cancelPayUSubscription();
+    const result = await cancelSubscription();
     setCancelling(false);
     if (result.error) {
       setError(result.error);
@@ -182,7 +161,7 @@ export function BillingManager({
         <Alert>
           <AlertDescription>
             Billing isn&apos;t configured yet for this app — an admin needs to
-            set the PayU API keys before subscriptions can be started.
+            set the Razorpay API keys before subscriptions can be started.
           </AlertDescription>
         </Alert>
       )}
@@ -249,22 +228,6 @@ export function BillingManager({
             </CardContent>
           )}
         </Card>
-      )}
-
-      {!hasInProgressSubscription && (
-        <div className="mx-auto max-w-sm space-y-2">
-          <Label htmlFor="upi-vpa">Your UPI ID</Label>
-          <Input
-            id="upi-vpa"
-            placeholder="yourname@bank"
-            value={vpa}
-            onChange={(e) => setVpa(e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">
-            Used to set up a UPI Autopay mandate — you&apos;ll confirm it in
-            your own UPI app, and nothing is charged until that&apos;s approved.
-          </p>
-        </div>
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

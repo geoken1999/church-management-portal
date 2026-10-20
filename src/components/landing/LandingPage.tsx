@@ -372,7 +372,7 @@ const FAQS = [
   {
     question: "Can we hold video and audio calls without another tool?",
     answer:
-      "Yes. K-Connect has video and audio calls built in, on the web and in the app. Hosts can admit people one by one, guests can join from an invite link without an account, and call length depends on your plan.",
+      "Yes. K-Connect has video and audio calls built in, on the web and in the app. Hosts can admit people one by one, guests can join from an invite link without an account, and every plan includes K-Connect minutes each month (Starter 20 video and 30 audio, Growth 40 and 50, Pro 60 and 70). Need more? Add 30 minutes for ₹100 + GST from the K-Connect page.",
   },
   {
     question: "Can we live stream our service to members?",

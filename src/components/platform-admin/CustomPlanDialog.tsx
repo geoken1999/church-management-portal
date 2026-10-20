@@ -162,7 +162,7 @@ export function CustomPlanDialog({
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
-              <Label htmlFor="kmeetMaxDurationMinutes">K-Connect video max (min, blank = unlimited)</Label>
+              <Label htmlFor="kmeetMaxDurationMinutes">K-Connect video minutes per month (audio gets 10 more, blank = unlimited)</Label>
               <Input id="kmeetMaxDurationMinutes" name="kmeetMaxDurationMinutes" type="number" min={0} defaultValue={nullableIntDefault(overrides.kmeetMaxDurationMinutes)} />
               <p className="text-xs text-muted-foreground">K-Connect audio is always this + 10 min.</p>
             </div>

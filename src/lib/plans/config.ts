@@ -35,11 +35,12 @@ export interface PlanLimits {
   instagramAccountLimit: number;
   youtubeAccountLimit: number;
   storageBytes: number;
-  // How long a single K-Meet call can run before it's automatically ended
-  // for everyone — null means unlimited. Snapshotted onto the meeting row
-  // the moment its call actually starts (see kmeet/actions.ts), not
-  // re-read live, so a mid-call plan change never changes an
-  // already-running call's countdown.
+  // K-Connect VIDEO minutes included per calendar month, for the whole church (every meeting, live class and
+  // live stream room counts, not one call) — null means unlimited. K-Audio gets its own pool of 10 more
+  // (see kaudioMaxDurationMinutes). When a call starts, the minutes still left are snapshotted onto the
+  // meeting row as its limit (see kmeet/minutes-service.ts), so a mid-call plan change never changes an
+  // already-running call's countdown. The field keeps its old name because custom plan overrides saved in
+  // the database use it.
   kmeetMaxDurationMinutes: number | null;
   // How many logins an owner/admin can add beyond themselves (invited
   // members, and now manually-issued logins), split by role — the org
@@ -197,7 +198,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
       instagramAccountLimit: 5,
       youtubeAccountLimit: 5,
       storageBytes: 150 * 1024 * 1024 * 1024, // 150GB
-      kmeetMaxDurationMinutes: null,
+      kmeetMaxDurationMinutes: 60,
       maxAdditionalAdmins: 10,
       maxAdditionalStaff: 20,
       branchLimit: 20,
@@ -367,7 +368,8 @@ export function priceForInterval(
 // One-time top-ups on top of a plan's monthly quota/storage ceiling —
 // bought individually, not tied to a billing cycle. "credits" is a message
 // count for sms/email/whatsapp, or a byte count for storage.
-export type AddonType = "sms" | "email" | "whatsapp" | "storage" | "ai";
+export type AddonType =
+  "sms" | "email" | "whatsapp" | "storage" | "ai" | "kconnect";
 
 export interface AddonPack {
   id: string;
@@ -383,6 +385,7 @@ export const ADDON_TYPE_LABELS: Record<AddonType, string> = {
   whatsapp: "WhatsApp",
   storage: "Storage",
   ai: "AI Credits",
+  kconnect: "K-Connect minutes",
 };
 
 export const ADDON_PACKS: AddonPack[] = [
@@ -455,6 +458,14 @@ export const ADDON_PACKS: AddonPack[] = [
     label: "500 AI credits",
     credits: 500,
     priceInRupees: 1199,
+  },
+  // Minutes, for video or audio, valid in the month they are bought.
+  {
+    id: "kconnect_30",
+    addonType: "kconnect",
+    label: "30 K-Connect minutes",
+    credits: 30,
+    priceInRupees: 100,
   },
 ];
 

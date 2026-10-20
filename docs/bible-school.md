@@ -170,8 +170,11 @@ and plan limits. Nothing about calls was duplicated.
   (in the church's time zone), length (15 to 480 minutes), video or audio. Creating a class creates its K-Connect
   meeting (admission off by default) and tells the course's enrolled students by push (and in their app inbox).
   The page `/dashboard/bible-school/live-classes` lists every class across courses.
-- **Plan limit.** K-Connect ends a call at the plan's limit (Starter 20 min, Growth 40, Pro none; audio +10). A class
-  longer than that is refused when scheduling, so a class is never cut off silently.
+- **Minutes.** K-Connect is sold as minutes per calendar month for the whole church, not as a cap per call: Starter 20
+  video / 30 audio, Growth 40 / 50, Pro 60 / 70. Live classes use the same minutes as meetings and live streams.
+  Extra minutes (30 for ₹100 + GST, any plan) are bought on the K-Connect page, are used once a plan pool runs out and
+  end with the month. A class longer than the minutes left is refused when scheduling, so a class is never cut off
+  silently; a call also ends when its minutes run out (migration `0204_kconnect_minutes.sql`, `src/lib/kmeet/minutes*.ts`).
 - **Changes.** Editing the time resets the reminder and notifies students; cancelling removes the room and notifies them.
 - **Joining (students, app).** Bible School → **Live classes** tab. The Join button opens 15 minutes before the start
   and closes at the end. Joining checks the student is enrolled, records them as **present**, and opens the K-Connect

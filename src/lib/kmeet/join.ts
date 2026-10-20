@@ -3,19 +3,18 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createVideoSdkRoom } from "@/lib/kmeet/client";
 import { endIdleMeetings } from "@/lib/kmeet/idle";
-import { getPlanLimits } from "@/lib/plans/dal";
-import { kaudioMaxDurationMinutes, type PlanLimits } from "@/lib/plans/config";
+import { minutesAvailableFor } from "@/lib/kmeet/minutes-service";
+import { NO_MINUTES_MESSAGE } from "@/lib/kmeet/minutes";
 import type { KmeetMode } from "@/types/database";
-
-export function maxDurationMinutesForMode(mode: KmeetMode, plan: PlanLimits): number | null {
-  return mode === "audio" ? kaudioMaxDurationMinutes(plan) : plan.kmeetMaxDurationMinutes;
-}
 
 // A moderator (anyone with write access to the kmeet tab — same bar as
 // scheduling/ending a meeting) always joins directly and can admit others/
 // mute or remove anyone; everyone else is subject to the meeting's
 // require_admission setting.
-export function participantPermissionsFor(isModerator: boolean, requireAdmission: boolean): string[] {
+export function participantPermissionsFor(
+  isModerator: boolean,
+  requireAdmission: boolean,
+): string[] {
   if (isModerator) return ["allow_join", "allow_mod"];
   return requireAdmission ? ["ask_join"] : ["allow_join"];
 }
@@ -30,20 +29,25 @@ export interface ResolvedRoom {
 
 // Shared by both join actions below — resolves the meeting's VideoSDK
 // room, creating one lazily (and marking the meeting "live", snapshotting
-// the org's current plan duration limit) the first time anyone actually
+// the minutes the church has left this month) the first time anyone actually
 // joins a scheduled meeting; an instant meeting already has one from the
 // moment it was started.
-export async function resolveMeetingRoom(meetingId: string): Promise<ResolvedRoom | { error: string }> {
+export async function resolveMeetingRoom(
+  meetingId: string,
+): Promise<ResolvedRoom | { error: string }> {
   await endIdleMeetings();
   const admin = createAdminClient();
   const { data: meeting } = await admin
     .from("kmeet_meetings")
-    .select("id, room_id, status, organization_id, require_admission, started_at, max_duration_minutes, mode")
+    .select(
+      "id, room_id, status, organization_id, require_admission, started_at, max_duration_minutes, mode",
+    )
     .eq("id", meetingId)
     .maybeSingle();
 
   if (!meeting) return { error: "That meeting could not be found." };
-  if (meeting.status === "ended") return { error: "This meeting has already ended." };
+  if (meeting.status === "ended")
+    return { error: "This meeting has already ended." };
   // (A call nobody was in for 3 minutes was just ended above, so it reads as ended too.)
 
   let roomId = meeting.room_id;
@@ -54,17 +58,34 @@ export async function resolveMeetingRoom(meetingId: string): Promise<ResolvedRoo
     try {
       roomId = await createVideoSdkRoom();
     } catch (err) {
-      return { error: err instanceof Error ? err.message : "Couldn't start the meeting." };
+      return {
+        error:
+          err instanceof Error ? err.message : "Couldn't start the meeting.",
+      };
     }
-    const plan = await getPlanLimits(meeting.organization_id);
+    // The call may run for the minutes the church has left this month; none left means it cannot start.
+    const minutesLeft = await minutesAvailableFor(
+      meeting.organization_id,
+      meeting.mode,
+    );
+    if (minutesLeft === 0) return { error: NO_MINUTES_MESSAGE(meeting.mode) };
     startedAt = new Date().toISOString();
-    maxDurationMinutes = maxDurationMinutesForMode(meeting.mode, plan);
+    maxDurationMinutes = minutesLeft;
     await admin
       .from("kmeet_meetings")
-      .update({ room_id: roomId, status: "live", started_at: startedAt, max_duration_minutes: maxDurationMinutes, last_active_at: startedAt })
+      .update({
+        room_id: roomId,
+        status: "live",
+        started_at: startedAt,
+        max_duration_minutes: maxDurationMinutes,
+        last_active_at: startedAt,
+      })
       .eq("id", meetingId);
   } else if (meeting.status === "scheduled") {
-    await admin.from("kmeet_meetings").update({ status: "live", last_active_at: new Date().toISOString() }).eq("id", meetingId);
+    await admin
+      .from("kmeet_meetings")
+      .update({ status: "live", last_active_at: new Date().toISOString() })
+      .eq("id", meetingId);
   }
 
   return {

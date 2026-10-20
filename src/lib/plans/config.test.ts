@@ -16,8 +16,14 @@ describe("kaudioMaxDurationMinutes", () => {
     expect(kaudioMaxDurationMinutes(PLANS.premium)).toBe(50); // premium: 40 -> 50
   });
 
-  it("stays unlimited when K-Meet's limit is unlimited", () => {
-    expect(kaudioMaxDurationMinutes(PLANS.pro)).toBeNull(); // pro: null -> null
+  it("gives Pro 60 video and 70 audio minutes a month", () => {
+    expect(kaudioMaxDurationMinutes(PLANS.pro)).toBe(70); // pro: 60 -> 70
+  });
+
+  it("stays unlimited for a custom plan with no limit", () => {
+    expect(
+      kaudioMaxDurationMinutes({ ...PLANS.pro, kmeetMaxDurationMinutes: null }),
+    ).toBeNull();
   });
 });
 
@@ -159,7 +165,7 @@ describe("PLANS.pro", () => {
   });
 
   it("leaves K-Meet/K-Audio and forms unlimited, but caps branches/members", () => {
-    expect(PLANS.pro.kmeetMaxDurationMinutes).toBeNull();
+    expect(PLANS.pro.kmeetMaxDurationMinutes).toBe(60);
     expect(PLANS.pro.formsLimit).toBeNull();
     expect(PLANS.pro.branchLimit).toBe(20);
     expect(PLANS.pro.memberLimit).toBe(10000);

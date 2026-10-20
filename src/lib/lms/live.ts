@@ -69,7 +69,9 @@ export function durationProblem(
   planLimitMinutes: number | null,
 ): string | null {
   if (planLimitMinutes === null || minutes <= planLimitMinutes) return null;
-  return `Your plan ends calls after ${planLimitMinutes} minutes. Make the class ${planLimitMinutes} minutes or shorter, or ask for a plan with longer calls.`;
+  return planLimitMinutes <= 0
+    ? "You have no K-Connect minutes left this month. Buy more minutes from the K-Connect page or wait for next month."
+    : `You have ${planLimitMinutes} K-Connect minutes left this month. Make the class ${planLimitMinutes} minutes or shorter, or buy more minutes from the K-Connect page.`;
 }
 
 export function endsAt(start: Date, durationMinutes: number): Date {

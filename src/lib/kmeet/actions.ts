@@ -11,9 +11,17 @@ import { generateParticipantToken } from "@/lib/kmeet/token";
 import { isVideoSdkConfigured } from "@/lib/kmeet/env";
 import { endStreamsForMeetings } from "@/lib/livestream/service";
 import { answerEntry, listPendingEntries } from "@/lib/kmeet/entry";
-import { maxDurationMinutesForMode, participantPermissionsFor, resolveMeetingRoom } from "@/lib/kmeet/join";
-import { tabKeyForMode, dashboardBasePathForMode, KCONNECT_PATH } from "@/lib/kmeet/mode";
-import { getPlanLimits } from "@/lib/plans/dal";
+import {
+  participantPermissionsFor,
+  resolveMeetingRoom,
+} from "@/lib/kmeet/join";
+import { minutesAvailableFor } from "@/lib/kmeet/minutes-service";
+import { NO_MINUTES_MESSAGE } from "@/lib/kmeet/minutes";
+import {
+  tabKeyForMode,
+  dashboardBasePathForMode,
+  KCONNECT_PATH,
+} from "@/lib/kmeet/mode";
 import { getSiteUrl } from "@/lib/site-url";
 import { zonedTimeToUtc } from "@/lib/organizations/timezone";
 import type { KmeetMode } from "@/types/database";
@@ -23,7 +31,10 @@ export interface KmeetFormState {
   meetingId?: string;
 }
 
-export async function scheduleMeetingAction(_prevState: KmeetFormState, formData: FormData): Promise<KmeetFormState> {
+export async function scheduleMeetingAction(
+  _prevState: KmeetFormState,
+  formData: FormData,
+): Promise<KmeetFormState> {
   const user = await requireUser();
   const membership = await requireOrganization();
   const organizationId = membership.organization.id;
@@ -35,7 +46,10 @@ export async function scheduleMeetingAction(_prevState: KmeetFormState, formData
     return { error: "You don't have permission to schedule a meeting." };
   }
   if (!isVideoSdkConfigured()) {
-    return { error: "Video calling isn't configured yet — ask your developer to set it up." };
+    return {
+      error:
+        "Video calling isn't configured yet — ask your developer to set it up.",
+    };
   }
 
   const title = String(formData.get("title") ?? "").trim();
@@ -48,9 +62,13 @@ export async function scheduleMeetingAction(_prevState: KmeetFormState, formData
 
   // The form has no timezone: the time is the church's local time.
   const validLocal = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(scheduledAtRaw);
-  const scheduledAt = validLocal ? zonedTimeToUtc(scheduledAtRaw, membership.organization.timezone) : new Date(Number.NaN);
-  if (!validLocal || Number.isNaN(scheduledAt.getTime())) return { error: "Choose a valid date and time." };
-  if (scheduledAt.getTime() < Date.now() - 60_000) return { error: "Choose a time in the future." };
+  const scheduledAt = validLocal
+    ? zonedTimeToUtc(scheduledAtRaw, membership.organization.timezone)
+    : new Date(Number.NaN);
+  if (!validLocal || Number.isNaN(scheduledAt.getTime()))
+    return { error: "Choose a valid date and time." };
+  if (scheduledAt.getTime() < Date.now() - 60_000)
+    return { error: "Choose a time in the future." };
 
   const supabase = await createClient();
   const { data: meeting, error } = await supabase
@@ -69,7 +87,8 @@ export async function scheduleMeetingAction(_prevState: KmeetFormState, formData
     .select("id")
     .single();
 
-  if (error || !meeting) return { error: "Couldn't schedule that meeting. Please try again." };
+  if (error || !meeting)
+    return { error: "Couldn't schedule that meeting. Please try again." };
 
   // Every scheduled meeting shows up in Events with the normal event
   // feature set (calendar, reminders, registration, attendance) — either
@@ -77,10 +96,17 @@ export async function scheduleMeetingAction(_prevState: KmeetFormState, formData
   // if none was picked, by creating a new event for it.
   const joinUrl = `${getSiteUrl()}${dashboardBasePathForMode(mode)}/${meeting.id}`;
   if (eventId) {
-    const { data: existingEvent } = await supabase.from("events").select("venue").eq("id", eventId).maybeSingle();
+    const { data: existingEvent } = await supabase
+      .from("events")
+      .select("venue")
+      .eq("id", eventId)
+      .maybeSingle();
     await supabase
       .from("events")
-      .update({ meeting_mode: existingEvent?.venue ? "hybrid" : "online", meeting_link: joinUrl })
+      .update({
+        meeting_mode: existingEvent?.venue ? "hybrid" : "online",
+        meeting_link: joinUrl,
+      })
       .eq("id", eventId);
   } else {
     const { data: newEvent } = await supabase
@@ -98,7 +124,10 @@ export async function scheduleMeetingAction(_prevState: KmeetFormState, formData
       .select("id")
       .single();
     if (newEvent) {
-      await supabase.from("kmeet_meetings").update({ event_id: newEvent.id }).eq("id", meeting.id);
+      await supabase
+        .from("kmeet_meetings")
+        .update({ event_id: newEvent.id })
+        .eq("id", meeting.id);
     }
   }
 
@@ -108,7 +137,11 @@ export async function scheduleMeetingAction(_prevState: KmeetFormState, formData
   return { meetingId: meeting.id };
 }
 
-export async function startInstantMeetingAction(title: string, requireAdmission: boolean, mode: KmeetMode = "video"): Promise<KmeetFormState> {
+export async function startInstantMeetingAction(
+  title: string,
+  requireAdmission: boolean,
+  mode: KmeetMode = "video",
+): Promise<KmeetFormState> {
   const user = await requireUser();
   const membership = await requireOrganization();
   const organizationId = membership.organization.id;
@@ -118,17 +151,24 @@ export async function startInstantMeetingAction(title: string, requireAdmission:
     return { error: "You don't have permission to start a meeting." };
   }
   if (!isVideoSdkConfigured()) {
-    return { error: "Video calling isn't configured yet — ask your developer to set it up." };
+    return {
+      error:
+        "Video calling isn't configured yet — ask your developer to set it up.",
+    };
   }
+
+  // The call may run for the minutes the church has left this month; none left means it cannot start.
+  const minutesLeft = await minutesAvailableFor(organizationId, mode);
+  if (minutesLeft === 0) return { error: NO_MINUTES_MESSAGE(mode) };
 
   let roomId: string;
   try {
     roomId = await createVideoSdkRoom();
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Couldn't start the meeting." };
+    return {
+      error: err instanceof Error ? err.message : "Couldn't start the meeting.",
+    };
   }
-
-  const plan = await getPlanLimits(organizationId);
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -140,14 +180,15 @@ export async function startInstantMeetingAction(title: string, requireAdmission:
       status: "live",
       require_admission: requireAdmission,
       started_at: new Date().toISOString(),
-      max_duration_minutes: maxDurationMinutesForMode(mode, plan),
+      max_duration_minutes: minutesLeft,
       mode,
       created_by: user.id,
     })
     .select("id")
     .single();
 
-  if (error || !data) return { error: "Couldn't start that meeting. Please try again." };
+  if (error || !data)
+    return { error: "Couldn't start that meeting. Please try again." };
 
   revalidatePath(dashboardBasePathForMode(mode));
   revalidatePath(KCONNECT_PATH);
@@ -166,9 +207,14 @@ export interface JoinMeetingResult {
   mode?: KmeetMode;
 }
 
-export async function joinMeetingAction(meetingId: string): Promise<JoinMeetingResult> {
+export async function joinMeetingAction(
+  meetingId: string,
+): Promise<JoinMeetingResult> {
   const user = await requireUser();
-  const [membership, profile] = await Promise.all([requireOrganization(), getProfile()]);
+  const [membership, profile] = await Promise.all([
+    requireOrganization(),
+    getProfile(),
+  ]);
   const organizationId = membership.organization.id;
 
   const admin = createAdminClient();
@@ -181,7 +227,11 @@ export async function joinMeetingAction(meetingId: string): Promise<JoinMeetingR
   if (!meeting) return { error: "That meeting could not be found." };
 
   // A live stream's broadcast room follows the Live stream permission.
-  const { data: stream } = await admin.from("live_streams").select("id").eq("meeting_id", meetingId).maybeSingle();
+  const { data: stream } = await admin
+    .from("live_streams")
+    .select("id")
+    .eq("meeting_id", meetingId)
+    .maybeSingle();
   const tabKey = stream ? "livestream" : tabKeyForMode(meeting.mode);
   const access = await checkTabAccess(organizationId, tabKey, "read");
   if (!access.ok) return { error: access.message };
@@ -190,8 +240,13 @@ export async function joinMeetingAction(meetingId: string): Promise<JoinMeetingR
   if ("error" in resolved) return { error: resolved.error };
 
   const isModerator = membership.tabAccess[tabKey].write;
-  const displayName = profile ? `${profile.first_name} ${profile.last_name}`.trim() : (user.email ?? "Guest");
-  const permissions = participantPermissionsFor(isModerator, resolved.requireAdmission);
+  const displayName = profile
+    ? `${profile.first_name} ${profile.last_name}`.trim()
+    : (user.email ?? "Guest");
+  const permissions = participantPermissionsFor(
+    isModerator,
+    resolved.requireAdmission,
+  );
 
   return {
     roomId: resolved.roomId,
@@ -212,14 +267,20 @@ export async function joinMeetingAction(meetingId: string): Promise<JoinMeetingR
 // that, same as every other invite-link-based feature in this app
 // (/join/[slug], /events/register/[token], /give/[token]). A guest is
 // never a moderator — always subject to require_admission.
-export async function joinMeetingAsGuestAction(meetingId: string, guestName: string): Promise<JoinMeetingResult> {
+export async function joinMeetingAsGuestAction(
+  meetingId: string,
+  guestName: string,
+): Promise<JoinMeetingResult> {
   const trimmedName = guestName.trim().slice(0, 80);
   if (!trimmedName) return { error: "Enter your name to join." };
 
   const resolved = await resolveMeetingRoom(meetingId);
   if ("error" in resolved) return { error: resolved.error };
 
-  const permissions = participantPermissionsFor(false, resolved.requireAdmission);
+  const permissions = participantPermissionsFor(
+    false,
+    resolved.requireAdmission,
+  );
 
   return {
     roomId: resolved.roomId,
@@ -233,24 +294,43 @@ export async function joinMeetingAsGuestAction(meetingId: string, guestName: str
   };
 }
 
-async function meetingModeOrNull(organizationId: string, meetingId: string): Promise<KmeetMode | null> {
+async function meetingModeOrNull(
+  organizationId: string,
+  meetingId: string,
+): Promise<KmeetMode | null> {
   const supabase = await createClient();
-  const { data } = await supabase.from("kmeet_meetings").select("mode").eq("organization_id", organizationId).eq("id", meetingId).maybeSingle();
+  const { data } = await supabase
+    .from("kmeet_meetings")
+    .select("mode")
+    .eq("organization_id", organizationId)
+    .eq("id", meetingId)
+    .maybeSingle();
   return data?.mode ?? null;
 }
 
-export async function toggleAdmissionModeAction(meetingId: string, requireAdmission: boolean): Promise<void> {
+export async function toggleAdmissionModeAction(
+  meetingId: string,
+  requireAdmission: boolean,
+): Promise<void> {
   await requireUser();
   const membership = await requireOrganization();
   const organizationId = membership.organization.id;
 
   const mode = await meetingModeOrNull(organizationId, meetingId);
   if (!mode) return;
-  const access = await checkTabAccess(organizationId, tabKeyForMode(mode), "write");
+  const access = await checkTabAccess(
+    organizationId,
+    tabKeyForMode(mode),
+    "write",
+  );
   if (!access.ok) return;
 
   const supabase = await createClient();
-  await supabase.from("kmeet_meetings").update({ require_admission: requireAdmission }).eq("organization_id", organizationId).eq("id", meetingId);
+  await supabase
+    .from("kmeet_meetings")
+    .update({ require_admission: requireAdmission })
+    .eq("organization_id", organizationId)
+    .eq("id", meetingId);
 }
 
 export async function endMeetingAction(meetingId: string): Promise<void> {
@@ -260,7 +340,11 @@ export async function endMeetingAction(meetingId: string): Promise<void> {
 
   const mode = await meetingModeOrNull(organizationId, meetingId);
   if (!mode) return;
-  const access = await checkTabAccess(organizationId, tabKeyForMode(mode), "write");
+  const access = await checkTabAccess(
+    organizationId,
+    tabKeyForMode(mode),
+    "write",
+  );
   if (!access.ok) return;
 
   const supabase = await createClient();
@@ -269,8 +353,14 @@ export async function endMeetingAction(meetingId: string): Promise<void> {
     .update({ status: "ended", ended_at: new Date().toISOString() })
     .eq("organization_id", organizationId)
     .eq("id", meetingId);
-  const { data: room } = await createAdminClient().from("kmeet_meetings").select("room_id").eq("id", meetingId).maybeSingle();
-  await endStreamsForMeetings([{ id: meetingId, room_id: room?.room_id ?? null }]);
+  const { data: room } = await createAdminClient()
+    .from("kmeet_meetings")
+    .select("room_id")
+    .eq("id", meetingId)
+    .maybeSingle();
+  await endStreamsForMeetings([
+    { id: meetingId, room_id: room?.room_id ?? null },
+  ]);
 
   revalidatePath(dashboardBasePathForMode(mode));
   revalidatePath(KCONNECT_PATH);
@@ -283,11 +373,19 @@ export async function cancelMeetingAction(meetingId: string): Promise<void> {
 
   const mode = await meetingModeOrNull(organizationId, meetingId);
   if (!mode) return;
-  const access = await checkTabAccess(organizationId, tabKeyForMode(mode), "delete");
+  const access = await checkTabAccess(
+    organizationId,
+    tabKeyForMode(mode),
+    "delete",
+  );
   if (!access.ok) return;
 
   const supabase = await createClient();
-  await supabase.from("kmeet_meetings").delete().eq("organization_id", organizationId).eq("id", meetingId);
+  await supabase
+    .from("kmeet_meetings")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("id", meetingId);
 
   revalidatePath(dashboardBasePathForMode(mode));
   revalidatePath(KCONNECT_PATH);
@@ -296,7 +394,9 @@ export async function cancelMeetingAction(meetingId: string): Promise<void> {
 // Every person connected to a call reports in every 30 seconds, which is what
 // keeps a call from being ended as idle (see kmeet/idle.ts). Open to guests too,
 // like joining: it can only mark a live call as active.
-export async function kmeetHeartbeatAction(meetingId: string): Promise<{ ended: boolean }> {
+export async function kmeetHeartbeatAction(
+  meetingId: string,
+): Promise<{ ended: boolean }> {
   if (!/^[0-9a-f-]{36}$/.test(meetingId)) return { ended: true };
   const admin = createAdminClient();
   const { data } = await admin
@@ -311,24 +411,38 @@ export async function kmeetHeartbeatAction(meetingId: string): Promise<{ ended: 
 
 // Hosts on the web: people from the mobile app waiting to be let into a call that
 // admits one by one (see kmeet/entry.ts). Polled by the call page.
-export async function listEntryRequestsAction(meetingId: string): Promise<{ id: string; name: string }[]> {
+export async function listEntryRequestsAction(
+  meetingId: string,
+): Promise<{ id: string; name: string }[]> {
   await requireUser();
   const membership = await requireOrganization();
   const organizationId = membership.organization.id;
   const mode = await meetingModeOrNull(organizationId, meetingId);
   if (!mode) return [];
-  const access = await checkTabAccess(organizationId, tabKeyForMode(mode), "write");
+  const access = await checkTabAccess(
+    organizationId,
+    tabKeyForMode(mode),
+    "write",
+  );
   if (!access.ok) return [];
   return listPendingEntries(meetingId);
 }
 
-export async function answerEntryRequestAction(meetingId: string, requestId: string, allow: boolean): Promise<void> {
+export async function answerEntryRequestAction(
+  meetingId: string,
+  requestId: string,
+  allow: boolean,
+): Promise<void> {
   await requireUser();
   const membership = await requireOrganization();
   const organizationId = membership.organization.id;
   const mode = await meetingModeOrNull(organizationId, meetingId);
   if (!mode) return;
-  const access = await checkTabAccess(organizationId, tabKeyForMode(mode), "write");
+  const access = await checkTabAccess(
+    organizationId,
+    tabKeyForMode(mode),
+    "write",
+  );
   if (!access.ok) return;
   await answerEntry(meetingId, requestId, allow ? "allowed" : "denied");
 }

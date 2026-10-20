@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPushToUsers } from "@/lib/push/client";
 import { isVideoSdkConfigured } from "@/lib/kmeet/env";
-import { maxDurationMinutesForMode } from "@/lib/kmeet/join";
-import { getPlanLimits, getOrgFeatureState } from "@/lib/plans/dal";
+import { minutesAvailableFor } from "@/lib/kmeet/minutes-service";
+import { getOrgFeatureState } from "@/lib/plans/dal";
 import { zonedTimeToUtc, DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 import { authorizeCurriculum } from "@/lib/lms/authz";
 import { enrolledStudentLogins } from "@/lib/lms/live-service";
@@ -52,19 +52,20 @@ async function notifyStudents(
 
 async function churchContext(organizationId: string, mode: "video" | "audio") {
   const admin = createAdminClient();
-  const [{ data: org }, plan, state] = await Promise.all([
+  const [{ data: org }, minutesLeft, state] = await Promise.all([
     admin
       .from("organizations")
       .select("timezone")
       .eq("id", organizationId)
       .maybeSingle(),
-    getPlanLimits(organizationId),
+    minutesAvailableFor(organizationId, mode),
     getOrgFeatureState(organizationId),
   ]);
   const tab = mode === "audio" ? "kaudio" : "kmeet";
   return {
     timeZone: org?.timezone || DEFAULT_TIMEZONE,
-    planMax: maxDurationMinutesForMode(mode, plan),
+    // What is left of this month's K-Connect minutes; a class longer than that would be cut off.
+    planMax: minutesLeft,
     callsAvailable: state.tabs[tab],
   };
 }

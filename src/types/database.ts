@@ -79,6 +79,9 @@ export type Organization = {
   addon_whatsapp_credits: number;
   addon_storage_bytes: number;
   addon_ai_credits: number;
+  // K-Connect minutes bought, valid only in the month named by addon_kmeet_month (YYYY-MM).
+  addon_kmeet_minutes: number;
+  addon_kmeet_month: string | null;
   // null until the welcome tour (src/components/dashboard/WelcomeTour.tsx)
   // is completed or skipped — that's also what triggers it to auto-show.
   tour_completed_at: string | null;
@@ -96,7 +99,7 @@ export type AddonOrderStatus = "created" | "paid";
 export type OrganizationAddonOrder = {
   id: string;
   organization_id: string;
-  addon_type: "sms" | "email" | "whatsapp" | "storage" | "ai";
+  addon_type: "sms" | "email" | "whatsapp" | "storage" | "ai" | "kconnect";
   pack_id: string;
   credits: number;
   amount: number;

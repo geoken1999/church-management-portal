@@ -5,8 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createVideoSdkRoom } from "@/lib/kmeet/client";
 import { isVideoSdkConfigured } from "@/lib/kmeet/env";
 import { dashboardBasePathForMode } from "@/lib/kmeet/mode";
-import { getPlanLimits } from "@/lib/plans/dal";
-import { kaudioMaxDurationMinutes } from "@/lib/plans/config";
+import { minutesAvailableFor } from "@/lib/kmeet/minutes-service";
+import { NO_MINUTES_MESSAGE } from "@/lib/kmeet/minutes";
 import { getSiteUrl } from "@/lib/site-url";
 import { zonedTimeToUtc, DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 import type { KmeetMode } from "@/types/database";
@@ -16,30 +16,54 @@ import type { KmeetMode } from "@/types/database";
 // (src/lib/kmeet/actions.ts). Who may do it was checked by the route. Joining a
 // call happens in the browser, from the meeting's link.
 
-export type MeetingResult = { ok: true; id?: string } | { ok: false; error: string };
+export type MeetingResult =
+  { ok: true; id?: string } | { ok: false; error: string };
 const fail = (error: string): MeetingResult => ({ ok: false, error });
 
 export async function scheduleMeeting(
   organizationId: string,
   userId: string,
-  f: { mode: KmeetMode; title: string; description: string; scheduledAt: string; eventId: string; requireAdmission: boolean },
+  f: {
+    mode: KmeetMode;
+    title: string;
+    description: string;
+    scheduledAt: string;
+    eventId: string;
+    requireAdmission: boolean;
+  },
 ): Promise<MeetingResult> {
-  if (!isVideoSdkConfigured()) return fail("Video calling isn't configured yet — ask your developer to set it up.");
+  if (!isVideoSdkConfigured())
+    return fail(
+      "Video calling isn't configured yet — ask your developer to set it up.",
+    );
   const title = f.title.trim();
   if (!title) return fail("Give the meeting a title.");
 
   const admin = createAdminClient();
-  const { data: org } = await admin.from("organizations").select("timezone").eq("id", organizationId).maybeSingle();
+  const { data: org } = await admin
+    .from("organizations")
+    .select("timezone")
+    .eq("id", organizationId)
+    .maybeSingle();
   const timeZone = org?.timezone || DEFAULT_TIMEZONE;
 
   // The time has no timezone: it is the church's local time.
   const validLocal = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(f.scheduledAt);
-  const scheduledAt = validLocal ? zonedTimeToUtc(f.scheduledAt, timeZone) : new Date(Number.NaN);
-  if (!validLocal || Number.isNaN(scheduledAt.getTime())) return fail("Choose a valid date and time.");
-  if (scheduledAt.getTime() < Date.now() - 60_000) return fail("Choose a time in the future.");
+  const scheduledAt = validLocal
+    ? zonedTimeToUtc(f.scheduledAt, timeZone)
+    : new Date(Number.NaN);
+  if (!validLocal || Number.isNaN(scheduledAt.getTime()))
+    return fail("Choose a valid date and time.");
+  if (scheduledAt.getTime() < Date.now() - 60_000)
+    return fail("Choose a time in the future.");
 
   if (f.eventId) {
-    const { data: event } = await admin.from("events").select("id").eq("id", f.eventId).eq("organization_id", organizationId).maybeSingle();
+    const { data: event } = await admin
+      .from("events")
+      .select("id")
+      .eq("id", f.eventId)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
     if (!event) return fail("That event could not be found.");
   }
 
@@ -58,15 +82,26 @@ export async function scheduleMeeting(
     })
     .select("id")
     .single();
-  if (error || !meeting) return fail("Couldn't schedule that meeting. Please try again.");
+  if (error || !meeting)
+    return fail("Couldn't schedule that meeting. Please try again.");
 
   // Every scheduled meeting also shows up in Events (calendar, reminders,
   // registration): the chosen event becomes online or hybrid, or a new event is
   // created for it.
   const joinUrl = `${getSiteUrl()}${dashboardBasePathForMode(f.mode)}/${meeting.id}`;
   if (f.eventId) {
-    const { data: existing } = await admin.from("events").select("venue").eq("id", f.eventId).maybeSingle();
-    await admin.from("events").update({ meeting_mode: existing?.venue ? "hybrid" : "online", meeting_link: joinUrl }).eq("id", f.eventId);
+    const { data: existing } = await admin
+      .from("events")
+      .select("venue")
+      .eq("id", f.eventId)
+      .maybeSingle();
+    await admin
+      .from("events")
+      .update({
+        meeting_mode: existing?.venue ? "hybrid" : "online",
+        meeting_link: joinUrl,
+      })
+      .eq("id", f.eventId);
   } else {
     const { data: newEvent } = await admin
       .from("events")
@@ -82,20 +117,36 @@ export async function scheduleMeeting(
       })
       .select("id")
       .single();
-    if (newEvent) await admin.from("kmeet_meetings").update({ event_id: newEvent.id }).eq("id", meeting.id);
+    if (newEvent)
+      await admin
+        .from("kmeet_meetings")
+        .update({ event_id: newEvent.id })
+        .eq("id", meeting.id);
   }
   return { ok: true, id: meeting.id };
 }
 
-export async function startInstantMeeting(organizationId: string, userId: string, mode: KmeetMode, title: string, requireAdmission: boolean): Promise<MeetingResult> {
-  if (!isVideoSdkConfigured()) return fail("Video calling isn't configured yet — ask your developer to set it up.");
+export async function startInstantMeeting(
+  organizationId: string,
+  userId: string,
+  mode: KmeetMode,
+  title: string,
+  requireAdmission: boolean,
+): Promise<MeetingResult> {
+  if (!isVideoSdkConfigured())
+    return fail(
+      "Video calling isn't configured yet — ask your developer to set it up.",
+    );
+  const minutesLeft = await minutesAvailableFor(organizationId, mode);
+  if (minutesLeft === 0) return fail(NO_MINUTES_MESSAGE(mode));
   let roomId: string;
   try {
     roomId = await createVideoSdkRoom();
   } catch (err) {
-    return fail(err instanceof Error ? err.message : "Couldn't start the meeting.");
+    return fail(
+      err instanceof Error ? err.message : "Couldn't start the meeting.",
+    );
   }
-  const plan = await getPlanLimits(organizationId);
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("kmeet_meetings")
@@ -106,30 +157,56 @@ export async function startInstantMeeting(organizationId: string, userId: string
       status: "live",
       require_admission: requireAdmission,
       started_at: new Date().toISOString(),
-      max_duration_minutes: mode === "audio" ? kaudioMaxDurationMinutes(plan) : plan.kmeetMaxDurationMinutes,
+      max_duration_minutes: minutesLeft,
       mode,
       created_by: userId,
     })
     .select("id")
     .single();
-  return error || !data ? fail("Couldn't start that meeting. Please try again.") : { ok: true, id: data.id };
+  return error || !data
+    ? fail("Couldn't start that meeting. Please try again.")
+    : { ok: true, id: data.id };
 }
 
-export async function endMeeting(organizationId: string, id: string): Promise<MeetingResult> {
+export async function endMeeting(
+  organizationId: string,
+  id: string,
+): Promise<MeetingResult> {
   const admin = createAdminClient();
-  const { data: ended, error } = await admin.from("kmeet_meetings").update({ status: "ended", ended_at: new Date().toISOString() }).eq("organization_id", organizationId).eq("id", id).select("id, room_id").maybeSingle();
+  const { data: ended, error } = await admin
+    .from("kmeet_meetings")
+    .update({ status: "ended", ended_at: new Date().toISOString() })
+    .eq("organization_id", organizationId)
+    .eq("id", id)
+    .select("id, room_id")
+    .maybeSingle();
   if (ended) await endStreamsForMeetings([ended]);
   return error ? fail("Couldn't end that meeting.") : { ok: true };
 }
 
-export async function setAdmission(organizationId: string, id: string, requireAdmission: boolean): Promise<MeetingResult> {
+export async function setAdmission(
+  organizationId: string,
+  id: string,
+  requireAdmission: boolean,
+): Promise<MeetingResult> {
   const admin = createAdminClient();
-  const { error } = await admin.from("kmeet_meetings").update({ require_admission: requireAdmission }).eq("organization_id", organizationId).eq("id", id);
+  const { error } = await admin
+    .from("kmeet_meetings")
+    .update({ require_admission: requireAdmission })
+    .eq("organization_id", organizationId)
+    .eq("id", id);
   return error ? fail("Couldn't change that.") : { ok: true };
 }
 
-export async function deleteMeeting(organizationId: string, id: string): Promise<MeetingResult> {
+export async function deleteMeeting(
+  organizationId: string,
+  id: string,
+): Promise<MeetingResult> {
   const admin = createAdminClient();
-  const { error } = await admin.from("kmeet_meetings").delete().eq("organization_id", organizationId).eq("id", id);
+  const { error } = await admin
+    .from("kmeet_meetings")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("id", id);
   return error ? fail("Couldn't delete that meeting.") : { ok: true };
 }

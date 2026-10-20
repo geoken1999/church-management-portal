@@ -159,6 +159,8 @@ export default async function BillingPage({
           whatsapp: planUsage.addonWhatsappCredits,
           storage: planUsage.addonStorageBytes,
           ai: planUsage.addonAiCredits,
+          // K-Connect minutes are bought on the K-Connect page and last only for the month.
+          kconnect: 0,
         }}
       />
 

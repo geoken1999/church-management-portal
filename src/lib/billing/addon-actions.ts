@@ -6,6 +6,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createCheckout } from "@/lib/razorpay/platform";
 import type { RazorpayCheckout } from "@/lib/razorpay/checkout";
 import { getAddonPack } from "@/lib/plans/config";
+import { monthKey } from "@/lib/kmeet/minutes-service";
+import { DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 import { getSiteUrl } from "@/lib/site-url";
 import { sendAddonPurchaseEmail } from "@/lib/billing/receipts";
 import { withGst } from "@/lib/billing/gst";
@@ -185,12 +187,13 @@ export async function finalizeAddonOrderPayment(
   const { data: org } = await admin
     .from("organizations")
     .select(
-      "addon_sms_credits, addon_email_credits, addon_whatsapp_credits, addon_storage_bytes, addon_ai_credits",
+      "addon_sms_credits, addon_email_credits, addon_whatsapp_credits, addon_storage_bytes, addon_ai_credits, addon_kmeet_minutes, addon_kmeet_month, timezone",
     )
     .eq("id", order.organization_id)
     .single();
 
   const addonType = order.addon_type as AddonType;
+  const thisMonth = monthKey(new Date(), org?.timezone || DEFAULT_TIMEZONE);
   const update =
     addonType === "sms"
       ? { addon_sms_credits: (org?.addon_sms_credits ?? 0) + order.credits }
@@ -206,7 +209,16 @@ export async function finalizeAddonOrderPayment(
             }
           : addonType === "ai"
             ? { addon_ai_credits: (org?.addon_ai_credits ?? 0) + order.credits }
-            : {
+            : addonType === "kconnect"
+              ? {
+                  // Valid for this month only: a balance left from an earlier month is gone.
+                  addon_kmeet_minutes:
+                    (org?.addon_kmeet_month === thisMonth
+                      ? (org?.addon_kmeet_minutes ?? 0)
+                      : 0) + order.credits,
+                  addon_kmeet_month: thisMonth,
+                }
+              : {
                 addon_storage_bytes:
                   (org?.addon_storage_bytes ?? 0) + order.credits,
               };

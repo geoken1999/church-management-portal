@@ -131,7 +131,7 @@ You can also **Approve**, **Reject** or **Withdraw** people there.
 
 ## 7. Live classes
 1. Course → **Live classes** → schedule: title, start, length (15 to 480 minutes), video or audio. Length
-   cannot exceed your plan's K-Connect limit.
+   cannot be longer than the K-Connect minutes your church has left this month (Starter 20 video / 30 audio, Growth 40 / 50, Pro 60 / 70; buy 30 more for ₹100 on the K-Connect page).
 2. Enrolled students are notified and reminded about 10 minutes before.
 3. At class time press **Start class**. Students can join from 15 minutes before; joining marks them present.
 4. Afterwards set attendance (present, absent, excused) and add a recording link.

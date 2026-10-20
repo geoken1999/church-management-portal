@@ -7,6 +7,7 @@ import {
   MessageCircle,
   HardDrive,
   Sparkles,
+  Webcam,
 } from "lucide-react";
 import { createAddonOrder } from "@/lib/billing/addon-actions";
 import { openRazorpayCheckout } from "@/lib/razorpay/browser";
@@ -38,13 +39,14 @@ const ADDON_ICONS: Record<AddonType, typeof MessageSquareText> = {
   whatsapp: MessageCircle,
   storage: HardDrive,
   ai: Sparkles,
+  kconnect: Webcam,
 };
 
 function formatBalance(addonType: AddonType, value: number): string {
   return addonType === "storage" ? formatBytes(value) : value.toLocaleString();
 }
 
-function PackCard({
+export function PackCard({
   pack,
   paymentsConfigured,
   billingDetails,

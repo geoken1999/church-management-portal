@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { confirmReturn } from "@/lib/razorpay/platform";
 import { finalizeAddonOrderPayment } from "@/lib/billing/addon-actions";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { getSiteUrl } from "@/lib/site-url";
 
@@ -49,6 +50,17 @@ export async function POST(request: Request) {
       });
       return billingUrl("failed", "reason=finalize_failed");
     }
+    // K-Connect minutes are bought on the K-Connect page, so that is where the buyer goes back to.
+    const { data: order } = await createAdminClient()
+      .from("organization_addon_orders")
+      .select("addon_type")
+      .eq("payu_txnid", outcome.reference)
+      .maybeSingle();
+    if (order?.addon_type === "kconnect")
+      return NextResponse.redirect(
+        `${getSiteUrl()}/dashboard/kconnect?minutes=bought`,
+        { status: 303 },
+      );
     return billingUrl("success");
   } catch (err) {
     await logPlatformEvent({

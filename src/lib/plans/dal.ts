@@ -655,13 +655,11 @@ export async function recordAiReplyUsage(
       .update({ addon_ai_credits: Math.max(0, usage.addonAiCredits - 1) })
       .eq("id", organizationId);
   }
-  await admin
-    .from("ai_reply_usage")
-    .insert({
-      organization_id: organizationId,
-      participant_id: participantId,
-      source,
-    });
+  await admin.from("ai_reply_usage").insert({
+    organization_id: organizationId,
+    participant_id: participantId,
+    source,
+  });
 }
 
 // --- Webhook-side AI credit check below: the Instagram webhook that
@@ -869,13 +867,11 @@ export async function recordAiReplyUsageForWebhook(
       .eq("id", organizationId);
   }
 
-  await admin
-    .from("ai_reply_usage")
-    .insert({
-      organization_id: organizationId,
-      participant_id: participantId,
-      source,
-    });
+  await admin.from("ai_reply_usage").insert({
+    organization_id: organizationId,
+    participant_id: participantId,
+    source,
+  });
 }
 
 // Per-tab on/off state and feature caps for one org — read by checkTabAccess

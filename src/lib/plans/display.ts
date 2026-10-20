@@ -64,7 +64,7 @@ export function planFeatureRows(
       label:
         plan.kmeetMaxDurationMinutes === null
           ? "Unlimited K-Connect calls"
-          : `${plan.kmeetMaxDurationMinutes}-min K-Connect video, ${plan.kmeetMaxDurationMinutes + 10}-min K-Connect audio`,
+          : `${plan.kmeetMaxDurationMinutes} min of K-Connect video and ${plan.kmeetMaxDurationMinutes + 10} min of audio a month, extra minutes ₹100 per 30`,
       included: true,
     },
     {

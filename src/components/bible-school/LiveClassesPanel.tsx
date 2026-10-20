@@ -288,7 +288,6 @@ export function LiveClassesPanel({
       ) : (
         sessions.map((session) => {
           const state = stateOf(session, now);
-          const hostPath = session.mode === "audio" ? "kaudio" : "kmeet";
           const canStart =
             session.status === "scheduled" &&
             session.meeting_id &&
@@ -326,7 +325,7 @@ export function LiveClassesPanel({
                         nativeButton={false}
                         render={
                           <a
-                            href={`/dashboard/${hostPath}/${session.meeting_id}`}
+                            href={`/class-room/${session.meeting_id}`}
                             target="_blank"
                             rel="noopener noreferrer"
                           >

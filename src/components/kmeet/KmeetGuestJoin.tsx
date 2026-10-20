@@ -31,8 +31,8 @@ export function KmeetGuestJoin({
 
   if (joining) {
     return (
-      <div className="min-h-screen bg-background p-4">
-        <KmeetCall mode={mode} meetingId={meetingId} title={title} alreadyEnded={alreadyEnded} canEnd={false} guestName={name.trim()} backHref="/" />
+      <div className="fixed inset-0 overflow-auto bg-background p-2 sm:p-3">
+        <KmeetCall mode={mode} meetingId={meetingId} title={title} alreadyEnded={alreadyEnded} canEnd={false} guestName={name.trim()} backHref="/" fullScreen />
       </div>
     );
   }

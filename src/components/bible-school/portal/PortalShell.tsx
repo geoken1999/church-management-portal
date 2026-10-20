@@ -1,5 +1,6 @@
 "use client";
 
+import { CodeBoxes } from "@/components/auth/CodeBoxes";
 import Link from "next/link";
 import {
   createContext,
@@ -206,20 +207,18 @@ function SignIn({ onDone }: { onDone: () => Promise<void> }) {
           </p>
           <div className="space-y-2">
             <Label htmlFor="portal-code">Code</Label>
-            <Input
+            <CodeBoxes
               id="portal-code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
               value={code}
-              onChange={(e) => setCode(e.target.value)}
-              maxLength={8}
+              onChange={setCode}
+              disabled={busy}
             />
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button
             type="submit"
             className="w-full"
-            disabled={busy || code.trim().length < 4}
+            disabled={busy || code.length < 6}
           >
             {busy ? "Checking..." : "Sign in"}
           </Button>

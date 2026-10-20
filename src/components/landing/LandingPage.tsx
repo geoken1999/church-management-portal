@@ -800,6 +800,47 @@ export function LandingPage() {
           </div>
         </section>
 
+        <section id="branded-app" className="px-4 py-20 sm:px-6">
+          <div className="mx-auto grid max-w-5xl items-center gap-10 rounded-3xl border border-border bg-card p-8 shadow-sm sm:p-12 lg:grid-cols-[1fr_auto]">
+            <div>
+              <Badge variant="secondary" className="mb-4">
+                <Smartphone className="size-3" />
+                Your own app
+              </Badge>
+              <h2 className="font-heading text-3xl font-bold tracking-tight text-balance">
+                Want the app in your church&apos;s own name?
+              </h2>
+              <p className="mt-3 max-w-xl text-muted-foreground">
+                Your members can get the KingdomFlow app with your church&apos;s
+                name, logo and colours, so it feels like your own. Tell us what
+                you have in mind and we will set it up with you.
+              </p>
+              <ul className="mt-5 space-y-2 text-sm">
+                {[
+                  "Your church's name, logo and colours",
+                  "Everything in KingdomFlow behind it: giving, events, prayer, Bible School",
+                  "We guide you through the app store steps",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <Button
+              size="lg"
+              nativeButton={false}
+              render={
+                <Link href="/contact?topic=branded-app">
+                  Contact us about your app
+                  <ArrowRight className="size-4" />
+                </Link>
+              }
+            />
+          </div>
+        </section>
+
         <section className="px-4 py-20 sm:px-6">
           <div className="mx-auto max-w-3xl">
             <div className="mx-auto max-w-2xl text-center">

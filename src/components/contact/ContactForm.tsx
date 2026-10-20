@@ -2,7 +2,10 @@
 
 import { useActionState } from "react";
 import { CheckCircle2, Send } from "lucide-react";
-import { submitContactForm, type ContactFormState } from "@/lib/contact/actions";
+import {
+  submitContactForm,
+  type ContactFormState,
+} from "@/lib/contact/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,8 +15,14 @@ import { ErrorToast } from "@/components/ui/error-toast";
 
 const initialState: ContactFormState = {};
 
-export function ContactForm() {
-  const [state, formAction, pending] = useActionState(submitContactForm, initialState);
+export function ContactForm({
+  defaultSubject,
+  defaultMessage,
+}: { defaultSubject?: string; defaultMessage?: string } = {}) {
+  const [state, formAction, pending] = useActionState(
+    submitContactForm,
+    initialState,
+  );
 
   if (state.success) {
     return (
@@ -21,7 +30,9 @@ export function ContactForm() {
         <CheckCircle2 className="size-9 text-primary" />
         <div>
           <p className="font-heading text-lg font-bold">Message sent</p>
-          <p className="mt-1 text-sm text-muted-foreground">Thanks for reaching out — we&apos;ll get back to you soon.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Thanks for reaching out — we&apos;ll get back to you soon.
+          </p>
         </div>
       </div>
     );
@@ -38,9 +49,14 @@ export function ContactForm() {
             id="contact-name"
             name="name"
             aria-invalid={Boolean(state.fieldErrors?.name)}
-            aria-describedby={state.fieldErrors?.name ? "contact-name-error" : undefined}
+            aria-describedby={
+              state.fieldErrors?.name ? "contact-name-error" : undefined
+            }
           />
-          <FieldError id="contact-name-error" message={state.fieldErrors?.name} />
+          <FieldError
+            id="contact-name-error"
+            message={state.fieldErrors?.name}
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="contact-email">Email</Label>
@@ -49,15 +65,25 @@ export function ContactForm() {
             name="email"
             type="email"
             aria-invalid={Boolean(state.fieldErrors?.email)}
-            aria-describedby={state.fieldErrors?.email ? "contact-email-error" : undefined}
+            aria-describedby={
+              state.fieldErrors?.email ? "contact-email-error" : undefined
+            }
           />
-          <FieldError id="contact-email-error" message={state.fieldErrors?.email} />
+          <FieldError
+            id="contact-email-error"
+            message={state.fieldErrors?.email}
+          />
         </div>
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="contact-subject">Subject (optional)</Label>
-        <Input id="contact-subject" name="subject" placeholder="What's this about?" />
+        <Input
+          id="contact-subject"
+          name="subject"
+          placeholder="What's this about?"
+          defaultValue={defaultSubject}
+        />
       </div>
 
       <div className="space-y-2">
@@ -66,11 +92,17 @@ export function ContactForm() {
           id="contact-message"
           name="message"
           rows={6}
+          defaultValue={defaultMessage}
           placeholder="How can we help?"
           aria-invalid={Boolean(state.fieldErrors?.message)}
-          aria-describedby={state.fieldErrors?.message ? "contact-message-error" : undefined}
+          aria-describedby={
+            state.fieldErrors?.message ? "contact-message-error" : undefined
+          }
         />
-        <FieldError id="contact-message-error" message={state.fieldErrors?.message} />
+        <FieldError
+          id="contact-message-error"
+          message={state.fieldErrors?.message}
+        />
       </div>
 
       <Button type="submit" disabled={pending} className="w-full sm:w-auto">

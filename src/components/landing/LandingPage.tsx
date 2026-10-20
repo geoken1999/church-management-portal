@@ -1,3 +1,4 @@
+import { ForceLightTheme } from "@/components/landing/ForceLightTheme";
 import Link from "next/link";
 import {
   Contact,
@@ -40,7 +41,13 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardContent,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { DashboardPreview } from "@/components/landing/DashboardPreview";
@@ -51,7 +58,10 @@ import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/app-links";
 
 const STATS = [
   { value: "30+", label: "built-in modules" },
-  { value: "Android app", label: "on Google Play for your team and members, iPhone coming soon" },
+  {
+    value: "Android app",
+    label: "on Google Play for your team and members, iPhone coming soon",
+  },
   { value: "14-day", label: "free trial, no card" },
   { value: "Multi-branch", label: "ready from day one" },
 ];
@@ -60,17 +70,20 @@ const STEPS = [
   {
     icon: Sparkles,
     title: "Create your church's account",
-    description: "Set your church's name, congregation size, branches, and country — done in under two minutes, with a 14-day full-access trial started automatically.",
+    description:
+      "Set your church's name, congregation size, branches, and country — done in under two minutes, with a 14-day full-access trial started automatically.",
   },
   {
     icon: UserPlus,
     title: "Bring your congregation in",
-    description: "Bulk-import your roster from an Excel template, or share a public join link and let new members sign themselves up for approval.",
+    description:
+      "Bulk-import your roster from an Excel template, or share a public join link and let new members sign themselves up for approval.",
   },
   {
     icon: LayoutDashboard,
     title: "Run everything from one dashboard",
-    description: "Invite your team with scoped Read/Write/Delete permissions, then manage ministries, attendance, giving, and communication without switching apps.",
+    description:
+      "Invite your team with scoped Read/Write/Delete permissions, then manage ministries, attendance, giving, and communication without switching apps.",
   },
 ];
 
@@ -94,32 +107,38 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
       {
         icon: Contact,
         title: "Members, Leaders & Youth",
-        description: "A full congregation roster with a dedicated Leaders list and a separate Youth roster with guardian details, plus a public join link for self-signup.",
+        description:
+          "A full congregation roster with a dedicated Leaders list and a separate Youth roster with guardian details, plus a public join link for self-signup.",
       },
       {
         icon: BadgeCheck,
         title: "Volunteers with digital ID cards",
-        description: "Keep a list of the members who serve, each with a volunteer ID. They get a digital ID card in the app, and an admin can scan its QR code to check the details and mark them verified, or remove it again.",
+        description:
+          "Keep a list of the members who serve, each with a volunteer ID. They get a digital ID card in the app, and an admin can scan its QR code to check the details and mark them verified, or remove it again.",
       },
       {
         icon: Users,
         title: "Family households",
-        description: "Create a family and add existing members to it with their relationship — spouse, child, guardian — so households are tracked, not just individuals.",
+        description:
+          "Create a family and add existing members to it with their relationship — spouse, child, guardian — so households are tracked, not just individuals.",
       },
       {
         icon: MapPin,
         title: "Multi-branch support",
-        description: "Manage every campus from one account, each with its own leader, country, and phone-number formatting.",
+        description:
+          "Manage every campus from one account, each with its own leader, country, and phone-number formatting.",
       },
       {
         icon: ClipboardCheck,
         title: "Attendance",
-        description: "Take attendance by branch and link a session to a specific date of a calendar event, with a manual check-in for anyone not on the default list — including registrants from that event's own sign-up page.",
+        description:
+          "Take attendance by branch and link a session to a specific date of a calendar event, with a manual check-in for anyone not on the default list — including registrants from that event's own sign-up page.",
       },
       {
         icon: ShieldCheck,
         title: "Team permissions",
-        description: "Issue logins for staff and volunteers with per-tab Read, Write, and Delete access. Every tab starts read-only until an admin opens it up.",
+        description:
+          "Issue logins for staff and volunteers with per-tab Read, Write, and Delete access. Every tab starts read-only until an admin opens it up.",
       },
     ],
   },
@@ -130,37 +149,44 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
       {
         icon: HeartHandshake,
         title: "Ministries, Worship & Media",
-        description: "Track every ministry your church runs, your worship team roster, and your media crew — with shared documents for chord charts and production files.",
+        description:
+          "Track every ministry your church runs, your worship team roster, and your media crew — with shared documents for chord charts and production files.",
       },
       {
         icon: CalendarDays,
         title: "Events with public registration",
-        description: "One-off and recurring events, online or in-person, each with an optional public sign-up page — capacity limits, custom fields, and rules that close registration automatically.",
+        description:
+          "One-off and recurring events, online or in-person, each with an optional public sign-up page — capacity limits, custom fields, and rules that close registration automatically.",
       },
       {
         icon: Video,
         title: "K-Connect video & audio calls",
-        description: "Host church meetings and prayer calls right from the dashboard or the app — a waiting room to admit people one by one, in-call chat and reactions, invite links for guests, and calls that close themselves when everyone has left.",
+        description:
+          "Host church meetings and prayer calls right from the dashboard or the app — a waiting room to admit people one by one, in-call chat and reactions, invite links for guests, and calls that close themselves when everyone has left.",
       },
       {
         icon: Radio,
         title: "Live stream",
-        description: "Broadcast your service and let members watch live inside the app, with chat and a viewer count. Go live from a camera or from OBS with a stream key, send to YouTube and Facebook too, and record it. Set up for your church on request.",
+        description:
+          "Broadcast your service and let members watch live inside the app, with chat and a viewer count. Go live from a camera or from OBS with a stream key, send to YouTube and Facebook too, and record it. Set up for your church on request.",
       },
       {
         icon: GraduationCap,
         title: "Bible School",
-        description: "Run courses with modules and lessons, upload video and audio that members watch inside the app with progress tracked, hold live classes in K-Connect with attendance, and open selected courses to people outside your church who apply and are approved by your team.",
+        description:
+          "Run courses with modules and lessons, upload video and audio that members watch inside the app with progress tracked, hold live classes in K-Connect with attendance, and open selected courses to people outside your church who apply and are approved by your team.",
       },
       {
         icon: HandHeart,
         title: "Prayer requests",
-        description: "Members send prayer requests from the app and your team is notified straight away, with every request kept in one place.",
+        description:
+          "Members send prayer requests from the app and your team is notified straight away, with every request kept in one place.",
       },
       {
         icon: ListTodo,
         title: "To Do",
-        description: "A shared task list for your team, with due dates and a calendar export so nothing falls through the cracks.",
+        description:
+          "A shared task list for your team, with due dates and a calendar export so nothing falls through the cracks.",
       },
     ],
   },
@@ -171,32 +197,38 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
       {
         icon: ClipboardList,
         title: "Planner",
-        description: "Keep a named initiative — a service, a building project, an outreach — in one place with its notes and tasks, instead of scattered across chats.",
+        description:
+          "Keep a named initiative — a service, a building project, an outreach — in one place with its notes and tasks, instead of scattered across chats.",
       },
       {
         icon: FolderOpen,
         title: "Folder",
-        description: "A private document library with category-based, opt-in shareable links — control exactly what's public, and revoke a link the moment you need to.",
+        description:
+          "A private document library with category-based, opt-in shareable links — control exactly what's public, and revoke a link the moment you need to.",
       },
       {
         icon: FileBarChart,
         title: "Reports",
-        description: "Filter Members, Attendance, Events, Offerings, and Donations data by date or branch, then export to Excel or PDF. Or make a monthly or annual church report, for the whole church or one branch, in English, Tamil or Hindi, with an AI-written summary and a paragraph for each section, your letterhead and photos, and download it as PDF or Word.",
+        description:
+          "Filter Members, Attendance, Events, Offerings, and Donations data by date or branch, then export to Excel or PDF. Or make a monthly or annual church report, for the whole church or one branch, in English, Tamil or Hindi, with an AI-written summary and a paragraph for each section, your letterhead and photos, and download it as PDF or Word.",
       },
       {
         icon: FileText,
         title: "Forms",
-        description: "Build custom public forms and collect responses directly into your dashboard — no separate form tool to manage.",
+        description:
+          "Build custom public forms and collect responses directly into your dashboard — no separate form tool to manage.",
       },
       {
         icon: MessageCircle,
         title: "Website widget",
-        description: "Embed a small, brandable chat-style form on your own church website to capture visitor inquiries — works on any site, no code changes beyond one snippet.",
+        description:
+          "Embed a small, brandable chat-style form on your own church website to capture visitor inquiries — works on any site, no code changes beyond one snippet.",
       },
       {
         icon: LifeBuoy,
         title: "Help & Support",
-        description: "Raise a support ticket right from the dashboard and get replies in the same thread, with a notification the moment our team responds.",
+        description:
+          "Raise a support ticket right from the dashboard and get replies in the same thread, with a notification the moment our team responds.",
       },
     ],
   },
@@ -207,17 +239,20 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
       {
         icon: HandCoins,
         title: "Fund Raiser, Offering & Donation",
-        description: "Run campaigns toward a goal and accept online giving by card or UPI through a shareable payment link — the raised total updates automatically as gifts come in, online or logged by hand.",
+        description:
+          "Run campaigns toward a goal and accept online giving by card or UPI through a shareable payment link — the raised total updates automatically as gifts come in, online or logged by hand.",
       },
       {
         icon: Wallet,
         title: "Membership fees & payouts",
-        description: "Ask members for a monthly fee by email with a secure payment link, watch what is collected and outstanding, and request payouts for fundraisers, paid events and fees from one Payouts page.",
+        description:
+          "Ask members for a monthly fee by email with a secure payment link, watch what is collected and outstanding, and request payouts for fundraisers, paid events and fees from one Payouts page.",
       },
       {
         icon: Calculator,
         title: "Accounting",
-        description: "Track income and expenses by category, a printable ledger, and line-itemed invoices — with a chart comparing income vs. expense over time.",
+        description:
+          "Track income and expenses by category, a printable ledger, and line-itemed invoices — with a chart comparing income vs. expense over time.",
       },
     ],
   },
@@ -228,32 +263,38 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
       {
         icon: Mail,
         title: "Email & SMS campaigns",
-        description: "Send bulk newsletters and text announcements from the app, metered by your plan or unmetered with your own SMTP server.",
+        description:
+          "Send bulk newsletters and text announcements from the app, metered by your plan or unmetered with your own SMTP server.",
       },
       {
         icon: MessagesSquare,
         title: "WhatsApp campaigns & chat",
-        description: "Send WhatsApp broadcasts through our shared service, or connect your own number for two-way chat with congregants, threaded right in your dashboard.",
+        description:
+          "Send WhatsApp broadcasts through our shared service, or connect your own number for two-way chat with congregants, threaded right in your dashboard.",
       },
       {
         icon: BellRing,
         title: "Push notifications",
-        description: "Send a notification to your whole church, a branch, a group or one member, with a link and a button — and members choose which kinds they want to receive.",
+        description:
+          "Send a notification to your whole church, a branch, a group or one member, with a link and a button — and members choose which kinds they want to receive.",
       },
       {
         icon: Megaphone,
         title: "Pop-up announcements",
-        description: "Show members a pop-up in the app with an image and an optional button that opens a link, and let them choose not to see it again.",
+        description:
+          "Show members a pop-up in the app with an image and an optional button that opens a link, and let them choose not to see it again.",
       },
       {
         icon: Cake,
         title: "Birthday & anniversary alerts",
-        description: "Owners and admins get a daily summary of birthdays and wedding anniversaries, and a heads-up the day before. Members with the app get a greeting on their day.",
+        description:
+          "Owners and admins get a daily summary of birthdays and wedding anniversaries, and a heads-up the day before. Members with the app get a greeting on their day.",
       },
       {
         icon: Share2,
         title: "Social media hub",
-        description: "Manage Instagram, YouTube, and Facebook without leaving your dashboard — connect and switch between multiple YouTube channels from one place.",
+        description:
+          "Manage Instagram, YouTube, and Facebook without leaving your dashboard — connect and switch between multiple YouTube channels from one place.",
       },
     ],
   },
@@ -263,7 +304,8 @@ const APP_CARDS = [
   {
     icon: ShieldCheck,
     title: "For your team",
-    description: "The dashboard's modules in your hand, with exactly the same permissions and plan rules.",
+    description:
+      "The dashboard's modules in your hand, with exactly the same permissions and plan rules.",
     points: [
       "Members, attendance, events, giving, accounting, reports and messaging — managed from your phone, with changes showing up everywhere in real time.",
       "Start and host video and audio calls inside the app, admit people from the waiting room, and end calls for everyone.",
@@ -275,7 +317,8 @@ const APP_CARDS = [
   {
     icon: Users,
     title: "For your members",
-    description: "A home screen designed by you, with everything a member needs.",
+    description:
+      "A home screen designed by you, with everything a member needs.",
     points: [
       "Design the Home screen in the Design Studio: banners, announcements, quick links, videos, upcoming events and a card that appears when a call is live.",
       "Register for events in one tap and keep the pass, check attendance, send prayer requests and show a membership QR code.",
@@ -303,66 +346,92 @@ const SECURITY_POINTS = [
 const FAQS = [
   {
     question: "Is there a free trial?",
-    answer: "Yes — every new organization gets 14 days of full Basic-plan access with no credit card required.",
+    answer:
+      "Yes — every new organization gets 14 days of full Basic-plan access with no credit card required.",
   },
   {
     question: "What happens when the trial ends?",
-    answer: "An owner or admin needs to subscribe from the Billing page to keep using the app. Other team members will see a message asking them to contact an owner or admin.",
+    answer:
+      "An owner or admin needs to subscribe from the Billing page to keep using the app. Other team members will see a message asking them to contact an owner or admin.",
   },
   {
     question: "Do the prices include GST?",
-    answer: "No. The prices shown are before GST. 18% GST is added at checkout, so Starter at ₹1,499 a month comes to ₹1,768.82 in total. You give your billing details (name, address, state and, if you have one, GSTIN) when you pay, and a GST tax invoice is emailed to you for every plan payment and add-on pack.",
+    answer:
+      "No. The prices shown are before GST. 18% GST is added at checkout, so Starter at ₹1,499 a month comes to ₹1,768.82 in total. You give your billing details (name, address, state and, if you have one, GSTIN) when you pay, and a GST tax invoice is emailed to you for every plan payment and add-on pack.",
   },
   {
     question: "Can I cancel anytime?",
-    answer: "Yes, from the Billing page. Cancellation takes effect immediately rather than at the end of your paid period, so there's no partial refund for the unused remainder.",
+    answer:
+      "Yes, from the Billing page. Cancellation takes effect immediately rather than at the end of your paid period, so there's no partial refund for the unused remainder.",
   },
   {
     question: "Is there a mobile app?",
-    answer: "Yes — the KingdomFlow app is on Google Play for Android phones, and the iPhone app is coming soon. Your team signs in with their dashboard login to manage the church, and members sign in with their phone number to see the Home screen you design, register for events, give, pray and join calls.",
+    answer:
+      "Yes — the KingdomFlow app is on Google Play for Android phones, and the iPhone app is coming soon. Your team signs in with their dashboard login to manage the church, and members sign in with their phone number to see the Home screen you design, register for events, give, pray and join calls.",
   },
   {
     question: "Can we hold video and audio calls without another tool?",
-    answer: "Yes. K-Connect has video and audio calls built in, on the web and in the app. Hosts can admit people one by one, guests can join from an invite link without an account, and call length depends on your plan.",
+    answer:
+      "Yes. K-Connect has video and audio calls built in, on the web and in the app. Hosts can admit people one by one, guests can join from an invite link without an account, and call length depends on your plan.",
   },
   {
     question: "Can we live stream our service to members?",
-    answer: "Yes. Live streaming plays inside the app, with live chat and a viewer count, and you can go live from a camera or from OBS using a stream key, and also send it to YouTube or Facebook. It isn't switched on by default: use Contact us to enable on the Live stream page and we will set it up with you.",
+    answer:
+      "Yes. Live streaming plays inside the app, with live chat and a viewer count, and you can go live from a camera or from OBS using a stream key, and also send it to YouTube or Facebook. It isn't switched on by default: use Contact us to enable on the Live stream page and we will set it up with you.",
   },
   {
     question: "Can we make a report for our church board in Tamil or Hindi?",
-    answer: "Yes. Reports → Advanced: church reports makes a monthly or annual report for the whole church or one branch in English, Tamil or Hindi. AI can write a summary and a paragraph for each section, and you download the result as a PDF or a Word document, with your letterhead and photos.",
+    answer:
+      "Yes. Reports → Advanced: church reports makes a monthly or annual report for the whole church or one branch in English, Tamil or Hindi. AI can write a summary and a paragraph for each section, and you download the result as a PDF or a Word document, with your letterhead and photos.",
   },
   {
     question: "Which plan includes Finance and Social Media?",
-    answer: "Finance (Fund Raiser, Offering, Donation) is included on Premium and Pro. Social Media (Instagram, YouTube, Facebook) is included on Pro only.",
+    answer:
+      "Finance (Fund Raiser, Offering, Donation) is included on Premium and Pro. Social Media (Instagram, YouTube, Facebook) is included on Pro only.",
   },
   {
     question: "Can I switch between Monthly and Annual billing?",
-    answer: "Not in place — cancel your current subscription first, then subscribe again on the plan or interval you want.",
+    answer:
+      "Not in place — cancel your current subscription first, then subscribe again on the plan or interval you want.",
   },
 ];
 
 export function LandingPage() {
   return (
     <div className="min-h-screen bg-background">
+      <ForceLightTheme />
       <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <Logo />
           <nav className="flex items-center gap-6">
-            <a href="#features" className="hidden text-sm font-medium text-muted-foreground hover:text-foreground sm:inline">
+            <a
+              href="#features"
+              className="hidden text-sm font-medium text-muted-foreground hover:text-foreground sm:inline"
+            >
               Features
             </a>
-            <a href="#how-it-works" className="hidden text-sm font-medium text-muted-foreground hover:text-foreground sm:inline">
+            <a
+              href="#how-it-works"
+              className="hidden text-sm font-medium text-muted-foreground hover:text-foreground sm:inline"
+            >
               How it works
             </a>
-            <a href="#pricing" className="hidden text-sm font-medium text-muted-foreground hover:text-foreground sm:inline">
+            <a
+              href="#pricing"
+              className="hidden text-sm font-medium text-muted-foreground hover:text-foreground sm:inline"
+            >
               Pricing
             </a>
-            <Link href="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground">
+            <Link
+              href="/login"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground"
+            >
               Sign in
             </Link>
-            <Button nativeButton={false} render={<Link href="/login">Get Started</Link>} />
+            <Button
+              nativeButton={false}
+              render={<Link href="/login">Get Started</Link>}
+            />
           </nav>
         </div>
       </header>
@@ -380,21 +449,43 @@ export function LandingPage() {
             </Badge>
             <h1 className="font-heading text-4xl font-bold tracking-tight text-balance sm:text-6xl">
               Shepherd your church with{" "}
-              <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">clarity</span>.
+              <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                clarity
+              </span>
+              .
             </h1>
-            <p className="mt-3 text-sm font-semibold tracking-wide text-primary uppercase">Built for the churches, by the church.</p>
+            <p className="mt-3 text-sm font-semibold tracking-wide text-primary uppercase">
+              Built for the churches, by the church.
+            </p>
             <p className="mt-5 text-lg text-muted-foreground text-balance">
-              KingdomFlow brings your congregation, ministries, attendance, giving, and communication into one
-              connected platform — so your team spends less time on spreadsheets and more time on people.
+              KingdomFlow brings your congregation, ministries, attendance,
+              giving, and communication into one connected platform — so your
+              team spends less time on spreadsheets and more time on people.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Button size="lg" nativeButton={false} render={<Link href="/login">Get Started<ArrowRight className="size-4" /></Link>} />
-              <Button size="lg" variant="outline" nativeButton={false} render={<a href="#pricing">See pricing</a>} />
+              <Button
+                size="lg"
+                nativeButton={false}
+                render={
+                  <Link href="/login">
+                    Get Started
+                    <ArrowRight className="size-4" />
+                  </Link>
+                }
+              />
+              <Button
+                size="lg"
+                variant="outline"
+                nativeButton={false}
+                render={<a href="#pricing">See pricing</a>}
+              />
             </div>
             <div className="mt-6 flex justify-center">
               <AppStoreButtons />
             </div>
-            <p className="mt-4 text-xs text-muted-foreground">No credit card required · 14-day free trial · Cancel anytime</p>
+            <p className="mt-4 text-xs text-muted-foreground">
+              No credit card required · 14-day free trial · Cancel anytime
+            </p>
           </div>
 
           <div className="mt-16 sm:mt-20">
@@ -404,8 +495,12 @@ export function LandingPage() {
           <div className="mx-auto mt-20 grid max-w-4xl grid-cols-2 gap-6 sm:mt-24 sm:grid-cols-4 sm:gap-4">
             {STATS.map((stat) => (
               <div key={stat.label} className="text-center">
-                <p className="font-heading text-2xl font-bold text-primary sm:text-3xl">{stat.value}</p>
-                <p className="mt-1 text-xs text-muted-foreground sm:text-sm">{stat.label}</p>
+                <p className="font-heading text-2xl font-bold text-primary sm:text-3xl">
+                  {stat.value}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+                  {stat.label}
+                </p>
               </div>
             ))}
           </div>
@@ -417,18 +512,32 @@ export function LandingPage() {
               <Badge variant="secondary" className="mb-4">
                 Getting started
               </Badge>
-              <h2 className="font-heading text-3xl font-bold tracking-tight">Up and running in three steps</h2>
-              <p className="mt-3 text-muted-foreground">No onboarding call needed — most churches are fully set up the same day.</p>
+              <h2 className="font-heading text-3xl font-bold tracking-tight">
+                Up and running in three steps
+              </h2>
+              <p className="mt-3 text-muted-foreground">
+                No onboarding call needed — most churches are fully set up the
+                same day.
+              </p>
             </div>
             <div className="mt-14 grid grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-6">
               {STEPS.map((step, index) => (
-                <div key={step.title} className="relative text-center sm:text-left">
+                <div
+                  key={step.title}
+                  className="relative text-center sm:text-left"
+                >
                   <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground sm:mx-0">
                     <step.icon className="size-5" />
                   </div>
-                  <p className="mt-4 font-heading text-xs font-bold tracking-wide text-primary uppercase">Step {index + 1}</p>
-                  <h3 className="mt-1 font-heading text-lg font-bold">{step.title}</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">{step.description}</p>
+                  <p className="mt-4 font-heading text-xs font-bold tracking-wide text-primary uppercase">
+                    Step {index + 1}
+                  </p>
+                  <h3 className="mt-1 font-heading text-lg font-bold">
+                    {step.title}
+                  </h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {step.description}
+                  </p>
                 </div>
               ))}
             </div>
@@ -441,9 +550,12 @@ export function LandingPage() {
               <Badge variant="secondary" className="mb-4">
                 Everything in one place
               </Badge>
-              <h2 className="font-heading text-3xl font-bold tracking-tight">Every module your church needs, connected</h2>
+              <h2 className="font-heading text-3xl font-bold tracking-tight">
+                Every module your church needs, connected
+              </h2>
               <p className="mt-3 text-muted-foreground">
-                Built specifically for how churches actually run — not a generic CRM bolted onto a spreadsheet.
+                Built specifically for how churches actually run — not a generic
+                CRM bolted onto a spreadsheet.
               </p>
             </div>
 
@@ -452,8 +564,12 @@ export function LandingPage() {
                 <div key={category.title}>
                   <div className="mb-6 flex flex-wrap items-end justify-between gap-2">
                     <div>
-                      <h3 className="font-heading text-xl font-bold">{category.title}</h3>
-                      <p className="mt-1 text-sm text-muted-foreground">{category.blurb}</p>
+                      <h3 className="font-heading text-xl font-bold">
+                        {category.title}
+                      </h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {category.blurb}
+                      </p>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -466,8 +582,12 @@ export function LandingPage() {
                           <div className="flex size-10 items-center justify-center rounded-lg bg-accent">
                             <feature.icon className="size-5 text-primary" />
                           </div>
-                          <CardTitle className="mt-2">{feature.title}</CardTitle>
-                          <CardDescription>{feature.description}</CardDescription>
+                          <CardTitle className="mt-2">
+                            {feature.title}
+                          </CardTitle>
+                          <CardDescription>
+                            {feature.description}
+                          </CardDescription>
                         </CardHeader>
                       </Card>
                     ))}
@@ -489,14 +609,24 @@ export function LandingPage() {
                 <div className="h-24 bg-gradient-to-br from-primary to-primary/40" />
                 <CardContent className="space-y-3 pt-4">
                   <div>
-                    <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">Grace Community Church</p>
-                    <p className="font-heading text-base font-bold">Youth Camp 2026</p>
-                    <p className="text-xs text-muted-foreground">Sat, Mar 14 &middot; Main Sanctuary</p>
+                    <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+                      Grace Community Church
+                    </p>
+                    <p className="font-heading text-base font-bold">
+                      Youth Camp 2026
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Sat, Mar 14 &middot; Main Sanctuary
+                    </p>
                   </div>
                   <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
                     <div>
-                      <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">Confirmation code</p>
-                      <p className="font-heading text-lg font-bold text-primary">7K2QX9LM</p>
+                      <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+                        Confirmation code
+                      </p>
+                      <p className="font-heading text-lg font-bold text-primary">
+                        7K2QX9LM
+                      </p>
                     </div>
                     <div className="flex size-14 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/40">
                       <QrCode className="size-7 text-muted-foreground" />
@@ -514,13 +644,16 @@ export function LandingPage() {
                 A full registration desk, built into every event
               </h2>
               <p className="mt-3 text-muted-foreground">
-                Not just a calendar entry — a public sign-up page, a branded pass, and check-in, all in one place.
+                Not just a calendar entry — a public sign-up page, a branded
+                pass, and check-in, all in one place.
               </p>
               <ul className="mt-8 space-y-4">
                 {REGISTRATION_POINTS.map((point) => (
                   <li key={point} className="flex items-start gap-3">
                     <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-primary" />
-                    <span className="text-sm text-muted-foreground">{point}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {point}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -539,13 +672,16 @@ export function LandingPage() {
                 Built to keep your congregation&apos;s data safe by default
               </h2>
               <p className="mt-3 text-muted-foreground">
-                Security isn&apos;t a setting you have to turn on — it&apos;s how every tab and every login already works.
+                Security isn&apos;t a setting you have to turn on — it&apos;s
+                how every tab and every login already works.
               </p>
               <ul className="mt-8 space-y-4">
                 {SECURITY_POINTS.map((point) => (
                   <li key={point} className="flex items-start gap-3">
                     <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-primary" />
-                    <span className="text-sm text-muted-foreground">{point}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {point}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -560,21 +696,32 @@ export function LandingPage() {
                   <div className="flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
                     <ShieldCheck className="size-7" />
                   </div>
-                  <CardTitle className="mt-4 text-xl">Row-level security</CardTitle>
-                  <CardDescription>Every query is scoped to your organization at the database layer — not just hidden in the UI.</CardDescription>
+                  <CardTitle className="mt-4 text-xl">
+                    Row-level security
+                  </CardTitle>
+                  <CardDescription>
+                    Every query is scoped to your organization at the database
+                    layer — not just hidden in the UI.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2 border-t border-border pt-4">
                   <div className="flex items-center gap-2 text-sm">
                     <Users className="size-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Owner, Admin, Member roles</span>
+                    <span className="text-muted-foreground">
+                      Owner, Admin, Member roles
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <ShieldCheck className="size-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Per-tab Read / Write / Delete</span>
+                    <span className="text-muted-foreground">
+                      Per-tab Read / Write / Delete
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <FolderOpen className="size-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Revocable shareable links</span>
+                    <span className="text-muted-foreground">
+                      Revocable shareable links
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -589,8 +736,13 @@ export function LandingPage() {
                 <Smartphone className="size-3" />
                 Mobile apps
               </Badge>
-              <h2 className="font-heading text-3xl font-bold tracking-tight text-balance">Your church in everyone&apos;s pocket</h2>
-              <p className="mt-3 text-muted-foreground">One app for your team to run the church, and the same app for members to belong to it.</p>
+              <h2 className="font-heading text-3xl font-bold tracking-tight text-balance">
+                Your church in everyone&apos;s pocket
+              </h2>
+              <p className="mt-3 text-muted-foreground">
+                One app for your team to run the church, and the same app for
+                members to belong to it.
+              </p>
               <div className="mt-6 flex justify-center">
                 <AppStoreButtons />
               </div>
@@ -611,7 +763,9 @@ export function LandingPage() {
                       {card.points.map((point) => (
                         <li key={point} className="flex items-start gap-3">
                           <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-primary" />
-                          <span className="text-sm text-muted-foreground">{point}</span>
+                          <span className="text-sm text-muted-foreground">
+                            {point}
+                          </span>
                         </li>
                       ))}
                     </ul>
@@ -630,8 +784,12 @@ export function LandingPage() {
               <Badge variant="secondary" className="mb-4">
                 Pricing
               </Badge>
-              <h2 className="font-heading text-3xl font-bold tracking-tight">Simple, transparent pricing</h2>
-              <p className="mt-3 text-muted-foreground">Start small. Upgrade as your church and ministry grow.</p>
+              <h2 className="font-heading text-3xl font-bold tracking-tight">
+                Simple, transparent pricing
+              </h2>
+              <p className="mt-3 text-muted-foreground">
+                Start small. Upgrade as your church and ministry grow.
+              </p>
             </div>
             <div className="mt-12">
               <PricingSection />
@@ -648,18 +806,25 @@ export function LandingPage() {
               <Badge variant="secondary" className="mb-4">
                 FAQ
               </Badge>
-              <h2 className="font-heading text-3xl font-bold tracking-tight">Common questions</h2>
+              <h2 className="font-heading text-3xl font-bold tracking-tight">
+                Common questions
+              </h2>
             </div>
             <div className="mt-10 space-y-3">
               {FAQS.map((faq) => (
-                <details key={faq.question} className="group rounded-xl border border-border bg-card px-5 py-4 open:shadow-sm">
+                <details
+                  key={faq.question}
+                  className="group rounded-xl border border-border bg-card px-5 py-4 open:shadow-sm"
+                >
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-heading text-sm font-bold">
                     {faq.question}
                     <span className="shrink-0 text-muted-foreground transition-transform group-open:rotate-45">
                       <ArrowRight className="size-4 -rotate-45" />
                     </span>
                   </summary>
-                  <p className="mt-3 text-sm text-muted-foreground">{faq.answer}</p>
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    {faq.answer}
+                  </p>
                 </details>
               ))}
             </div>
@@ -672,14 +837,20 @@ export function LandingPage() {
               Ready to bring it all together?
             </h2>
             <p className="mt-3 text-primary-foreground/80">
-              Create your church&apos;s account in minutes — no credit card required.
+              Create your church&apos;s account in minutes — no credit card
+              required.
             </p>
             <div className="mt-8 flex justify-center">
               <Button
                 size="lg"
                 variant="secondary"
                 nativeButton={false}
-                render={<Link href="/login">Get Started<ArrowRight className="size-4" /></Link>}
+                render={
+                  <Link href="/login">
+                    Get Started
+                    <ArrowRight className="size-4" />
+                  </Link>
+                }
               />
             </div>
           </div>
@@ -690,46 +861,85 @@ export function LandingPage() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-6">
           <div>
             <Logo size="sm" />
-            <p className="mt-1 text-xs text-muted-foreground">Built for the churches, by the church.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Built for the churches, by the church.
+            </p>
           </div>
           <nav className="flex flex-wrap items-center gap-6">
-            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground">
+            <a
+              href="#features"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
               Features
             </a>
-            <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground">
+            <a
+              href={PLAY_STORE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
               Android app
             </a>
             {APP_STORE_URL && (
-              <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground">
+              <a
+                href={APP_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
                 iPhone app
               </a>
             )}
-            <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground">
+            <a
+              href="#pricing"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
               Pricing
             </a>
-            <Link href="/login" className="text-sm text-muted-foreground hover:text-foreground">
+            <Link
+              href="/login"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
               Sign in
             </Link>
-            <Link href="/about" className="text-sm text-muted-foreground hover:text-foreground">
+            <Link
+              href="/about"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
               About Us
             </Link>
-            <Link href="/privacy" className="text-sm text-muted-foreground hover:text-foreground">
+            <Link
+              href="/privacy"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
               Privacy Policy
             </Link>
-            <Link href="/terms" className="text-sm text-muted-foreground hover:text-foreground">
+            <Link
+              href="/terms"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
               Terms of Use
             </Link>
-            <Link href="/refund" className="text-sm text-muted-foreground hover:text-foreground">
+            <Link
+              href="/refund"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
               Refund Policy
             </Link>
-            <Link href="/contact" className="text-sm text-muted-foreground hover:text-foreground">
+            <Link
+              href="/contact"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
               Contact Us
             </Link>
           </nav>
           <div className="space-y-0.5 text-sm text-muted-foreground">
             <p className="font-medium text-foreground">KingdomFlow</p>
             <p>Operated by PHILOMINA VINCENT KOUNDER</p>
-            <p>Mother Theresa Society, Anthony Church Road, Tembipada, Bhandup West, Mumbai 400078</p>
+            <p>
+              Mother Theresa Society, Anthony Church Road, Tembipada, Bhandup
+              West, Mumbai 400078
+            </p>
             <p>© {new Date().getFullYear()} All rights reserved.</p>
           </div>
         </div>

@@ -1206,6 +1206,49 @@ export type LmsQuizAttempt = {
   submitted_at: string;
 };
 
+export type ChurchGroup = {
+  id: string;
+  organization_id: string;
+  name: string;
+  description: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+};
+
+export type ChurchGroupMember = {
+  id: string;
+  group_id: string;
+  organization_id: string;
+  member_id: string | null;
+  auth_user_id: string | null;
+  role: "member" | "admin";
+  notify_mode: "all" | "mentions" | "none";
+  muted_until: string | null;
+  last_read_at: string;
+  added_by: string | null;
+  joined_at: string;
+};
+
+export type ChurchGroupMessage = {
+  id: string;
+  group_id: string;
+  organization_id: string;
+  sender_auth_user_id: string | null;
+  sender_name: string;
+  body: string | null;
+  attachment_path: string | null;
+  attachment_name: string | null;
+  attachment_type: "image" | "file" | null;
+  attachment_size: number | null;
+  reply_to: string | null;
+  is_announcement: boolean;
+  mentions: string[];
+  created_at: string;
+  deleted_at: string | null;
+};
+
 export type PlatformServiceUser = {
   auth_user_id: string;
   email: string;
@@ -3945,6 +3988,24 @@ export type Database = {
         Row: LmsQuizAttempt;
         Insert: Partial<LmsQuizAttempt> & Pick<LmsQuizAttempt, "organization_id" | "lesson_id" | "course_id" | "enrollment_id" | "member_id" | "attempt_number">;
         Update: Partial<LmsQuizAttempt>;
+        Relationships: [];
+      };
+      church_groups: {
+        Row: ChurchGroup;
+        Insert: Partial<ChurchGroup> & Pick<ChurchGroup, "organization_id" | "name">;
+        Update: Partial<ChurchGroup>;
+        Relationships: [];
+      };
+      church_group_members: {
+        Row: ChurchGroupMember;
+        Insert: Partial<ChurchGroupMember> & Pick<ChurchGroupMember, "group_id" | "organization_id">;
+        Update: Partial<ChurchGroupMember>;
+        Relationships: [];
+      };
+      church_group_messages: {
+        Row: ChurchGroupMessage;
+        Insert: Partial<ChurchGroupMessage> & Pick<ChurchGroupMessage, "group_id" | "organization_id" | "sender_name">;
+        Update: Partial<ChurchGroupMessage>;
         Relationships: [];
       };
       platform_service_users: {

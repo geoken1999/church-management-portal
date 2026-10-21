@@ -50,6 +50,7 @@ export const en = {
       volunteers: "Volunteers",
       committee: "Committee",
       families: "Families",
+      groups: "Groups",
       ministries: "Ministries",
       worship: "Worship",
       media: "Media",

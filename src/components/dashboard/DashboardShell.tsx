@@ -39,6 +39,7 @@ import {
   Calculator,
   LayoutTemplate,
   House,
+  MessagesSquare,
   Compass,
   Webcam,
   ShieldCheck,
@@ -101,6 +102,7 @@ const NAV_GROUPS = [
       { href: "/dashboard/committee", itemKey: "committee" as const, icon: Users2, tab: "committee" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/volunteers", itemKey: "volunteers" as const, icon: HandHelping, tab: "volunteers" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/families", itemKey: "families" as const, icon: House, tab: "families" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/groups", itemKey: "groups" as const, icon: MessagesSquare, tab: "groups" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
   {

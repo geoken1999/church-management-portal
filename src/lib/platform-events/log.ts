@@ -21,6 +21,7 @@ export type PlatformEventSource =
   | "automation_send"
   | "event_registration_payment"
   | "bible_school_payment"
+  | "group_chat"
   | "membership_fee"
   | "subscription_billing"
   | "member_mobile_login"

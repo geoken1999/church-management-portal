@@ -122,6 +122,16 @@ export const DOC_CATEGORIES: DocCategory[] = [
         ],
       },
       {
+        id: "groups",
+        title: "Groups: chat with a team, a ministry or a class",
+        body: [
+          "People → Groups is where you create a group and add people to it. Everyone in the group chats together from the KingdomFlow app (and you can read and post from the web). Click \"New group\", give it a name, then open it and add members from the People tab. You can also add a team login so they can chat from the team app.",
+          "In a group's chat people can send text, photos and files (pictures up to 10 MB, other files up to 25 MB), reply to a message, and mention someone by typing @ and their name. A group admin (and anyone with Write access to Groups) can also post an announcement, which is highlighted and notifies everyone who has not muted the group. You can delete a message, and make a person a group admin or remove them from the People tab.",
+          "Each person controls their own notifications for each group in the app: every message, only mentions and announcements, or none, and they can mute a group for an hour, eight hours or a week. Each group shows an unread count. Notifications only go to people who have signed in to the app.",
+          "Groups follow the same Read, Write and Delete permissions as every other tab: Read lets someone see the groups and their chat, Write lets them create groups, add and remove people and post, and Delete lets them delete a group's messages. Anyone, member or team, only sees the groups they have been added to in the app.",
+        ],
+      },
+      {
         id: "team-logins",
         title: "Creating logins for staff and volunteers",
         body: [

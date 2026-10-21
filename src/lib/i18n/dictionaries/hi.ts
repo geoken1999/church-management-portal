@@ -48,6 +48,7 @@ export const hi: Dictionary = {
       volunteers: "स्वयंसेवक",
       committee: "समिति",
       families: "परिवार",
+      groups: "समूह",
       ministries: "सेवकाई",
       worship: "आराधना",
       media: "मीडिया",

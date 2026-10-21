@@ -48,6 +48,7 @@ export const ta: Dictionary = {
       volunteers: "தன்னார்வலர்கள்",
       committee: "கமிட்டி",
       families: "குடும்பங்கள்",
+      groups: "குழுக்கள்",
       ministries: "ஊழியங்கள்",
       worship: "வழிபாடு",
       media: "ஊடகம்",

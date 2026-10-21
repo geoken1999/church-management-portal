@@ -1036,6 +1036,35 @@ function EventsListTab({
     },
   ];
 
+  const oneTime = groups.upcoming.filter((event) => !event.is_recurring);
+  const recurring = groups.upcoming.filter((event) => event.is_recurring);
+
+  const renderItems = (items: EventRow[], empty: string) =>
+    items.length === 0 ? (
+      <Card>
+        <CardContent className="py-10 text-center text-sm text-muted-foreground">
+          {empty}
+        </CardContent>
+      </Card>
+    ) : (
+      <div className="space-y-4">
+        {items.map((event) => (
+          <EventCard
+            key={event.id}
+            event={event}
+            members={members}
+            branches={branches}
+            canManage={canManage}
+            siteUrl={siteUrl}
+            kmeetMeetings={kmeetByEventId[event.id] ?? []}
+            financeEnabled={financeEnabled}
+            savedPayoutDetails={savedPayoutDetails}
+            organizationTimezone={organizationTimezone}
+          />
+        ))}
+      </div>
+    );
+
   return (
     <Tabs defaultValue="upcoming">
       <TabsList>
@@ -1048,29 +1077,31 @@ function EventsListTab({
       </TabsList>
       {panels.map((panel) => (
         <TabsPanel key={panel.value} value={panel.value}>
-          {panel.items.length === 0 ? (
-            <Card>
-              <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                {panel.empty}
-              </CardContent>
-            </Card>
+          {panel.value === "upcoming" ? (
+            // Upcoming events are told apart by kind: a one-time event happens once, a recurring one repeats.
+            <Tabs
+              defaultValue={
+                oneTime.length === 0 && recurring.length > 0
+                  ? "recurring"
+                  : "one-time"
+              }
+            >
+              <TabsList>
+                <TabsIndicator />
+                <TabsTab value="one-time">One-time ({oneTime.length})</TabsTab>
+                <TabsTab value="recurring">
+                  Recurring ({recurring.length})
+                </TabsTab>
+              </TabsList>
+              <TabsPanel value="one-time">
+                {renderItems(oneTime, "No upcoming one-time events.")}
+              </TabsPanel>
+              <TabsPanel value="recurring">
+                {renderItems(recurring, "No upcoming recurring events.")}
+              </TabsPanel>
+            </Tabs>
           ) : (
-            <div className="space-y-4">
-              {panel.items.map((event) => (
-                <EventCard
-                  key={event.id}
-                  event={event}
-                  members={members}
-                  branches={branches}
-                  canManage={canManage}
-                  siteUrl={siteUrl}
-                  kmeetMeetings={kmeetByEventId[event.id] ?? []}
-                  financeEnabled={financeEnabled}
-                  savedPayoutDetails={savedPayoutDetails}
-                  organizationTimezone={organizationTimezone}
-                />
-              ))}
-            </div>
+            renderItems(panel.items, panel.empty)
           )}
         </TabsPanel>
       ))}

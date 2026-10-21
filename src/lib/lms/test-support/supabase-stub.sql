@@ -14,7 +14,7 @@ create table public.profiles (auth_user_id uuid primary key references auth.user
 create function public.set_updated_at() returns trigger language plpgsql as $$ begin new.updated_at = now(); return new; end; $$;
 
 create table public.organizations (id uuid primary key default gen_random_uuid(), name text, plan text, custom_plan_limits jsonb);
-create table public.organization_members (id uuid primary key default gen_random_uuid(), organization_id uuid references public.organizations (id), auth_user_id uuid, role text);
+create table public.organization_members (id uuid primary key default gen_random_uuid(), organization_id uuid references public.organizations (id), auth_user_id uuid, role text, tab_permissions jsonb);
 create table public.branches (id uuid primary key default gen_random_uuid(), organization_id uuid references public.organizations (id));
 create table public.members (id uuid primary key default gen_random_uuid(), organization_id uuid not null references public.organizations (id), first_name text not null, last_name text not null, status text not null default 'active', auth_user_id uuid, branch_id uuid, phone text, email text, constraint members_status_check check (status in ('active', 'left', 'pending')));
 create unique index members_organization_id_phone_key on public.members (organization_id, phone) where phone is not null;

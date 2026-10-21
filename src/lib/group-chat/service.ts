@@ -1,5 +1,6 @@
 import "server-only";
 
+import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPushToUsers } from "@/lib/push/client";
 import { logPlatformEvent } from "@/lib/platform-events/log";
@@ -252,12 +253,21 @@ export async function sendMessage(
   input: SendInput,
 ): Promise<Result<{ message: ChurchGroupMessage }>> {
   const admin = createAdminClient();
-  const group = await loadGroup(input.groupId, actor.organizationId);
+  // The group, everyone in it (which also tells who the sender is) and the sender's name, all at once.
+  const [group, { data: participants }, senderName] = await Promise.all([
+    loadGroup(input.groupId, actor.organizationId),
+    admin
+      .from("church_group_members")
+      .select("id, auth_user_id, role, notify_mode, muted_until")
+      .eq("group_id", input.groupId),
+    displayName(actor.organizationId, actor.authUserId),
+  ]);
   if (!group || group.archived_at)
     return fail("That group could not be found.");
 
   let role: "member" | "admin" | null =
-    (await participantRow(group.id, actor.authUserId))?.role ?? null;
+    (participants ?? []).find((p) => p.auth_user_id === actor.authUserId)
+      ?.role ?? null;
   if (!role) {
     if (!actor.manager) return fail("You are not in this group.");
     await ensureStaffParticipant(
@@ -314,10 +324,6 @@ export async function sendMessage(
     replyTo = parent?.id ?? null;
   }
 
-  const { data: participants } = await admin
-    .from("church_group_members")
-    .select("auth_user_id, notify_mode, muted_until")
-    .eq("group_id", group.id);
   const inGroup = new Set(
     (participants ?? [])
       .map((p) => p.auth_user_id)
@@ -327,7 +333,6 @@ export async function sendMessage(
     .filter((id) => inGroup.has(id) && id !== actor.authUserId)
     .slice(0, 50);
 
-  const senderName = await displayName(actor.organizationId, actor.authUserId);
   const { data: message, error } = await admin
     .from("church_group_messages")
     .insert({
@@ -351,40 +356,51 @@ export async function sendMessage(
   if (error || !message)
     return fail("Couldn't send the message. Please try again.");
 
-  // The sender has read everything up to their own message.
-  await admin
-    .from("church_group_members")
-    .update({ last_read_at: new Date().toISOString() })
-    .eq("group_id", group.id)
-    .eq("auth_user_id", actor.authUserId);
-
-  // Telling people is best effort: the message is sent either way.
-  try {
-    const recipients = notificationRecipients(
-      (participants ?? []).map((p) => ({
-        authUserId: p.auth_user_id,
-        notifyMode: p.notify_mode,
-        mutedUntil: p.muted_until,
-      })),
-      { senderAuthUserId: actor.authUserId, mentions, announcement },
-      new Date(),
-    );
-    if (recipients.length > 0) {
-      const preview = previewOf(message.body, kind);
-      await sendPushToUsers(recipients, "group_post", {
-        title: announcement ? `${group.name}: announcement` : group.name,
-        body: announcement ? preview : `${senderName}: ${preview}`,
-        data: { type: "group_chat", groupId: group.id, groupName: group.name },
+  // What happens next does not hold up the sender: their marker, and telling the others. It runs after the
+  // response is sent, and a failure here never un-sends the message.
+  const notify = async () => {
+    try {
+      await admin
+        .from("church_group_members")
+        .update({ last_read_at: new Date().toISOString() })
+        .eq("group_id", group.id)
+        .eq("auth_user_id", actor.authUserId);
+      const recipients = notificationRecipients(
+        (participants ?? []).map((p) => ({
+          authUserId: p.auth_user_id,
+          notifyMode: p.notify_mode,
+          mutedUntil: p.muted_until,
+        })),
+        { senderAuthUserId: actor.authUserId, mentions, announcement },
+        new Date(),
+      );
+      if (recipients.length > 0) {
+        const preview = previewOf(message.body, kind);
+        await sendPushToUsers(recipients, "group_post", {
+          title: announcement ? `${group.name}: announcement` : group.name,
+          body: announcement ? preview : `${senderName}: ${preview}`,
+          data: {
+            type: "group_chat",
+            groupId: group.id,
+            groupName: group.name,
+          },
+        });
+      }
+    } catch (err) {
+      await logPlatformEvent({
+        level: "warning",
+        source: "group_chat",
+        message: `Group message notification failed: ${err instanceof Error ? err.message : "unknown error"}`,
+        organizationId: actor.organizationId,
+        metadata: { groupId: group.id },
       });
     }
-  } catch (err) {
-    await logPlatformEvent({
-      level: "warning",
-      source: "group_chat",
-      message: `Group message notification failed: ${err instanceof Error ? err.message : "unknown error"}`,
-      organizationId: actor.organizationId,
-      metadata: { groupId: group.id },
-    });
+  };
+  try {
+    after(notify);
+  } catch {
+    // Not inside a request (for example a script): just do it now.
+    await notify();
   }
   return { ok: true, message };
 }

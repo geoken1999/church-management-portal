@@ -12,6 +12,10 @@ const MIGRATION = readFileSync(
   "supabase/migrations/0206_church_group_chats.sql",
   "utf8",
 );
+const TEAM_VIEW = readFileSync(
+  "supabase/migrations/0207_group_chat_team_view.sql",
+  "utf8",
+);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = Record<string, any>;
@@ -60,6 +64,7 @@ describe("group chats (migration 0206)", () => {
   beforeAll(async () => {
     await db.exec(BOOTSTRAP);
     await db.exec(MIGRATION);
+    await db.exec(TEAM_VIEW);
     orgA = (
       await q(
         "insert into organizations (name, plan) values ('A','pro') returning id",
@@ -336,5 +341,57 @@ describe("group chats (migration 0206)", () => {
         )
       )[0].n,
     ).toBe(4);
+  });
+
+  it("lets the church team follow a group's chat without being in it, as far as their Groups permission allows", async () => {
+    const owner = await uid();
+    const reader = await uid();
+    const blocked = await uid();
+    const otherChurchOwner = await uid();
+    await q(
+      "insert into organization_members (organization_id, auth_user_id, role) values ($1,$2,'owner')",
+      [orgA, owner],
+    );
+    await q(
+      "insert into organization_members (organization_id, auth_user_id, role, tab_permissions) values ($1,$2,'member','{}'::jsonb)",
+      [orgA, reader],
+    );
+    await q(
+      "insert into organization_members (organization_id, auth_user_id, role, tab_permissions) values ($1,$2,'member','{\"groups\": {\"read\": false}}'::jsonb)",
+      [orgA, blocked],
+    );
+    await q(
+      "insert into organization_members (organization_id, auth_user_id, role) values ($1,$2,'owner')",
+      [orgB, otherChurchOwner],
+    );
+    expect(
+      (
+        await as(owner, "select count(*)::int as n from church_group_messages")
+      )[0].n,
+    ).toBeGreaterThan(0);
+    expect(
+      (
+        await as(reader, "select count(*)::int as n from church_group_messages")
+      )[0].n,
+    ).toBeGreaterThan(0);
+    expect(
+      (
+        await as(
+          blocked,
+          "select count(*)::int as n from church_group_messages",
+        )
+      )[0].n,
+    ).toBe(0);
+    expect(
+      (
+        await as(
+          otherChurchOwner,
+          "select count(*)::int as n from church_group_messages",
+        )
+      )[0].n,
+    ).toBe(0);
+    expect(
+      (await as(owner, "select count(*)::int as n from church_groups"))[0].n,
+    ).toBe(1);
   });
 });

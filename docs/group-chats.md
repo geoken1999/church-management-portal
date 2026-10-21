@@ -23,6 +23,17 @@ People → **Groups** (web) and **Group chats** (member app Space tab, team app 
 - Posting from the web makes a team login part of the group (as an admin), so they are notified of replies.
 - Announcements: group admins, or anyone with Write on the Groups tab.
 
+## Delivery speed and mentions
+
+- The web chat receives messages through Realtime, like the apps. Team logins with access to the Groups tab may select
+  a church's group messages without being in the group (migration `0207_group_chat_team_view.sql`, `cg_team_can_view`),
+  which is what lets Realtime deliver to them. A 30-second refresh is only a safety net.
+- Sending does not wait for notifications: the sender's read marker and the push run after the response
+  (`after()` in `service.ts`), and the group, its people and the sender's name are read in one go.
+- Typing `@` opens a picker above the message box (round initial, name, Admin tag; arrow keys, Enter or Tab on the web).
+  A mention in a message is shown as a highlighted name, stronger when it is the reader. The text of a mention is
+  `@` plus the person's full name (`src/lib/group-chat/mentions.ts`, `lib/screens/groups/mentions.dart`).
+
 ## Notifications
 
 `notificationRecipients` (`src/lib/group-chat/rules.ts`): everyone in the group with a login except the sender; "all" gets

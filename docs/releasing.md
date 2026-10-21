@@ -28,7 +28,7 @@ must say so in its notes and be deployed in the order in step 4.
 2. Web: `npx tsc --noEmit`, `npx eslint src scripts`, `npx vitest run`, `npx next build`.
 3. Mobile: `flutter analyze` (no errors or warnings), `flutter test`, `flutter build apk --debug` (and an iOS build on a Mac).
 4. End-to-end smoke tests against the built web app: `npm run e2e` (see `e2e/README.md`).
-5. Database: every new migration is listed in the release notes. Run `supabase/setup/verify-migrations-0182-0198.sql`
+5. Database: every new migration is listed in the release notes. Run `supabase/setup/verify-migrations-0182-0198.sql` and `supabase/setup/verify-migrations-0199-0207.sql` (one line per migration: OK, or how many things are missing)
    on staging first (extend it for new migrations).
 6. Secrets and settings the release needs are set in the target environment (for example
    `CONNECTION_SECRETS_KEY`, `CRON_SECRET`).

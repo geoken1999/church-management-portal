@@ -30,6 +30,8 @@ People → **Groups** (web) and **Group chats** (member app Space tab, team app 
   which is what lets Realtime deliver to them. A 30-second refresh is only a safety net.
 - Sending does not wait for notifications: the sender's read marker and the push run after the response
   (`after()` in `service.ts`), and the group, its people and the sender's name are read in one go.
+- A chat that is open on a phone does not show a banner for its own messages (`ActiveChat` in the app), and chat pushes are not
+  saved to the notification center (`saveToInbox: false`), since the messages are already in the chat.
 - Typing `@` opens a picker above the message box (round initial, name, Admin tag; arrow keys, Enter or Tab on the web).
   A mention in a message is shown as a highlighted name, stronger when it is the reader. The text of a mention is
   `@` plus the person's full name (`src/lib/group-chat/mentions.ts`, `lib/screens/groups/mentions.dart`).

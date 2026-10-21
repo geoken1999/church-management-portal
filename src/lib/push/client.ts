@@ -6,7 +6,17 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getPushEnv, isPushConfigured } from "@/lib/push/env";
 import { buildPushBatches } from "@/lib/push/messages";
 
-export type PushCategory = "event_new" | "todo_assigned" | "todo_due_soon" | "prayer_request" | "account_deletion" | "church_announcement" | "group_post" | "special_day" | "team_alert" | "event_update";
+export type PushCategory =
+  | "event_new"
+  | "todo_assigned"
+  | "todo_due_soon"
+  | "prayer_request"
+  | "account_deletion"
+  | "church_announcement"
+  | "group_post"
+  | "special_day"
+  | "team_alert"
+  | "event_update";
 
 let app: App | null = null;
 
@@ -18,7 +28,9 @@ function getFirebaseApp(): App {
     return existing;
   }
   const { projectId, clientEmail, privateKey } = getPushEnv();
-  app = initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
+  app = initializeApp({
+    credential: cert({ projectId, clientEmail, privateKey }),
+  });
   return app;
 }
 
@@ -42,7 +54,12 @@ export interface PushPayload {
 // exists in every environment.
 export interface PushResult {
   // Why nothing was sent, when that is the case.
-  skipped?: "no_recipients" | "not_configured" | "opted_out" | "no_devices" | "send_failed";
+  skipped?:
+    | "no_recipients"
+    | "not_configured"
+    | "opted_out"
+    | "no_devices"
+    | "send_failed";
   devices: number;
   delivered: number;
   failed: number;
@@ -50,34 +67,58 @@ export interface PushResult {
   error?: string;
 }
 
-export async function sendPushToUsers(authUserIds: string[], category: PushCategory, payload: PushPayload): Promise<PushResult> {
-  if (authUserIds.length === 0) return { skipped: "no_recipients", devices: 0, delivered: 0, failed: 0 };
+export interface PushOptions {
+  /** false = push only, nothing in the in-app notification center (chat messages: they are already in the chat). */
+  saveToInbox?: boolean;
+}
+
+export async function sendPushToUsers(
+  authUserIds: string[],
+  category: PushCategory,
+  payload: PushPayload,
+  options: PushOptions = {},
+): Promise<PushResult> {
+  if (authUserIds.length === 0)
+    return { skipped: "no_recipients", devices: 0, delivered: 0, failed: 0 };
 
   const admin = createAdminClient();
 
   const { data: preferences } = await admin
     .from("notification_preferences")
-    .select("auth_user_id, event_new, todo_assigned, todo_due_soon, prayer_request, church_announcement, group_post, special_day, team_alert, event_update")
+    .select(
+      "auth_user_id, event_new, todo_assigned, todo_due_soon, prayer_request, church_announcement, group_post, special_day, team_alert, event_update",
+    )
     .in("auth_user_id", authUserIds);
 
   // "account_deletion" is an alert to church admins with no preference of its
   // own, so nobody is opted out of it.
   const optedOut = new Set(
-    category === "account_deletion" ? [] : (preferences ?? []).filter((row) => row[category] === false).map((row) => row.auth_user_id),
+    category === "account_deletion"
+      ? []
+      : (preferences ?? [])
+          .filter((row) => row[category] === false)
+          .map((row) => row.auth_user_id),
   );
   const recipients = authUserIds.filter((id) => !optedOut.has(id));
-  if (recipients.length === 0) return { skipped: "opted_out", devices: 0, delivered: 0, failed: 0 };
+  if (recipients.length === 0)
+    return { skipped: "opted_out", devices: 0, delivered: 0, failed: 0 };
 
   // Everyone who is sent a notification also gets it in their in-app inbox
   // (notification center), whether or not push is set up or the phone received it.
-  await saveToInboxes(recipients, category, payload);
+  if (options.saveToInbox !== false)
+    await saveToInboxes(recipients, category, payload);
 
-  if (!isPushConfigured()) return { skipped: "not_configured", devices: 0, delivered: 0, failed: 0 };
+  if (!isPushConfigured())
+    return { skipped: "not_configured", devices: 0, delivered: 0, failed: 0 };
 
-  const { data: tokenRows } = await admin.from("device_push_tokens").select("token, platform").in("auth_user_id", recipients);
+  const { data: tokenRows } = await admin
+    .from("device_push_tokens")
+    .select("token, platform")
+    .in("auth_user_id", recipients);
   const batches = buildPushBatches(tokenRows ?? [], payload);
   const allTokens = (tokenRows ?? []).map((row) => row.token);
-  if (allTokens.length === 0) return { skipped: "no_devices", devices: 0, delivered: 0, failed: 0 };
+  if (allTokens.length === 0)
+    return { skipped: "no_devices", devices: 0, delivered: 0, failed: 0 };
 
   const responses: { error?: { code: string; message: string } }[] = [];
   const staleTokens: string[] = [];
@@ -85,7 +126,9 @@ export async function sendPushToUsers(authUserIds: string[], category: PushCateg
   let failed = 0;
   try {
     for (const batch of batches) {
-      const response = await getMessaging(getFirebaseApp()).sendEachForMulticast({ tokens: batch.tokens, ...batch.message });
+      const response = await getMessaging(
+        getFirebaseApp(),
+      ).sendEachForMulticast({ tokens: batch.tokens, ...batch.message });
       delivered += response.successCount;
       failed += response.failureCount;
       response.responses.forEach((result, index) => {
@@ -94,12 +137,22 @@ export async function sendPushToUsers(authUserIds: string[], category: PushCateg
         // signs out of Firebase on that device — clean those up now rather
         // than paying for the same failed lookup on every future send.
         const code = result.error?.code;
-        if (code === "messaging/registration-token-not-registered" || code === "messaging/invalid-registration-token") staleTokens.push(batch.tokens[index]);
+        if (
+          code === "messaging/registration-token-not-registered" ||
+          code === "messaging/invalid-registration-token"
+        )
+          staleTokens.push(batch.tokens[index]);
       });
     }
   } catch (error) {
     console.error("sendPushToUsers: FCM send failed", error);
-    return { skipped: "send_failed", devices: allTokens.length, delivered, failed: allTokens.length - delivered, error: error instanceof Error ? error.message : String(error) };
+    return {
+      skipped: "send_failed",
+      devices: allTokens.length,
+      delivered,
+      failed: allTokens.length - delivered,
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 
   if (staleTokens.length > 0) {
@@ -107,7 +160,12 @@ export async function sendPushToUsers(authUserIds: string[], category: PushCateg
   }
 
   const firstError = responses.find((result) => result.error)?.error;
-  if (firstError) console.error("sendPushToUsers: FCM rejected a message", firstError.code, firstError.message);
+  if (firstError)
+    console.error(
+      "sendPushToUsers: FCM rejected a message",
+      firstError.code,
+      firstError.message,
+    );
   return {
     devices: allTokens.length,
     delivered,
@@ -117,16 +175,42 @@ export async function sendPushToUsers(authUserIds: string[], category: PushCateg
 }
 
 // Best-effort: a failure to save to the inbox never stops the push itself.
-async function saveToInboxes(recipients: string[], category: PushCategory, payload: PushPayload): Promise<void> {
+async function saveToInboxes(
+  recipients: string[],
+  category: PushCategory,
+  payload: PushPayload,
+): Promise<void> {
   try {
     const admin = createAdminClient();
-    const link = typeof payload.data?.link === "string" && payload.data.link ? payload.data.link : null;
-    const buttonLabel = typeof payload.data?.buttonLabel === "string" && payload.data.buttonLabel ? payload.data.buttonLabel : null;
+    const link =
+      typeof payload.data?.link === "string" && payload.data.link
+        ? payload.data.link
+        : null;
+    const buttonLabel =
+      typeof payload.data?.buttonLabel === "string" && payload.data.buttonLabel
+        ? payload.data.buttonLabel
+        : null;
     // What the notification is about (type and ids), so tapping it in the notification center opens the
     // right screen. Only simple values are kept.
-    const data = Object.fromEntries(Object.entries(payload.data ?? {}).filter(([, v]) => typeof v === "string" || typeof v === "number" || typeof v === "boolean"));
-    const rows = recipients.map((authUserId) => ({ auth_user_id: authUserId, category, title: payload.title, body: payload.body, link, button_label: buttonLabel }));
-    const { error } = await admin.from("member_notifications").insert(rows.map((row) => ({ ...row, data })));
+    const data = Object.fromEntries(
+      Object.entries(payload.data ?? {}).filter(
+        ([, v]) =>
+          typeof v === "string" ||
+          typeof v === "number" ||
+          typeof v === "boolean",
+      ),
+    );
+    const rows = recipients.map((authUserId) => ({
+      auth_user_id: authUserId,
+      category,
+      title: payload.title,
+      body: payload.body,
+      link,
+      button_label: buttonLabel,
+    }));
+    const { error } = await admin
+      .from("member_notifications")
+      .insert(rows.map((row) => ({ ...row, data })));
     // Before the target migration is applied the column does not exist: save the notification without it.
     if (error) await admin.from("member_notifications").insert(rows);
   } catch (error) {

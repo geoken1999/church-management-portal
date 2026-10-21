@@ -376,15 +376,21 @@ export async function sendMessage(
       );
       if (recipients.length > 0) {
         const preview = previewOf(message.body, kind);
-        await sendPushToUsers(recipients, "group_post", {
-          title: announcement ? `${group.name}: announcement` : group.name,
-          body: announcement ? preview : `${senderName}: ${preview}`,
-          data: {
-            type: "group_chat",
-            groupId: group.id,
-            groupName: group.name,
+        // Push only: chat messages are already in the chat, so they stay out of the notification center.
+        await sendPushToUsers(
+          recipients,
+          "group_post",
+          {
+            title: announcement ? `${group.name}: announcement` : group.name,
+            body: announcement ? preview : `${senderName}: ${preview}`,
+            data: {
+              type: "group_chat",
+              groupId: group.id,
+              groupName: group.name,
+            },
           },
-        });
+          { saveToInbox: false },
+        );
       }
     } catch (err) {
       await logPlatformEvent({

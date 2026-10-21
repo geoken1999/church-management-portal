@@ -10,7 +10,7 @@ create schema storage;
 create table storage.buckets (id text primary key, name text, public boolean default false, file_size_limit bigint, allowed_mime_types text[]);
 create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text);
 
-create table public.profiles (auth_user_id uuid primary key references auth.users (id));
+create table public.profiles (auth_user_id uuid primary key references auth.users (id), first_name text, last_name text);
 create function public.set_updated_at() returns trigger language plpgsql as $$ begin new.updated_at = now(); return new; end; $$;
 
 create table public.organizations (id uuid primary key default gen_random_uuid(), name text, plan text, custom_plan_limits jsonb);

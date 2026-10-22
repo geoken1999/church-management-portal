@@ -8,6 +8,10 @@ export const ADMIN_SCOPES = [
   "tickets",
   "billing",
   "health",
+  "finance",
+  "operations",
+  "platform",
+  "support",
 ] as const;
 
 export type AdminScope = (typeof ADMIN_SCOPES)[number];

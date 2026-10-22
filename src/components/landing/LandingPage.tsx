@@ -1,5 +1,4 @@
 import { ForceLightTheme } from "@/components/landing/ForceLightTheme";
-import { ChurchesSection } from "@/components/landing/ChurchesSection";
 import Link from "next/link";
 import {
   Contact,
@@ -730,7 +729,7 @@ export function LandingPage() {
           </div>
         </section>
 
-        <ChurchesSection />
+        {/* Church listing is hidden for now — re-enable by restoring <ChurchesSection />. */}
 
         <section id="apps" className="px-4 py-20 sm:px-6">
           <div className="mx-auto max-w-6xl">

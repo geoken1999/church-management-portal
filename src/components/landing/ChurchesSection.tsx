@@ -22,32 +22,34 @@ export async function ChurchesSection() {
             on KingdomFlow.
           </p>
         </div>
-        <ul className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <ul className="mt-10 flex flex-wrap items-start justify-center gap-x-10 gap-y-8">
           {churches.map((church) => (
             <li
               key={church.id}
-              className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-card px-4 py-6 text-center shadow-sm"
+              className="flex w-32 flex-col items-center gap-3 text-center sm:w-36"
             >
               {church.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={church.logoUrl}
-                  alt=""
-                  className="size-16 rounded-full border border-border object-cover"
+                  alt={church.name}
+                  className="size-24 rounded-2xl border border-border bg-white object-contain p-2 shadow-sm sm:size-28"
                   loading="lazy"
                 />
               ) : (
                 <span
                   aria-hidden
-                  className="flex size-16 items-center justify-center rounded-full bg-primary/10 font-heading text-xl font-bold text-primary"
+                  className="flex size-24 items-center justify-center rounded-2xl bg-primary/10 font-heading text-2xl font-bold text-primary shadow-sm sm:size-28"
                 >
                   {initialsOf(church.name)}
                 </span>
               )}
               <div>
-                <p className="font-heading text-sm font-bold">{church.name}</p>
+                <p className="font-heading text-xs font-bold leading-snug">
+                  {church.name}
+                </p>
                 {countryName(church.country) && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[11px] text-muted-foreground">
                     {countryName(church.country)}
                   </p>
                 )}

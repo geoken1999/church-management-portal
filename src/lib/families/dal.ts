@@ -30,3 +30,15 @@ export const getFamilies = cache(async (organizationId: string) => {
     members: membersByFamily.get(family.id) ?? [],
   }));
 });
+
+// Families that members asked for from the app, waiting for an owner or admin.
+export const getPendingFamilyRequests = cache(async (organizationId: string) => {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("family_requests")
+    .select("*, requester:members!family_requests_requested_by_fkey(first_name, last_name)")
+    .eq("organization_id", organizationId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: true });
+  return data ?? [];
+});

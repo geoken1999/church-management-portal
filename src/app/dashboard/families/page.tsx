@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getMembers } from "@/lib/members/dal";
-import { getFamilies } from "@/lib/families/dal";
+import { getFamilies, getPendingFamilyRequests } from "@/lib/families/dal";
+import { FamilyRequestsCard } from "@/components/families/FamilyRequestsCard";
 import { FamiliesManager } from "@/components/families/FamiliesManager";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
@@ -17,7 +18,11 @@ export default async function FamiliesPage() {
     return <AccessRestricted label="Families" />;
   }
 
-  const [members, families] = await Promise.all([getMembers(organizationId), getFamilies(organizationId)]);
+  const [members, families, requests] = await Promise.all([
+    getMembers(organizationId),
+    getFamilies(organizationId),
+    getPendingFamilyRequests(organizationId),
+  ]);
 
   // Pending join requests haven't been approved yet, so they aren't
   // eligible to be assigned to a family.
@@ -31,6 +36,12 @@ export default async function FamiliesPage() {
         <h1 className="font-heading text-3xl font-bold tracking-tight">Families</h1>
         <p className="mt-1 text-muted-foreground">Group {membership.organization.name}&apos;s congregation into household/family units.</p>
       </div>
+
+      <FamilyRequestsCard
+        requests={requests}
+        members={assignableMembers}
+        canReview={membership.role === "owner" || membership.role === "admin"}
+      />
 
       <FamiliesManager
         organizationId={organizationId}

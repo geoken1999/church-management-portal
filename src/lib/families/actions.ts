@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { checkFeatureCap } from "@/lib/plans/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
+import { requireOrganization } from "@/lib/organizations/dal";
+import { reviewFamilyRequest } from "@/lib/families/requests";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { validateFamily, validateFamilyMember, type FamilyFieldErrors, type FamilyMemberFieldErrors } from "@/lib/families/validation";
 
@@ -215,4 +217,33 @@ export async function removeFamilyMember(formData: FormData) {
   await admin.from("family_members").delete().eq("id", id);
 
   revalidatePath(FAMILIES_PATH);
+}
+
+// ---------------------------------------------------------------------------
+// Family requests from members (migration 0209). Owners and admins only, the same
+// bar as reviewing a member's profile change.
+// ---------------------------------------------------------------------------
+
+async function reviewFamilyRequestAction(formData: FormData, decision: "approved" | "rejected"): Promise<void> {
+  const user = await requireUser();
+  const membership = await requireOrganization();
+  if (membership.role !== "owner" && membership.role !== "admin") return;
+  const requestId = String(formData.get("requestId") ?? "");
+  if (!requestId) return;
+  await reviewFamilyRequest({
+    requestId,
+    organizationId: membership.organization.id,
+    reviewerId: user.id,
+    decision,
+    note: String(formData.get("note") ?? ""),
+  });
+  revalidatePath(FAMILIES_PATH);
+}
+
+export async function approveFamilyRequest(formData: FormData): Promise<void> {
+  await reviewFamilyRequestAction(formData, "approved");
+}
+
+export async function rejectFamilyRequest(formData: FormData): Promise<void> {
+  await reviewFamilyRequestAction(formData, "rejected");
 }

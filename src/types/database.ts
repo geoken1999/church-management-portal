@@ -316,6 +316,27 @@ export type MemberProfileUpdateRequest = {
   updated_at: string;
 };
 
+export type FamilyRequestStatus = "pending" | "approved" | "rejected";
+
+export type FamilyRequestPerson = { member_id: string; relationship: string };
+
+export type FamilyRequest = {
+  id: string;
+  organization_id: string;
+  requested_by: string;
+  name: string;
+  notes: string | null;
+  requester_relationship: string;
+  people: FamilyRequestPerson[];
+  status: FamilyRequestStatus;
+  family_id: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type MediaTeamMember = {
   id: string;
   organization_id: string;
@@ -2731,6 +2752,28 @@ export type Database = {
           {
             foreignKeyName: "member_profile_update_requests_member_id_fkey";
             columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      family_requests: {
+        Row: FamilyRequest;
+        Insert: Partial<FamilyRequest> &
+          Pick<FamilyRequest, "organization_id" | "requested_by" | "name" | "requester_relationship">;
+        Update: Partial<FamilyRequest>;
+        Relationships: [
+          {
+            foreignKeyName: "family_requests_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "family_requests_requested_by_fkey";
+            columns: ["requested_by"];
             isOneToOne: false;
             referencedRelation: "members";
             referencedColumns: ["id"];

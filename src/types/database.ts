@@ -328,6 +328,9 @@ export type FamilyRequest = {
   notes: string | null;
   requester_relationship: string;
   people: FamilyRequestPerson[];
+  /** "create" asks for a new family; "add" asks to put one person into target_family_id. */
+  kind: "create" | "add";
+  target_family_id: string | null;
   status: FamilyRequestStatus;
   family_id: string | null;
   reviewed_by: string | null;

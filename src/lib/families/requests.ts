@@ -109,7 +109,7 @@ export async function myFamilies(authUserId: string) {
   }
   const { data: latest } = await admin
     .from("family_requests")
-    .select("id, name, status, review_note, created_at")
+    .select("id, name, kind, status, review_note, created_at")
     .eq("requested_by", me.id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -204,7 +204,31 @@ export async function reviewFamilyRequest(input: {
   if (request.status !== "pending") return { ok: false, error: "That request has already been reviewed." };
 
   let familyId: string | null = null;
-  if (input.decision === "approved") {
+  if (input.decision === "approved" && request.kind === "add") {
+    const person = ((request.people as FamilyRequestPerson[]) ?? [])[0];
+    const { data: family } = request.target_family_id
+      ? await admin.from("families").select("id, name").eq("id", request.target_family_id).maybeSingle()
+      : { data: null };
+    if (!family || !person) return { ok: false, error: "That family or person no longer exists." };
+    const { data: valid } = await admin
+      .from("members")
+      .select("id")
+      .eq("id", person.member_id)
+      .eq("organization_id", input.organizationId)
+      .eq("status", "active")
+      .maybeSingle();
+    if (!valid) return { ok: false, error: "That person is no longer an active member." };
+    if ((await inAFamily([person.member_id])).size > 0) return { ok: false, error: "That person is already in a family." };
+    const { error: addError } = await admin.from("family_members").insert({
+      organization_id: input.organizationId,
+      family_id: family.id,
+      member_id: person.member_id,
+      relationship: person.relationship,
+    });
+    if (addError) return { ok: false, error: "Couldn't add that person." };
+    familyId = family.id;
+    await notifyMember(person.member_id, "You were added to a family", `You are now in the "${family.name}" family.`);
+  } else if (input.decision === "approved") {
     const capError = await checkFeatureCap(input.organizationId, "families", "families");
     if (capError) return { ok: false, error: capError };
 
@@ -267,12 +291,19 @@ export async function reviewFamilyRequest(input: {
     })
     .eq("id", input.requestId);
 
+  const adding = request.kind === "add";
   await notifyMember(
     request.requested_by,
-    input.decision === "approved" ? "Your family was approved" : "Your family request wasn't approved",
     input.decision === "approved"
-      ? `The "${request.name}" family is now in your church's records.`
-      : `Your church didn't approve the "${request.name}" family request.`,
+      ? adding ? "Your family change was approved" : "Your family was approved"
+      : adding ? "Your family change wasn't approved" : "Your family request wasn't approved",
+    adding
+      ? input.decision === "approved"
+        ? `The person you added is now in the "${request.name}" family.`
+        : `Your church didn't approve adding someone to the "${request.name}" family.`
+      : input.decision === "approved"
+        ? `The "${request.name}" family is now in your church's records.`
+        : `Your church didn't approve the "${request.name}" family request.`,
   );
   return { ok: true };
 }
@@ -330,14 +361,32 @@ export async function addToMyFamily(authUserId: string, familyId: string, member
     .maybeSingle();
   if (!person) return { ok: false, error: "That person isn't a member of this church." };
   if ((await inAFamily([memberId])).size > 0) return { ok: false, error: "That person is already in a family." };
-  const { error } = await admin.from("family_members").insert({
+
+  const [{ data: mine }, name] = await Promise.all([
+    admin.from("family_members").select("relationship").eq("family_id", familyId).eq("member_id", ctx.me.id).maybeSingle(),
+    familyName(familyId),
+  ]);
+  // Goes to the church's admins first, like creating a family.
+  const { error } = await admin.from("family_requests").insert({
     organization_id: ctx.me.organization_id,
-    family_id: familyId,
-    member_id: memberId,
-    relationship: relationship.trim(),
+    requested_by: ctx.me.id,
+    kind: "add",
+    target_family_id: familyId,
+    name,
+    requester_relationship: mine?.relationship ?? "Member",
+    people: [{ member_id: memberId, relationship: relationship.trim() }],
   });
-  if (error) return { ok: false, error: "Couldn't add that person. Please try again." };
-  await notifyMember(memberId, "You were added to a family", `You are now in the "${await familyName(familyId)}" family.`);
+  if (error) {
+    if (error.code === "23505") return { ok: false, error: "You already have a request waiting for approval." };
+    return { ok: false, error: "Couldn't send that request. Please try again." };
+  }
+  await pushToTeam({
+    organizationId: ctx.me.organization_id,
+    tab: "families",
+    title: "Family change to review",
+    body: `${fullName(ctx.me)} asked to add someone to the "${name}" family.`,
+    link: "/dashboard/families",
+  });
   return { ok: true };
 }
 

@@ -36,15 +36,17 @@ export function FamilyRequestsCard({
         {requests.map((r) => (
           <div key={r.id} className="rounded-lg border p-3">
             <p className="font-medium">
-              {r.name}{" "}
+              {r.kind === "add" ? `Add to ${r.name}` : r.name}{" "}
               <span className="text-sm font-normal text-muted-foreground">
                 asked by {r.requester ? `${r.requester.first_name} ${r.requester.last_name ?? ""}`.trim() : "a member"}
               </span>
             </p>
             <ul className="mt-2 space-y-0.5 text-sm text-muted-foreground">
-              <li>
-                {r.requester ? r.requester.first_name : "Requester"} — {r.requester_relationship}
-              </li>
+              {r.kind === "add" ? null : (
+                <li>
+                  {r.requester ? r.requester.first_name : "Requester"} — {r.requester_relationship}
+                </li>
+              )}
               {(r.people ?? []).map((p) => (
                 <li key={p.member_id}>
                   {nameOf(p.member_id)} — {p.relationship}

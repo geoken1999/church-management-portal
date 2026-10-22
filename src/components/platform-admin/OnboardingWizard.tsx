@@ -20,15 +20,14 @@ import {
   ONBOARDING_DOCS,
   ONBOARDING_MODULES,
   MANDATE_LIMIT_RUPEES,
-  MEMBERS_INCLUDED,
-  MEMBERS_STEP,
-  MEMBERS_STEP_PRICE,
   cleanCredits,
   creditText,
-  membersPrice,
+  creditPrice,
   quoteFor,
-  snapMembersCount,
-  stepMembersCount,
+  snapCount,
+  stepCount,
+  steppedRule,
+  type CreditKey,
   type Credits,
 } from "@/lib/onboarding/config";
 import { formatPrice } from "@/lib/billing/gst";
@@ -145,6 +144,22 @@ export function OnboardingWizard({
         </CardContent>
       </Card>
     );
+  }
+
+  // One block up or down for a limit sold in blocks; the price follows from the count.
+  function stepCredit(key: CreditKey, direction: 1 | -1) {
+    setCredits((c) => {
+      const included = steppedRule(key)?.included ?? 0;
+      const next = stepCount(key, Number(c[key].count) || included, direction);
+      return {
+        ...c,
+        [key]: {
+          ...c[key],
+          count: String(next),
+          price: String(creditPrice(key, next)),
+        },
+      };
+    });
   }
 
   const isCustom = onboarding.plan_type === "custom";
@@ -341,66 +356,37 @@ export function OnboardingWizard({
                           ({t.unit})
                         </span>
                       </span>
-                      {t.key === "members" ? (
+                      {steppedRule(t.key) ? (
                         <div className="flex items-center gap-1">
                           <Button
                             type="button"
                             size="icon"
                             variant="outline"
-                            disabled={locked || credits.members.unlimited}
-                            aria-label={`Fewer members (down ${MEMBERS_STEP})`}
-                            onClick={() =>
-                              setCredits((c) => {
-                                const next = stepMembersCount(
-                                  Number(c.members.count) || MEMBERS_INCLUDED,
-                                  -1,
-                                );
-                                return {
-                                  ...c,
-                                  members: {
-                                    ...c.members,
-                                    count: String(next),
-                                    price: String(membersPrice(next)),
-                                  },
-                                };
-                              })
-                            }
+                            disabled={locked || credits[t.key].unlimited}
+                            aria-label={`Fewer ${t.label} (down ${steppedRule(t.key)!.step.toLocaleString("en-IN")})`}
+                            onClick={() => stepCredit(t.key, -1)}
                           >
                             −
                           </Button>
                           <span
-                            className="min-w-12 text-center text-sm font-medium"
-                            aria-label="Members count"
+                            className="min-w-14 text-center text-sm font-medium"
+                            aria-label={`${t.label} count`}
                           >
-                            {credits.members.unlimited
+                            {credits[t.key].unlimited
                               ? "—"
-                              : snapMembersCount(
-                                  Number(credits.members.count) ||
-                                    MEMBERS_INCLUDED,
+                              : snapCount(
+                                  t.key,
+                                  Number(credits[t.key].count) ||
+                                    steppedRule(t.key)!.included,
                                 ).toLocaleString("en-IN")}
                           </span>
                           <Button
                             type="button"
                             size="icon"
                             variant="outline"
-                            disabled={locked || credits.members.unlimited}
-                            aria-label={`More members (up ${MEMBERS_STEP})`}
-                            onClick={() =>
-                              setCredits((c) => {
-                                const next = stepMembersCount(
-                                  Number(c.members.count) || MEMBERS_INCLUDED,
-                                  1,
-                                );
-                                return {
-                                  ...c,
-                                  members: {
-                                    ...c.members,
-                                    count: String(next),
-                                    price: String(membersPrice(next)),
-                                  },
-                                };
-                              })
-                            }
+                            disabled={locked || credits[t.key].unlimited}
+                            aria-label={`More ${t.label} (up ${steppedRule(t.key)!.step.toLocaleString("en-IN")})`}
+                            onClick={() => stepCredit(t.key, 1)}
                           >
                             +
                           </Button>
@@ -447,17 +433,19 @@ export function OnboardingWizard({
                         type="number"
                         min={0}
                         step="1"
-                        // Members are priced from the count (₹30 per extra 100), so the price is not typed in.
+                        // Limits sold in blocks are priced from the count, so the price is not typed in.
                         disabled={
                           locked ||
-                          (t.key === "members" && !credits.members.unlimited)
+                          (Boolean(steppedRule(t.key)) &&
+                            !credits[t.key].unlimited)
                         }
                         aria-label={`${t.label} price per month`}
                         value={
-                          t.key === "members" && !credits.members.unlimited
-                            ? membersPrice(
-                                Number(credits.members.count) ||
-                                  MEMBERS_INCLUDED,
+                          steppedRule(t.key) && !credits[t.key].unlimited
+                            ? creditPrice(
+                                t.key,
+                                Number(credits[t.key].count) ||
+                                  steppedRule(t.key)!.included,
                               )
                             : credits[t.key].price
                         }
@@ -473,13 +461,15 @@ export function OnboardingWizard({
                 ))}
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                Members: 350 are included, and the count goes up or down by 100
-                at a time. Each extra 100 adds ₹{MEMBERS_STEP_PRICE} a month
-                (before GST), worked out for you. Anything left blank gets the
-                Starter plan&apos;s number (emails, SMS, WhatsApp and AI
-                replies, storage, members, branches, forms, chat groups, logins,
-                call length, social accounts), so a tenant never gets more than
-                you priced. Mobile app features default to 15.
+                Each limit starts at what the Starter plan includes, and goes up
+                or down one block at a time with the + and − buttons. Each extra
+                block adds its price a month (before GST), worked out for you
+                and the same as the add-on packs: storage 20 GB ₹50, branch ₹10,
+                forms 10 ₹20, chat group ₹20, admin login ₹20, staff login ₹5,
+                social account ₹50, emails 1,000 ₹50, SMS 20 ₹30, WhatsApp 500
+                ₹50, AI replies 100 ₹50, members 100 ₹30. Anything left alone
+                gets the Starter number, so a tenant never gets more than you
+                priced. Mobile app features are the Starter&apos;s for everyone.
               </p>
             </div>
 

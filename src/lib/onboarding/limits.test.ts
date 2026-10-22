@@ -8,8 +8,8 @@ describe("limitsFor", () => {
     const limits = limitsFor(
       cleanCredits({
         email: { count: 20000, price: 200 },
-        sms: { count: 500, price: 300 },
-        storage: { count: 50, price: 100 },
+        sms: { count: 490, price: 300 },
+        storage: { count: 60, price: 100 },
         members: { count: 3050, price: 500 },
         branches: { count: 8, price: 0 },
         forms: { unlimited: true, price: 0 },
@@ -19,15 +19,15 @@ describe("limitsFor", () => {
         kmeet: { unlimited: true, price: 50 },
         instagram: { count: 2, price: 0 },
         youtube: { count: 3, price: 0 },
-        mobileFeatures: { count: 10, price: 0 },
+        mobileFeatures: { count: 10, price: 0 }, // not sold: ignored
       }),
     );
     expect(limits).toMatchObject({
       emailsPerMonth: 20000,
-      smsPerMonth: 500,
+      smsPerMonth: 490,
       whatsappPerMonth: PLANS.basic.whatsappPerMonth,
       aiRepliesPerMonth: PLANS.basic.aiRepliesPerMonth,
-      storageBytes: 50 * 1024 ** 3,
+      storageBytes: 60 * 1024 ** 3,
       memberLimit: 3050,
       branchLimit: 8,
       formsLimit: null,
@@ -37,7 +37,7 @@ describe("limitsFor", () => {
       kmeetMaxDurationMinutes: null,
       instagramAccountLimit: 2,
       youtubeAccountLimit: 3,
-      mobileFeatureLimit: 10,
+      mobileFeatureLimit: 15,
     });
   });
 

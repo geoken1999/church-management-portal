@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { EXTRA_PRICING } from "@/lib/plans/config";
 import {
   ONBOARDING_DOCS,
+  CREDIT_TYPES,
+  creditPrice,
+  snapCount,
+  stepCount,
+  steppedRule,
   ONBOARDING_MODULES,
   cleanCredits,
   quoteFor,
@@ -52,16 +58,20 @@ describe("onboarding modules", () => {
     expect(q.total).toBe(1180);
   });
 
-  it("keeps only credits with a count and a price", () => {
+  it("keeps only credits with a usable count, pricing block-sold ones itself", () => {
     expect(
       cleanCredits({
         sms: { count: "5000", price: "300" },
         email: { count: 0, price: 5 },
         ai: { count: 10, price: -1 },
+        kmeet: { count: 45, price: 80 },
         junk: { count: 1, price: 1 },
       }),
     ).toEqual({
-      sms: { count: 5000, price: 300 },
+      // 5000 SMS: 50 included, so 4,950 more is 247 whole blocks of 20 (4,940): 4,990 SMS at 247 x ₹30.
+      sms: { count: 4990, price: 7410 },
+      // K-Connect is priced by hand.
+      kmeet: { count: 45, price: 80 },
     });
   });
 });
@@ -128,5 +138,48 @@ describe("onboarding documents", () => {
     expect(
       ONBOARDING_DOCS.some((d) => d.type === "signatory_id" && d.required),
     ).toBe(true);
+  });
+});
+
+describe("limits sold in blocks above Starter", () => {
+  it("prices each limit per block, at the add-on rates", () => {
+    expect(creditPrice("storage", 40)).toBe(50); // 20 GB included, +20 GB
+    expect(creditPrice("storage", 20)).toBe(0);
+    expect(creditPrice("branches", 5)).toBe(20); // 3 included, 2 more at ₹10
+    expect(creditPrice("forms", 40)).toBe(40); // 20 included, 2 blocks of 10 at ₹20
+    expect(creditPrice("groups", 6)).toBe(60); // 3 included, 3 at ₹20
+    expect(creditPrice("admins", 3)).toBe(40); // 1 included, 2 at ₹20
+    expect(creditPrice("staff", 6)).toBe(20); // 2 included, 4 at ₹5
+    expect(creditPrice("instagram", 3)).toBe(100); // 1 included, 2 at ₹50
+    expect(creditPrice("youtube", 2)).toBe(50);
+    expect(creditPrice("email", 3000)).toBe(100); // 1000 included, 2 blocks of 1000 at ₹50
+    expect(creditPrice("sms", 90)).toBe(60); // 50 included, 2 blocks of 20 at ₹30
+    expect(creditPrice("whatsapp", 3500)).toBe(100); // 2500 included, 2 blocks of 500 at ₹50
+    expect(creditPrice("ai", 300)).toBe(100); // 100 included, 2 blocks at ₹50
+  });
+  it("starts at Starter's number and moves a block at a time", () => {
+    expect(steppedRule("storage")?.included).toBe(20);
+    expect(stepCount("storage", 20, 1)).toBe(40);
+    expect(stepCount("storage", 20, -1)).toBe(20);
+    expect(stepCount("sms", 50, 1)).toBe(70);
+    expect(stepCount("forms", 20, 1)).toBe(30);
+    expect(stepCount("branches", 3, 1)).toBe(4);
+    expect(snapCount("sms", 79)).toBe(70);
+    expect(snapCount("email", 10)).toBe(1000);
+  });
+  it("sells the same blocks at the same price in the add-on packs", () => {
+    expect(EXTRA_PRICING.sms).toEqual({ step: 20, price: 30 });
+    expect(creditPrice("sms", 50 + EXTRA_PRICING.sms.step)).toBe(
+      EXTRA_PRICING.sms.price,
+    );
+    expect(creditPrice("storage", 20 + EXTRA_PRICING.storageGb.step)).toBe(
+      EXTRA_PRICING.storageGb.price,
+    );
+  });
+  it("leaves K-Connect to be priced by hand and mobile features out of the list", () => {
+    expect(steppedRule("kmeet")).toBeNull();
+    expect(
+      CREDIT_TYPES.some((t) => (t.key as string) === "mobileFeatures"),
+    ).toBe(false);
   });
 });

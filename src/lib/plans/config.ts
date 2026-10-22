@@ -393,77 +393,81 @@ export const ADDON_TYPE_LABELS: Record<AddonType, string> = {
   kconnect: "K-Connect minutes",
 };
 
+// What one more block of anything costs, in rupees a month before GST. One table, used for the add-on packs below and
+// for pricing a custom package (src/lib/onboarding/config.ts), so the two always agree. "step" is the size of one block
+// and the smallest change: counts go up by this much at a time.
+export const EXTRA_PRICING = {
+  storageGb: { step: 20, price: 50 },
+  email: { step: 1000, price: 50 },
+  sms: { step: 20, price: 30 },
+  whatsapp: { step: 500, price: 50 },
+  ai: { step: 100, price: 50 },
+  members: { step: 100, price: 30 },
+  branches: { step: 1, price: 10 },
+  forms: { step: 10, price: 20 },
+  groups: { step: 1, price: 20 },
+  admins: { step: 1, price: 20 },
+  staff: { step: 1, price: 5 },
+  socialAccount: { step: 1, price: 50 },
+} as const;
+
+// Add-on packs: one block at the rate above, and five blocks at the same rate per block.
+function blocks(
+  id: string,
+  addonType: AddonType,
+  label: (amount: string) => string,
+  rate: { step: number; price: number },
+  times: number,
+  creditsPer: number = rate.step,
+  format: (n: number) => string = (n) => n.toLocaleString("en-IN"),
+): AddonPack {
+  return {
+    id: `${id}_${rate.step * times}`,
+    addonType,
+    label: label(format(rate.step * times)),
+    credits: creditsPer * times,
+    priceInRupees: rate.price * times,
+  };
+}
+
+const GB = 1024 * 1024 * 1024;
+
 export const ADDON_PACKS: AddonPack[] = [
-  {
-    id: "sms_500",
-    addonType: "sms",
-    label: "500 SMS credits",
-    credits: 500,
-    priceInRupees: 399,
-  },
-  {
-    id: "sms_2000",
-    addonType: "sms",
-    label: "2,000 SMS credits",
-    credits: 2000,
-    priceInRupees: 1399,
-  },
-  {
-    id: "email_2000",
-    addonType: "email",
-    label: "2,000 email credits",
-    credits: 2000,
-    priceInRupees: 199,
-  },
-  {
-    id: "email_10000",
-    addonType: "email",
-    label: "10,000 email credits",
-    credits: 10000,
-    priceInRupees: 799,
-  },
-  {
-    id: "whatsapp_500",
-    addonType: "whatsapp",
-    label: "500 WhatsApp credits",
-    credits: 500,
-    priceInRupees: 499,
-  },
-  {
-    id: "whatsapp_2000",
-    addonType: "whatsapp",
-    label: "2,000 WhatsApp credits",
-    credits: 2000,
-    priceInRupees: 1699,
-  },
-  {
-    id: "storage_5gb",
-    addonType: "storage",
-    label: "+5 GB storage",
-    credits: 5 * 1024 * 1024 * 1024,
-    priceInRupees: 249,
-  },
-  {
-    id: "storage_25gb",
-    addonType: "storage",
-    label: "+25 GB storage",
-    credits: 25 * 1024 * 1024 * 1024,
-    priceInRupees: 999,
-  },
-  {
-    id: "ai_100",
-    addonType: "ai",
-    label: "100 AI credits",
-    credits: 100,
-    priceInRupees: 299,
-  },
-  {
-    id: "ai_500",
-    addonType: "ai",
-    label: "500 AI credits",
-    credits: 500,
-    priceInRupees: 1199,
-  },
+  ...[1, 5].map((n) =>
+    blocks("sms", "sms", (a) => `${a} SMS credits`, EXTRA_PRICING.sms, n),
+  ),
+  ...[1, 5].map((n) =>
+    blocks(
+      "email",
+      "email",
+      (a) => `${a} email credits`,
+      EXTRA_PRICING.email,
+      n,
+    ),
+  ),
+  ...[1, 5].map((n) =>
+    blocks(
+      "whatsapp",
+      "whatsapp",
+      (a) => `${a} WhatsApp credits`,
+      EXTRA_PRICING.whatsapp,
+      n,
+    ),
+  ),
+  ...[1, 5].map((n) => ({
+    ...blocks(
+      "storage",
+      "storage",
+      (a) => `+${a} GB storage`,
+      EXTRA_PRICING.storageGb,
+      n,
+      EXTRA_PRICING.storageGb.step * GB,
+    ),
+    id: `storage_${EXTRA_PRICING.storageGb.step * n}gb`,
+  })),
+  ...[1, 5].map((n) =>
+    blocks("ai", "ai", (a) => `${a} AI credits`, EXTRA_PRICING.ai, n),
+  ),
   // Minutes, for video or audio, valid in the month they are bought.
   {
     id: "kconnect_30",

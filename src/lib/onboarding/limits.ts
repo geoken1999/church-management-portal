@@ -52,6 +52,7 @@ export function limitsFor(credits: Credits): LimitFields {
     instagramAccountLimit:
       credits.instagram?.count ?? starter.instagramAccountLimit,
     youtubeAccountLimit: credits.youtube?.count ?? starter.youtubeAccountLimit,
-    mobileFeatureLimit: credits.mobileFeatures?.count ?? 15,
+    // The Starter plan's number for everyone (the most the app allows); not sold in blocks.
+    mobileFeatureLimit: 15,
   };
 }

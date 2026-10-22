@@ -1,6 +1,11 @@
 // Pure constants and sums for tenant onboarding, safe to import from client components.
 import { TAB_KEYS, TAB_LABELS, type TabKey } from "@/lib/permissions/tabs";
-import { FINANCE_TABS, SOCIAL_TABS } from "@/lib/plans/config";
+import {
+  EXTRA_PRICING,
+  FINANCE_TABS,
+  PLANS,
+  SOCIAL_TABS,
+} from "@/lib/plans/config";
 import { withGst } from "@/lib/billing/gst";
 
 // UPI Autopay won't debit more than this in one go without extra authentication.
@@ -71,8 +76,7 @@ export type CreditKey =
   | "staff"
   | "kmeet"
   | "instagram"
-  | "youtube"
-  | "mobileFeatures";
+  | "youtube";
 
 export interface CreditType {
   key: CreditKey;
@@ -197,57 +201,107 @@ export const CREDIT_TYPES: CreditType[] = [
     group: "Social media",
     max: 1_000,
   },
-  {
-    key: "mobileFeatures",
-    label: "Mobile app features",
-    unit: "features (up to 15)",
-    group: "Mobile app",
-    max: 15,
-  },
 ];
 
-// Members in a custom plan are sold in blocks: 350 are included, and every further block of 100 adds ₹30 a month
-// (before GST). The count only ever moves in steps of 100, and the price follows from the count, never typed in.
-export const MEMBERS_INCLUDED = 350;
-export const MEMBERS_STEP = 100;
-export const MEMBERS_STEP_PRICE = 30;
+// Most limits of a custom package are sold in blocks above what the Starter plan includes. The Starter number is
+// included for nothing; each further block costs the rate in EXTRA_PRICING (the same rate as the add-on packs), and
+// the count only ever moves a block at a time. The price follows from the count and is never typed in. The limits
+// not listed here (K-Connect minutes) are priced by hand, and mobile app features are the Starter's 15 for everyone.
+export interface SteppedRule {
+  /** What the Starter plan includes: the least a count can be, and the starting point. */
+  included: number;
+  /** The size of one block: counts go up or down by this much. */
+  step: number;
+  /** Rupees a month, before GST, for each block above the included amount. */
+  price: number;
+}
 
-/** Whether a members count is allowed: 350, 450, 550 and so on. */
-export function isValidMembersCount(count: number): boolean {
+export const STEPPED_CREDITS: Partial<Record<CreditKey, SteppedRule>> = {
+  email: { included: PLANS.basic.emailsPerMonth, ...EXTRA_PRICING.email },
+  sms: { included: PLANS.basic.smsPerMonth, ...EXTRA_PRICING.sms },
+  whatsapp: {
+    included: PLANS.basic.whatsappPerMonth,
+    ...EXTRA_PRICING.whatsapp,
+  },
+  ai: { included: PLANS.basic.aiRepliesPerMonth, ...EXTRA_PRICING.ai },
+  storage: {
+    included: PLANS.basic.storageBytes / 1024 ** 3,
+    ...EXTRA_PRICING.storageGb,
+  },
+  members: { included: PLANS.basic.memberLimit ?? 0, ...EXTRA_PRICING.members },
+  branches: {
+    included: PLANS.basic.branchLimit ?? 0,
+    ...EXTRA_PRICING.branches,
+  },
+  forms: { included: PLANS.basic.formsLimit ?? 0, ...EXTRA_PRICING.forms },
+  groups: { included: PLANS.basic.groupLimit ?? 0, ...EXTRA_PRICING.groups },
+  admins: {
+    included: PLANS.basic.maxAdditionalAdmins,
+    ...EXTRA_PRICING.admins,
+  },
+  staff: { included: PLANS.basic.maxAdditionalStaff, ...EXTRA_PRICING.staff },
+  instagram: {
+    included: PLANS.basic.instagramAccountLimit,
+    ...EXTRA_PRICING.socialAccount,
+  },
+  youtube: {
+    included: PLANS.basic.youtubeAccountLimit,
+    ...EXTRA_PRICING.socialAccount,
+  },
+};
+
+export function steppedRule(key: CreditKey): SteppedRule | null {
+  return STEPPED_CREDITS[key] ?? null;
+}
+
+/** The nearest allowed count at or below this one (never below what Starter includes). */
+export function snapCount(key: CreditKey, count: number): number {
+  const rule = steppedRule(key);
+  if (!rule) return count;
+  if (!Number.isFinite(count) || count <= rule.included) return rule.included;
   return (
-    Number.isInteger(count) &&
-    count >= MEMBERS_INCLUDED &&
-    (count - MEMBERS_INCLUDED) % MEMBERS_STEP === 0
+    rule.included +
+    Math.floor((Math.floor(count) - rule.included) / rule.step) * rule.step
   );
 }
 
-/** The nearest allowed members count at or below this one (never below the 350 included). */
-export function snapMembersCount(count: number): number {
-  if (!Number.isFinite(count) || count <= MEMBERS_INCLUDED)
-    return MEMBERS_INCLUDED;
-  return (
-    MEMBERS_INCLUDED +
-    Math.floor((Math.floor(count) - MEMBERS_INCLUDED) / MEMBERS_STEP) *
-      MEMBERS_STEP
+/** Monthly price, before GST, of a count: nothing for what Starter includes, the block rate for each block above. */
+export function creditPrice(key: CreditKey, count: number): number {
+  const rule = steppedRule(key);
+  if (!rule) return 0;
+  return ((snapCount(key, count) - rule.included) / rule.step) * rule.price;
+}
+
+/** The count one block up or down (never below what Starter includes, never above the largest allowed). */
+export function stepCount(
+  key: CreditKey,
+  count: number,
+  direction: 1 | -1,
+): number {
+  const rule = steppedRule(key);
+  if (!rule) return count;
+  const max = snapCount(
+    key,
+    CREDIT_TYPES.find((t) => t.key === key)?.max ?? count,
+  );
+  return Math.min(
+    Math.max(snapCount(key, count) + direction * rule.step, rule.included),
+    max,
   );
 }
 
-/** Monthly price, before GST, of a members count: nothing for the 350 included, ₹30 for each 100 more. */
-export function membersPrice(count: number): number {
-  return (
-    ((snapMembersCount(count) - MEMBERS_INCLUDED) / MEMBERS_STEP) *
-    MEMBERS_STEP_PRICE
-  );
-}
-
-/** The count one step up or down (never below the 350 included, never above the largest allowed). */
-export function stepMembersCount(count: number, direction: 1 | -1): number {
-  const next = snapMembersCount(count) + direction * MEMBERS_STEP;
-  const max = snapMembersCount(
-    CREDIT_TYPES.find((t) => t.key === "members")!.max,
-  );
-  return Math.min(Math.max(next, MEMBERS_INCLUDED), max);
-}
+// Members, kept under their own names (the first limit sold this way).
+export const MEMBERS_INCLUDED = STEPPED_CREDITS.members!.included;
+export const MEMBERS_STEP = STEPPED_CREDITS.members!.step;
+export const MEMBERS_STEP_PRICE = STEPPED_CREDITS.members!.price;
+export const isValidMembersCount = (count: number) =>
+  Number.isInteger(count) &&
+  count >= MEMBERS_INCLUDED &&
+  (count - MEMBERS_INCLUDED) % MEMBERS_STEP === 0;
+export const snapMembersCount = (count: number) => snapCount("members", count);
+export const membersPrice = (count: number) => creditPrice("members", count);
+export const stepMembersCount = (count: number, direction: 1 | -1) =>
+  stepCount("members", count, direction);
 
 export interface CreditLine {
   /** Ignored when unlimited. */
@@ -275,16 +329,20 @@ export function cleanCredits(input: unknown): Credits {
       continue;
     }
     const count = Math.floor(Number(line?.count));
-    // Members come in blocks of 100 above the 350 included, and the price is worked out from the count.
-    if (type.key === "members") {
-      // Fewer than the 350 included means nothing was chosen: the plan's 350 apply without a line.
+    // Sold in blocks above what Starter includes: the count snaps to a block and the price is worked out from it.
+    const rule = steppedRule(type.key);
+    if (rule) {
+      // Less than what Starter includes means nothing was chosen: Starter's number applies without a line.
       if (
         Number.isFinite(count) &&
-        count >= MEMBERS_INCLUDED &&
+        count >= rule.included &&
         count <= type.max
       ) {
-        const snapped = snapMembersCount(count);
-        result.members = { count: snapped, price: membersPrice(snapped) };
+        const snapped = snapCount(type.key, count);
+        result[type.key] = {
+          count: snapped,
+          price: creditPrice(type.key, snapped),
+        };
       }
       continue;
     }

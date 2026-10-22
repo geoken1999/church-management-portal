@@ -174,7 +174,7 @@ describe("PLANS.pro", () => {
 
 describe("getAddonPack", () => {
   it("finds a pack by id", () => {
-    expect(getAddonPack("sms_500")?.credits).toBe(500);
+    expect(getAddonPack("sms_20")?.credits).toBe(20);
   });
 
   it("returns undefined for an unknown id", () => {
@@ -234,5 +234,35 @@ describe("chat group limits", () => {
       resolvePlanLimits("basic", { ...rules, groupLimit: null }).groupLimit,
     ).toBeNull();
     expect(resolvePlanLimits("basic", null).groupLimit).toBe(3);
+  });
+});
+
+describe("add-on pack prices", () => {
+  it("sells one block of each at the same rate as a custom package", () => {
+    expect(getAddonPack("email_1000")).toMatchObject({
+      credits: 1000,
+      priceInRupees: 50,
+    });
+    expect(getAddonPack("sms_20")).toMatchObject({
+      credits: 20,
+      priceInRupees: 30,
+    });
+    expect(getAddonPack("whatsapp_500")).toMatchObject({
+      credits: 500,
+      priceInRupees: 50,
+    });
+    expect(getAddonPack("ai_100")).toMatchObject({
+      credits: 100,
+      priceInRupees: 50,
+    });
+    expect(getAddonPack("storage_20gb")).toMatchObject({
+      credits: 20 * 1024 ** 3,
+      priceInRupees: 50,
+    });
+  });
+  it("keeps the same price per block when buying five", () => {
+    expect(getAddonPack("email_5000")?.priceInRupees).toBe(250);
+    expect(getAddonPack("sms_100")?.priceInRupees).toBe(150);
+    expect(getAddonPack("storage_100gb")?.priceInRupees).toBe(250);
   });
 });

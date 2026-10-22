@@ -197,6 +197,49 @@ export const CREDIT_TYPES: CreditType[] = [
   },
 ];
 
+// Members in a custom plan are sold in blocks: 350 are included, and every further block of 100 adds ₹30 a month
+// (before GST). The count only ever moves in steps of 100, and the price follows from the count, never typed in.
+export const MEMBERS_INCLUDED = 350;
+export const MEMBERS_STEP = 100;
+export const MEMBERS_STEP_PRICE = 30;
+
+/** Whether a members count is allowed: 350, 450, 550 and so on. */
+export function isValidMembersCount(count: number): boolean {
+  return (
+    Number.isInteger(count) &&
+    count >= MEMBERS_INCLUDED &&
+    (count - MEMBERS_INCLUDED) % MEMBERS_STEP === 0
+  );
+}
+
+/** The nearest allowed members count at or below this one (never below the 350 included). */
+export function snapMembersCount(count: number): number {
+  if (!Number.isFinite(count) || count <= MEMBERS_INCLUDED)
+    return MEMBERS_INCLUDED;
+  return (
+    MEMBERS_INCLUDED +
+    Math.floor((Math.floor(count) - MEMBERS_INCLUDED) / MEMBERS_STEP) *
+      MEMBERS_STEP
+  );
+}
+
+/** Monthly price, before GST, of a members count: nothing for the 350 included, ₹30 for each 100 more. */
+export function membersPrice(count: number): number {
+  return (
+    ((snapMembersCount(count) - MEMBERS_INCLUDED) / MEMBERS_STEP) *
+    MEMBERS_STEP_PRICE
+  );
+}
+
+/** The count one step up or down (never below the 350 included, never above the largest allowed). */
+export function stepMembersCount(count: number, direction: 1 | -1): number {
+  const next = snapMembersCount(count) + direction * MEMBERS_STEP;
+  const max = snapMembersCount(
+    CREDIT_TYPES.find((t) => t.key === "members")!.max,
+  );
+  return Math.min(Math.max(next, MEMBERS_INCLUDED), max);
+}
+
 export interface CreditLine {
   /** Ignored when unlimited. */
   count: number;
@@ -223,6 +266,19 @@ export function cleanCredits(input: unknown): Credits {
       continue;
     }
     const count = Math.floor(Number(line?.count));
+    // Members come in blocks of 100 above the 350 included, and the price is worked out from the count.
+    if (type.key === "members") {
+      // Fewer than the 350 included means nothing was chosen: the plan's 350 apply without a line.
+      if (
+        Number.isFinite(count) &&
+        count >= MEMBERS_INCLUDED &&
+        count <= type.max
+      ) {
+        const snapped = snapMembersCount(count);
+        result.members = { count: snapped, price: membersPrice(snapped) };
+      }
+      continue;
+    }
     if (Number.isFinite(count) && count > 0 && count <= type.max && priceOk)
       result[type.key] = { count, price };
   }

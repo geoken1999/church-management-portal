@@ -20,9 +20,15 @@ import {
   ONBOARDING_DOCS,
   ONBOARDING_MODULES,
   MANDATE_LIMIT_RUPEES,
+  MEMBERS_INCLUDED,
+  MEMBERS_STEP,
+  MEMBERS_STEP_PRICE,
   cleanCredits,
   creditText,
+  membersPrice,
   quoteFor,
+  snapMembersCount,
+  stepMembersCount,
   type Credits,
 } from "@/lib/onboarding/config";
 import { formatPrice } from "@/lib/billing/gst";
@@ -335,23 +341,89 @@ export function OnboardingWizard({
                           ({t.unit})
                         </span>
                       </span>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={t.max}
-                        step="1"
-                        disabled={locked || credits[t.key].unlimited}
-                        aria-label={`${t.label} count`}
-                        value={
-                          credits[t.key].unlimited ? "" : credits[t.key].count
-                        }
-                        onChange={(e) =>
-                          setCredits((c) => ({
-                            ...c,
-                            [t.key]: { ...c[t.key], count: e.target.value },
-                          }))
-                        }
-                      />
+                      {t.key === "members" ? (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            disabled={locked || credits.members.unlimited}
+                            aria-label={`Fewer members (down ${MEMBERS_STEP})`}
+                            onClick={() =>
+                              setCredits((c) => {
+                                const next = stepMembersCount(
+                                  Number(c.members.count) || MEMBERS_INCLUDED,
+                                  -1,
+                                );
+                                return {
+                                  ...c,
+                                  members: {
+                                    ...c.members,
+                                    count: String(next),
+                                    price: String(membersPrice(next)),
+                                  },
+                                };
+                              })
+                            }
+                          >
+                            −
+                          </Button>
+                          <span
+                            className="min-w-12 text-center text-sm font-medium"
+                            aria-label="Members count"
+                          >
+                            {credits.members.unlimited
+                              ? "—"
+                              : snapMembersCount(
+                                  Number(credits.members.count) ||
+                                    MEMBERS_INCLUDED,
+                                ).toLocaleString("en-IN")}
+                          </span>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            disabled={locked || credits.members.unlimited}
+                            aria-label={`More members (up ${MEMBERS_STEP})`}
+                            onClick={() =>
+                              setCredits((c) => {
+                                const next = stepMembersCount(
+                                  Number(c.members.count) || MEMBERS_INCLUDED,
+                                  1,
+                                );
+                                return {
+                                  ...c,
+                                  members: {
+                                    ...c.members,
+                                    count: String(next),
+                                    price: String(membersPrice(next)),
+                                  },
+                                };
+                              })
+                            }
+                          >
+                            +
+                          </Button>
+                        </div>
+                      ) : (
+                        <Input
+                          type="number"
+                          min={0}
+                          max={t.max}
+                          step="1"
+                          disabled={locked || credits[t.key].unlimited}
+                          aria-label={`${t.label} count`}
+                          value={
+                            credits[t.key].unlimited ? "" : credits[t.key].count
+                          }
+                          onChange={(e) =>
+                            setCredits((c) => ({
+                              ...c,
+                              [t.key]: { ...c[t.key], count: e.target.value },
+                            }))
+                          }
+                        />
+                      )}
                       {t.canBeUnlimited ? (
                         <input
                           type="checkbox"
@@ -375,9 +447,20 @@ export function OnboardingWizard({
                         type="number"
                         min={0}
                         step="1"
-                        disabled={locked}
+                        // Members are priced from the count (₹30 per extra 100), so the price is not typed in.
+                        disabled={
+                          locked ||
+                          (t.key === "members" && !credits.members.unlimited)
+                        }
                         aria-label={`${t.label} price per month`}
-                        value={credits[t.key].price}
+                        value={
+                          t.key === "members" && !credits.members.unlimited
+                            ? membersPrice(
+                                Number(credits.members.count) ||
+                                  MEMBERS_INCLUDED,
+                              )
+                            : credits[t.key].price
+                        }
                         onChange={(e) =>
                           setCredits((c) => ({
                             ...c,
@@ -390,11 +473,14 @@ export function OnboardingWizard({
                 ))}
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                Blank means none for monthly emails, SMS, WhatsApp and AI
-                replies. For the size limits (storage, members, branches, forms,
-                logins, call length, social accounts) blank means the Starter
-                plan&apos;s number, so a tenant never gets more than you priced.
-                Mobile app features default to 15.
+                Members: 350 are included, and the count goes up or down by 100
+                at a time. Each extra 100 adds ₹{MEMBERS_STEP_PRICE} a month
+                (before GST), worked out for you. Blank means none for monthly
+                emails, SMS, WhatsApp and AI replies. For the size limits
+                (storage, members, branches, forms, logins, call length, social
+                accounts) blank means the Starter plan&apos;s number, so a
+                tenant never gets more than you priced. Mobile app features
+                default to 15.
               </p>
             </div>
 

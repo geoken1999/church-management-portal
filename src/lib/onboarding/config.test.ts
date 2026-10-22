@@ -5,6 +5,10 @@ import {
   quoteFor,
   tabStatesFor,
   MANDATE_LIMIT_RUPEES,
+  isValidMembersCount,
+  membersPrice,
+  snapMembersCount,
+  stepMembersCount,
 } from "@/lib/onboarding/config";
 
 describe("onboarding modules", () => {
@@ -58,5 +62,52 @@ describe("onboarding modules", () => {
     ).toEqual({
       sms: { count: 5000, price: 300 },
     });
+  });
+});
+
+describe("members in a custom plan", () => {
+  it("includes 350 and charges ₹30 for each further 100", () => {
+    expect(membersPrice(350)).toBe(0);
+    expect(membersPrice(450)).toBe(30);
+    expect(membersPrice(1050)).toBe(210);
+  });
+  it("only allows 350, 450, 550 and so on", () => {
+    expect(isValidMembersCount(350)).toBe(true);
+    expect(isValidMembersCount(450)).toBe(true);
+    expect(isValidMembersCount(400)).toBe(false);
+    expect(isValidMembersCount(250)).toBe(false);
+    expect(isValidMembersCount(350.5)).toBe(false);
+  });
+  it("moves in steps of 100 and never below the 350 included", () => {
+    expect(stepMembersCount(350, 1)).toBe(450);
+    expect(stepMembersCount(450, -1)).toBe(350);
+    expect(stepMembersCount(350, -1)).toBe(350);
+    expect(snapMembersCount(499)).toBe(450);
+    expect(snapMembersCount(100)).toBe(350);
+    expect(snapMembersCount(Number.NaN)).toBe(350);
+  });
+  it("works out the price from the count, whatever price is sent", () => {
+    expect(cleanCredits({ members: { count: 650, price: 1 } }).members).toEqual(
+      { count: 650, price: 90 },
+    );
+    expect(
+      cleanCredits({ members: { count: 499, price: 5000 } }).members,
+    ).toEqual({ count: 450, price: 30 });
+    // Fewer than the 350 included is "nothing chosen": the plan's 350 apply.
+    expect(
+      cleanCredits({ members: { count: 100, price: 0 } }).members,
+    ).toBeUndefined();
+    expect(
+      cleanCredits({ members: { count: 0, price: 10 } }).members,
+    ).toBeUndefined();
+  });
+  it("still allows no limit, priced by hand", () => {
+    expect(
+      cleanCredits({ members: { unlimited: true, price: 999 } }).members,
+    ).toEqual({ count: 0, unlimited: true, price: 999 });
+  });
+  it("adds the member blocks to the quote", () => {
+    const credits = cleanCredits({ members: { count: 750 } });
+    expect(quoteFor([], {}, credits).base).toBe(120);
   });
 });

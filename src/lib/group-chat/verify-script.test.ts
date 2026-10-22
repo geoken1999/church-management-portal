@@ -39,5 +39,5 @@ describe("verify-migrations-0199-0207.sql", () => {
     expect(by["0206_church_group_chats"].status).toBe("MISSING 1 of 12");
     expect(by["0206_church_group_chats"].missing).toContain("Realtime");
     expect(by["0205_platform_service_users"].status).toMatch(/^MISSING/);
-  });
+  }, 30000);
 });

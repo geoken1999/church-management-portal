@@ -1,4 +1,4 @@
--- Read-only check: which of migrations 0199 to 0207 have been applied. Run it in the Supabase SQL editor (it changes
+-- Read-only check: which of migrations 0199 to 0208 have been applied. Run it in the Supabase SQL editor (it changes
 -- nothing). Each row says OK or MISSING for one thing a migration creates (a table, column, function, policy, bucket
 -- or trigger). A migration with any MISSING row still needs to be run, in order. The last query summarises one line
 -- per migration, so you can see at a glance which to run.
@@ -67,7 +67,10 @@ with checks(migration, what, ok) as (
   -- 0207: the team follows group chats on the web
   ('0207_group_chat_team_view', 'function cg_team_can_view', exists (select 1 from pg_proc where proname='cg_team_can_view')),
   ('0207_group_chat_team_view', 'policy "Team can view group messages"', exists (select 1 from pg_policies where schemaname='public' and tablename='church_group_messages' and policyname='Team can view group messages')),
-  ('0207_group_chat_team_view', 'policy "Team can view groups"', exists (select 1 from pg_policies where schemaname='public' and tablename='church_groups' and policyname='Team can view groups'))
+  ('0207_group_chat_team_view', 'policy "Team can view groups"', exists (select 1 from pg_policies where schemaname='public' and tablename='church_groups' and policyname='Team can view groups')),
+
+  -- 0208: churches listed on the landing page
+  ('0208_landing_listed', 'column organizations.landing_listed', exists (select 1 from information_schema.columns where table_schema='public' and table_name='organizations' and column_name='landing_listed'))
 )
 -- One line per migration: OK when everything it creates is there, otherwise how many things are missing and which.
 select migration,

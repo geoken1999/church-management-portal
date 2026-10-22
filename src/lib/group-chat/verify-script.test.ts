@@ -2,10 +2,10 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-// The verify script for migrations 0199 to 0207 (supabase/setup) must run as written. Here it runs against the
+// The verify script for migrations 0199 to 0208 (supabase/setup) must run as written. Here it runs against the
 // group chat migrations in PGlite: what is applied reads OK, and what this small database does not have (the
 // older tables, the Realtime publication) reads MISSING, which proves the script tells the two apart.
-describe("verify-migrations-0199-0207.sql", () => {
+describe("verify-migrations-0199-0208.sql", () => {
   it("runs, and tells applied from missing", async () => {
     const db = new PGlite();
     await db.exec(
@@ -21,7 +21,7 @@ describe("verify-migrations-0199-0207.sql", () => {
       migration: string;
       status: string;
       missing: string;
-    }>(readFileSync("supabase/setup/verify-migrations-0199-0207.sql", "utf8"));
+    }>(readFileSync("supabase/setup/verify-migrations-0199-0208.sql", "utf8"));
     const by = Object.fromEntries(rows.map((r) => [r.migration, r]));
     expect(rows.map((r) => r.migration)).toEqual([
       "0199_prayer_voice",
@@ -33,6 +33,7 @@ describe("verify-migrations-0199-0207.sql", () => {
       "0205_platform_service_users",
       "0206_church_group_chats",
       "0207_group_chat_team_view",
+      "0208_landing_listed",
     ]);
     expect(by["0207_group_chat_team_view"].status).toBe("OK");
     // Everything but the Realtime publication (a Supabase feature this test database lacks).

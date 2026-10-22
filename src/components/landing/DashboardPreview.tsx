@@ -1,4 +1,13 @@
-import { LayoutDashboard, Contact, ClipboardCheck, CalendarDays, HandCoins, FolderOpen, Bell, Search } from "lucide-react";
+import {
+  LayoutDashboard,
+  Contact,
+  ClipboardCheck,
+  CalendarDays,
+  HandCoins,
+  FolderOpen,
+  Bell,
+  Search,
+} from "lucide-react";
 
 const NAV_ITEMS = [
   { icon: LayoutDashboard, label: "Dashboard", active: true },
@@ -39,14 +48,18 @@ export function DashboardPreview() {
           <div className="hidden w-44 shrink-0 border-r border-border bg-muted/30 p-3 sm:block">
             <div className="mb-4 flex items-center gap-2 px-1">
               <div className="size-6 rounded-md bg-primary" />
-              <span className="font-heading text-xs font-bold">KingdomFlow</span>
+              <span className="font-heading text-xs font-bold">
+                KingdomFlow
+              </span>
             </div>
             <div className="flex flex-col gap-1">
               {NAV_ITEMS.map((item) => (
                 <div
                   key={item.label}
                   className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium ${
-                    item.active ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+                    item.active
+                      ? "bg-accent text-accent-foreground"
+                      : "text-muted-foreground"
                   }`}
                 >
                   <item.icon className="size-3.5" />
@@ -72,16 +85,26 @@ export function DashboardPreview() {
 
             <div className="grid grid-cols-3 gap-2 sm:gap-3">
               {STATS.map((stat) => (
-                <div key={stat.label} className="rounded-xl border border-border bg-background p-2.5 sm:p-3">
-                  <p className="text-[10px] text-muted-foreground sm:text-xs">{stat.label}</p>
-                  <p className="font-heading text-sm font-bold sm:text-lg">{stat.value}</p>
+                <div
+                  key={stat.label}
+                  className="rounded-xl border border-border bg-background p-2.5 sm:p-3"
+                >
+                  <p className="text-[10px] text-muted-foreground sm:text-xs">
+                    {stat.label}
+                  </p>
+                  <p className="font-heading text-sm font-bold sm:text-lg">
+                    {stat.value}
+                  </p>
                 </div>
               ))}
             </div>
 
             <div className="mt-3 space-y-2 sm:mt-4">
               {[0, 1, 2].map((row) => (
-                <div key={row} className="flex items-center gap-3 rounded-lg border border-border bg-background p-2.5 sm:p-3">
+                <div
+                  key={row}
+                  className="flex items-center gap-3 rounded-lg border border-border bg-background p-2.5 sm:p-3"
+                >
                   <div className="size-7 shrink-0 rounded-full bg-accent" />
                   <div className="flex-1 space-y-1.5">
                     <div className="h-2 w-1/3 rounded-full bg-foreground/10" />
@@ -98,7 +121,9 @@ export function DashboardPreview() {
       {/* Floating stat card */}
       <div className="absolute -bottom-6 -left-4 hidden rounded-xl border border-border bg-card px-4 py-3 shadow-xl sm:block">
         <p className="text-xs text-muted-foreground">Attendance today</p>
-        <p className="font-heading text-lg font-bold text-primary">312 checked in</p>
+        <p className="font-heading text-lg font-bold text-primary">
+          312 checked in
+        </p>
       </div>
     </div>
   );

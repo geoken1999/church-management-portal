@@ -54,6 +54,8 @@ export type Organization = {
   own_gateway: "razorpay" | "payu" | "cashfree";
   member_count_range: MemberCountRange | null;
   branch_count: number | null;
+  // Shown on the public landing page when a platform admin turns it on (migration 0208).
+  landing_listed: boolean;
   plan: string;
   // ISO 3166-1 alpha-2 (e.g. "US") — the default country code for
   // resolving members' phone numbers when their branch has none set.

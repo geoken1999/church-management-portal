@@ -1,12 +1,24 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Users, MapPin, Mail, MessageSquareText, MessageCircle, HardDrive, HandCoins, AlertTriangle } from "lucide-react";
+import {
+  ArrowLeft,
+  Users,
+  MapPin,
+  Mail,
+  MessageSquareText,
+  MessageCircle,
+  HardDrive,
+  HandCoins,
+  AlertTriangle,
+} from "lucide-react";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
 import { getTenantUsage } from "@/lib/platform-admin/dal";
 import { exportTenantReport } from "@/lib/platform-admin/report-actions";
 import { formatBytes } from "@/lib/plans/format";
 import { ReportExportButtons } from "@/components/platform-admin/ReportExportButtons";
+import { LandingListingCard } from "@/components/platform-admin/LandingListingCard";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { LiveStreamAccessCard } from "@/components/platform-admin/LiveStreamAccessCard";
 import { BibleSchoolAccessCard } from "@/components/platform-admin/BibleSchoolAccessCard";
 import { getBibleSchoolAccess } from "@/lib/lms/access";
@@ -20,13 +32,25 @@ function formatMoney(amount: number): string {
   return `₹${amount.toLocaleString("en-IN")}`;
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
   const { id } = await params;
   const usage = await getTenantUsage(id);
-  return { title: usage ? `${usage.name} | KingdomFlow Super Admin` : "Tenant | KingdomFlow Super Admin" };
+  return {
+    title: usage
+      ? `${usage.name} | KingdomFlow Super Admin`
+      : "Tenant | KingdomFlow Super Admin",
+  };
 }
 
-export default async function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function TenantDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   await requirePlatformAdmin();
   const { id } = await params;
   const usage = await getTenantUsage(id);
@@ -37,15 +61,42 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
 
   const liveAccess = await getLiveStreamAccess(usage.id);
   const schoolAccess = await getBibleSchoolAccess(usage.id);
-  const stillTrialing = usage.trialEndsAt ? new Date(usage.trialEndsAt) > new Date() : false;
-  const statusLabel = usage.subscriptionStatus === "active" ? "Active" : stillTrialing ? "Trialing" : "Expired";
-  const statusVariant = usage.subscriptionStatus === "active" ? "default" : stillTrialing ? "secondary" : "destructive";
-  const storagePercent = usage.storageBytesLimit > 0 ? Math.min(100, Math.round((usage.storageBytesUsed / usage.storageBytesLimit) * 100)) : 0;
+  const { data: listing } = await createAdminClient()
+    .from("organizations")
+    .select("landing_listed")
+    .eq("id", usage.id)
+    .maybeSingle();
+  const landingListed = listing?.landing_listed === true;
+  const stillTrialing = usage.trialEndsAt
+    ? new Date(usage.trialEndsAt) > new Date()
+    : false;
+  const statusLabel =
+    usage.subscriptionStatus === "active"
+      ? "Active"
+      : stillTrialing
+        ? "Trialing"
+        : "Expired";
+  const statusVariant =
+    usage.subscriptionStatus === "active"
+      ? "default"
+      : stillTrialing
+        ? "secondary"
+        : "destructive";
+  const storagePercent =
+    usage.storageBytesLimit > 0
+      ? Math.min(
+          100,
+          Math.round((usage.storageBytesUsed / usage.storageBytesLimit) * 100),
+        )
+      : 0;
 
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/platform-admin/tenants" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <Link
+          href="/platform-admin/tenants"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
           <ArrowLeft className="size-3.5" />
           Back to tenants
         </Link>
@@ -54,14 +105,20 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-heading text-3xl font-bold tracking-tight">{usage.name}</h1>
+            <h1 className="font-heading text-3xl font-bold tracking-tight">
+              {usage.name}
+            </h1>
             <Badge variant={statusVariant}>{statusLabel}</Badge>
-            <Badge variant={usage.customPlanLimits ? "default" : "outline"}>{usage.planName}</Badge>
+            <Badge variant={usage.customPlanLimits ? "default" : "outline"}>
+              {usage.planName}
+            </Badge>
           </div>
           <p className="mt-1 text-muted-foreground">
             Joined {formatPlatformDate(usage.createdAt)}
             {usage.country && ` · ${usage.country}`}
-            {usage.trialEndsAt && stillTrialing && ` · Trial ends ${formatPlatformDate(usage.trialEndsAt)}`}
+            {usage.trialEndsAt &&
+              stillTrialing &&
+              ` · Trial ends ${formatPlatformDate(usage.trialEndsAt)}`}
           </p>
           <div className="mt-2">
             <CustomPlanDialog
@@ -72,11 +129,28 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
             />
           </div>
         </div>
-        <ReportExportButtons onExport={exportTenantReport.bind(null, usage.id)} />
+        <ReportExportButtons
+          onExport={exportTenantReport.bind(null, usage.id)}
+        />
       </div>
 
-      <LiveStreamAccessCard organizationId={usage.id} enabled={liveAccess.enabled} requestedAt={liveAccess.requestedAt} initialNote={liveAccess.note ?? ""} />
-      <BibleSchoolAccessCard organizationId={usage.id} enabled={schoolAccess.enabled} requestedAt={schoolAccess.requestedAt} initialNote={schoolAccess.note ?? ""} />
+      <LandingListingCard
+        organizationId={usage.id}
+        listed={landingListed}
+        hasLogo={Boolean(usage.logoUrl)}
+      />
+      <LiveStreamAccessCard
+        organizationId={usage.id}
+        enabled={liveAccess.enabled}
+        requestedAt={liveAccess.requestedAt}
+        initialNote={liveAccess.note ?? ""}
+      />
+      <BibleSchoolAccessCard
+        organizationId={usage.id}
+        enabled={schoolAccess.enabled}
+        requestedAt={schoolAccess.requestedAt}
+        initialNote={schoolAccess.note ?? ""}
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card>
@@ -85,9 +159,12 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
               <Users className="size-4" />
               <p className="text-xs font-medium">Congregation</p>
             </div>
-            <p className="font-heading text-2xl font-bold">{usage.congregationMembers}</p>
+            <p className="font-heading text-2xl font-bold">
+              {usage.congregationMembers}
+            </p>
             <p className="text-xs text-muted-foreground">
-              {usage.leaders} leaders · {usage.youth} youth · {usage.families} families
+              {usage.leaders} leaders · {usage.youth} youth · {usage.families}{" "}
+              families
             </p>
           </CardContent>
         </Card>
@@ -98,7 +175,9 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
               <p className="text-xs font-medium">Branches</p>
             </div>
             <p className="font-heading text-2xl font-bold">{usage.branches}</p>
-            <p className="text-xs text-muted-foreground">{usage.branchCountClaimed ?? "—"} self-reported at onboarding</p>
+            <p className="text-xs text-muted-foreground">
+              {usage.branchCountClaimed ?? "—"} self-reported at onboarding
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -107,8 +186,12 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
               <Users className="size-4" />
               <p className="text-xs font-medium">Team logins</p>
             </div>
-            <p className="font-heading text-2xl font-bold">{usage.teamLogins}</p>
-            <p className="text-xs text-muted-foreground">{usage.supportTicketsCount} support tickets raised</p>
+            <p className="font-heading text-2xl font-bold">
+              {usage.teamLogins}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {usage.supportTicketsCount} support tickets raised
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -120,8 +203,13 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
               <Mail className="size-4" />
               <p className="text-xs font-medium">Emails sent</p>
             </div>
-            <p className="font-heading text-xl font-bold">{usage.emailsSentThisMonth} this month</p>
-            <p className="text-xs text-muted-foreground">{usage.emailsSentAllTime} all time · {usage.addonEmailCredits} add-on credits</p>
+            <p className="font-heading text-xl font-bold">
+              {usage.emailsSentThisMonth} this month
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {usage.emailsSentAllTime} all time · {usage.addonEmailCredits}{" "}
+              add-on credits
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -130,8 +218,13 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
               <MessageSquareText className="size-4" />
               <p className="text-xs font-medium">SMS sent</p>
             </div>
-            <p className="font-heading text-xl font-bold">{usage.smsSentThisMonth} this month</p>
-            <p className="text-xs text-muted-foreground">{usage.smsSentAllTime} all time · {usage.addonSmsCredits} add-on credits</p>
+            <p className="font-heading text-xl font-bold">
+              {usage.smsSentThisMonth} this month
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {usage.smsSentAllTime} all time · {usage.addonSmsCredits} add-on
+              credits
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -140,8 +233,13 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
               <MessageCircle className="size-4" />
               <p className="text-xs font-medium">WhatsApp sent</p>
             </div>
-            <p className="font-heading text-xl font-bold">{usage.whatsappSentThisMonth} this month</p>
-            <p className="text-xs text-muted-foreground">{usage.whatsappSentAllTime} all time · {usage.addonWhatsappCredits} add-on credits</p>
+            <p className="font-heading text-xl font-bold">
+              {usage.whatsappSentThisMonth} this month
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {usage.whatsappSentAllTime} all time ·{" "}
+              {usage.addonWhatsappCredits} add-on credits
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -154,9 +252,15 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
               <p className="text-xs font-medium">Storage</p>
             </div>
             <p className="font-heading text-xl font-bold">
-              {formatBytes(usage.storageBytesUsed)} <span className="text-sm font-normal text-muted-foreground">/ {formatBytes(usage.storageBytesLimit)}</span>
+              {formatBytes(usage.storageBytesUsed)}{" "}
+              <span className="text-sm font-normal text-muted-foreground">
+                / {formatBytes(usage.storageBytesLimit)}
+              </span>
             </p>
-            <p className="text-xs text-muted-foreground">{storagePercent}% used · {formatBytes(usage.addonStorageBytes)} add-on</p>
+            <p className="text-xs text-muted-foreground">
+              {storagePercent}% used · {formatBytes(usage.addonStorageBytes)}{" "}
+              add-on
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -165,9 +269,12 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
               <HandCoins className="size-4" />
               <p className="text-xs font-medium">Giving (all time)</p>
             </div>
-            <p className="font-heading text-xl font-bold">{formatMoney(usage.donationsTotalAllTime)}</p>
+            <p className="font-heading text-xl font-bold">
+              {formatMoney(usage.donationsTotalAllTime)}
+            </p>
             <p className="text-xs text-muted-foreground">
-              {formatMoney(usage.offeringsTotalAllTime)} offerings · {usage.activeFundraisers} active fundraisers
+              {formatMoney(usage.offeringsTotalAllTime)} offerings ·{" "}
+              {usage.activeFundraisers} active fundraisers
             </p>
           </CardContent>
         </Card>
@@ -177,8 +284,12 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
               <AlertTriangle className="size-4" />
               <p className="text-xs font-medium">Delivery failures</p>
             </div>
-            <p className="font-heading text-xl font-bold">{usage.deliveryFailuresLast30Days}</p>
-            <p className="text-xs text-muted-foreground">Last 30 days, across email/SMS/WhatsApp</p>
+            <p className="font-heading text-xl font-bold">
+              {usage.deliveryFailuresLast30Days}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Last 30 days, across email/SMS/WhatsApp
+            </p>
           </CardContent>
         </Card>
       </div>

@@ -3,12 +3,26 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Check, X, Sparkles } from "lucide-react";
-import { PLANS, priceForInterval, type BillingInterval } from "@/lib/plans/config";
+import {
+  PLANS,
+  priceForInterval,
+  type BillingInterval,
+} from "@/lib/plans/config";
 import { formatPrice, GST_PERCENT, withGst } from "@/lib/billing/gst";
-import { PLAN_ORDER, planFeatureRows, planDescription } from "@/lib/plans/display";
+import {
+  PLAN_ORDER,
+  planFeatureRows,
+  planDescription,
+} from "@/lib/plans/display";
 import { CustomPlanRequestDialog } from "@/components/landing/CustomPlanRequestDialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTab, TabsIndicator } from "@/components/ui/tabs";
 
@@ -31,12 +45,18 @@ const FEATURED_PLAN_ID = "premium";
 // already uses — one source of truth, so a future price or limit change
 // never has to be made in two places.
 export function PricingSection() {
-  const [billingInterval, setBillingInterval] = useState<BillingInterval>("monthly");
+  const [billingInterval, setBillingInterval] =
+    useState<BillingInterval>("monthly");
 
   return (
     <>
       <div className="mb-8 flex justify-center">
-        <Tabs value={billingInterval} onValueChange={(v) => setBillingInterval((v as BillingInterval) ?? "monthly")}>
+        <Tabs
+          value={billingInterval}
+          onValueChange={(v) =>
+            setBillingInterval((v as BillingInterval) ?? "monthly")
+          }
+        >
           <TabsList>
             <TabsIndicator />
             <TabsTab value="monthly">Monthly</TabsTab>
@@ -56,7 +76,10 @@ export function PricingSection() {
           const featured = planId === FEATURED_PLAN_ID;
           const price = priceForInterval(plan, billingInterval);
           return (
-            <Card key={planId} className={featured ? "border-primary shadow-lg" : undefined}>
+            <Card
+              key={planId}
+              className={featured ? "border-primary shadow-lg" : undefined}
+            >
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg">{plan.name}</CardTitle>
@@ -64,7 +87,10 @@ export function PricingSection() {
                 </div>
                 <p className="font-heading text-3xl font-bold">{price.label}</p>
                 <p className="text-xs text-muted-foreground">
-                  + {GST_PERCENT}% GST ({formatPrice(withGst(price.amount).total)} {billingInterval === "monthly" ? "a month" : "a year"} in total)
+                  + {GST_PERCENT}% GST (
+                  {formatPrice(withGst(price.amount).total)}{" "}
+                  {billingInterval === "monthly" ? "a month" : "a year"} in
+                  total)
                 </p>
                 <CardDescription>{planDescription(planId)}</CardDescription>
               </CardHeader>
@@ -77,7 +103,13 @@ export function PricingSection() {
                       ) : (
                         <X className="mt-0.5 size-4 shrink-0 text-muted-foreground/50" />
                       )}
-                      <span className={row.included ? "" : "text-muted-foreground/60"}>{row.label}</span>
+                      <span
+                        className={
+                          row.included ? "" : "text-muted-foreground/60"
+                        }
+                      >
+                        {row.label}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -91,11 +123,12 @@ export function PricingSection() {
             </Card>
           );
         })}
-
       </div>
 
       <p className="mt-6 text-center text-xs text-muted-foreground">
-        All prices are shown without GST. {GST_PERCENT}% GST is added at checkout, and a GST tax invoice is emailed to you with every payment, for plans and add-on packs alike.
+        All prices are shown without GST. {GST_PERCENT}% GST is added at
+        checkout, and a GST tax invoice is emailed to you with every payment,
+        for plans and add-on packs alike.
       </p>
 
       <Card className="mt-6 overflow-hidden border-primary/30 bg-gradient-to-r from-primary/5 via-transparent to-transparent">
@@ -105,8 +138,12 @@ export function PricingSection() {
               <Sparkles className="size-5 text-primary" />
             </div>
             <div>
-              <p className="font-heading text-lg font-bold">Need something custom?</p>
-              <p className="mt-1 text-sm text-muted-foreground">For churches that need something outside the standard plans.</p>
+              <p className="font-heading text-lg font-bold">
+                Need something custom?
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                For churches that need something outside the standard plans.
+              </p>
               <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 {CUSTOM_PLAN_HIGHLIGHTS.map((highlight) => (
                   <li key={highlight} className="flex items-center gap-1.5">
@@ -117,7 +154,10 @@ export function PricingSection() {
               </ul>
             </div>
           </div>
-          <CustomPlanRequestDialog triggerLabel="Request a Custom plan" triggerClassName="shrink-0" />
+          <CustomPlanRequestDialog
+            triggerLabel="Request a Custom plan"
+            triggerClassName="shrink-0"
+          />
         </CardContent>
       </Card>
     </>

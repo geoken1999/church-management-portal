@@ -179,6 +179,10 @@ export function CustomPlanDialog({
               <Input id="formsLimit" name="formsLimit" type="number" min={0} defaultValue={nullableIntDefault(overrides.formsLimit)} />
             </div>
             <div className="space-y-1.5">
+              <Label htmlFor="groupLimit">Chat groups (blank = unlimited)</Label>
+              <Input id="groupLimit" name="groupLimit" type="number" min={0} defaultValue={nullableIntDefault(overrides.groupLimit)} />
+            </div>
+            <div className="space-y-1.5">
               <Label htmlFor="maxAdditionalAdmins">Added admin seats</Label>
               <Input id="maxAdditionalAdmins" name="maxAdditionalAdmins" type="number" min={0} defaultValue={overrides.maxAdditionalAdmins} />
             </div>

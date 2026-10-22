@@ -475,12 +475,11 @@ export function OnboardingWizard({
               <p className="mt-2 text-xs text-muted-foreground">
                 Members: 350 are included, and the count goes up or down by 100
                 at a time. Each extra 100 adds ₹{MEMBERS_STEP_PRICE} a month
-                (before GST), worked out for you. Blank means none for monthly
-                emails, SMS, WhatsApp and AI replies. For the size limits
-                (storage, members, branches, forms, logins, call length, social
-                accounts) blank means the Starter plan&apos;s number, so a
-                tenant never gets more than you priced. Mobile app features
-                default to 15.
+                (before GST), worked out for you. Anything left blank gets the
+                Starter plan&apos;s number (emails, SMS, WhatsApp and AI
+                replies, storage, members, branches, forms, chat groups, logins,
+                call length, social accounts), so a tenant never gets more than
+                you priced. Mobile app features default to 15.
               </p>
             </div>
 

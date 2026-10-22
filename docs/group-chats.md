@@ -23,6 +23,13 @@ People → **Groups** (web) and **Group chats** (member app Space tab, team app 
 - Posting from the web makes a team login part of the group (as an admin), so they are notified of replies.
 - Announcements: group admins, or anyone with Write on the Groups tab.
 
+## Plan limits
+
+A church can have at most **3 groups on Starter, 7 on Growth and 15 on Pro** (`groupLimit` in `src/lib/plans/config.ts`; archived
+groups do not count, so archiving frees a place). `checkGroupQuota` (plans/dal.ts) refuses a new group over the limit with a
+message that says so. Custom plans: set "Chat groups" in the Custom rules dialog, or as a credit in the onboarding wizard
+(Capacity > Chat groups; blank = the Starter 3).
+
 ## Delivery speed and mentions
 
 - The web chat receives messages through Realtime, like the apps. Team logins with access to the Groups tab may select

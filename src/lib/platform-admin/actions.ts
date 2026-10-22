@@ -219,6 +219,7 @@ export async function setTenantCustomPlanLimits(
     branchLimit: readNullableInt(formData, "branchLimit"),
     memberLimit: readNullableInt(formData, "memberLimit"),
     formsLimit: readNullableInt(formData, "formsLimit"),
+    groupLimit: readNullableInt(formData, "groupLimit"),
     financeEnabled: formData.get("financeEnabled") === "on",
     ownPaymentGatewayEnabled: formData.get("ownPaymentGatewayEnabled") === "on",
     socialMediaEnabled: formData.get("socialMediaEnabled") === "on",

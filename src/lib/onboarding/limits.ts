@@ -11,6 +11,7 @@ type LimitFields = Pick<
   | "memberLimit"
   | "branchLimit"
   | "formsLimit"
+  | "groupLimit"
   | "maxAdditionalAdmins"
   | "maxAdditionalStaff"
   | "kmeetMaxDurationMinutes"
@@ -19,10 +20,11 @@ type LimitFields = Pick<
   | "mobileFeatureLimit"
 >;
 
-// The limits a custom plan's tenant gets from what the platform admin set. Monthly emails, SMS,
-// WhatsApp and AI replies are none unless given. The size limits fall back to the Starter plan's
-// numbers unless set (or set to no limit), so a tenant never gets more than was priced. Mobile app
-// features default to 15, the most the app allows.
+// The limits a custom plan's tenant gets from what the platform admin set. Every limit that was not
+// set falls back to the Starter plan's number (monthly emails, SMS, WhatsApp and AI replies, storage,
+// members, branches, forms, chat groups, logins, call length, social accounts), or to no limit where the
+// admin chose that, so a tenant never gets more than was priced. Mobile app features default to 15,
+// the most the app allows.
 export function limitsFor(credits: Credits): LimitFields {
   const starter = PLANS.basic;
   const size = (
@@ -30,16 +32,17 @@ export function limitsFor(credits: Credits): LimitFields {
     fallback: number | null,
   ): number | null => (line?.unlimited ? null : line ? line.count : fallback);
   return {
-    emailsPerMonth: credits.email?.count ?? 0,
-    smsPerMonth: credits.sms?.count ?? 0,
-    whatsappPerMonth: credits.whatsapp?.count ?? 0,
-    aiRepliesPerMonth: credits.ai?.count ?? 0,
+    emailsPerMonth: credits.email?.count ?? starter.emailsPerMonth,
+    smsPerMonth: credits.sms?.count ?? starter.smsPerMonth,
+    whatsappPerMonth: credits.whatsapp?.count ?? starter.whatsappPerMonth,
+    aiRepliesPerMonth: credits.ai?.count ?? starter.aiRepliesPerMonth,
     storageBytes: credits.storage
       ? credits.storage.count * 1024 ** 3
       : starter.storageBytes,
     memberLimit: size(credits.members, starter.memberLimit),
     branchLimit: size(credits.branches, starter.branchLimit),
     formsLimit: size(credits.forms, starter.formsLimit),
+    groupLimit: size(credits.groups, starter.groupLimit),
     maxAdditionalAdmins: credits.admins?.count ?? starter.maxAdditionalAdmins,
     maxAdditionalStaff: credits.staff?.count ?? starter.maxAdditionalStaff,
     kmeetMaxDurationMinutes: size(

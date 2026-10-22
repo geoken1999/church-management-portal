@@ -584,6 +584,24 @@ export async function checkFormsQuota(
   return null;
 }
 
+// Chat groups (People > Groups) the church has at once. Archived groups do not count, so archiving frees a place.
+export async function checkGroupQuota(
+  organizationId: string,
+): Promise<string | null> {
+  const { plan } = await getPlanUsage(organizationId);
+  if (plan.groupLimit === null) return null;
+  const supabase = createAdminClient();
+  const { count } = await supabase
+    .from("church_groups")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .is("archived_at", null);
+  if ((count ?? 0) >= plan.groupLimit) {
+    return `Your ${plan.name} plan allows up to ${plan.groupLimit} chat groups. Archive one or upgrade your plan to add more.`;
+  }
+  return null;
+}
+
 // Only active automations count against the plan's "at a time" limit. Drafts
 // and paused automations are free to keep. Enforced at activation, atomically,
 // by the activate_automation_within_limit database function (migration 0110).

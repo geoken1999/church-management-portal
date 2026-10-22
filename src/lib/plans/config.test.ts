@@ -209,3 +209,30 @@ describe("ADDON_PACKS", () => {
     }
   });
 });
+
+describe("chat group limits", () => {
+  it("allows 3 groups on Starter, 7 on Growth and 15 on Pro", () => {
+    expect(PLANS.basic.groupLimit).toBe(3);
+    expect(PLANS.premium.groupLimit).toBe(7);
+    expect(PLANS.pro.groupLimit).toBe(15);
+  });
+  it("lets a custom plan change it, or remove it", () => {
+    const {
+      id: _id,
+      name: _n,
+      priceInRupees: _p,
+      priceLabel: _pl,
+      priceInRupeesAnnual: _pa,
+      priceLabelAnnual: _pla,
+      ...rules
+    } = PLANS.basic;
+    void [_id, _n, _p, _pl, _pa, _pla];
+    expect(
+      resolvePlanLimits("basic", { ...rules, groupLimit: 12 }).groupLimit,
+    ).toBe(12);
+    expect(
+      resolvePlanLimits("basic", { ...rules, groupLimit: null }).groupLimit,
+    ).toBeNull();
+    expect(resolvePlanLimits("basic", null).groupLimit).toBe(3);
+  });
+});

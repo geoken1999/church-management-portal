@@ -82,9 +82,9 @@ export async function getOnboardingDocuments(
 
 // Switches a tenant's chosen modules and limits on: the Pro plan's rules for everything not set
 // here, with every module not chosen turned off for this tenant. What the platform admin set is
-// exactly what the tenant gets: monthly emails, SMS, WhatsApp and AI replies are none unless given;
-// the size limits (storage, members, branches, forms, logins, call length, social accounts) fall
-// back to the Starter plan's numbers unless set, so a tenant never gets more than was priced.
+// exactly what the tenant gets: every limit that was not set (monthly emails, SMS, WhatsApp and AI
+// replies, storage, members, branches, forms, chat groups, logins, call length, social accounts) falls
+// back to the Starter plan's number, so a tenant never gets more than was priced.
 export async function applyOnboardingModules(
   organizationId: string,
   modules: string[],

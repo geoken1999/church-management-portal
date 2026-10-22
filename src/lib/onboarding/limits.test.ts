@@ -13,6 +13,7 @@ describe("limitsFor", () => {
         members: { count: 3050, price: 500 },
         branches: { count: 8, price: 0 },
         forms: { unlimited: true, price: 0 },
+        groups: { count: 12, price: 0 },
         admins: { count: 4, price: 0 },
         staff: { count: 12, price: 0 },
         kmeet: { unlimited: true, price: 50 },
@@ -24,12 +25,13 @@ describe("limitsFor", () => {
     expect(limits).toMatchObject({
       emailsPerMonth: 20000,
       smsPerMonth: 500,
-      whatsappPerMonth: 0,
-      aiRepliesPerMonth: 0,
+      whatsappPerMonth: PLANS.basic.whatsappPerMonth,
+      aiRepliesPerMonth: PLANS.basic.aiRepliesPerMonth,
       storageBytes: 50 * 1024 ** 3,
       memberLimit: 3050,
       branchLimit: 8,
       formsLimit: null,
+      groupLimit: 12,
       maxAdditionalAdmins: 4,
       maxAdditionalStaff: 12,
       kmeetMaxDurationMinutes: null,
@@ -46,7 +48,11 @@ describe("limitsFor", () => {
       PLANS.basic.kmeetMaxDurationMinutes,
     );
     expect(limits.storageBytes).toBe(PLANS.basic.storageBytes);
-    expect(limits.emailsPerMonth).toBe(0);
+    expect(limits.emailsPerMonth).toBe(PLANS.basic.emailsPerMonth);
+    expect(limits.smsPerMonth).toBe(PLANS.basic.smsPerMonth);
+    expect(limits.whatsappPerMonth).toBe(PLANS.basic.whatsappPerMonth);
+    expect(limits.aiRepliesPerMonth).toBe(PLANS.basic.aiRepliesPerMonth);
+    expect(limits.groupLimit).toBe(3);
     expect(limits.mobileFeatureLimit).toBe(15);
   });
 

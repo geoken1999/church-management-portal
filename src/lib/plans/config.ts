@@ -55,6 +55,8 @@ export interface PlanLimits {
   branchLimit: number | null;
   memberLimit: number | null;
   formsLimit: number | null;
+  // How many chat groups (People > Groups) a church can have at once; archived groups do not count. null = unlimited.
+  groupLimit: number | null;
   // Whole-module gates, independent of the tab permissions matrix — that
   // matrix decides who *within* an org can use a tab; this decides whether
   // the org has the tab at all, and applies even to the owner.
@@ -141,6 +143,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
       branchLimit: 3,
       memberLimit: 350,
       formsLimit: 20,
+      groupLimit: 3,
       financeEnabled: true,
       ownPaymentGatewayEnabled: false,
       socialMediaEnabled: true,
@@ -174,6 +177,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
       branchLimit: 10,
       memberLimit: 2000,
       formsLimit: 100,
+      groupLimit: 7,
       financeEnabled: true,
       ownPaymentGatewayEnabled: true,
       socialMediaEnabled: true,
@@ -204,6 +208,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
       branchLimit: 20,
       memberLimit: 10000,
       formsLimit: null,
+      groupLimit: 15,
       financeEnabled: true,
       ownPaymentGatewayEnabled: true,
       socialMediaEnabled: true,

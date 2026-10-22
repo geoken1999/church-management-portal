@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkTabAccess } from "@/lib/permissions/dal";
+import { checkGroupQuota } from "@/lib/plans/dal";
 import {
   addMembers,
   addStaff,
@@ -58,6 +59,8 @@ export async function createGroupAction(
 ): Promise<GroupResult> {
   const access = await allowed(organizationId, "write");
   if (!access.ok) return fail(access.message);
+  const capError = await checkGroupQuota(organizationId);
+  if (capError) return fail(capError);
   const result = await createGroup(organizationId, access.userId, {
     name,
     description,

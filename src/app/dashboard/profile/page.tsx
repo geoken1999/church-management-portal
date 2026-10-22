@@ -196,6 +196,7 @@ export default async function ProfilePage() {
               <li>{plan.branchLimit === null ? "Unlimited branches" : `Up to ${plan.branchLimit} branches`}</li>
               <li>{plan.memberLimit === null ? "Unlimited members" : `Up to ${plan.memberLimit.toLocaleString()} members`}</li>
               <li>{plan.formsLimit === null ? "Unlimited forms" : `Up to ${plan.formsLimit} forms`}</li>
+              <li>{plan.groupLimit === null ? "Unlimited chat groups" : `Up to ${plan.groupLimit} chat groups`}</li>
               <li>
                 {plan.financeEnabled
                   ? plan.ownPaymentGatewayEnabled

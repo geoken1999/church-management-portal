@@ -66,6 +66,7 @@ export type CreditKey =
   | "members"
   | "branches"
   | "forms"
+  | "groups"
   | "admins"
   | "staff"
   | "kmeet"
@@ -151,6 +152,14 @@ export const CREDIT_TYPES: CreditType[] = [
     group: "Capacity",
     canBeUnlimited: true,
     max: 1_000_000,
+  },
+  {
+    key: "groups",
+    label: "Chat groups",
+    unit: "groups",
+    group: "Capacity",
+    canBeUnlimited: true,
+    max: 100_000,
   },
   {
     key: "admins",

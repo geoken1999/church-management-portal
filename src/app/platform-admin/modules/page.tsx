@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
 import { getModulePricing } from "@/lib/onboarding/store";
 import { Button } from "@/components/ui/button";
-import { FileDown } from "lucide-react";
+import { Eye } from "lucide-react";
 import { ModulePricingPanel } from "@/components/platform-admin/ModulePricingPanel";
 
 export const metadata: Metadata = {
@@ -32,15 +32,19 @@ export default async function ModulesPricingPage() {
           <p className="font-medium">Price sheet (PDF)</p>
           <p className="text-sm text-muted-foreground">
             The plans, these module prices, the block prices of a custom package
-            and the add-on packs, ready to share. It always uses the prices
-            saved on this page.
+            and the add-on packs. It opens in a new tab and always uses the
+            prices saved on this page.
           </p>
         </div>
         <Button
           nativeButton={false}
           render={
-            <a href="/api/platform-admin/pricing-pdf" download>
-              <FileDown className="size-4" /> Download PDF
+            <a
+              href="/api/platform-admin/pricing-pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Eye className="size-4" /> View PDF
             </a>
           }
         />

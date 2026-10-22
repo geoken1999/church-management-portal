@@ -22,7 +22,8 @@ export async function GET() {
   return new NextResponse(new Uint8Array(bytes), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": 'attachment; filename="kingdomflow-pricing.pdf"',
+      // Shown in the browser (not downloaded); the name is only what a "save" from the viewer would suggest.
+      "Content-Disposition": 'inline; filename="kingdomflow-pricing.pdf"',
       "Cache-Control": "private, no-store",
     },
   });

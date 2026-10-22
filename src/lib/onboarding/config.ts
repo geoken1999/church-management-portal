@@ -338,37 +338,39 @@ export interface OnboardingDocType {
   required: boolean;
 }
 
-// The legal documents collected from a tenant.
+// The documents collected from a tenant. Only two are mandatory: a personal ID proof and an address proof. The rest
+// are optional and can be added when the tenant has them. (The ID's stored type stays "signatory_id", the key
+// documents already uploaded were saved under.)
 export const ONBOARDING_DOCS: OnboardingDocType[] = [
   {
-    type: "registration",
-    label: "Registration certificate",
-    help: "Trust deed, society or company registration.",
-    required: true,
-  },
-  {
-    type: "pan",
-    label: "Organisation PAN card",
-    help: "PAN of the organisation.",
-    required: true,
-  },
-  {
     type: "signatory_id",
-    label: "Authorised signatory ID",
-    help: "Government ID of the person signing for the organisation.",
+    label: "Personal ID proof",
+    help: "Government photo ID of the person: Aadhaar, passport, voter ID or driving licence.",
     required: true,
   },
   {
     type: "address_proof",
     label: "Address proof",
-    help: "Recent utility bill, rent agreement or similar for the registered address.",
+    help: "Recent utility bill, rent agreement, bank statement or similar showing the address.",
     required: true,
+  },
+  {
+    type: "registration",
+    label: "Registration certificate",
+    help: "Trust deed, society or company registration, if there is one.",
+    required: false,
+  },
+  {
+    type: "pan",
+    label: "Organisation PAN card",
+    help: "PAN of the organisation, if it has one.",
+    required: false,
   },
   {
     type: "agreement",
     label: "Signed service agreement",
-    help: "The signed KingdomFlow agreement.",
-    required: true,
+    help: "The signed KingdomFlow agreement, if one was signed.",
+    required: false,
   },
   {
     type: "bank",

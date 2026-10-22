@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ONBOARDING_DOCS,
   ONBOARDING_MODULES,
   cleanCredits,
   quoteFor,
@@ -109,5 +110,23 @@ describe("members in a custom plan", () => {
   it("adds the member blocks to the quote", () => {
     const credits = cleanCredits({ members: { count: 750 } });
     expect(quoteFor([], {}, credits).base).toBe(120);
+  });
+});
+
+describe("onboarding documents", () => {
+  it("makes exactly two mandatory: a personal ID proof and an address proof", () => {
+    const required = ONBOARDING_DOCS.filter((d) => d.required);
+    expect(required.map((d) => d.label)).toEqual([
+      "Personal ID proof",
+      "Address proof",
+    ]);
+    expect(ONBOARDING_DOCS.filter((d) => !d.required).length).toBeGreaterThan(
+      0,
+    );
+  });
+  it("keeps the stored type of the ID proof, so earlier uploads still count", () => {
+    expect(
+      ONBOARDING_DOCS.some((d) => d.type === "signatory_id" && d.required),
+    ).toBe(true);
   });
 });

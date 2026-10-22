@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { Plus, Pencil, Trash2, Mail, Phone, MapPin, X, Check, Inbox, Search, Upload, Download } from "lucide-react";
+import { Plus, Pencil, Trash2, Mail, Phone, MapPin, X, Inbox, Search, Upload, Download } from "lucide-react";
 import {
   createMember,
   updateMember,
@@ -11,6 +11,7 @@ import {
   bulkDeleteMembers,
   type MemberFormState,
 } from "@/lib/members/actions";
+import { ReviewButtons } from "@/components/ui/review-buttons";
 import { approveMemberProfileUpdateRequest, rejectMemberProfileUpdateRequest } from "@/lib/members/profile-update-actions";
 import { downloadMemberTemplate, bulkImportMembers } from "@/lib/members/bulk-actions";
 import { PublicJoinLinkCard } from "@/components/members/PublicJoinLinkCard";
@@ -553,22 +554,7 @@ function PendingRequestCard({ member }: { member: MemberWithBranch }) {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <form action={approveMember}>
-            <input type="hidden" name="memberId" value={member.id} />
-            <Button type="submit" size="sm">
-              <Check className="size-3.5" />
-              Approve
-            </Button>
-          </form>
-          <form action={deleteMember}>
-            <input type="hidden" name="memberId" value={member.id} />
-            <Button type="submit" variant="ghost" size="sm">
-              <Trash2 className="size-3.5" />
-              Reject
-            </Button>
-          </form>
-        </div>
+        <ReviewButtons approve={approveMember} reject={deleteMember} field="memberId" value={member.id} rejectLabel="Reject" rejectVariant="ghost" />
       </CardContent>
     </Card>
   );
@@ -616,22 +602,7 @@ function ProfileUpdateRequestCard({ request }: { request: ProfileUpdateRequestWi
             );
           })}
         </div>
-        <div className="flex items-center gap-2">
-          <form action={approveMemberProfileUpdateRequest}>
-            <input type="hidden" name="requestId" value={request.id} />
-            <Button type="submit" size="sm">
-              <Check className="size-3.5" />
-              Approve
-            </Button>
-          </form>
-          <form action={rejectMemberProfileUpdateRequest}>
-            <input type="hidden" name="requestId" value={request.id} />
-            <Button type="submit" variant="ghost" size="sm">
-              <X className="size-3.5" />
-              Reject
-            </Button>
-          </form>
-        </div>
+        <ReviewButtons approve={approveMemberProfileUpdateRequest} reject={rejectMemberProfileUpdateRequest} field="requestId" value={request.id} rejectVariant="ghost" />
       </CardContent>
     </Card>
   );

@@ -24,6 +24,13 @@ export async function memberForAuthUser(authUserId: string) {
   return data ?? null;
 }
 
+/** Member ids that are already in a family (a person can be in one family only). */
+async function inAFamily(memberIds: string[]): Promise<Set<string>> {
+  if (memberIds.length === 0) return new Set();
+  const { data } = await createAdminClient().from("family_members").select("member_id").in("member_id", memberIds);
+  return new Set((data ?? []).map((r) => r.member_id));
+}
+
 const fullName = (m: { first_name: string; last_name: string | null }) =>
   `${m.first_name} ${m.last_name ?? ""}`.trim();
 
@@ -52,9 +59,12 @@ export async function searchMembersForFamily(
     .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,phone.ilike.%${q}%`)
     .order("first_name")
     .limit(15);
+  const taken = await inAFamily((data ?? []).map((m) => m.id));
   return {
     ok: true,
-    people: (data ?? []).map((m) => ({ id: m.id, name: fullName(m), phone: maskPhone(m.phone) })),
+    people: (data ?? [])
+      .filter((m) => !taken.has(m.id))
+      .map((m) => ({ id: m.id, name: fullName(m), phone: maskPhone(m.phone) })),
   };
 }
 
@@ -62,7 +72,9 @@ export type MyFamily = {
   id: string;
   name: string;
   notes: string | null;
-  people: { name: string; relationship: string; isMe: boolean }[];
+  /** The caller asked for this family, so they can edit it. */
+  isOwner: boolean;
+  people: { memberId: string; name: string; relationship: string; isMe: boolean }[];
 };
 
 /** The caller's families, and their latest request (so the app can show "waiting" or "not approved"). */
@@ -75,7 +87,7 @@ export async function myFamilies(authUserId: string) {
   const families: MyFamily[] = [];
   if (ids.length > 0) {
     const [{ data: rows }, { data: people }] = await Promise.all([
-      admin.from("families").select("id, name, notes").in("id", ids).order("name"),
+      admin.from("families").select("id, name, notes, owner_member_id").in("id", ids).order("name"),
       admin.from("family_members").select("family_id, member_id, relationship, members(first_name, last_name)").in("family_id", ids),
     ]);
     for (const family of rows ?? []) {
@@ -83,9 +95,11 @@ export async function myFamilies(authUserId: string) {
         id: family.id,
         name: family.name,
         notes: family.notes,
+        isOwner: family.owner_member_id === me.id,
         people: (people ?? [])
           .filter((p) => p.family_id === family.id)
           .map((p) => ({
+            memberId: p.member_id,
             name: p.members ? fullName(p.members) : "Member",
             relationship: p.relationship,
             isMe: p.member_id === me.id,
@@ -131,7 +145,11 @@ export async function submitFamilyRequest(
   if (invalid) return { ok: false, error: invalid };
 
   const admin = createAdminClient();
+  if ((await inAFamily([me.id])).size > 0)
+    return { ok: false, error: "You're already in a family. A person can be in one family only." };
   if (input.people.length > 0) {
+    const taken = await inAFamily(input.people.map((p) => p.memberId));
+    if (taken.size > 0) return { ok: false, error: "One of the people you picked is already in a family." };
     const { data: found } = await admin
       .from("members")
       .select("id")
@@ -203,6 +221,10 @@ export async function reviewFamilyRequest(input: {
       .in("id", wanted.map((p) => p.member_id));
     const ok = new Set((valid ?? []).map((m) => m.id));
     if (!ok.has(request.requested_by)) return { ok: false, error: "The member who asked is no longer active." };
+    // One family per person: anyone who joined another family meanwhile is left out.
+    const taken = await inAFamily([...ok]);
+    if (taken.has(request.requested_by)) return { ok: false, error: "The member who asked is already in a family." };
+    for (const id of taken) ok.delete(id);
 
     const { data: family, error: familyError } = await admin
       .from("families")
@@ -211,6 +233,7 @@ export async function reviewFamilyRequest(input: {
         name: request.name,
         notes: request.notes,
         created_by: input.reviewerId,
+        owner_member_id: request.requested_by,
       })
       .select("id")
       .single();
@@ -251,5 +274,88 @@ export async function reviewFamilyRequest(input: {
       ? `The "${request.name}" family is now in your church's records.`
       : `Your church didn't approve the "${request.name}" family request.`,
   );
+  return { ok: true };
+}
+
+// ---- The family's owner (and everyone else in it) managing it from the app ----
+
+async function ownFamily(authUserId: string, familyId: string) {
+  const me = await memberForAuthUser(authUserId);
+  if (!me) return null;
+  const admin = createAdminClient();
+  const { data: family } = await admin
+    .from("families")
+    .select("id, organization_id, owner_member_id")
+    .eq("id", familyId)
+    .maybeSingle();
+  if (!family || family.organization_id !== me.organization_id) return null;
+  const { data: mine } = await admin
+    .from("family_members")
+    .select("id")
+    .eq("family_id", familyId)
+    .eq("member_id", me.id)
+    .maybeSingle();
+  if (!mine) return null;
+  return { me, family, isOwner: family.owner_member_id === me.id };
+}
+
+const NOT_YOURS = "Only the person who created this family can change it.";
+
+export async function renameMyFamily(authUserId: string, familyId: string, name: string, notes: string): Promise<Answer> {
+  const ctx = await ownFamily(authUserId, familyId);
+  if (!ctx) return { ok: false, error: "That family could not be found." };
+  if (!ctx.isOwner) return { ok: false, error: NOT_YOURS };
+  if (name.trim().length < 2) return { ok: false, error: "Give the family a name (at least 2 letters)." };
+  const { error } = await createAdminClient()
+    .from("families")
+    .update({ name: name.trim(), notes: notes.trim() || null })
+    .eq("id", familyId);
+  return error ? { ok: false, error: "Couldn't save that. Please try again." } : { ok: true };
+}
+
+export async function addToMyFamily(authUserId: string, familyId: string, memberId: string, relationship: string): Promise<Answer> {
+  const ctx = await ownFamily(authUserId, familyId);
+  if (!ctx) return { ok: false, error: "That family could not be found." };
+  if (!ctx.isOwner) return { ok: false, error: NOT_YOURS };
+  if (relationship.trim().length < 2) return { ok: false, error: "Say what this person is in the family, for example Son." };
+  const admin = createAdminClient();
+  const { count } = await admin.from("family_members").select("id", { count: "exact", head: true }).eq("family_id", familyId);
+  if ((count ?? 0) >= MAX_FAMILY_PEOPLE + 1) return { ok: false, error: `A family can have up to ${MAX_FAMILY_PEOPLE + 1} people.` };
+  const { data: person } = await admin
+    .from("members")
+    .select("id")
+    .eq("id", memberId)
+    .eq("organization_id", ctx.me.organization_id)
+    .eq("status", "active")
+    .maybeSingle();
+  if (!person) return { ok: false, error: "That person isn't a member of this church." };
+  if ((await inAFamily([memberId])).size > 0) return { ok: false, error: "That person is already in a family." };
+  const { error } = await admin.from("family_members").insert({
+    organization_id: ctx.me.organization_id,
+    family_id: familyId,
+    member_id: memberId,
+    relationship: relationship.trim(),
+  });
+  if (error) return { ok: false, error: "Couldn't add that person. Please try again." };
+  await notifyMember(memberId, "You were added to a family", `You are now in the "${await familyName(familyId)}" family.`);
+  return { ok: true };
+}
+
+async function familyName(familyId: string): Promise<string> {
+  const { data } = await createAdminClient().from("families").select("name").eq("id", familyId).maybeSingle();
+  return data?.name ?? "";
+}
+
+/** The owner removes someone else; anyone else in the family can only remove themselves (leave). */
+export async function removeFromMyFamily(authUserId: string, familyId: string, memberId: string): Promise<Answer> {
+  const ctx = await ownFamily(authUserId, familyId);
+  if (!ctx) return { ok: false, error: "That family could not be found." };
+  const leaving = memberId === ctx.me.id;
+  if (leaving && ctx.isOwner)
+    return { ok: false, error: "You created this family, so you can't leave it. Ask your church admin if it needs to be removed." };
+  if (!leaving && !ctx.isOwner) return { ok: false, error: NOT_YOURS };
+  const { error } = await createAdminClient().from("family_members").delete().eq("family_id", familyId).eq("member_id", memberId);
+  if (error) return { ok: false, error: "Couldn't do that. Please try again." };
+  if (!leaving) await notifyMember(memberId, "You were removed from a family", `You are no longer in the "${await familyName(familyId)}" family.`);
   return { ok: true };
 }

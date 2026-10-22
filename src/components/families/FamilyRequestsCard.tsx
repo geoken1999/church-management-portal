@@ -1,7 +1,7 @@
-import { Check, X, House } from "lucide-react";
+import { House } from "lucide-react";
 import { approveFamilyRequest, rejectFamilyRequest } from "@/lib/families/actions";
 import type { FamilyRequest } from "@/types/database";
-import { Button } from "@/components/ui/button";
+import { ReviewButtons } from "@/components/ui/review-buttons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Person = { id: string; first_name: string; last_name: string };
@@ -53,19 +53,8 @@ export function FamilyRequestsCard({
             </ul>
             {r.notes ? <p className="mt-2 text-sm">{r.notes}</p> : null}
             {canReview ? (
-              <div className="mt-3 flex gap-2">
-                <form action={approveFamilyRequest}>
-                  <input type="hidden" name="requestId" value={r.id} />
-                  <Button size="sm" type="submit">
-                    <Check className="size-4" /> Approve
-                  </Button>
-                </form>
-                <form action={rejectFamilyRequest}>
-                  <input type="hidden" name="requestId" value={r.id} />
-                  <Button size="sm" variant="outline" type="submit">
-                    <X className="size-4" /> Reject
-                  </Button>
-                </form>
+              <div className="mt-3">
+                <ReviewButtons approve={approveFamilyRequest} reject={rejectFamilyRequest} field="requestId" value={r.id} />
               </div>
             ) : null}
           </div>

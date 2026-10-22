@@ -420,6 +420,7 @@ export type Family = {
   name: string;
   notes: string | null;
   created_by: string | null;
+  owner_member_id: string | null;
   created_at: string;
   updated_at: string;
 };

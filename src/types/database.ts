@@ -2310,6 +2310,7 @@ export type NotificationType =
   | "prayer_request"
   | "account_deletion_request"
   | "special_days"
+  | "family_request"
   | "bible_school_request";
 
 export type Notification = {

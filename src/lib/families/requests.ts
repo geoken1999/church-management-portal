@@ -3,7 +3,7 @@ import "server-only";
 import { checkFeatureCap } from "@/lib/plans/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyMember } from "@/lib/push/member-notice";
-import { pushToTeam } from "@/lib/push/team";
+import { createNotificationForWebhook } from "@/lib/notifications/create";
 import type { FamilyRequestPerson } from "@/types/database";
 
 // Members ask for a family from the mobile app; an owner or admin approves it. The member
@@ -175,9 +175,10 @@ export async function submitFamilyRequest(
     return { ok: false, error: "Couldn't send that request. Please try again." };
   }
 
-  await pushToTeam({
+  // The web bell, and a push to the owners' and admins' phones.
+  await createNotificationForWebhook({
     organizationId: me.organization_id,
-    tab: "families",
+    type: "family_request",
     title: "Family request to review",
     body: `${fullName(me)} asked to create the "${input.name.trim()}" family.`,
     link: "/dashboard/families",
@@ -380,9 +381,9 @@ export async function addToMyFamily(authUserId: string, familyId: string, member
     if (error.code === "23505") return { ok: false, error: "You already have a request waiting for approval." };
     return { ok: false, error: "Couldn't send that request. Please try again." };
   }
-  await pushToTeam({
+  await createNotificationForWebhook({
     organizationId: ctx.me.organization_id,
-    tab: "families",
+    type: "family_request",
     title: "Family change to review",
     body: `${fullName(ctx.me)} asked to add someone to the "${name}" family.`,
     link: "/dashboard/families",

@@ -4,7 +4,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/plans/dal", () => ({ checkFeatureCap: vi.fn() }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
 vi.mock("@/lib/push/member-notice", () => ({ notifyMember: vi.fn() }));
-vi.mock("@/lib/push/team", () => ({ pushToTeam: vi.fn() }));
+vi.mock("@/lib/notifications/create", () => ({ createNotificationForWebhook: vi.fn() }));
 
 import { validateFamilyRequestInput, MAX_FAMILY_PEOPLE } from "./requests";
 

@@ -6,6 +6,8 @@ import { getAllDeletionRequests } from "@/lib/account-deletion/dal";
 import { processDeletionRequest } from "@/lib/account-deletion/process";
 import { allowedDecisions, type DeletionDecision } from "@/lib/account-deletion/rules";
 import { notifyOrgOfSupportReply } from "@/lib/support/notify-org";
+import { sendBulkEmail } from "@/lib/email/client";
+import { isEmailConfigured } from "@/lib/email/env";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import type { SupportTicketStatus } from "@/types/database";
 import { fail, ok, when, type AdminSection } from "./common";
@@ -180,7 +182,7 @@ const deletions: AdminSection = {
           })),
         },
         {
-          title: "From the web form (process these on the web dashboard)",
+          title: "From the web form",
           items: (forms ?? []).map((f) => ({
             id: `form-${f.id}`,
             title: f.name,
@@ -191,6 +193,18 @@ const deletions: AdminSection = {
               { label: "Relationship", value: f.relationship ?? "—" },
               { label: "Scope", value: f.scope ?? "—" },
             ],
+            actions:
+              f.status === "pending"
+                ? [
+                    {
+                      key: "form_completed",
+                      label: "Mark completed",
+                      confirm: "Mark this request completed and email the person? Delete their data first.",
+                      inputs: [{ key: "note", label: "Note for the person (optional)", kind: "text" as const }],
+                    },
+                    { key: "form_rejected", label: "Decline", danger: true, inputs: [{ key: "note", label: "Why (optional)", kind: "text" as const }] },
+                  ]
+                : undefined,
           })),
         },
       ].filter((g) => g.items.length > 0),
@@ -199,6 +213,38 @@ const deletions: AdminSection = {
   },
   async act(caller, action, id, input) {
     if (!id) return fail("Unknown request.");
+    if (action === "form_completed" || action === "form_rejected") {
+      if (!id.startsWith("form-")) return fail("Unknown request.");
+      const formId = id.slice(5);
+      const decision = action === "form_completed" ? "completed" : "rejected";
+      const admin = createAdminClient();
+      const { data: request } = await admin.from("deletion_form_requests").select("*").eq("id", formId).maybeSingle();
+      if (!request) return fail("That request wasn't found.");
+      if (request.status !== "pending") return fail("Only a confirmed, pending request can be processed.");
+      const note = (input.note ?? "").trim().slice(0, 500);
+      const { error } = await admin
+        .from("deletion_form_requests")
+        .update({ status: decision, outcome_note: note || null, processed_by: caller.userId, processed_at: new Date().toISOString() })
+        .eq("id", formId);
+      if (error) return fail("Couldn't update the request. Please try again.");
+      if (isEmailConfigured()) {
+        const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const done = decision === "completed";
+        await sendBulkEmail({
+          fromName: "KingdomFlow",
+          subject: done ? "Your account deletion request is complete" : "About your account deletion request",
+          html: `<div style="font-family:sans-serif;max-width:480px"><p>Hi ${esc(request.name)},</p><p>${
+            done
+              ? "Your account deletion request has been completed. Your sign-in and the data you asked us to remove have been deleted, apart from records we must keep by law (such as tax invoices)."
+              : "We couldn't complete your deletion request."
+          }</p>${note ? `<p>${esc(note)}</p>` : ""}<p>Questions? Reply to this email.</p></div>`,
+          recipients: [request.email],
+          replyTo: "admin@kingdomflow.in",
+        });
+      }
+      await logPlatformEvent({ level: "warning", source: "platform_admin", message: `Web deletion request ${decision} for ${request.email} by ${caller.email} (admin app)` });
+      return ok("Done.");
+    }
     if (!["delete_account", "delete_account_and_record", "reject"].includes(action))
       return fail("Unknown action.");
     const result = await processDeletionRequest({

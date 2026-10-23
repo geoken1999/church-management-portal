@@ -12,6 +12,7 @@ export const ADMIN_SCOPES = [
   "operations",
   "platform",
   "support",
+  "users",
 ] as const;
 
 export type AdminScope = (typeof ADMIN_SCOPES)[number];
@@ -28,6 +29,9 @@ export function cleanScopes(values: unknown): AdminScope[] {
   if (!Array.isArray(values)) return [];
   return [...new Set(values.filter(isAdminScope))];
 }
+
+/** Scopes a service user can be given: "users" (managing the other admin-app users) is for platform owners only. */
+export const GRANTABLE_SCOPES = ADMIN_SCOPES.filter((s) => s !== "users");
 
 export function hasScope(scopes: readonly AdminScope[], needed: AdminScope) {
   return scopes.includes(needed);

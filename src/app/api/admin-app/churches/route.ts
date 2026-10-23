@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { withAdminScope } from "@/lib/admin-app/auth";
 import { getAllTenants, getTenantUsage } from "@/lib/platform-admin/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getBibleSchoolAccess } from "@/lib/lms/access";
+import { getLiveStreamAccess } from "@/lib/livestream/access";
 import { isPlanId, PLANS } from "@/lib/plans/config";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 
@@ -29,10 +31,16 @@ export const GET = (request: Request) =>
       .select("landing_listed")
       .eq("id", id)
       .maybeSingle();
+    const [bibleSchool, liveStream] = await Promise.all([
+      getBibleSchoolAccess(id),
+      getLiveStreamAccess(id),
+    ]);
     return NextResponse.json({
       ok: true,
       church: usage,
       landingListed: listing?.landing_listed === true,
+      bibleSchool: { enabled: bibleSchool.enabled, requested: Boolean(bibleSchool.requestedAt) },
+      liveStream: { enabled: liveStream.enabled, requested: Boolean(liveStream.requestedAt) },
       plans: Object.values(PLANS).map((p) => ({ id: p.id, name: p.name })),
     });
   });
@@ -40,7 +48,8 @@ export const GET = (request: Request) =>
 const fail = (error: string, status = 400) =>
   NextResponse.json({ ok: false, error }, { status });
 
-// POST {id, action}: extend_trial {days}, set_plan {planId} (comps a plan for free), landing_listed {listed}.
+// POST {id, action}: extend_trial {days}, set_plan {planId} (comps a plan for free), landing_listed {listed},
+// bible_school {enabled}, live_stream {enabled}.
 export const POST = (request: Request) =>
   withAdminScope(request, "churches", async (caller) => {
     let body: Record<string, unknown>;
@@ -108,6 +117,26 @@ export const POST = (request: Request) =>
           .eq("id", id);
         if (error) return fail("Couldn't save that.");
         return NextResponse.json({ ok: true, message: body.listed === true ? "Listed on the landing page." : "Removed from the landing page." });
+      }
+      case "bible_school":
+      case "live_stream": {
+        const enabled = body.enabled === true;
+        const now = new Date().toISOString();
+        const table = body.action === "bible_school" ? "bible_school_access" : "live_stream_access";
+        const { error } = await admin
+          .from(table)
+          .upsert(
+            { organization_id: id, enabled, updated_at: now, ...(enabled ? { enabled_at: now } : {}) },
+            { onConflict: "organization_id" },
+          );
+        if (error) return fail("Couldn't save that.");
+        await logPlatformEvent({
+          level: "info",
+          source: "platform_admin",
+          message: `Platform admin (${caller.email}) ${enabled ? "turned on" : "turned off"} ${body.action === "bible_school" ? "Bible School" : "live streaming"} (admin app)`,
+          organizationId: id,
+        });
+        return NextResponse.json({ ok: true, message: enabled ? "Turned on." : "Turned off." });
       }
       default:
         return fail("Unknown action.");

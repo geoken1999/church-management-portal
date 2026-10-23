@@ -9,8 +9,9 @@ export type SectionTone = "good" | "warn" | "bad" | "info";
 export type SectionInput = {
   key: string;
   label: string;
-  kind: "text" | "number" | "date" | "select" | "multiline";
+  kind: "text" | "number" | "date" | "select" | "multiselect" | "multiline";
   options?: { value: string; label: string }[];
+  /** A multiselect answer comes back as the chosen values joined with commas. */
   required?: boolean;
   placeholder?: string;
   initial?: string;

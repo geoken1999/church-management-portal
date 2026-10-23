@@ -3,6 +3,7 @@ import "server-only";
 import type { AdminScope } from "@/lib/admin-app/scopes";
 import type { AdminSection } from "./common";
 import { financeSections } from "./finance";
+import { manageSections } from "./manage";
 import { operationsSections } from "./operations";
 import { platformSections } from "./platform";
 import { supportSections } from "./support";
@@ -12,6 +13,7 @@ export const ALL_SECTIONS: AdminSection[] = [
   ...operationsSections,
   ...platformSections,
   ...supportSections,
+  ...manageSections,
 ];
 
 export function sectionByKey(key: string): AdminSection | undefined {

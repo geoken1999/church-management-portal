@@ -67,7 +67,8 @@ export async function adminCaller(
     email,
     name: service.display_name || name,
     role: "service",
-    scopes: cleanScopes(service.scopes),
+    // Managing the admin-app users stays with the platform owners.
+    scopes: cleanScopes(service.scopes).filter((scope) => scope !== "users"),
   };
 }
 

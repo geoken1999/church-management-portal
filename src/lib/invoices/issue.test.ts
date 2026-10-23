@@ -82,12 +82,39 @@ describe("issueInvoice", () => {
     const { issueAndEmailInvoice } = await import("@/lib/invoices/issue");
     const id = await issueAndEmailInvoice({ organizationId: "org", kind: "addon", reference: "addon3", description: "Add-on pack: 2,000 email credits", baseAmount: 199 });
     expect(id).toBeTruthy();
-    expect(sendBulkEmail).toHaveBeenCalledTimes(1);
+    // The church's invoice, then our own copy.
+    expect(sendBulkEmail).toHaveBeenCalledTimes(2);
     const call = (sendBulkEmail.mock.calls[0] as unknown as [{ recipients: string[]; attachments: { filename: string; contentType: string; content: Buffer }[]; subject: string }])[0];
     expect(call.recipients).toEqual(["billing@grace.test"]);
     expect(call.subject).toMatch(/KF\/26-27\/\d{6}/);
     expect(call.attachments[0].filename).toMatch(/^Invoice-KF-.*\.pdf$/);
     expect(call.attachments[0].content.subarray(0, 5).toString()).toBe("%PDF-");
     expect(db.invoices[0].email_sent_at).toBeTruthy();
+
+    const copy = (sendBulkEmail.mock.calls[1] as unknown as [{ recipients: string[]; subject: string; attachments: { content: Buffer }[] }])[0];
+    expect(copy.recipients).toEqual([template.email]);
+    expect(copy.subject).toMatch(/^\[Copy\] Tax invoice KF\/26-27\/\d{6} — Grace Church Trust/);
+    expect(copy.attachments[0].content.subarray(0, 5).toString()).toBe("%PDF-");
+    expect(db.invoices[0].copy_emailed_at).toBeTruthy();
+  });
+
+  it("sends our copy even when the church has no email, and only once", async () => {
+    db.details = { ...details, email: "" };
+    const { issueAndEmailInvoice, emailInvoice } = await import("@/lib/invoices/issue");
+    await issueAndEmailInvoice({ organizationId: "org", kind: "addon", reference: "addon4", description: "Add-on pack", baseAmount: 199 });
+    expect(sendBulkEmail).toHaveBeenCalledTimes(1);
+    expect(db.invoices[0].email_error).toBe("No billing email on file.");
+    // Sending it to the church again later doesn't send our copy again.
+    await emailInvoice(db.invoices[0] as never);
+    expect(sendBulkEmail).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("invoiceCopyRecipients", () => {
+  it("prefers INVOICE_COPY_EMAIL, else the template email", async () => {
+    const { invoiceCopyRecipients } = await import("@/lib/invoices/issue");
+    expect(invoiceCopyRecipients("billing@kf.test", " a@x.com, b@x.com ")).toEqual(["a@x.com", "b@x.com"]);
+    expect(invoiceCopyRecipients("billing@kf.test", "")).toEqual(["billing@kf.test"]);
+    expect(invoiceCopyRecipients("", undefined)).toEqual([]);
   });
 });

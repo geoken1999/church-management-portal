@@ -6,9 +6,12 @@ import {
   getPlatformExpensesReport,
 } from "@/lib/platform-admin/finance";
 import {
+  INVESTMENT_CATEGORIES,
   PLATFORM_SERVICES,
+  investmentCategoryLabel,
   platformServiceLabel,
   validateExpenseInput,
+  validateInvestmentInput,
 } from "@/lib/platform-admin/finance-config";
 import {
   getCourseLedgerAdmin,
@@ -44,6 +47,7 @@ const earnings: AdminSection = {
         { label: "All-time expenses", value: inr(r.allTime.expenses) },
         { label: "All-time net", value: inr(r.allTime.net) },
         { label: "Held for churches", value: inr(r.allTime.heldForChurches) },
+        { label: "Invested, all time", value: inr(r.allTime.invested) },
         { label: `This month (${r.thisMonth.month})`, value: inr(r.thisMonth.net) },
       ],
       groups: [
@@ -90,17 +94,37 @@ const expenseInputs = [
   { key: "reference", label: "Reference (optional)", kind: "text" as const },
 ];
 
+const investmentInputs = [
+  { key: "investor", label: "Invested by", kind: "text" as const, required: true },
+  {
+    key: "category",
+    label: "Kind",
+    kind: "select" as const,
+    required: true,
+    initial: "capital",
+    options: INVESTMENT_CATEGORIES.map((c) => ({ value: c.key, label: c.label })),
+  },
+  { key: "amount", label: "Amount (₹)", kind: "number" as const, required: true },
+  { key: "investedOn", label: "Invested on (YYYY-MM-DD)", kind: "date" as const, required: true },
+  { key: "purpose", label: "What it is for (optional)", kind: "text" as const },
+  { key: "reference", label: "Reference (optional)", kind: "text" as const },
+];
+
 const expenses: AdminSection = {
   key: "expenses",
   scope: "finance",
-  title: "Expenses",
-  description: "What it costs to run the platform; record and remove bills",
+  title: "Expenses & investments",
+  description: "What it costs to run the platform and the money put into it",
   icon: "receipt_long",
   async load() {
     const r = await getPlatformExpensesReport();
     return {
       title: "Expenses",
-      actions: [{ key: "add", label: "Record expense", inputs: expenseInputs }],
+      summary: [{ label: "Total invested", value: inr(r.totalInvested) }],
+      actions: [
+        { key: "add", label: "Record expense", inputs: expenseInputs },
+        { key: "invest", label: "Record investment", inputs: investmentInputs },
+      ],
       groups: [
         {
           title: "Services (last 12 months)",
@@ -132,12 +156,65 @@ const expenses: AdminSection = {
             ],
           })),
         },
-      ],
+        {
+          title: "Investments",
+          items: r.investments.map((i) => ({
+            id: i.id,
+            title: i.investor,
+            badge: inr(i.amount),
+            tone: "good" as const,
+            subtitle: `${investmentCategoryLabel(i.category)} · ${day(i.invested_on)}`,
+            fields: [
+              { label: "Purpose", value: i.purpose ?? "—" },
+              { label: "Reference", value: i.reference ?? "—" },
+            ],
+            actions: [
+              {
+                key: "delete_investment",
+                label: "Delete",
+                danger: true,
+                confirm: "Delete this investment record?",
+              },
+            ],
+          })),
+        },
+      ].filter((g) => g.title !== "Investments" || g.items.length > 0),
       empty: "No expenses recorded.",
     };
   },
   async act(caller, action, id, input) {
     const admin = createAdminClient();
+    if (action === "delete_investment" && id) {
+      await admin.from("platform_investments").delete().eq("id", id);
+      return ok("Investment deleted.");
+    }
+    if (action === "invest") {
+      const amount = input.amount?.trim() === "" ? Number.NaN : Number(input.amount);
+      const errors = validateInvestmentInput({
+        investor: input.investor ?? "",
+        category: input.category ?? "",
+        amount,
+        investedOn: input.investedOn ?? "",
+      });
+      const first = Object.values(errors)[0];
+      if (first) return fail(String(first));
+      const { error } = await admin.from("platform_investments").insert({
+        investor: input.investor.trim(),
+        category: input.category as "capital" | "investor" | "loan" | "grant" | "other",
+        amount,
+        invested_on: input.investedOn,
+        purpose: input.purpose?.trim() || null,
+        reference: input.reference?.trim() || null,
+        created_by: caller.userId,
+      });
+      if (error) return fail("Couldn't record that investment. Please try again.");
+      await logPlatformEvent({
+        level: "info",
+        source: "platform_admin",
+        message: `Recorded platform investment of ${amount} from ${input.investor} (admin app, ${caller.email})`,
+      });
+      return ok("Investment recorded.");
+    }
     if (action === "delete" && id) {
       await admin.from("platform_expenses").delete().eq("id", id);
       return ok("Expense deleted.");

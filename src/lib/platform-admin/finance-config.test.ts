@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPlatformServiceKey, monthKeyOfDate, recentMonthKeys, validateExpenseInput } from "@/lib/platform-admin/finance-config";
+import { isPlatformServiceKey, monthKeyOfDate, recentMonthKeys, validateExpenseInput, validateInvestmentInput } from "@/lib/platform-admin/finance-config";
 
 describe("monthKeyOfDate", () => {
   it("reads a plain date as its own month", () => {
@@ -53,5 +53,19 @@ describe("validateExpenseInput", () => {
   it("recognises service keys", () => {
     expect(isPlatformServiceKey("meta_whatsapp")).toBe(true);
     expect(isPlatformServiceKey("bogus")).toBe(false);
+  });
+});
+
+describe("validateInvestmentInput", () => {
+  const ok = { investor: "George Kennedy", category: "capital", amount: 50000, investedOn: "2026-10-01" };
+  it("accepts a complete investment", () => {
+    expect(validateInvestmentInput(ok)).toEqual({});
+  });
+  it("needs who, a known kind, a positive amount and a date", () => {
+    expect(validateInvestmentInput({ ...ok, investor: " " }).investor).toBeTruthy();
+    expect(validateInvestmentInput({ ...ok, category: "gift" }).category).toBeTruthy();
+    expect(validateInvestmentInput({ ...ok, amount: 0 }).amount).toBeTruthy();
+    expect(validateInvestmentInput({ ...ok, amount: Number.NaN }).amount).toBeTruthy();
+    expect(validateInvestmentInput({ ...ok, investedOn: "1 Oct" }).investedOn).toBeTruthy();
   });
 });

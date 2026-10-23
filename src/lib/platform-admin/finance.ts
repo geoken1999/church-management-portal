@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sharedServiceFee } from "@/lib/finance/fees";
 import { DEFAULT_TIMEZONE, dateKeyInTimezone } from "@/lib/organizations/timezone";
 import { PLATFORM_SERVICES, monthKeyOfDate, platformServiceLabel, recentMonthKeys } from "@/lib/platform-admin/finance-config";
-import type { PlatformExpense } from "@/types/database";
+import type { PlatformExpense, PlatformInvestment } from "@/types/database";
 
 // Money KingdomFlow itself keeps. Revenue is the platform's share only:
 // subscriptions and add-on packs in full, and the shared-account fee on
@@ -45,7 +45,7 @@ export interface MonthRow {
 }
 
 export interface PlatformEarningsReport {
-  allTime: { revenue: number; expenses: number; net: number; heldForChurches: number };
+  allTime: { revenue: number; expenses: number; net: number; heldForChurches: number; invested: number };
   thisMonth: { month: string; revenue: number; expenses: number; net: number };
   bySource: SourceTotal[];
   months: MonthRow[];
@@ -64,6 +64,8 @@ export interface ExpenseServiceSummary {
 export interface PlatformExpensesReport {
   services: ExpenseServiceSummary[];
   rows: PlatformExpense[];
+  investments: PlatformInvestment[];
+  totalInvested: number;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -71,13 +73,14 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 export async function getPlatformEarningsReport(now: Date = new Date()): Promise<PlatformEarningsReport> {
   const admin = createAdminClient();
 
-  const [subs, addons, sharedDonations, eventOrders, membershipPayments, expenses] = await Promise.all([
+  const [subs, addons, sharedDonations, eventOrders, membershipPayments, expenses, investments] = await Promise.all([
     admin.from("platform_subscription_payments").select("amount, paid_at"),
     admin.from("organization_addon_orders").select("amount, paid_at, created_at").eq("status", "paid"),
     admin.from("donations").select("amount, donated_on").eq("payment_mode", "shared"),
     admin.from("event_registration_payment_orders").select("amount, updated_at").eq("status", "paid"),
     admin.from("membership_fee_invoices").select("amount, paid_at").eq("status", "paid"),
     admin.from("platform_expenses").select("paid_on, amount"),
+    admin.from("platform_investments").select("amount"),
   ]);
 
   const revenueEvents: RevenueEvent[] = [];
@@ -160,6 +163,7 @@ export async function getPlatformEarningsReport(now: Date = new Date()): Promise
       expenses: round2(expensesAll),
       net: round2(revenueAll - expensesAll),
       heldForChurches: round2(heldForChurches),
+      invested: round2((investments.data ?? []).reduce((sum, row) => sum + Number(row.amount), 0)),
     },
     thisMonth: {
       month: currentMonth,
@@ -195,5 +199,9 @@ export async function getPlatformExpensesReport(now: Date = new Date()): Promise
     return { key: s.key, label: platformServiceLabel(s.key), lastPaidOn, last12Months: round2(last12Months) };
   });
 
-  return { services, rows: all.slice(0, 200) };
+  const { data: invested } = await admin.from("platform_investments").select("*").order("invested_on", { ascending: false }).order("created_at", { ascending: false });
+  const investments = (invested ?? []) as PlatformInvestment[];
+  const totalInvested = round2(investments.reduce((sum, row) => sum + Number(row.amount), 0));
+
+  return { services, rows: all.slice(0, 200), investments: investments.slice(0, 200), totalInvested };
 }

@@ -38,6 +38,7 @@ export default async function PlatformEarningsPage() {
         <SummaryCard label="Expenses, all time" value={money(report.allTime.expenses)} />
         <SummaryCard label="Net, all time" value={money(report.allTime.net)} tone={report.allTime.net >= 0 ? "good" : "bad"} />
         <SummaryCard label="Held for churches" value={money(report.allTime.heldForChurches)} hint="Gross on shared accounts, not earnings" />
+        <SummaryCard label="Invested, all time" value={money(report.allTime.invested)} hint="Capital, investors and loans (not earnings)" />
       </div>
 
       <Card>

@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
 import { getPlatformExpensesReport } from "@/lib/platform-admin/finance";
-import { platformServiceLabel } from "@/lib/platform-admin/finance-config";
+import { investmentCategoryLabel, platformServiceLabel } from "@/lib/platform-admin/finance-config";
 import { RecordExpenseDialog } from "@/components/platform-admin/RecordExpenseDialog";
 import { DeleteExpenseButton } from "@/components/platform-admin/DeleteExpenseButton";
+import { RecordInvestmentDialog } from "@/components/platform-admin/RecordInvestmentDialog";
+import { DeleteInvestmentButton } from "@/components/platform-admin/DeleteInvestmentButton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { dateKeyInTimezone, DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 
@@ -35,7 +37,10 @@ export default async function PlatformExpensesPage() {
             glance whether anything has been missed.
           </p>
         </div>
-        <RecordExpenseDialog today={today} />
+        <div className="flex flex-wrap gap-2">
+          <RecordInvestmentDialog today={today} />
+          <RecordExpenseDialog today={today} />
+        </div>
       </div>
 
       <section className="space-y-3">
@@ -85,6 +90,54 @@ export default async function PlatformExpensesPage() {
                       <td className="px-4 py-2 text-right tabular-nums">{money(Number(row.amount))}</td>
                       <td className="px-4 py-2 text-right">
                         <DeleteExpenseButton expenseId={row.id} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="font-heading text-xl font-bold">Investments</h2>
+            <p className="text-sm text-muted-foreground">Money put into KingdomFlow itself: capital, investors, loans.</p>
+          </div>
+          <p className="text-sm">
+            Total invested: <span className="font-semibold tabular-nums">{money(report.totalInvested)}</span>
+          </p>
+        </div>
+        {report.investments.length === 0 ? (
+          <Card>
+            <CardContent className="py-10 text-center text-sm text-muted-foreground">No investments recorded yet.</CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="overflow-x-auto p-0">
+              <table className="w-full text-sm">
+                <thead className="border-b text-left text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-2 font-medium">Invested on</th>
+                    <th className="px-4 py-2 font-medium">Invested by</th>
+                    <th className="px-4 py-2 font-medium">Kind</th>
+                    <th className="px-4 py-2 font-medium">Purpose / ref</th>
+                    <th className="px-4 py-2 text-right font-medium">Amount</th>
+                    <th className="px-4 py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.investments.map((row) => (
+                    <tr key={row.id} className="border-b last:border-0">
+                      <td className="px-4 py-2 whitespace-nowrap">{dateLabel(row.invested_on)}</td>
+                      <td className="px-4 py-2">{row.investor}</td>
+                      <td className="px-4 py-2">{investmentCategoryLabel(row.category)}</td>
+                      <td className="px-4 py-2 text-muted-foreground">{[row.purpose, row.reference].filter(Boolean).join(" · ") || "—"}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{money(Number(row.amount))}</td>
+                      <td className="px-4 py-2 text-right">
+                        <DeleteInvestmentButton investmentId={row.id} />
                       </td>
                     </tr>
                   ))}

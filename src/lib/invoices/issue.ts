@@ -107,8 +107,37 @@ export async function invoicePdf(invoice: PlatformInvoice | InvoiceDocument): Pr
 
 export const invoiceFileName = (invoiceNumber: string) => `Invoice-${invoiceNumber.replace(/\//g, "-")}.pdf`;
 
-// Emails the invoice, with the PDF attached, to the billing email on it. Records whether it
-// went, so a failure can be seen (and sent again) from Super Admin.
+// Where the platform owner's copy of every invoice goes: INVOICE_COPY_EMAIL (comma separated), else the
+// email on the invoice template.
+export function invoiceCopyRecipients(templateEmail: string | undefined, env: string | undefined = process.env.INVOICE_COPY_EMAIL): string[] {
+  const fromEnv = (env ?? "").split(",").map((e) => e.trim()).filter(Boolean);
+  if (fromEnv.length > 0) return fromEnv;
+  return templateEmail?.trim() ? [templateEmail.trim()] : [];
+}
+
+// The copy for us: same PDF, with who it went to. Sent once per invoice, whether or not the church's own
+// email went. Never throws.
+async function emailInvoiceCopy(invoice: PlatformInvoice, doc: InvoiceDocument, pdf: Buffer, customerError: string | null): Promise<void> {
+  if (invoice.copy_emailed_at) return;
+  const recipients = invoiceCopyRecipients(doc.seller.email);
+  if (recipients.length === 0 || !isEmailConfigured()) return;
+  try {
+    const result = await sendBulkEmail({
+      fromName: `${doc.seller.name} Billing`,
+      subject: `[Copy] Tax invoice ${doc.invoiceNumber} — ${doc.buyer.name} — ${formatRupees(doc.total)}`,
+      html: `<p>A tax invoice was issued.</p><p><strong>${escapeHtml(doc.invoiceNumber)}</strong> to <strong>${escapeHtml(doc.buyer.name)}</strong> (${escapeHtml(doc.buyer.email || "no email")}) for <strong>${formatRupees(doc.total)}</strong> including GST.</p><p>${doc.lineItems.map((i) => escapeHtml(i.description)).join("<br>")}</p><p style="color:#666;font-size:12px">${customerError ? `The email to the church did not go: ${escapeHtml(customerError)}` : "The church has been emailed the same PDF."}</p>`,
+      recipients,
+      attachments: [{ filename: invoiceFileName(doc.invoiceNumber), content: pdf, contentType: "application/pdf" }],
+      organizationId: invoice.organization_id,
+    });
+    if (result.sentCount > 0) await createAdminClient().from("platform_invoices").update({ copy_emailed_at: new Date().toISOString() }).eq("id", invoice.id);
+  } catch (err) {
+    await logPlatformEvent({ level: "warning", source: "platform_admin", message: `Invoice copy not sent: ${err instanceof Error ? err.message : "unknown error"}`, organizationId: invoice.organization_id, metadata: { invoice: invoice.invoice_number } });
+  }
+}
+
+// Emails the invoice, with the PDF attached, to the billing email on it, and a copy to us. Records whether
+// the church's email went, so a failure can be seen (and sent again) from Super Admin.
 export async function emailInvoice(invoice: PlatformInvoice): Promise<{ ok: boolean; error?: string }> {
   const admin = createAdminClient();
   const doc = documentFromInvoice(invoice);
@@ -116,37 +145,40 @@ export async function emailInvoice(invoice: PlatformInvoice): Promise<{ ok: bool
   const record = async (error: string | null) => {
     await admin.from("platform_invoices").update({ email_sent_at: error ? null : new Date().toISOString(), email_error: error }).eq("id", invoice.id);
   };
-  if (!to) {
-    await record("No billing email on file.");
-    return { ok: false, error: "No billing email on file." };
-  }
   if (!isEmailConfigured()) {
     await record("Email isn't configured.");
     return { ok: false, error: "Email isn't configured." };
   }
+  let pdf: Buffer | null = null;
   try {
-    const pdf = await invoicePdf(invoice);
-    const result = await sendBulkEmail({
-      fromName: `${doc.seller.name} Billing`,
-      subject: `Tax invoice ${doc.invoiceNumber} from ${doc.seller.name}`,
-      html: `<p>Dear ${escapeHtml(doc.buyer.name)},</p><p>Thank you for your payment. Your tax invoice <strong>${escapeHtml(doc.invoiceNumber)}</strong> for <strong>${formatRupees(doc.total)}</strong> (including GST) is attached as a PDF.</p><p>${doc.lineItems.map((i) => escapeHtml(i.description)).join("<br>")}</p><p style="color:#666;font-size:12px">${escapeHtml(doc.template.footer)}</p>`,
-      recipients: [to],
-      replyTo: doc.seller.email || undefined,
-      attachments: [{ filename: invoiceFileName(doc.invoiceNumber), content: pdf, contentType: "application/pdf" }],
-      organizationId: invoice.organization_id,
-    });
-    if (result.sentCount === 0) {
-      const message = result.failed[0]?.error ?? "The email wasn't sent.";
-      await record(message);
-      return { ok: false, error: message };
-    }
-    await record(null);
-    return { ok: true };
+    pdf = await invoicePdf(invoice);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "The email wasn't sent.";
+    const message = err instanceof Error ? err.message : "The invoice PDF couldn't be made.";
     await record(message);
     return { ok: false, error: message };
   }
+  let failure: string | null = null;
+  if (!to) {
+    failure = "No billing email on file.";
+  } else {
+    try {
+      const result = await sendBulkEmail({
+        fromName: `${doc.seller.name} Billing`,
+        subject: `Tax invoice ${doc.invoiceNumber} from ${doc.seller.name}`,
+        html: `<p>Dear ${escapeHtml(doc.buyer.name)},</p><p>Thank you for your payment. Your tax invoice <strong>${escapeHtml(doc.invoiceNumber)}</strong> for <strong>${formatRupees(doc.total)}</strong> (including GST) is attached as a PDF.</p><p>${doc.lineItems.map((i) => escapeHtml(i.description)).join("<br>")}</p><p style="color:#666;font-size:12px">${escapeHtml(doc.template.footer)}</p>`,
+        recipients: [to],
+        replyTo: doc.seller.email || undefined,
+        attachments: [{ filename: invoiceFileName(doc.invoiceNumber), content: pdf, contentType: "application/pdf" }],
+        organizationId: invoice.organization_id,
+      });
+      if (result.sentCount === 0) failure = result.failed[0]?.error ?? "The email wasn't sent.";
+    } catch (err) {
+      failure = err instanceof Error ? err.message : "The email wasn't sent.";
+    }
+  }
+  await record(failure);
+  await emailInvoiceCopy(invoice, doc, pdf, failure);
+  return failure ? { ok: false, error: failure } : { ok: true };
 }
 
 // What the payment paths call: make the invoice and email it. Never throws, so a problem with

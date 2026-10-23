@@ -63,3 +63,41 @@ export function validateExpenseInput(input: { service: string; description: stri
   }
   return errors;
 }
+
+// Money put into the platform. Keep in step with the check constraint on platform_investments.category
+// (migration 0214).
+export const INVESTMENT_CATEGORIES = [
+  { key: "capital", label: "Owner's capital" },
+  { key: "investor", label: "Investor" },
+  { key: "loan", label: "Loan" },
+  { key: "grant", label: "Grant" },
+  { key: "other", label: "Other" },
+] as const;
+
+export type InvestmentCategoryKey = (typeof INVESTMENT_CATEGORIES)[number]["key"];
+
+export function isInvestmentCategory(value: string): value is InvestmentCategoryKey {
+  return INVESTMENT_CATEGORIES.some((c) => c.key === value);
+}
+
+export function investmentCategoryLabel(key: string): string {
+  return INVESTMENT_CATEGORIES.find((c) => c.key === key)?.label ?? key;
+}
+
+export interface InvestmentInputErrors {
+  investor?: string;
+  category?: string;
+  amount?: string;
+  investedOn?: string;
+}
+
+export function validateInvestmentInput(input: { investor: string; category: string; amount: number; investedOn: string }): InvestmentInputErrors {
+  const errors: InvestmentInputErrors = {};
+  if (input.investor.trim().length < 2) errors.investor = "Say who put the money in.";
+  if (!isInvestmentCategory(input.category)) errors.category = "Choose the kind of investment.";
+  if (!Number.isFinite(input.amount) || input.amount <= 0) errors.amount = "Enter an amount greater than 0.";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.investedOn) || Number.isNaN(Date.parse(`${input.investedOn}T00:00:00Z`))) {
+    errors.investedOn = "Enter the date it was invested.";
+  }
+  return errors;
+}

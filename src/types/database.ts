@@ -1137,6 +1137,7 @@ export type PlatformInvoice = {
   place_of_supply: string | null;
   email_sent_at: string | null;
   email_error: string | null;
+  copy_emailed_at: string | null;
 };
 
 // A church's saved email template (migration 0180).
@@ -1887,6 +1888,18 @@ export type PlatformSubscriptionPayment = {
   amount: number;
   currency: string;
   paid_at: string;
+  created_at: string;
+};
+
+export type PlatformInvestment = {
+  id: string;
+  invested_on: string;
+  amount: number;
+  investor: string;
+  category: "capital" | "investor" | "loan" | "grant" | "other";
+  purpose: string | null;
+  reference: string | null;
+  created_by: string | null;
   created_at: string;
 };
 
@@ -2784,6 +2797,12 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      platform_investments: {
+        Row: PlatformInvestment;
+        Insert: Partial<PlatformInvestment> & Pick<PlatformInvestment, "invested_on" | "amount" | "investor">;
+        Update: Partial<PlatformInvestment>;
+        Relationships: [];
       };
       notifications: {
         Row: Notification;

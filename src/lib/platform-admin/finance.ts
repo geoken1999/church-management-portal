@@ -128,22 +128,16 @@ export async function getPlatformEarningsReport(now: Date = new Date()): Promise
   for (const row of addons.data ?? []) {
     collected.push({ source: "addon_packs", amount: Number(row.amount), when: row.paid_at ?? row.created_at, organizationId: row.organization_id, reference: row.payu_txnid ?? row.id, description: `Add-on pack ${row.pack_id}` });
   }
-  // The gross on shared accounts belongs to churches until it is paid out, so it is counted whenever it was
-  // paid; the earnings start date only decides which fees count as earnings.
-  let heldForChurches = 0;
   for (const row of membershipPayments.data ?? []) {
     const gross = Number(row.amount);
-    heldForChurches += gross;
     collected.push({ source: "shared_membership_fees", amount: sharedServiceFee(gross), when: row.paid_at ?? new Date().toISOString(), organizationId: row.organization_id, reference: row.id, description: `Membership fee ${row.period}`, gross });
   }
   for (const row of sharedDonations.data ?? []) {
     const gross = Number(row.amount);
-    heldForChurches += gross;
     collected.push({ source: "shared_fundraiser_fees", amount: sharedServiceFee(gross), when: row.donated_on, organizationId: row.organization_id, reference: row.id, description: "Fundraiser donation", gross });
   }
   for (const row of eventOrders.data ?? []) {
     const gross = Number(row.amount);
-    heldForChurches += gross;
     collected.push({ source: "shared_event_fees", amount: sharedServiceFee(gross), when: row.updated_at, organizationId: row.organization_id, reference: row.payu_txnid ?? row.id, description: "Event registration", gross });
   }
   // Counted from the start day on, by the Indian-time day of the payment.
@@ -200,6 +194,9 @@ export async function getPlatformEarningsReport(now: Date = new Date()): Promise
       bySource: Object.fromEntries(REVENUE_SOURCES.map((s) => [s, round2(bucket.bySource[s])])) as Record<RevenueSource, number>,
     };
   });
+
+  // Money held on the shared accounts for churches, counted from the same start day as the earnings.
+  const heldForChurches = revenueEvents.reduce((sum, e) => sum + (e.gross ?? 0), 0);
 
   const orgIds = [...new Set(revenueEvents.map((e) => e.organizationId).filter((id): id is string => Boolean(id)))];
   const { data: orgRows } = orgIds.length ? await admin.from("organizations").select("id, name").in("id", orgIds) : { data: [] };

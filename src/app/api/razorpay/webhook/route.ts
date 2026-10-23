@@ -172,6 +172,7 @@ export async function POST(request: Request) {
         subscriptionRowId: existing.id,
         organizationId: existing.organization_id,
         planId: existing.plan_id,
+        interval: existing.billing_interval === "annual" ? "annual" : "monthly",
         monthlyAmount:
           existing.monthly_amount !== null
             ? Number(existing.monthly_amount)

@@ -8,11 +8,13 @@ import {
   type RazorpaySubscriptionCheckout,
 } from "@/lib/razorpay/checkout";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isPlanId, PLANS } from "@/lib/plans/config";
+import { isPlanId, PLANS, type BillingInterval } from "@/lib/plans/config";
+import { planMismatch, totalCountFor } from "@/lib/billing/razorpay-plans";
 import { withGst } from "@/lib/billing/gst";
 import { sendSubscriptionActivatedEmail } from "@/lib/billing/receipts";
 import { applyOnboardingModules } from "@/lib/onboarding/store";
 import { cleanCredits } from "@/lib/onboarding/config";
+import { logPlatformEvent } from "@/lib/platform-events/log";
 import { issueAndEmailInvoice } from "@/lib/invoices/issue";
 import { planNameFor } from "@/lib/billing/cancellation-store";
 
@@ -20,9 +22,6 @@ import { planNameFor } from "@/lib/billing/cancellation-store";
 // onboarding) is charged monthly, including 18% GST, by Razorpay itself: the church authorises once in
 // Razorpay's checkout (UPI Autopay, card or e-mandate, their choice) and Razorpay collects every cycle and
 // tells us through the webhook (src/app/api/razorpay/webhook/route.ts).
-
-// "Until cancelled", the way Razorpay wants it: a finite cycle count, 10 years of months.
-const TOTAL_COUNT = 120;
 
 export function subscriptionSignatureValid(
   paymentId: string,
@@ -40,10 +39,17 @@ export function subscriptionSignatureValid(
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-/** Creates the monthly plan and the subscription on it. `totalRupees` is what the church pays each month with GST. */
+/**
+ * Starts a subscription. With `razorpayPlanId` (a standard plan made once in the Razorpay Dashboard) the
+ * subscription goes on that plan, after checking its price and cycle are what we are about to sell; without
+ * one (a custom tenant amount, a plan not set up yet, or one that doesn't match) a plan is created for this checkout.
+ * `totalRupees` is what the church pays each cycle with GST.
+ */
 export async function createSubscriptionCheckout(input: {
   organizationId: string;
   planLabel: string;
+  interval?: BillingInterval;
+  razorpayPlanId?: string | null;
   totalRupees: number;
   prefill: RazorpaySubscriptionCheckout["prefill"];
   callbackUrl: string;
@@ -56,19 +62,46 @@ export async function createSubscriptionCheckout(input: {
 }> {
   const { keyId } = getRazorpayEnv();
   const client = createRazorpayClient();
-  const plan = await client.plans.create({
-    period: "monthly",
-    interval: 1,
-    item: {
-      name: `${input.planLabel} (monthly, incl. GST)`.slice(0, 100),
-      amount: toPaise(input.totalRupees),
-      currency: "INR",
-    },
-  });
+  const interval = input.interval ?? "monthly";
+  let planId: string | null = null;
+  if (input.razorpayPlanId) {
+    // A fixed plan whose price or cycle is not what we sell (set up before a price change, or from the wrong
+    // Razorpay mode) is not used: the church is charged the right amount on a plan made for this checkout, and
+    // the problem is logged for the platform owner (it also shows on the Health page).
+    try {
+      const fixed = await client.plans.fetch(input.razorpayPlanId);
+      const problem = planMismatch(
+        fixed as unknown as Parameters<typeof planMismatch>[0],
+        interval,
+        toPaise(input.totalRupees),
+      );
+      if (problem) throw new Error(problem);
+      planId = fixed.id;
+    } catch (err) {
+      await logPlatformEvent({
+        level: "error",
+        source: "subscription_billing",
+        message: `Razorpay plan ${input.razorpayPlanId} can't be used: ${err instanceof Error ? err.message : "unknown error"}. A plan was created for this checkout instead; fix the plan id in the environment variables.`,
+        organizationId: input.organizationId,
+      });
+    }
+  }
+  if (!planId) {
+    const created = await client.plans.create({
+      period: interval === "annual" ? "yearly" : "monthly",
+      interval: 1,
+      item: {
+        name: `${input.planLabel} (${interval === "annual" ? "yearly" : "monthly"}, incl. GST)`.slice(0, 100),
+        amount: toPaise(input.totalRupees),
+        currency: "INR",
+      },
+    });
+    planId = created.id;
+  }
   const subscription = await client.subscriptions.create({
-    plan_id: plan.id,
+    plan_id: planId,
     customer_notify: 1,
-    total_count: TOTAL_COUNT,
+    total_count: totalCountFor(interval),
     notes: { organization_id: input.organizationId, ...input.notes },
   });
   return {
@@ -111,7 +144,7 @@ export async function activateRazorpaySubscription(
   const { data: row } = await admin
     .from("organization_subscriptions")
     .select(
-      "id, organization_id, plan_id, status, monthly_amount, onboarding_modules, onboarding_credits",
+      "id, organization_id, plan_id, billing_interval, status, monthly_amount, onboarding_modules, onboarding_credits",
     )
     .eq("razorpay_subscription_id", subscriptionId)
     .maybeSingle();
@@ -169,7 +202,7 @@ export async function activateRazorpaySubscription(
   await sendSubscriptionActivatedEmail(
     row.organization_id,
     planNameFor(row.plan_id, null),
-    "monthly",
+    row.billing_interval === "annual" ? "annual" : "monthly",
   );
   return { success: true };
 }
@@ -183,6 +216,7 @@ export async function recordSubscriptionCharge(input: {
   subscriptionRowId: string;
   organizationId: string;
   planId: string;
+  interval?: BillingInterval;
   monthlyAmount: number | null;
   razorpaySubscriptionId: string;
   paymentId: string;
@@ -195,9 +229,14 @@ export async function recordSubscriptionCharge(input: {
     input.monthlyAmount !== null && input.monthlyAmount !== undefined
       ? Number(input.monthlyAmount)
       : null;
+  const annual = input.interval === "annual" && customAmount === null;
   const base =
     customAmount ??
-    (isPlanId(input.planId) ? PLANS[input.planId].priceInRupees : null);
+    (isPlanId(input.planId)
+      ? annual
+        ? PLANS[input.planId].priceInRupeesAnnual
+        : PLANS[input.planId].priceInRupees
+      : null);
   const price = base !== null ? withGst(base) : null;
 
   await admin.from("platform_subscription_payments").upsert(
@@ -239,7 +278,7 @@ export async function recordSubscriptionCharge(input: {
         description:
           customAmount !== null
             ? "KingdomFlow modules subscription (monthly)"
-            : `${planNameFor(input.planId, null)} plan subscription (monthly)`,
+            : `${planNameFor(input.planId, null)} plan subscription (${annual ? "annual" : "monthly"})`,
         baseAmount: price.base,
       })
     : null;

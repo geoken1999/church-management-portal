@@ -13,7 +13,14 @@ import {
 } from "@/lib/billing/receipts";
 import { cancelMode, dateLabel } from "@/lib/billing/cancellation";
 import { planNameFor } from "@/lib/billing/cancellation-store";
-import { isPlanId, PLANS, type PlanId } from "@/lib/plans/config";
+import {
+  isBillingInterval,
+  isPlanId,
+  PLANS,
+  type BillingInterval,
+  type PlanId,
+} from "@/lib/plans/config";
+import { razorpayPlanIdFor } from "@/lib/billing/razorpay-plans";
 import { withGst } from "@/lib/billing/gst";
 import { saveBillingDetails } from "@/lib/billing/billing-details-dal";
 import type {
@@ -48,6 +55,7 @@ export interface SubscriptionCheckoutState {
 export async function startSubscriptionCheckout(
   planId: string,
   billing: BillingDetailsInput,
+  billingInterval: string = "monthly",
 ): Promise<SubscriptionCheckoutState> {
   const user = await requireUser();
   const [profile, membership] = await Promise.all([
@@ -58,6 +66,9 @@ export async function startSubscriptionCheckout(
   if (membership.role !== "owner" && membership.role !== "admin")
     return { error: "Only owners and admins can manage billing." };
   if (!isPlanId(planId)) return { error: "Select a valid plan." };
+  if (!isBillingInterval(billingInterval))
+    return { error: "Choose monthly or yearly billing." };
+  const interval: BillingInterval = billingInterval;
 
   const saved = await saveBillingDetails(membership.organization.id, billing);
   if ("errors" in saved)
@@ -71,6 +82,8 @@ export async function startSubscriptionCheckout(
   );
   // A not-yet-authorised attempt can be replaced; anything live blocks a second one.
   const replaceable = existing?.status === "created";
+  const sameAsExisting =
+    existing?.plan_id === planId && existing?.billing_interval === interval;
   if (
     existing &&
     IN_PROGRESS_STATUSES.includes(existing.status) &&
@@ -78,7 +91,7 @@ export async function startSubscriptionCheckout(
   ) {
     return {
       error:
-        existing.plan_id === planId
+        sameAsExisting
           ? "You're already subscribed to this plan."
           : "Cancel your current subscription before switching plans.",
     };
@@ -90,14 +103,18 @@ export async function startSubscriptionCheckout(
     created = await createSubscriptionCheckout({
       organizationId: membership.organization.id,
       planLabel: `KingdomFlow ${plan.name} plan`,
-      totalRupees: withGst(plan.priceInRupees).total,
+      interval,
+      razorpayPlanId: razorpayPlanIdFor(planId as PlanId, interval),
+      totalRupees: withGst(
+        interval === "annual" ? plan.priceInRupeesAnnual : plan.priceInRupees,
+      ).total,
       prefill: {
         name: profile?.first_name ?? membership.organization.name,
         email: profile?.email ?? user.email ?? undefined,
         contact: profile?.phone ?? undefined,
       },
       callbackUrl: `${getSiteUrl()}/api/razorpay/subscription/return?organizationId=${membership.organization.id}`,
-      notes: { plan_id: planId },
+      notes: { plan_id: planId, billing_interval: interval },
     });
   } catch (err) {
     await logPlatformEvent({
@@ -116,7 +133,7 @@ export async function startSubscriptionCheckout(
         organization_id: membership.organization.id,
         razorpay_subscription_id: created.subscriptionId,
         plan_id: planId,
-        billing_interval: "monthly",
+        billing_interval: interval,
         status: "created",
         short_url: created.shortUrl,
         monthly_amount: null,

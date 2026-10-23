@@ -7,6 +7,8 @@ import { parseGraphError } from "@/lib/whatsapp/graph-error";
 import { isEmailConfigured, getEmailEnv } from "@/lib/email/env";
 import { isRazorpayConfigured } from "@/lib/billing/env";
 import { createRazorpayClient } from "@/lib/billing/razorpay";
+import { expectedChargePaise, planEnvVar, planMismatch, razorpayPlanIdFor } from "@/lib/billing/razorpay-plans";
+import { PLANS, type BillingInterval, type PlanId } from "@/lib/plans/config";
 
 // A short per-check timeout — this feeds the Health page, which shouldn't
 // hang (or worse, time out entirely) just because one third-party provider
@@ -139,7 +141,29 @@ async function checkRazorpay(): Promise<IntegrationHealth> {
   try {
     const client = createRazorpayClient();
     await client.orders.all({ count: 1 });
-    return { name, status: "operational", liveChecked: true };
+
+    // The standard plans' Razorpay plans: each id that is set must exist and charge what we sell (price plus
+    // GST, the right cycle). One that is not set is fine: the checkout creates a plan for that purchase.
+    const problems: string[] = [];
+    let missing = 0;
+    for (const planId of Object.keys(PLANS) as PlanId[]) {
+      for (const interval of ["monthly", "annual"] as BillingInterval[]) {
+        const id = razorpayPlanIdFor(planId, interval);
+        if (!id) {
+          missing += 1;
+          continue;
+        }
+        try {
+          const plan = await client.plans.fetch(id);
+          const issue = planMismatch(plan as unknown as Parameters<typeof planMismatch>[0], interval, expectedChargePaise(planId, interval));
+          if (issue) problems.push(`${planEnvVar(planId, interval)}: ${issue}`);
+        } catch {
+          problems.push(`${planEnvVar(planId, interval)}: ${id} was not found in this Razorpay account (test and live accounts have different plans)`);
+        }
+      }
+    }
+    if (problems.length > 0) return { name, status: "degraded", detail: problems.join(" · "), liveChecked: true };
+    return { name, status: "operational", detail: missing > 0 ? `${missing} of 6 plan ids not set (checkout creates those plans itself).` : undefined, liveChecked: true };
   } catch (err) {
     return { name, status: "down", detail: err instanceof Error ? err.message : "Couldn't reach Razorpay.", liveChecked: true };
   }

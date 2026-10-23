@@ -9,7 +9,12 @@ import {
   keepSubscription,
 } from "@/lib/billing/actions";
 import { openRazorpaySubscription } from "@/lib/razorpay/browser";
-import { PLANS, priceForInterval, type PlanId } from "@/lib/plans/config";
+import {
+  PLANS,
+  priceForInterval,
+  type BillingInterval,
+  type PlanId,
+} from "@/lib/plans/config";
 import {
   PLAN_ORDER,
   planFeatureRows,
@@ -78,6 +83,10 @@ export function BillingManager({
   const router = useRouter();
   // The plan being bought: asks for billing details first.
   const [checkoutPlanId, setCheckoutPlanId] = useState<PlanId | null>(null);
+  // Monthly or yearly: what the plan cards show and what the checkout charges.
+  const [cycle, setCycle] = useState<BillingInterval>(
+    subscription?.billing_interval === "annual" ? "annual" : "monthly",
+  );
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,7 +94,6 @@ export function BillingManager({
     subscription && IN_PROGRESS_STATUSES.includes(subscription.status),
   );
 
-  // Monthly billing only for new subscriptions (an older annual one, if any, still displays below).
   function handleSubscribe(planId: PlanId) {
     setError(null);
     setCheckoutPlanId(planId);
@@ -97,7 +105,11 @@ export function BillingManager({
     details: BillingDetailsInput,
   ): Promise<CheckoutResult> {
     if (!checkoutPlanId) return { error: "Choose a plan." };
-    const result = await startSubscriptionCheckout(checkoutPlanId, details);
+    const result = await startSubscriptionCheckout(
+      checkoutPlanId,
+      details,
+      cycle,
+    );
     if (result.error || !result.checkout)
       return {
         error: result.error ?? "Couldn't start checkout.",
@@ -230,19 +242,36 @@ export function BillingManager({
         </Card>
       )}
 
+      <div className="flex items-center justify-center gap-1 rounded-full border p-1 text-sm sm:w-fit sm:self-center">
+        {(["monthly", "annual"] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setCycle(value)}
+            className={`rounded-full px-4 py-1.5 font-medium transition-colors ${
+              cycle === value
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {value === "monthly" ? "Monthly" : "Yearly"}
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {PLAN_ORDER.map((planId) => {
           const plan = PLANS[planId];
-          const price = priceForInterval(plan, "monthly");
+          const price = priceForInterval(plan, cycle);
           const isCurrent =
             planId === currentPlanId &&
             subscription?.status === "active" &&
-            subscription.billing_interval === "monthly";
+            subscription.billing_interval === cycle;
           const blockedBySwitch =
             hasInProgressSubscription &&
             !isCurrent &&
             (subscription?.plan_id !== planId ||
-              subscription?.billing_interval !== "monthly");
+              subscription?.billing_interval !== cycle);
 
           return (
             <Card
@@ -256,8 +285,8 @@ export function BillingManager({
                 </div>
                 <p className="font-heading text-3xl font-bold">{price.label}</p>
                 <p className="text-xs text-muted-foreground">
-                  + 18% GST: {formatPrice(withGst(plan.priceInRupees).total)} a
-                  month in total
+                  + 18% GST: {formatPrice(withGst(price.amount).total)} a{" "}
+                  {cycle === "annual" ? "year" : "month"} in total
                 </p>
                 <CardDescription>{planDescription(planId)}</CardDescription>
               </CardHeader>
@@ -304,8 +333,8 @@ export function BillingManager({
         <BillingDetailsDialog
           open
           onOpenChange={(open) => !open && setCheckoutPlanId(null)}
-          title={`Subscribe to ${PLANS[checkoutPlanId].name}`}
-          basePrice={PLANS[checkoutPlanId].priceInRupees}
+          title={`Subscribe to ${PLANS[checkoutPlanId].name} (${cycle === "annual" ? "yearly" : "monthly"})`}
+          basePrice={priceForInterval(PLANS[checkoutPlanId], cycle).amount}
           sellerState={sellerState}
           initial={billingDetails}
           onSubmit={startCheckout}

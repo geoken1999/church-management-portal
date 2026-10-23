@@ -108,18 +108,20 @@ export async function invoicePdf(invoice: PlatformInvoice | InvoiceDocument): Pr
 export const invoiceFileName = (invoiceNumber: string) => `Invoice-${invoiceNumber.replace(/\//g, "-")}.pdf`;
 
 // Where the platform owner's copy of every invoice goes: INVOICE_COPY_EMAIL (comma separated), else the
-// email on the invoice template.
-export function invoiceCopyRecipients(templateEmail: string | undefined, env: string | undefined = process.env.INVOICE_COPY_EMAIL): string[] {
+// platform's own inbox. (Not the email on the invoice template: that one is printed on the invoice for the
+// church to write to, and may be a different mailbox.)
+export const DEFAULT_INVOICE_COPY_EMAIL = "admin@kingdomflow.in";
+
+export function invoiceCopyRecipients(env: string | undefined = process.env.INVOICE_COPY_EMAIL): string[] {
   const fromEnv = (env ?? "").split(",").map((e) => e.trim()).filter(Boolean);
-  if (fromEnv.length > 0) return fromEnv;
-  return templateEmail?.trim() ? [templateEmail.trim()] : [];
+  return fromEnv.length > 0 ? fromEnv : [DEFAULT_INVOICE_COPY_EMAIL];
 }
 
 // The copy for us: same PDF, with who it went to. Sent once per invoice, whether or not the church's own
 // email went. Never throws.
 async function emailInvoiceCopy(invoice: PlatformInvoice, doc: InvoiceDocument, pdf: Buffer, customerError: string | null): Promise<void> {
   if (invoice.copy_emailed_at) return;
-  const recipients = invoiceCopyRecipients(doc.seller.email);
+  const recipients = invoiceCopyRecipients();
   if (recipients.length === 0 || !isEmailConfigured()) return;
   try {
     const result = await sendBulkEmail({

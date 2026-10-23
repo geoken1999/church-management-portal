@@ -92,7 +92,7 @@ describe("issueInvoice", () => {
     expect(db.invoices[0].email_sent_at).toBeTruthy();
 
     const copy = (sendBulkEmail.mock.calls[1] as unknown as [{ recipients: string[]; subject: string; attachments: { content: Buffer }[] }])[0];
-    expect(copy.recipients).toEqual([template.email]);
+    expect(copy.recipients).toEqual(["admin@kingdomflow.in"]);
     expect(copy.subject).toMatch(/^\[Copy\] Tax invoice KF\/26-27\/\d{6} — Grace Church Trust/);
     expect(copy.attachments[0].content.subarray(0, 5).toString()).toBe("%PDF-");
     expect(db.invoices[0].copy_emailed_at).toBeTruthy();
@@ -111,10 +111,10 @@ describe("issueInvoice", () => {
 });
 
 describe("invoiceCopyRecipients", () => {
-  it("prefers INVOICE_COPY_EMAIL, else the template email", async () => {
+  it("prefers INVOICE_COPY_EMAIL, else the platform inbox (not the template email)", async () => {
     const { invoiceCopyRecipients } = await import("@/lib/invoices/issue");
-    expect(invoiceCopyRecipients("billing@kf.test", " a@x.com, b@x.com ")).toEqual(["a@x.com", "b@x.com"]);
-    expect(invoiceCopyRecipients("billing@kf.test", "")).toEqual(["billing@kf.test"]);
-    expect(invoiceCopyRecipients("", undefined)).toEqual([]);
+    expect(invoiceCopyRecipients(" a@x.com, b@x.com ")).toEqual(["a@x.com", "b@x.com"]);
+    expect(invoiceCopyRecipients("")).toEqual(["admin@kingdomflow.in"]);
+    expect(invoiceCopyRecipients(undefined)).toEqual(["admin@kingdomflow.in"]);
   });
 });

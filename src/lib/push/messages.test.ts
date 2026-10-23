@@ -31,4 +31,11 @@ describe("buildPushBatches", () => {
   it("needs a link as well as a button label", () => {
     expect(buildPushBatches(rows, { title: "T", body: "B", data: { buttonLabel: "Join" } })).toHaveLength(1);
   });
+
+  it("asks iPhones to play a sound and deliver at once, with or without a button", () => {
+    const plain = buildPushBatches([{ token: "ios1", platform: "ios" }], { title: "Hi", body: "There" });
+    expect(plain[0].message.apns).toEqual({ headers: { "apns-priority": "10" }, payload: { aps: { sound: "default" } } });
+    const button = buildPushBatches([{ token: "ios1", platform: "ios" }], { title: "Hi", body: "There", data: { link: "/x", buttonLabel: "Join" } });
+    expect(button[0].message.apns?.payload.aps).toMatchObject({ sound: "default", category: "btn_join" });
+  });
 });

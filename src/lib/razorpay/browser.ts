@@ -5,9 +5,11 @@ import type {
   RazorpaySubscriptionCheckout,
 } from "@/lib/razorpay/checkout";
 
-// Opens Razorpay's checkout in the browser. On success Razorpay sends the browser to checkout.callbackUrl
-// with the result (a full navigation, like the redirect the old checkout used), so the page that calls this
-// does not stay open: the return route decides where the person lands next.
+// Opens Razorpay's checkout in the browser. On success the result is posted to checkout.callbackUrl from THIS
+// tab (a full navigation, so the page that calls this does not stay open): the return route decides where the
+// person lands next. The checkout's `handler` is used rather than its `callback_url` + `redirect` mode, because
+// that mode can finish in a new tab (UPI, netbanking and wallet pages open in a popup, and the result landed
+// there), leaving the original tab behind.
 
 declare global {
   interface Window {
@@ -16,6 +18,25 @@ declare global {
       on: (event: string, handler: (response: unknown) => void) => void;
     };
   }
+}
+
+/** Sends Razorpay's signed result to the return route as a form post, in the tab the person paid from. */
+function postResultHere(callbackUrl: string, response: unknown): void {
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = callbackUrl;
+  form.target = "_self";
+  form.style.display = "none";
+  for (const [name, value] of Object.entries((response ?? {}) as Record<string, unknown>)) {
+    if (typeof value !== "string") continue;
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
+  }
+  document.body.appendChild(form);
+  form.submit();
 }
 
 const SCRIPT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
@@ -60,8 +81,7 @@ export async function openRazorpayCheckout(
     name: checkout.name,
     description: checkout.description,
     prefill: checkout.prefill,
-    callback_url: checkout.callbackUrl,
-    redirect: true,
+    handler: (response: unknown) => postResultHere(checkout.callbackUrl, response),
     theme: { color: "#2d4a7a" },
     modal: { ondismiss: () => onDismiss?.() },
   });
@@ -81,8 +101,7 @@ export async function openRazorpaySubscription(
     name: checkout.name,
     description: checkout.description,
     prefill: checkout.prefill,
-    callback_url: checkout.callbackUrl,
-    redirect: true,
+    handler: (response: unknown) => postResultHere(checkout.callbackUrl, response),
     theme: { color: "#2d4a7a" },
     modal: { ondismiss: () => onDismiss?.() },
   });

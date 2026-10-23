@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
 import { validateExpenseInput, validateInvestmentInput, type ExpenseInputErrors, type InvestmentInputErrors } from "@/lib/platform-admin/finance-config";
 import type { PlatformInvestment } from "@/types/database";
+import { setEarningsStart } from "@/lib/platform-admin/finance";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 
 const EXPENSES_PATH = "/platform-admin/expenses";
@@ -132,5 +133,20 @@ export async function deletePlatformInvestment(formData: FormData): Promise<void
   if (!id) return;
   await createAdminClient().from("platform_investments").delete().eq("id", id);
   revalidatePath(EXPENSES_PATH);
+  revalidatePath(EARNINGS_PATH);
+}
+
+// Earnings count payments from this day on (Indian time); earlier ones stay stored but leave every figure.
+// An empty date counts everything again.
+export async function setEarningsStartAction(formData: FormData): Promise<void> {
+  const user = await requirePlatformAdmin();
+  const day = String(formData.get("day") ?? "").trim();
+  if (day && (!/^\d{4}-\d{2}-\d{2}$/.test(day) || Number.isNaN(Date.parse(`${day}T00:00:00Z`)))) return;
+  await setEarningsStart(day || null);
+  await logPlatformEvent({
+    level: "warning",
+    source: "platform_admin",
+    message: `Platform admin (${user.email ?? "unknown"}) set earnings to count from ${day || "the beginning"}`,
+  });
   revalidatePath(EARNINGS_PATH);
 }

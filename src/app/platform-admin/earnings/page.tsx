@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
 import { getPlatformEarningsReport, REVENUE_SOURCE_LABELS } from "@/lib/platform-admin/finance";
 import { SHARED_SERVICE_FEE_RATE } from "@/lib/finance/fees";
+import { setEarningsStartAction } from "@/lib/platform-admin/expense-actions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const metadata: Metadata = {
@@ -12,6 +15,17 @@ const FEE_PERCENT = `${SHARED_SERVICE_FEE_RATE * 100}%`;
 
 function money(amount: number): string {
   return `₹${amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function dateLabel(key: string): string {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+function whenLabel(iso: string): string {
+  // A donation only has a day; everything else has a time.
+  if (iso.length === 10) return dateLabel(iso);
+  return new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 function monthLabel(key: string): string {
@@ -33,6 +47,23 @@ export default async function PlatformEarningsPage() {
         </p>
       </div>
 
+      <Card>
+        <CardContent className="flex flex-wrap items-end justify-between gap-3 py-4">
+          <div className="text-sm">
+            <p className="font-medium">
+              {report.earningsStart ? `Counting payments from ${dateLabel(report.earningsStart)}` : "Counting every payment"}
+            </p>
+            <p className="text-muted-foreground">Earlier payments stay stored but are left out of every figure here. Church balances and payouts are not affected.</p>
+          </div>
+          <form action={setEarningsStartAction} className="flex items-end gap-2">
+            <Input name="day" type="date" defaultValue={report.earningsStart ?? ""} className="w-40" />
+            <Button type="submit" variant="outline">
+              Save
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryCard label="Earned, all time" value={money(report.allTime.revenue)} />
         <SummaryCard label="Expenses, all time" value={money(report.allTime.expenses)} />
@@ -49,6 +80,50 @@ export default async function PlatformEarningsPage() {
           </CardDescription>
         </CardHeader>
       </Card>
+
+      <section className="space-y-3">
+        <h2 className="font-heading text-xl font-bold">Transactions</h2>
+        <p className="text-sm text-muted-foreground">
+          Every payment that counts, newest first (latest {report.transactions.length}). &ldquo;Earned&rdquo; is KingdomFlow&apos;s share; for shared-account fees the whole payment is shown too.
+        </p>
+        {report.transactions.length === 0 ? (
+          <Card>
+            <CardContent className="py-10 text-center text-sm text-muted-foreground">No payments yet.</CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="overflow-x-auto p-0">
+              <table className="w-full text-sm">
+                <thead className="border-b text-left text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-2 font-medium">When</th>
+                    <th className="px-4 py-2 font-medium">Church</th>
+                    <th className="px-4 py-2 font-medium">What</th>
+                    <th className="px-4 py-2 font-medium">Reference</th>
+                    <th className="px-4 py-2 text-right font-medium">Payment</th>
+                    <th className="px-4 py-2 text-right font-medium">Earned</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.transactions.map((t) => (
+                    <tr key={t.id} className="border-b last:border-0">
+                      <td className="px-4 py-2 whitespace-nowrap">{whenLabel(t.when)}</td>
+                      <td className="px-4 py-2">{t.churchName}</td>
+                      <td className="px-4 py-2">
+                        {t.description}
+                        <span className="block text-xs text-muted-foreground">{t.sourceLabel}</span>
+                      </td>
+                      <td className="px-4 py-2 font-mono text-xs text-muted-foreground">{t.reference}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{t.gross === null ? "—" : money(t.gross)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums font-medium">{money(t.earned)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        )}
+      </section>
 
       <section className="space-y-3">
         <h2 className="font-heading text-xl font-bold">Where it comes from</h2>

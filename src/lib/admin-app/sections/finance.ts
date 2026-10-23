@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   getPlatformEarningsReport,
   getPlatformExpensesReport,
+  setEarningsStart,
 } from "@/lib/platform-admin/finance";
 import {
   INVESTMENT_CATEGORIES,
@@ -27,7 +28,7 @@ import {
 } from "@/lib/billing/receipts";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import type { SectionAction, SectionItem } from "@/lib/admin-app/section-types";
-import { day, fail, inr, ok, type AdminSection } from "./common";
+import { day, fail, inr, ok, when, type AdminSection } from "./common";
 
 const earnings: AdminSection = {
   key: "earnings",
@@ -50,7 +51,29 @@ const earnings: AdminSection = {
         { label: "Invested, all time", value: inr(r.allTime.invested) },
         { label: `This month (${r.thisMonth.month})`, value: inr(r.thisMonth.net) },
       ],
+      actions: [
+        {
+          key: "start",
+          label: r.earningsStart ? `Counting from ${day(r.earningsStart)}: change` : "Count from a date",
+          inputs: [{ key: "day", label: "Count payments from (YYYY-MM-DD, empty = all)", kind: "date" as const, initial: r.earningsStart ?? "" }],
+        },
+      ],
       groups: [
+        {
+          title: "Transactions",
+          items: r.transactions.map((t) => ({
+            id: t.id,
+            title: `${t.churchName} · ${t.description}`,
+            subtitle: `${t.sourceLabel} · ${t.when.length === 10 ? day(t.when) : when(t.when)}`,
+            badge: inr(t.earned),
+            tone: "good" as const,
+            fields: [
+              { label: "Reference", value: t.reference },
+              ...(t.gross === null ? [] : [{ label: "Payment total", value: inr(t.gross) }]),
+              { label: "Earned", value: inr(t.earned) },
+            ],
+          })),
+        },
         {
           title: "By source",
           items: r.bySource.map((s) => ({
@@ -76,6 +99,14 @@ const earnings: AdminSection = {
         },
       ],
     };
+  },
+  async act(caller, action, _id, input) {
+    if (action !== "start") return fail("Unknown action.");
+    const dayValue = (input.day ?? "").trim();
+    if (dayValue && (!/^\d{4}-\d{2}-\d{2}$/.test(dayValue) || Number.isNaN(Date.parse(`${dayValue}T00:00:00Z`)))) return fail("Enter a date like 2026-10-23.");
+    await setEarningsStart(dayValue || null);
+    await logPlatformEvent({ level: "warning", source: "platform_admin", message: `Platform admin (${caller.email}) set earnings to count from ${dayValue || "the beginning"} (admin app)` });
+    return ok("Saved.");
   },
 };
 

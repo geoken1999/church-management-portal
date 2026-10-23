@@ -25,8 +25,41 @@ const REVENUE_SOURCES = Object.keys(REVENUE_SOURCE_LABELS) as RevenueSource[];
 
 interface RevenueEvent {
   source: RevenueSource;
+  /** What KingdomFlow earned from this payment. */
   amount: number;
   when: string;
+  organizationId: string | null;
+  /** The payment's own id, to find it in Razorpay. */
+  reference: string;
+  /** What was bought. */
+  description: string;
+  /** For a shared-account fee, the whole payment the fee was taken from. */
+  gross?: number;
+}
+
+/** One payment as the earnings page lists it. */
+export interface EarningTransaction {
+  id: string;
+  source: RevenueSource;
+  sourceLabel: string;
+  when: string;
+  churchName: string;
+  description: string;
+  reference: string;
+  earned: number;
+  gross: number | null;
+}
+
+const EARNINGS_START_KEY = "earnings_start";
+
+/** The first day (YYYY-MM-DD, Indian time) whose payments count as earnings; null counts everything. */
+export async function getEarningsStart(): Promise<string | null> {
+  const { data } = await createAdminClient().from("platform_settings").select("value").eq("key", EARNINGS_START_KEY).maybeSingle();
+  return typeof data?.value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data.value) ? data.value : null;
+}
+
+export async function setEarningsStart(day: string | null): Promise<void> {
+  await createAdminClient().from("platform_settings").upsert({ key: EARNINGS_START_KEY, value: (day ?? "") as never, updated_at: new Date().toISOString() }, { onConflict: "key" });
 }
 
 export interface SourceTotal {
@@ -49,6 +82,10 @@ export interface PlatformEarningsReport {
   thisMonth: { month: string; revenue: number; expenses: number; net: number };
   bySource: SourceTotal[];
   months: MonthRow[];
+  /** Payments before this day are left out of every figure above (they are still stored). */
+  earningsStart: string | null;
+  /** Every counted payment, newest first (up to 500). */
+  transactions: EarningTransaction[];
   // Earliest subscription charge recorded. Charges before this were never
   // stored, so subscription revenue is understated for earlier months.
   subscriptionTrackingSince: string | null;
@@ -74,38 +111,47 @@ export async function getPlatformEarningsReport(now: Date = new Date()): Promise
   const admin = createAdminClient();
 
   const [subs, addons, sharedDonations, eventOrders, membershipPayments, expenses, investments] = await Promise.all([
-    admin.from("platform_subscription_payments").select("amount, paid_at"),
-    admin.from("organization_addon_orders").select("amount, paid_at, created_at").eq("status", "paid"),
-    admin.from("donations").select("amount, donated_on").eq("payment_mode", "shared"),
-    admin.from("event_registration_payment_orders").select("amount, updated_at").eq("status", "paid"),
-    admin.from("membership_fee_invoices").select("amount, paid_at").eq("status", "paid"),
+    admin.from("platform_subscription_payments").select("amount, paid_at, organization_id, plan_id, razorpay_payment_id"),
+    admin.from("organization_addon_orders").select("id, amount, paid_at, created_at, organization_id, pack_id, payu_txnid").eq("status", "paid"),
+    admin.from("donations").select("id, amount, donated_on, organization_id").eq("payment_mode", "shared"),
+    admin.from("event_registration_payment_orders").select("id, amount, updated_at, organization_id, payu_txnid").eq("status", "paid"),
+    admin.from("membership_fee_invoices").select("id, amount, paid_at, organization_id, period").eq("status", "paid"),
     admin.from("platform_expenses").select("paid_on, amount"),
     admin.from("platform_investments").select("amount"),
   ]);
 
-  const revenueEvents: RevenueEvent[] = [];
+  const earningsStart = await getEarningsStart();
+  const collected: RevenueEvent[] = [];
   for (const row of subs.data ?? []) {
-    revenueEvents.push({ source: "subscriptions", amount: Number(row.amount), when: row.paid_at });
+    collected.push({ source: "subscriptions", amount: Number(row.amount), when: row.paid_at, organizationId: row.organization_id, reference: row.razorpay_payment_id, description: `${row.plan_id} plan subscription` });
   }
   for (const row of addons.data ?? []) {
-    revenueEvents.push({ source: "addon_packs", amount: Number(row.amount), when: row.paid_at ?? row.created_at });
+    collected.push({ source: "addon_packs", amount: Number(row.amount), when: row.paid_at ?? row.created_at, organizationId: row.organization_id, reference: row.payu_txnid ?? row.id, description: `Add-on pack ${row.pack_id}` });
   }
+  // The gross on shared accounts belongs to churches until it is paid out, so it is counted whenever it was
+  // paid; the earnings start date only decides which fees count as earnings.
   let heldForChurches = 0;
   for (const row of membershipPayments.data ?? []) {
     const gross = Number(row.amount);
     heldForChurches += gross;
-    revenueEvents.push({ source: "shared_membership_fees", amount: sharedServiceFee(gross), when: row.paid_at ?? new Date().toISOString() });
+    collected.push({ source: "shared_membership_fees", amount: sharedServiceFee(gross), when: row.paid_at ?? new Date().toISOString(), organizationId: row.organization_id, reference: row.id, description: `Membership fee ${row.period}`, gross });
   }
   for (const row of sharedDonations.data ?? []) {
     const gross = Number(row.amount);
     heldForChurches += gross;
-    revenueEvents.push({ source: "shared_fundraiser_fees", amount: sharedServiceFee(gross), when: row.donated_on });
+    collected.push({ source: "shared_fundraiser_fees", amount: sharedServiceFee(gross), when: row.donated_on, organizationId: row.organization_id, reference: row.id, description: "Fundraiser donation", gross });
   }
   for (const row of eventOrders.data ?? []) {
     const gross = Number(row.amount);
     heldForChurches += gross;
-    revenueEvents.push({ source: "shared_event_fees", amount: sharedServiceFee(gross), when: row.updated_at });
+    collected.push({ source: "shared_event_fees", amount: sharedServiceFee(gross), when: row.updated_at, organizationId: row.organization_id, reference: row.payu_txnid ?? row.id, description: "Event registration", gross });
   }
+  // Counted from the start day on, by the Indian-time day of the payment.
+  const revenueEvents = collected.filter(
+    (event) =>
+      !earningsStart ||
+      dateKeyInTimezone(new Date(event.when.length === 10 ? `${event.when}T12:00:00+05:30` : event.when), DEFAULT_TIMEZONE) >= earningsStart,
+  );
 
   const currentMonth = dateKeyInTimezone(now, DEFAULT_TIMEZONE).slice(0, 7);
   const months = recentMonthKeys(now, 12);
@@ -155,6 +201,24 @@ export async function getPlatformEarningsReport(now: Date = new Date()): Promise
     };
   });
 
+  const orgIds = [...new Set(revenueEvents.map((e) => e.organizationId).filter((id): id is string => Boolean(id)))];
+  const { data: orgRows } = orgIds.length ? await admin.from("organizations").select("id, name").in("id", orgIds) : { data: [] };
+  const orgName = new Map((orgRows ?? []).map((o) => [o.id, o.name]));
+  const transactions: EarningTransaction[] = [...revenueEvents]
+    .sort((a, b) => new Date(b.when.length === 10 ? `${b.when}T12:00:00+05:30` : b.when).getTime() - new Date(a.when.length === 10 ? `${a.when}T12:00:00+05:30` : a.when).getTime())
+    .slice(0, 500)
+    .map((e) => ({
+      id: `${e.source}:${e.reference}`,
+      source: e.source,
+      sourceLabel: REVENUE_SOURCE_LABELS[e.source],
+      when: e.when,
+      churchName: (e.organizationId && orgName.get(e.organizationId)) || "—",
+      description: e.description,
+      reference: e.reference,
+      earned: round2(e.amount),
+      gross: e.gross === undefined ? null : round2(e.gross),
+    }));
+
   const earliest = (subs.data ?? []).map((r) => r.paid_at).sort()[0] ?? null;
 
   return {
@@ -176,6 +240,8 @@ export async function getPlatformEarningsReport(now: Date = new Date()): Promise
       return { ...t, revenue: round2(t.revenue) };
     }),
     months: monthRows,
+    earningsStart,
+    transactions,
     subscriptionTrackingSince: earliest ? monthKeyOfDate(earliest) : null,
   };
 }

@@ -10,6 +10,7 @@ import { getBranches } from "@/lib/branches/dal";
 import { getForms } from "@/lib/forms/dal";
 import { getAiDataAccessRules, type AiDataAccessRules } from "@/lib/ai-rules/dal";
 import type { ToolDefinition } from "@/lib/ai/openai";
+import { LEADERSHIP_TOOLS, LEADERSHIP_TOOL_CATEGORY, executeLeadershipTool } from "@/lib/aura/leadership-tools";
 
 // Every tool below runs with the session-scoped client (not the admin
 // client) and takes organizationId from the already-authorized caller
@@ -161,7 +162,7 @@ const AURA_TOOLS_BASE: ToolDefinition[] = [
 
 export async function getAuraTools(organizationId: string): Promise<ToolDefinition[]> {
   const rules = await getAiDataAccessRules(organizationId);
-  return AURA_TOOLS_BASE.filter((tool) => rules[TOOL_CATEGORY[tool.function.name]]);
+  return [...AURA_TOOLS_BASE, ...LEADERSHIP_TOOLS].filter((tool) => rules[TOOL_CATEGORY[tool.function.name] ?? LEADERSHIP_TOOL_CATEGORY[tool.function.name]]);
 }
 
 type ToolArgs = Record<string, unknown>;
@@ -316,7 +317,7 @@ async function listForms(organizationId: string, args: ToolArgs) {
 }
 
 export async function executeAuraTool(organizationId: string, name: string, args: ToolArgs): Promise<unknown> {
-  const category = TOOL_CATEGORY[name];
+  const category = TOOL_CATEGORY[name] ?? LEADERSHIP_TOOL_CATEGORY[name];
   if (category) {
     const rules = await getAiDataAccessRules(organizationId);
     if (!rules[category]) {
@@ -343,7 +344,9 @@ export async function executeAuraTool(organizationId: string, name: string, args
       return listBranches(organizationId, args);
     case "list_forms":
       return listForms(organizationId, args);
-    default:
-      return { error: `Unknown tool "${name}".` };
+    default: {
+      const answer = await executeLeadershipTool(organizationId, name, args);
+      return answer === undefined ? { error: `Unknown tool "${name}".` } : answer;
+    }
   }
 }

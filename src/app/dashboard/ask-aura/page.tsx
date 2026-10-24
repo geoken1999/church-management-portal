@@ -26,7 +26,7 @@ export default async function AskAuraPage() {
       <div>
         <h1 className="font-heading text-3xl font-bold tracking-tight">Ask Aura</h1>
         <p className="mt-1 text-muted-foreground">
-          Your organization&apos;s AI assistant — ask about attendance, members, events, or giving and get a real answer from your own data.
+          Your church&apos;s AI adviser. Ask how the church is doing, who needs a follow-up, how attendance and giving are trending, or what is waiting on you, and get answers from your own records.
         </p>
       </div>
 

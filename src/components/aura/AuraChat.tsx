@@ -16,10 +16,14 @@ export interface AuraChatMessage {
 }
 
 const SUGGESTIONS = [
+  "How is my church doing? Where are we lacking?",
+  "Who needs a follow-up call or visit?",
+  "Is our attendance going up or down?",
+  "How is giving compared to last month?",
+  "Who joined recently and needs a welcome?",
+  "What is waiting for me to approve or do?",
+  "Whose birthdays are coming up?",
   "How many people attended last Sunday's service?",
-  "How many active members do we have?",
-  "What events are coming up this month?",
-  "How much have we raised across active fundraisers?",
 ];
 
 export function AuraChat({
@@ -82,8 +86,8 @@ export function AuraChat({
                 <Sparkles className="size-6 text-primary" />
               </div>
               <div>
-                <p className="font-heading font-semibold">Ask Aura anything about your organization</p>
-                <p className="text-sm text-muted-foreground">Try one of these, or type your own question below.</p>
+                <p className="font-heading font-semibold">Ask Aura about your church</p>
+                <p className="text-sm text-muted-foreground">Aura reads your church's records and tells you what needs attention. Try one of these, or type your own question.</p>
               </div>
               <div className="flex flex-wrap justify-center gap-2">
                 {SUGGESTIONS.map((suggestion) => (

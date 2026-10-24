@@ -27,6 +27,7 @@ import {
   Boxes,
   KanbanSquare,
   UserRoundX,
+  Gauge,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -154,6 +155,12 @@ const NAV_ITEMS = [
     href: "/platform-admin/versions",
     label: "Versions",
     icon: Tag,
+    exact: false,
+  },
+  {
+    href: "/platform-admin/module-health",
+    label: "Module health",
+    icon: Gauge,
     exact: false,
   },
   {

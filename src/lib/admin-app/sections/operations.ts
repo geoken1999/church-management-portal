@@ -20,6 +20,7 @@ import { isAutoDeleteOn, setAutoDelete } from "@/lib/retention/settings";
 import { daysSince, deletionDate, nextAction } from "@/lib/retention/rules";
 import { getMobileHealth, getMobileVersions } from "@/lib/mobile-health/dal";
 import { getWebVersion } from "@/lib/version";
+import { getModuleHealthReport } from "@/lib/module-health/service";
 import { getUpdateConfig } from "@/lib/mobile/update-store";
 import { getWhatsAppHealth } from "@/lib/whatsapp/health";
 import { shouldPauseMarketing } from "@/lib/whatsapp/reputation-rules";
@@ -504,7 +505,52 @@ const whatsappHealth: AdminSection = {
   },
 };
 
+const moduleHealth: AdminSection = {
+  key: "module-health",
+  scope: "operations",
+  title: "Module health",
+  description: "How each module is used across churches, with trends and errors",
+  icon: "monitor_heart",
+  async load() {
+    const r = await getModuleHealthReport();
+    const tracked = r.modules.filter((m) => m.tracked);
+    const tone = { healthy: "good", quiet: "warn", unused: undefined, attention: "bad" } as const;
+    return {
+      title: "Module health",
+      note: "Counted from what churches record. Open a module to see its weekly and daily activity, churches using it and errors; the full charts are on the web dashboard.",
+      summary: [
+        { label: "Active churches (30 days)", value: `${r.activeChurches30} / ${r.totalChurches}` },
+        { label: "Modules in use", value: `${tracked.filter((m) => m.activeChurches30 > 0).length} / ${tracked.length}` },
+        { label: "Errors (7 days)", value: String(r.errors7d) },
+      ],
+      groups: [
+        {
+          items: r.modules.map((m) => {
+            const main = m.records ?? m.activity;
+            const pulse = m.activity ?? m.records;
+            return {
+              id: m.key,
+              title: m.label,
+              subtitle: `${m.group} · ${m.status}`,
+              badge: m.health === "attention" ? "needs attention" : m.health === "unused" ? "not used" : m.health,
+              tone: tone[m.health],
+              fields: [
+                ...(main ? [{ label: `Total ${main.noun}`, value: String(main.total) }] : []),
+                ...(pulse ? [{ label: `Last 30 days`, value: `${pulse.last30} ${pulse.noun} (${pulse.trend.percent === null ? pulse.trend.direction : `${pulse.trend.percent > 0 ? "+" : ""}${pulse.trend.percent}%`})` }, { label: "Per week (12 weeks)", value: pulse.weekly.join(" · ") }] : []),
+                { label: "Churches using it", value: `${m.churchesEver} of ${r.totalChurches} (${m.adoptionPercent}%), ${m.activeChurches30} active` },
+                { label: "Errors (7 days)", value: String(m.errors7d) },
+              ],
+              body: (r.errors[m.key] ?? []).slice(0, 5).map((e) => `${e.level} · ${e.churchName ?? "Platform"} · ${e.message}`).join("\n") || undefined,
+            };
+          }),
+        },
+      ],
+    };
+  },
+};
+
 export const operationsSections = [
+  moduleHealth,
   usage,
   sessions,
   cron,

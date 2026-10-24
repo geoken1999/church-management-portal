@@ -3,7 +3,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   getActiveSessions,
-  getPlatformEvents,
+  getPlatformEventsWithChurch,
 } from "@/lib/platform-admin/dal";
 import {
   getChurchUsageReport,
@@ -227,7 +227,7 @@ const logs: AdminSection = {
     const level = (LEVELS as readonly string[]).includes(filter ?? "")
       ? (filter as PlatformEventLevel)
       : undefined;
-    const events = await getPlatformEvents({ level, limit: 200 });
+    const events = await getPlatformEventsWithChurch({ level, limit: 200 });
     return {
       title: "Logs",
       filter: {
@@ -240,7 +240,7 @@ const logs: AdminSection = {
           items: events.map((e) => ({
             id: e.id,
             title: e.message,
-            subtitle: `${e.source} · ${when(e.created_at)}`,
+            subtitle: `${e.churchName ?? "Platform"} · ${e.source} · ${when(e.created_at)}`,
             badge: e.level,
             tone: e.level === "error" ? ("bad" as const) : e.level === "warning" ? ("warn" as const) : ("info" as const),
             body: Object.keys(e.metadata ?? {}).length ? JSON.stringify(e.metadata, null, 2) : undefined,

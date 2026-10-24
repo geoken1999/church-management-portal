@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { withAdminScope } from "@/lib/admin-app/auth";
 import { getMobileHealth } from "@/lib/mobile-health/dal";
-import { getPlatformEvents } from "@/lib/platform-admin/dal";
+import { getPlatformEventsWithChurch } from "@/lib/platform-admin/dal";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export const GET = (request: Request) =>
     const level = new URL(request.url).searchParams.get("level");
     const [health, events] = await Promise.all([
       getMobileHealth(),
-      getPlatformEvents({
+      getPlatformEventsWithChurch({
         level:
           level === "error" || level === "warning" || level === "info"
             ? level

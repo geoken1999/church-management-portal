@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
-import { getPlatformEvents } from "@/lib/platform-admin/dal";
+import { getPlatformEventsWithChurch } from "@/lib/platform-admin/dal";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { PlatformEventLevel } from "@/types/database";
@@ -24,12 +24,21 @@ const LEVEL_FILTERS: { label: string; value: PlatformEventLevel | undefined }[] 
   { label: "Info", value: "info" },
 ];
 
-export default async function PlatformAdminLogsPage({ searchParams }: { searchParams: Promise<{ level?: string }> }) {
+export default async function PlatformAdminLogsPage({ searchParams }: { searchParams: Promise<{ level?: string; church?: string }> }) {
   await requirePlatformAdmin();
-  const { level } = await searchParams;
+  const { level, church } = await searchParams;
+  const churchId = church && /^[0-9a-f-]{36}$/i.test(church) ? church : undefined;
   const activeLevel = level === "error" || level === "warning" || level === "info" ? level : undefined;
 
-  const events = await getPlatformEvents({ level: activeLevel, limit: 200 });
+  const events = await getPlatformEventsWithChurch({ level: activeLevel, limit: 200, organizationId: churchId });
+  const filteredChurch = churchId ? events.find((e) => e.churchName)?.churchName ?? "this church" : null;
+  const query = (params: { level?: string; church?: string }) => {
+    const q = new URLSearchParams();
+    if (params.level) q.set("level", params.level);
+    if (params.church) q.set("church", params.church);
+    const text = q.toString();
+    return text ? `/platform-admin/logs?${text}` : "/platform-admin/logs";
+  };
 
   return (
     <div className="space-y-6">
@@ -45,7 +54,7 @@ export default async function PlatformAdminLogsPage({ searchParams }: { searchPa
         {LEVEL_FILTERS.map((filter) => (
           <Link
             key={filter.label}
-            href={filter.value ? `/platform-admin/logs?level=${filter.value}` : "/platform-admin/logs"}
+            href={query({ level: filter.value, church: churchId })}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
               activeLevel === filter.value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
             }`}
@@ -54,6 +63,16 @@ export default async function PlatformAdminLogsPage({ searchParams }: { searchPa
           </Link>
         ))}
       </div>
+
+      {churchId && (
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Showing only</span>
+          <Badge variant="outline">{filteredChurch}</Badge>
+          <Link href={query({ level: activeLevel })} className="text-primary hover:underline">
+            Show all churches
+          </Link>
+        </div>
+      )}
 
       {events.length === 0 ? (
         <Card>
@@ -68,6 +87,18 @@ export default async function PlatformAdminLogsPage({ searchParams }: { searchPa
                   <div className="flex items-center gap-2">
                     <Badge variant={LEVEL_VARIANTS[event.level]}>{event.level}</Badge>
                     <span className="text-xs font-medium text-muted-foreground">{event.source}</span>
+                    {/* Which church the event is about; click to see only that church's logs. */}
+                    {event.organization_id ? (
+                      <Link href={query({ level: activeLevel, church: event.organization_id })} title="Show only this church's logs">
+                        <Badge variant="outline" className="border-primary/40 text-primary">
+                          {event.churchName}
+                        </Badge>
+                      </Link>
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground">
+                        Platform
+                      </Badge>
+                    )}
                   </div>
                   <span className="text-xs text-muted-foreground">{formatPlatformDateTime(event.created_at)}</span>
                 </div>

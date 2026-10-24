@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CheckCircle2, XCircle, Database, HardDrive, ExternalLink, AlertTriangle, Rocket, Gauge, AlertOctagon } from "lucide-react";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
-import { getPlatformOverview, getPlatformEvents, getDatabaseHealth, getPlatformStorageStats } from "@/lib/platform-admin/dal";
+import { getPlatformOverview, getPlatformEventsWithChurch, getDatabaseHealth, getPlatformStorageStats } from "@/lib/platform-admin/dal";
 import { getLatestProductionDeployment } from "@/lib/platform-admin/vercel";
 import { getSupabaseProjectStatus } from "@/lib/platform-admin/supabase-management";
 import { getPortalResponseTime } from "@/lib/platform-admin/portal-speed";
@@ -45,7 +45,7 @@ export default async function PlatformAdminHealthPage() {
   const [integrations, overview, recentErrors, dbHealth, storageStats, deployment, supabaseStatus, portalSpeed] = await Promise.all([
     getIntegrationHealth(),
     getPlatformOverview(),
-    getPlatformEvents({ level: "error", limit: 10 }),
+    getPlatformEventsWithChurch({ level: "error", limit: 10 }),
     getDatabaseHealth(),
     getPlatformStorageStats(),
     getLatestProductionDeployment(),
@@ -282,7 +282,7 @@ export default async function PlatformAdminHealthPage() {
                   <div className="min-w-0">
                     <p className="text-sm">{event.message}</p>
                     <p className="text-xs text-muted-foreground">
-                      {event.source} · {formatPlatformDateTime(event.created_at)}
+                      {event.churchName ?? "Platform"} · {event.source} · {formatPlatformDateTime(event.created_at)}
                     </p>
                   </div>
                   <Badge variant="destructive">error</Badge>

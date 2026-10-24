@@ -612,17 +612,33 @@ export async function getPlatformStorageStats(): Promise<PlatformStorageStats | 
 // src/lib/platform-events/log.ts).
 // ---------------------------------------------------------------------------
 
-export async function getPlatformEvents(filter: { level?: PlatformEventLevel; limit?: number; since?: string } = {}): Promise<PlatformEvent[]> {
+export async function getPlatformEvents(filter: { level?: PlatformEventLevel; limit?: number; since?: string; organizationId?: string } = {}): Promise<PlatformEvent[]> {
   const admin = createAdminClient();
   let query = admin.from("platform_events").select("*").order("created_at", { ascending: false }).limit(filter.limit ?? 100);
   if (filter.level) {
     query = query.eq("level", filter.level);
+  }
+  if (filter.organizationId) {
+    query = query.eq("organization_id", filter.organizationId);
   }
   if (filter.since) {
     query = query.gte("created_at", filter.since);
   }
   const { data } = await query;
   return data ?? [];
+}
+
+/** Log events with the name of the church each is about (null for events about the platform as a whole). */
+export type PlatformEventWithChurch = PlatformEvent & { churchName: string | null };
+
+export async function getPlatformEventsWithChurch(filter: Parameters<typeof getPlatformEvents>[0] = {}): Promise<PlatformEventWithChurch[]> {
+  const events = await getPlatformEvents(filter);
+  const ids = [...new Set(events.map((e) => e.organization_id).filter((id): id is string => Boolean(id)))];
+  if (ids.length === 0) return events.map((e) => ({ ...e, churchName: null }));
+  const { data } = await createAdminClient().from("organizations").select("id, name").in("id", ids);
+  const names = new Map((data ?? []).map((o) => [o.id, o.name]));
+  // A church that has since been deleted still shows that it was a church, not the platform.
+  return events.map((e) => ({ ...e, churchName: e.organization_id ? (names.get(e.organization_id) ?? "Deleted church") : null }));
 }
 
 // ---------------------------------------------------------------------------

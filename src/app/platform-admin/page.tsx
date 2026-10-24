@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Building2, TrendingUp, Clock, AlertCircle, ArrowRight } from "lucide-react";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
-import { getPlatformOverview, getPlatformEvents } from "@/lib/platform-admin/dal";
+import { getPlatformOverview, getPlatformEventsWithChurch } from "@/lib/platform-admin/dal";
 import { PLANS } from "@/lib/plans/config";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +35,7 @@ function StatCard({ icon: Icon, label, value, hint }: { icon: typeof Building2; 
 
 export default async function PlatformAdminOverviewPage() {
   await requirePlatformAdmin();
-  const [overview, recentEvents] = await Promise.all([getPlatformOverview(), getPlatformEvents({ limit: 8 })]);
+  const [overview, recentEvents] = await Promise.all([getPlatformOverview(), getPlatformEventsWithChurch({ limit: 8 })]);
 
   return (
     <div className="space-y-8">
@@ -83,7 +83,7 @@ export default async function PlatformAdminOverviewPage() {
                   <div className="min-w-0">
                     <p className="truncate text-sm">{event.message}</p>
                     <p className="text-xs text-muted-foreground">
-                      {event.source} · {formatPlatformDateTime(event.created_at)}
+                      {event.churchName ?? "Platform"} · {event.source} · {formatPlatformDateTime(event.created_at)}
                     </p>
                   </div>
                   <Badge variant={LEVEL_VARIANTS[event.level]}>{event.level}</Badge>

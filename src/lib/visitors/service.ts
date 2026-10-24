@@ -12,6 +12,17 @@ import { logPlatformEvent } from "@/lib/platform-events/log";
 import { feedbackDue, phoneKey, validateFeedback, validateVisit, type FeedbackInput, type VisitErrors, type VisitInput } from "@/lib/visitors/rules";
 import type { Visitor } from "@/types/database";
 
+// Tells the church's team: a row in the web bell (so it is there whether or not a phone push reaches anyone), and
+// a push to owners, admins and anyone who can open the Visitors tab.
+async function notifyTeam(organizationId: string, title: string, body: string): Promise<void> {
+  try {
+    await createAdminClient().from("notifications").insert({ organization_id: organizationId, type: "visitor", title, body, link: "/dashboard/visitors" });
+  } catch (err) {
+    console.error("visitor bell notification failed:", err);
+  }
+  await pushToTeam({ organizationId, tab: "visitors", title, body, link: "/dashboard/visitors" });
+}
+
 export interface PublicChurch {
   id: string;
   name: string;
@@ -74,13 +85,7 @@ export async function recordVisit(slug: string, input: VisitInput): Promise<Visi
     return { ok: false, error: "Couldn't save your details. Please try again." };
   }
 
-  await pushToTeam({
-    organizationId: church.id,
-    tab: "visitors",
-    title: "New visitor",
-    body: `${input.name.trim()} visited today${input.prayerRequest.trim() ? " and left a prayer request" : ""}.`,
-    link: "/dashboard/visitors",
-  });
+  await notifyTeam(church.id, "New visitor", `${input.name.trim()} visited today${input.prayerRequest.trim() ? " and left a prayer request" : ""}.`);
   return { ok: true, kind: "new", churchName: church.name };
 }
 
@@ -113,15 +118,12 @@ export async function recordFeedback(token: string, input: FeedbackInput): Promi
     .eq("id", visitor.id)
     .is("feedback_at", null);
   if (error) return { ok: false, error: "Couldn't save your feedback. Please try again." };
-  if (input.wantsFollowup) {
-    await pushToTeam({
-      organizationId: visitor.organization_id,
-      tab: "visitors",
-      title: "A visitor would like a follow-up",
-      body: `${visitor.name} left feedback and asked for someone to follow up.`,
-      link: "/dashboard/visitors",
-    });
-  }
+  // Every answer reaches the team; one that asks for a follow-up says so up front.
+  await notifyTeam(
+    visitor.organization_id,
+    input.wantsFollowup ? "A visitor would like a follow-up" : "New visitor feedback",
+    `${visitor.name} rated their visit ${input.rating}/5${input.wantsFollowup ? " and asked for someone to follow up" : ""}${input.text.trim() ? `: "${input.text.trim().slice(0, 120)}"` : "."}`,
+  );
   return { ok: true };
 }
 

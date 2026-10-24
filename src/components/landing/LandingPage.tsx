@@ -53,6 +53,7 @@ import { PricingSection } from "@/components/landing/PricingSection";
 import { DashboardPreview } from "@/components/landing/DashboardPreview";
 import { AiAutomationSection } from "@/components/landing/AiAutomationSection";
 import { MobileAppPreview } from "@/components/landing/MobileAppPreview";
+import { DevicesShowcase } from "@/components/landing/DevicesShowcase";
 import { AppStoreButtons } from "@/components/landing/AppStoreButtons";
 import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/app-links";
 
@@ -730,6 +731,24 @@ export function LandingPage() {
         </section>
 
         {/* Church listing is hidden for now — re-enable by restoring <ChurchesSection />. */}
+
+        <section id="devices" className="bg-muted/40 px-4 py-20 sm:px-6">
+          <div className="mx-auto max-w-6xl">
+            <div className="mx-auto max-w-2xl text-center">
+              <Badge variant="secondary" className="mb-4">
+                <Smartphone className="size-3" />
+                On every device
+              </Badge>
+              <h2 className="font-heading text-3xl font-bold tracking-tight text-balance">
+                One church, every screen
+              </h2>
+              <p className="mt-3 text-muted-foreground">
+                Your team works on a computer, members use the app on their phone or iPad, and it all stays in step.
+              </p>
+            </div>
+            <DevicesShowcase />
+          </div>
+        </section>
 
         <section id="apps" className="px-4 py-20 sm:px-6">
           <div className="mx-auto max-w-6xl">

@@ -115,6 +115,15 @@ export function defaultMemberTabPermissions(): Record<TabKey, TabAccess> {
   return Object.fromEntries(TAB_KEYS.map((key) => [key, readOnlyTabAccess()])) as Record<TabKey, TabAccess>;
 }
 
+/**
+ * The tabs a saved permissions value says nothing about: ones added after it was last saved. They fall back to
+ * view-only (see defaultMemberTabPermissions), so the Team screen points them out for an admin to review.
+ */
+export function tabsMissingFrom(raw: TabPermissions | null | undefined): TabKey[] {
+  if (!raw) return [];
+  return TAB_KEYS.filter((key) => !raw[key] || typeof raw[key] !== "object");
+}
+
 export function normalizeTabPermissions(raw: TabPermissions | null | undefined): Record<TabKey, TabAccess> {
   const result = defaultMemberTabPermissions();
   if (!raw) return result;

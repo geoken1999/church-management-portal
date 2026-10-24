@@ -8,6 +8,7 @@ import {
   allFullTabAccess,
   defaultMemberTabPermissions,
   normalizeTabPermissions,
+  tabsMissingFrom,
 } from "./tabs";
 
 // This session added three new tabs (attendance, folder, reports) — these
@@ -97,5 +98,19 @@ describe("normalizeTabPermissions", () => {
   it("coerces non-boolean truthy/falsy values on a known tab rather than crashing", () => {
     const result = normalizeTabPermissions({ folder: { read: 1, write: 0, delete: "" } } as never);
     expect(result.folder).toEqual({ read: true, write: false, delete: false });
+  });
+});
+
+describe("tabsMissingFrom", () => {
+  const some = { members: { read: true, write: true, delete: false }, events: { read: true, write: true, delete: false } };
+  it("lists the tabs a saved value doesn't mention (added since)", () => {
+    const missing = tabsMissingFrom(some);
+    expect(missing).not.toContain("members");
+    expect(missing).toContain("visitors");
+    expect(missing.length).toBe(TAB_KEYS.length - 2);
+  });
+  it("has nothing to point out for a login that was never customised, or one that covers every tab", () => {
+    expect(tabsMissingFrom(null)).toEqual([]);
+    expect(tabsMissingFrom(allFullTabAccess())).toEqual([]);
   });
 });

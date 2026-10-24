@@ -22,11 +22,13 @@ export function MemberPermissionsButton({
   memberId,
   memberName,
   initialPermissions,
+  newTabs,
 }: {
   organizationId: string;
   memberId: string;
   memberName: string;
   initialPermissions: Record<TabKey, TabAccess>;
+  newTabs?: TabKey[];
 }) {
   const [open, setOpen] = useState(false);
   const [permissions, setPermissions] = useState(initialPermissions);
@@ -63,7 +65,7 @@ export function MemberPermissionsButton({
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="organizationId" value={organizationId} />
           <input type="hidden" name="memberId" value={memberId} />
-          <PermissionMatrix value={permissions} onChange={setPermissions} />
+          <PermissionMatrix value={permissions} onChange={setPermissions} newTabs={newTabs} />
           <DialogFooter>
             <Button type="submit" disabled={pending}>
               {pending ? "Saving..." : "Save"}

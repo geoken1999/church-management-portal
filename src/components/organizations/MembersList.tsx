@@ -1,5 +1,5 @@
 import { removeMember } from "@/lib/organizations/actions";
-import { normalizeTabPermissions } from "@/lib/permissions/tabs";
+import { normalizeTabPermissions, tabsMissingFrom } from "@/lib/permissions/tabs";
 import type { TabPermissions } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { MemberPermissionsButton } from "@/components/organizations/MemberPermissionsButton";
@@ -51,6 +51,7 @@ export function MembersList({
                   memberId={member.id}
                   memberName={name}
                   initialPermissions={normalizeTabPermissions(member.tab_permissions)}
+                  newTabs={tabsMissingFrom(member.tab_permissions)}
                 />
               )}
               {canManage && !isSelf && member.role !== "owner" && (

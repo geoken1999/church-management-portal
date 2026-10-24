@@ -205,7 +205,7 @@ const whatsappTemplates: AdminSection = {
               subtitle: t.name,
               badge: row ? row.status.replace("_", " ") : "not submitted",
               tone: !row ? undefined : row.status === "approved" ? ("good" as const) : row.status === "pending_review" ? ("warn" as const) : ("bad" as const),
-              body: `${t.description}\n\n${t.body}${row?.rejected_reason && row.rejected_reason !== "NONE" ? `\n\nRejected: ${row.rejected_reason}` : ""}`,
+              body: `${t.description}\n\n${t.body}${t.urlButton ? `\n\n[ ${t.urlButton.text} ] button` : ""}${row?.rejected_reason && row.rejected_reason !== "NONE" ? `\n\nRejected: ${row.rejected_reason}` : ""}`,
               actions: row ? undefined : [{ key: "submit", label: "Submit to WhatsApp", confirm: "Send this template to WhatsApp for review? It can't be edited afterwards." }],
             };
           }),

@@ -6,7 +6,6 @@ import { VISITOR_FORM_RULE } from "@/lib/auth/rate-limit-rules";
 import { dateKeyInTimezone, DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 import { pushToTeam } from "@/lib/push/team";
 import { sendCatalogNotice } from "@/lib/whatsapp/catalog-send";
-import { getSiteUrl } from "@/lib/site-url";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { feedbackDue, phoneKey, validateFeedback, validateVisit, type FeedbackInput, type VisitErrors, type VisitInput } from "@/lib/visitors/rules";
 import type { Visitor } from "@/types/database";
@@ -154,7 +153,9 @@ export async function sendFeedbackRequests(now: Date = new Date()): Promise<{ ch
       refId: v.id,
       rawPhone: v.phone,
       orgCountry: org.country,
-      bodyParams: [v.name.split(" ")[0], org.name, `${getSiteUrl()}/visit/feedback/${v.feedback_token}`],
+      // The link is the template's button; only its last part (the visitor's own token) is sent.
+      bodyParams: [v.name.split(" ")[0], org.name],
+      buttonUrlParam: v.feedback_token,
     });
     if (outcome.status === "sent" || (outcome.status === "skipped" && outcome.reason === "Already sent.")) {
       await admin.from("visitors").update({ feedback_sent_at: new Date().toISOString(), feedback_note: null }).eq("id", v.id);

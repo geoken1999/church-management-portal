@@ -1,4 +1,4 @@
-import type { WhatsAppTemplateCategory } from "@/types/database";
+import type { WhatsAppTemplateButton, WhatsAppTemplateCategory } from "@/types/database";
 
 // The templates KingdomFlow offers every church. Variables are numbered
 // {{1}}, {{2}}... as WhatsApp requires; in the campaign composer a church
@@ -17,6 +17,8 @@ export interface PlatformTemplateDefinition {
   language: string;
   body: string;
   examples: string[];
+  /** A tap-to-open link button under the message. The part after `path` is filled in per message ({{1}} in the button, not the body). */
+  urlButton?: { text: string; path: string };
 }
 
 export const PLATFORM_TEMPLATE_CATALOG: PlatformTemplateDefinition[] = [
@@ -77,8 +79,9 @@ export const PLATFORM_TEMPLATE_CATALOG: PlatformTemplateDefinition[] = [
     description: "The day after a first visit, ask a visitor how it went. Sent automatically to people who scanned the church's visitor QR code.",
     category: "utility",
     language: "en_US",
-    body: "Hi {{1}}, thank you for visiting {{2}}. We would love to hear how your visit went, and whether you would like someone to follow up with you. It takes a minute: {{3}} God bless you.",
-    examples: ["Ann", "Grace Church", "https://www.kingdomflow.in/visit/feedback/abc123"],
+    body: "Hi {{1}}, thank you for visiting {{2}}. We would love to hear how your visit went, and whether you would like someone to follow up with you. Tap the button below to share your feedback. God bless you.",
+    examples: ["Ann", "Grace Church"],
+    urlButton: { text: "Give feedback", path: "/visit/feedback/" },
   },
   {
     key: "thank_you_giving",
@@ -145,4 +148,10 @@ export const PLATFORM_TEMPLATE_CATALOG: PlatformTemplateDefinition[] = [
 export function variableCountOf(body: string): number {
   const found = new Set([...body.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map((m) => Number(m[1])));
   return found.size;
+}
+
+/** The buttons a catalog template is submitted with. The link's last part is the per-message {{1}}. */
+export function catalogButtons(definition: PlatformTemplateDefinition, siteUrl: string): WhatsAppTemplateButton[] {
+  if (!definition.urlButton) return [];
+  return [{ type: "url", text: definition.urlButton.text, url: `${siteUrl.replace(/\/$/, "")}${definition.urlButton.path}{{1}}` }];
 }

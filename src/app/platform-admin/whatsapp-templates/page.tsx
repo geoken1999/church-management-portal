@@ -56,6 +56,9 @@ export default async function PlatformAdminWhatsAppTemplatesPage() {
                 </div>
                 <p className="text-sm text-muted-foreground">{template.description}</p>
                 <p className="rounded-md bg-muted/50 p-2 text-sm">{template.body}</p>
+                {template.urlButton && (
+                  <p className="inline-block rounded-md border border-border px-3 py-1 text-sm font-medium text-primary">{template.urlButton.text}</p>
+                )}
                 {row?.rejected_reason && row.rejected_reason !== "NONE" && <p className="text-xs text-destructive">Rejected: {row.rejected_reason}</p>}
               </CardContent>
             </Card>

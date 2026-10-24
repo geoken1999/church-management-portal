@@ -5,8 +5,15 @@ import { logPlatformEvent } from "@/lib/platform-events/log";
 import { getPlatformWhatsAppCredentials, getWhatsAppCredentials } from "@/lib/whatsapp/credentials";
 import { createMetaTemplate, fetchMetaTemplateStatus, findMetaTemplateByName } from "@/lib/whatsapp/templates-client";
 import { describeWhatsAppError } from "@/lib/whatsapp/graph-error";
-import { PLATFORM_TEMPLATE_CATALOG, variableCountOf, type PlatformTemplateDefinition } from "@/lib/whatsapp/platform-catalog";
+import { PLATFORM_TEMPLATE_CATALOG, catalogButtons, variableCountOf, type PlatformTemplateDefinition } from "@/lib/whatsapp/platform-catalog";
+import { getSiteUrl } from "@/lib/site-url";
 import type { PlatformWhatsAppTemplate } from "@/types/database";
+
+// The buttons a church's copy of a platform template carries (the same as the master was submitted with).
+function buttonsForMaster(catalogKey: string) {
+  const definition = PLATFORM_TEMPLATE_CATALOG.find((t) => t.key === catalogKey);
+  return definition ? catalogButtons(definition, getSiteUrl()) : [];
+}
 
 export function catalogEntry(key: string): PlatformTemplateDefinition | undefined {
   return PLATFORM_TEMPLATE_CATALOG.find((t) => t.key === key);
@@ -37,6 +44,7 @@ export async function submitPlatformTemplate(key: string): Promise<{ error?: str
         category: definition.category,
         bodyText: definition.body,
         exampleValues: definition.examples,
+        buttons: catalogButtons(definition, getSiteUrl()),
         credentials,
       })),
       rejectedReason: null as string | null,
@@ -114,7 +122,7 @@ export async function syncPlatformTemplatesForOrg(organizationId: string): Promi
           variable_count: m.variable_count,
           header_type: "none" as const,
           header_image_path: null,
-          buttons: [],
+          buttons: buttonsForMaster(m.catalog_key),
           platform_template_id: m.id,
           meta_template_id: m.meta_template_id,
           status: m.status,
@@ -159,6 +167,7 @@ export async function addPlatformTemplateToOwnAccount(organizationId: string, pl
         category: master.category,
         bodyText: master.body_text,
         exampleValues: definition.examples,
+        buttons: catalogButtons(definition, getSiteUrl()),
         credentials,
       })),
       rejectedReason: null as string | null,
@@ -172,7 +181,7 @@ export async function addPlatformTemplateToOwnAccount(organizationId: string, pl
       variable_count: master.variable_count,
       header_type: "none",
       header_image_path: null,
-      buttons: [],
+      buttons: catalogButtons(definition, getSiteUrl()),
       platform_template_id: master.id,
       meta_template_id: created.metaTemplateId,
       status: created.status,

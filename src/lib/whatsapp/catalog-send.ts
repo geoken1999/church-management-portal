@@ -32,6 +32,8 @@ export async function sendCatalogNotice(input: {
   orgCountry?: string | null;
   memberId?: string | null;
   bodyParams: string[];
+  // Fills the {{1}} of the template's link button (e.g. a feedback token), when it has one.
+  buttonUrlParam?: string;
 }): Promise<NoticeOutcome> {
   const { organizationId } = input;
   const definition = catalogEntry(input.catalogKey);
@@ -89,7 +91,7 @@ export async function sendCatalogNotice(input: {
   }
 
   try {
-    const { id } = await sendTemplateMessage({ to: phone, templateName: template.name, languageCode: template.language, bodyParams: input.bodyParams, credentials });
+    const { id } = await sendTemplateMessage({ to: phone, templateName: template.name, languageCode: template.language, bodyParams: input.bodyParams, buttonUrlParam: input.buttonUrlParam, credentials });
     await admin.from("whatsapp_notice_log").update({ wamid: id }).eq("id", reserved.id);
     await logOutboundMessages([
       { organizationId, kind: "automation", refId: reserved.id, recipient: phone, wamid: id, templateName: template.name, category: template.category, senderKey, bodyText: renderTemplateText(template.body_text, input.bodyParams) },

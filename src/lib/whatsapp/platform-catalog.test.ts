@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PLATFORM_TEMPLATE_CATALOG, variableCountOf } from "./platform-catalog";
+import { PLATFORM_TEMPLATE_CATALOG, catalogButtons, variableCountOf } from "./platform-catalog";
 
 describe("platform template catalog", () => {
   it("has unique keys and valid, unique template names", () => {
@@ -51,5 +51,23 @@ describe("the new fee and follow-up templates", () => {
   it("has unique names", () => {
     const names = PLATFORM_TEMPLATE_CATALOG.map((t) => t.name);
     expect(new Set(names).size).toBe(names.length);
+  });
+});
+
+describe("the visitor feedback template", () => {
+  const t = PLATFORM_TEMPLATE_CATALOG.find((x) => x.key === "visitor_feedback")!;
+  it("carries the link as a button, not in the message", () => {
+    expect(t.body).not.toMatch(/https?:/);
+    expect(variableCountOf(t.body)).toBe(2);
+    expect(t.urlButton?.text).toBe("Give feedback");
+  });
+  it("is submitted with a link button whose last part is filled in per message", () => {
+    expect(catalogButtons(t, "https://www.kingdomflow.in/")).toEqual([
+      { type: "url", text: "Give feedback", url: "https://www.kingdomflow.in/visit/feedback/{{1}}" },
+    ]);
+  });
+  it("other templates have no buttons", () => {
+    const other = PLATFORM_TEMPLATE_CATALOG.find((x) => x.key === "service_reminder")!;
+    expect(catalogButtons(other, "https://x.test")).toEqual([]);
   });
 });

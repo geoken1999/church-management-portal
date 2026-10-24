@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronAuthResponse } from "@/lib/cron/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPushToUsers } from "@/lib/push/client";
 import { dateKeyInTimezone, DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
@@ -15,13 +16,8 @@ const LOOKAHEAD_MS = 60 * 60 * 60 * 1000;
 // to (a team login, or a leader with the app), or to its creator when nobody is.
 // The sent-on dates keep it to once a day per kind.
 async function run(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
+  const denied = cronAuthResponse(request);
+  if (denied) return denied;
 
   const admin = createAdminClient();
   const now = new Date();

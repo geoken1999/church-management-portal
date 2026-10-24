@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronAuthResponse } from "@/lib/cron/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { findEligibleMembersForTrigger } from "@/lib/automations/eligibility";
 import { sendDirectMemberMessage, sendStaffDigest } from "@/lib/automations/send";
@@ -21,13 +22,8 @@ import { withCronLogging } from "@/lib/cron/run-logger";
 // sendBulkTemplateMessage's own sequential loop, to avoid bursting Meta's
 // per-number rate limits.
 async function run(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
+  const denied = cronAuthResponse(request);
+  if (denied) return denied;
 
   const admin = createAdminClient();
   const now = new Date();

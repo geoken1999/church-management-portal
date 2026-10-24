@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronAuthResponse } from "@/lib/cron/auth";
 import { withCronLogging } from "@/lib/cron/run-logger";
 import { runRetention } from "@/lib/retention/run";
 
@@ -6,11 +7,8 @@ import { runRetention } from "@/lib/retention/run";
 // them the day before, and deletes them after 30 days while the platform admin's
 // switch is on. See src/lib/retention/run.ts.
 async function run(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = cronAuthResponse(request);
+  if (denied) return denied;
   const summary = await runRetention();
   return NextResponse.json(summary);
 }

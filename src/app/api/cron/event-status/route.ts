@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronAuthResponse } from "@/lib/cron/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasEventEnded } from "@/lib/events/status";
 import { DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
@@ -9,13 +10,8 @@ import { withCronLogging } from "@/lib/cron/run-logger";
 // Completed on its own). Cancelled events are left alone. Daily, like the
 // other cron jobs (see event-reminders/route.ts on the Hobby plan limit).
 async function run(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
+  const denied = cronAuthResponse(request);
+  if (denied) return denied;
 
   const admin = createAdminClient();
   const now = new Date();

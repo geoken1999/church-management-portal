@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronAuthResponse } from "@/lib/cron/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOccurrencesInRange } from "@/lib/events/recurrence";
 import { sendRegistrationReminderEmail } from "@/lib/events/registration-reminder";
@@ -45,13 +46,8 @@ function dateKeyAndHour(date: Date, timeZone: string): { dateKey: string; hour: 
 // due-check below, however, now uses each event's own org timezone
 // (previously hardcoded to Asia/Kolkata for every org).
 async function run(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
+  const denied = cronAuthResponse(request);
+  if (denied) return denied;
 
   const admin = createAdminClient();
   const now = new Date();

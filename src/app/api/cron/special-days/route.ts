@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronAuthResponse } from "@/lib/cron/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPushToUsers } from "@/lib/push/client";
 import {
@@ -18,13 +19,8 @@ import { withCronLogging } from "@/lib/cron/run-logger";
 // app, on their special day in their church's timezone. special_day_pushes
 // (member, kind, year) stops a re-run from sending twice.
 async function run(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
+  const denied = cronAuthResponse(request);
+  if (denied) return denied;
 
   const admin = createAdminClient();
   const now = new Date();

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronAuthResponse } from "@/lib/cron/auth";
 import { buildDailyHealthReport } from "@/lib/platform-admin/daily-report";
 import { sendBulkEmail } from "@/lib/email/client";
 import { isEmailConfigured } from "@/lib/email/env";
@@ -12,13 +13,8 @@ import { withCronLogging } from "@/lib/cron/run-logger";
 // requirePlatformAdmin(), which needs a signed-in user. Sends to
 // HEALTH_REPORT_EMAIL from EMAIL_FROM_ADDRESS — both @kingdomflow.in.
 async function run(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
+  const denied = cronAuthResponse(request);
+  if (denied) return denied;
 
   const recipient = process.env.HEALTH_REPORT_EMAIL;
   if (!recipient) {

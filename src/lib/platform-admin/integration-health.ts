@@ -6,6 +6,7 @@ import { isWhatsAppConfigured, getMetaWhatsAppEnv } from "@/lib/whatsapp/env";
 import { parseGraphError } from "@/lib/whatsapp/graph-error";
 import { isEmailConfigured, getEmailEnv } from "@/lib/email/env";
 import { isRazorpayConfigured } from "@/lib/billing/env";
+import { cronSecretMissingIsFatal } from "@/lib/cron/auth";
 import { createRazorpayClient } from "@/lib/billing/razorpay";
 import { expectedChargePaise, planEnvVar, planMismatch, razorpayPlanIdFor } from "@/lib/billing/razorpay-plans";
 import { PLANS, type BillingInterval, type PlanId } from "@/lib/plans/config";
@@ -134,6 +135,19 @@ async function checkResend(): Promise<IntegrationHealth> {
   }
 }
 
+// The daily jobs (billing, reminders, retention, feedback messages) only run for a caller holding CRON_SECRET.
+// Without it every one of them is refused, so it is the first thing to check when jobs stop.
+function checkScheduledJobs(): IntegrationHealth {
+  const name = "Scheduled jobs (CRON_SECRET)";
+  if (process.env.CRON_SECRET?.trim()) return { name, status: "operational", liveChecked: false };
+  return {
+    name,
+    status: cronSecretMissingIsFatal() ? "down" : "unconfigured",
+    detail: "CRON_SECRET is not set, so every scheduled job is refused. Add it to the Vercel environment variables and redeploy.",
+    liveChecked: false,
+  };
+}
+
 async function checkRazorpay(): Promise<IntegrationHealth> {
   const name = "Razorpay (billing & giving)";
   if (!isRazorpayConfigured()) return unconfigured(name);
@@ -236,5 +250,5 @@ export async function getIntegrationHealth(): Promise<IntegrationHealth[]> {
     checkMetaApp("Facebook", process.env.FACEBOOK_APP_ID, process.env.FACEBOOK_APP_SECRET),
   ]);
 
-  return [twilioSms, whatsapp, resend, razorpay, instagram, facebook, checkYouTube()];
+  return [checkScheduledJobs(), twilioSms, whatsapp, resend, razorpay, instagram, facebook, checkYouTube()];
 }

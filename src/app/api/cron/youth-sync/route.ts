@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronAuthResponse } from "@/lib/cron/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { withCronLogging } from "@/lib/cron/run-logger";
 
@@ -7,13 +8,8 @@ import { withCronLogging } from "@/lib/cron/run-logger";
 // daily pass covers birthdays: someone turning into the range joins, someone
 // passing out of it comes off (only if the rule added them).
 async function run(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
+  const denied = cronAuthResponse(request);
+  if (denied) return denied;
 
   const admin = createAdminClient();
   const { data: organizations } = await admin.from("organizations").select("id").not("youth_age_from", "is", null).not("youth_age_to", "is", null);

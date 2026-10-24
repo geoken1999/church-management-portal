@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { cronAuthResponse } from "@/lib/cron/auth";
 
 type Handler = (request: Request) => Promise<Response>;
 
@@ -24,6 +25,10 @@ async function readSummary(response: Response): Promise<Record<string, unknown> 
 // rethrown unchanged.
 export function withCronLogging(jobKey: string, handler: Handler): Handler {
   return async (request) => {
+    // Checked before anything is written: a call without the secret must not even create a run record.
+    const denied = cronAuthResponse(request);
+    if (denied) return denied;
+
     const triggerHeader = request.headers.get(CRON_TRIGGER_HEADER) ?? "";
     const manual = triggerHeader.startsWith("manual:");
     const admin = createAdminClient();

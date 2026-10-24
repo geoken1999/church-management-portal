@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronAuthResponse } from "@/lib/cron/auth";
 import {
   sealIfConfigured,
   openSecret,
@@ -15,13 +16,8 @@ import { withCronLogging } from "@/lib/cron/run-logger";
 // RLS-bypassing admin client — every org's connections have to be
 // readable here, not just one caller's.
 async function run(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
+  const denied = cronAuthResponse(request);
+  if (denied) return denied;
 
   const supabase = createAdminClient();
   const soon = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();

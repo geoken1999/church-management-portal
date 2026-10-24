@@ -194,6 +194,49 @@ export async function getCheckoutData(
   }
 }
 
+interface PaidOrder {
+  id: string;
+  organization_id: string;
+  program_id: string | null;
+  member_id: string | null;
+  application_id: string | null;
+  payer_name: string;
+  payer_email: string | null;
+}
+
+// Enrols the person a paid order is for: approves the outside student's application, or enrols the member in the
+// program. Safe to run again: an application already approved and a member already enrolled both count as done.
+// Used right after payment, and by the Super Admin "Paid, not enrolled" list to retry one that failed.
+export async function enrolPaidOrder(order: PaidOrder, programTitle: string | null, churchName: string): Promise<{ error?: string }> {
+  const admin = createAdminClient();
+  if (order.application_id) {
+    await admin.from("lms_student_applications").update({ payment_status: "paid" }).eq("id", order.application_id);
+    const { error } = await admin.rpc("lms_approve_application", {
+      p_org: order.organization_id,
+      p_application: order.application_id,
+      p_course: null,
+      p_actor: null,
+      p_program: order.program_id,
+    });
+    if (error) return { error: error.message };
+    await emailStudentApproved(churchName, order.payer_email ?? "", order.payer_name.split(" ")[0], programTitle, {
+      paid: true,
+      learnUrl: `${getSiteUrl()}/bible-school/learn`,
+    });
+  } else if (order.member_id && order.program_id) {
+    const { error } = await admin.rpc("lms_enroll_program", {
+      p_organization_id: order.organization_id,
+      p_program_id: order.program_id,
+      p_member_id: order.member_id,
+      p_status: "approved",
+      p_source: "payment",
+      p_actor: null,
+    });
+    if (error && !error.message.includes("already has an open enrollment")) return { error: error.message };
+  }
+  return {};
+}
+
 export interface FinalizeResult {
   error?: string;
   success?: boolean;
@@ -264,42 +307,10 @@ export async function finalizeProgramPayment(
   };
 
   try {
-    if (order.application_id) {
-      await admin
-        .from("lms_student_applications")
-        .update({ payment_status: "paid" })
-        .eq("id", order.application_id);
-      const { error } = await admin.rpc("lms_approve_application", {
-        p_org: order.organization_id,
-        p_application: order.application_id,
-        p_course: null,
-        p_actor: null,
-        p_program: order.program_id,
-      });
-      if (error) {
-        await problem(error.message);
-        return base;
-      }
-      await emailStudentApproved(
-        org?.name ?? "the church",
-        order.payer_email ?? "",
-        order.payer_name.split(" ")[0],
-        program?.title ?? null,
-        { paid: true, learnUrl: `${getSiteUrl()}/bible-school/learn` },
-      );
-    } else if (order.member_id && order.program_id) {
-      const { error } = await admin.rpc("lms_enroll_program", {
-        p_organization_id: order.organization_id,
-        p_program_id: order.program_id,
-        p_member_id: order.member_id,
-        p_status: "approved",
-        p_source: "payment",
-        p_actor: null,
-      });
-      if (error && !error.message.includes("already has an open enrollment")) {
-        await problem(error.message);
-        return base;
-      }
+    const enrolled = await enrolPaidOrder(order, program?.title ?? null, org?.name ?? "the church");
+    if (enrolled.error) {
+      await problem(enrolled.error);
+      return base;
     }
 
     // Telling the team is best effort: the person is enrolled either way.

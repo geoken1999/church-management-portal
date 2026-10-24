@@ -26,6 +26,7 @@ import {
   ClipboardCheck,
   Boxes,
   KanbanSquare,
+  UserRoundX,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -69,6 +70,12 @@ const NAV_ITEMS = [
     href: "/platform-admin/support",
     label: "Support",
     icon: LifeBuoy,
+    exact: false,
+  },
+  {
+    href: "/platform-admin/unenrolled-payments",
+    label: "Paid, not enrolled",
+    icon: UserRoundX,
     exact: false,
   },
   {

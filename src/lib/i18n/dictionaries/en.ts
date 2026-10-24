@@ -51,6 +51,7 @@ export const en = {
       committee: "Committee",
       families: "Families",
       groups: "Groups",
+      visitors: "Visitors",
       ministries: "Ministries",
       worship: "Worship",
       media: "Media",

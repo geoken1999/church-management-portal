@@ -49,6 +49,7 @@ export const hi: Dictionary = {
       committee: "समिति",
       families: "परिवार",
       groups: "समूह",
+      visitors: "आगंतुक",
       ministries: "सेवकाई",
       worship: "आराधना",
       media: "मीडिया",

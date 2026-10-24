@@ -40,6 +40,7 @@ import {
   LayoutTemplate,
   House,
   MessagesSquare,
+  UserCheck,
   Compass,
   Webcam,
   ShieldCheck,
@@ -103,6 +104,7 @@ const NAV_GROUPS = [
       { href: "/dashboard/volunteers", itemKey: "volunteers" as const, icon: HandHelping, tab: "volunteers" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/families", itemKey: "families" as const, icon: House, tab: "families" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/groups", itemKey: "groups" as const, icon: MessagesSquare, tab: "groups" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/visitors", itemKey: "visitors" as const, icon: UserCheck, tab: "visitors" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
     ],
   },
   {

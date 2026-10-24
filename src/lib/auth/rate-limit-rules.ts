@@ -68,3 +68,7 @@ export const DELETION_FORM_RULE: AttemptRule = { action: "deletion-form", window
 // The public Bible School application form: counts every submission (by phone number and by IP), so it
 // can't be used to flood a church's team with notifications.
 export const STUDENT_APPLICATION_RULE: AttemptRule = { action: "student-application", windowMinutes: 60, perEmail: 3, perIp: 10 };
+
+// The public visitor form (QR code at church): counts every submission by phone number and by IP. A church shares
+// one IP at its service, so the per-IP allowance is generous.
+export const VISITOR_FORM_RULE: AttemptRule = { action: "visitor-form", windowMinutes: 60, perEmail: 4, perIp: 60 };

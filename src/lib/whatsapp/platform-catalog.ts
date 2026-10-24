@@ -71,6 +71,16 @@ export const PLATFORM_TEMPLATE_CATALOG: PlatformTemplateDefinition[] = [
     examples: ["Ann", "Grace Church"],
   },
   {
+    key: "visitor_feedback",
+    name: "kf_visitor_feedback",
+    label: "Visitor feedback",
+    description: "The day after a first visit, ask a visitor how it went. Sent automatically to people who scanned the church's visitor QR code.",
+    category: "utility",
+    language: "en_US",
+    body: "Hi {{1}}, thank you for visiting {{2}}. We would love to hear how your visit went, and whether you would like someone to follow up with you. It takes a minute: {{3}} God bless you.",
+    examples: ["Ann", "Grace Church", "https://www.kingdomflow.in/visit/feedback/abc123"],
+  },
+  {
     key: "thank_you_giving",
     name: "kf_thank_you_giving",
     label: "Thank you for giving",

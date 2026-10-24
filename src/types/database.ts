@@ -316,6 +316,28 @@ export type MemberProfileUpdateRequest = {
   updated_at: string;
 };
 
+export type Visitor = {
+  id: string;
+  organization_id: string;
+  name: string;
+  phone: string;
+  phone_key: string;
+  email: string | null;
+  prayer_request: string | null;
+  first_visited_on: string;
+  last_visited_on: string;
+  visit_count: number;
+  feedback_token: string;
+  feedback_sent_at: string | null;
+  feedback_note: string | null;
+  rating: number | null;
+  feedback_text: string | null;
+  wants_followup: boolean | null;
+  feedback_at: string | null;
+  followed_up_at: string | null;
+  created_at: string;
+};
+
 export type FamilyRequestStatus = "pending" | "approved" | "rejected";
 
 export type FamilyRequestPerson = { member_id: string; relationship: string };
@@ -1611,7 +1633,7 @@ export type ScheduledCampaign = {
 };
 
 // A WhatsApp message the system sent on its own, for idempotency and plan usage (migration 0175).
-export type WhatsAppNoticeKind = "fee_request" | "fee_reminder" | "followup_member" | "followup_leader";
+export type WhatsAppNoticeKind = "fee_request" | "fee_reminder" | "followup_member" | "followup_leader" | "visitor_feedback";
 export type WhatsAppNotice = {
   id: string;
   organization_id: string;
@@ -2803,6 +2825,20 @@ export type Database = {
         Insert: Partial<PlatformInvestment> & Pick<PlatformInvestment, "invested_on" | "amount" | "investor">;
         Update: Partial<PlatformInvestment>;
         Relationships: [];
+      };
+      visitors: {
+        Row: Visitor;
+        Insert: Partial<Visitor> & Pick<Visitor, "organization_id" | "name" | "phone" | "phone_key" | "first_visited_on" | "last_visited_on">;
+        Update: Partial<Visitor>;
+        Relationships: [
+          {
+            foreignKeyName: "visitors_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       notifications: {
         Row: Notification;
@@ -4982,6 +5018,10 @@ export type Database = {
           user_agent: string | null;
           ip: string | null;
         }[];
+      };
+      member_has_phone: {
+        Args: { p_org: string; p_key: string };
+        Returns: boolean;
       };
       admin_revoke_session: {
         Args: { target_session_id: string };

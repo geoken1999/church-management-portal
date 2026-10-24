@@ -29,6 +29,11 @@ const JOB_DEFINITIONS: Record<string, { label: string; description: string; load
     description: "Sends app users a birthday or wedding-anniversary notification on their day, and owners and admins a summary for today plus a heads-up for tomorrow.",
     load: () => import("@/app/api/cron/special-days/route"),
   },
+  "visitor-feedback": {
+    label: "Visitor feedback",
+    description: "The day after a first visit, WhatsApps each visitor a feedback link and asks if they would like a follow-up.",
+    load: () => import("@/app/api/cron/visitor-feedback/route"),
+  },
   "todo-reminders": {
     label: "To-do reminders",
     description: "Reminds assignees about due to-dos.",

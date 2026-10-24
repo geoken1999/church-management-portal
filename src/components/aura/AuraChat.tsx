@@ -87,7 +87,7 @@ export function AuraChat({
               </div>
               <div>
                 <p className="font-heading font-semibold">Ask Aura about your church</p>
-                <p className="text-sm text-muted-foreground">Aura reads your church's records and tells you what needs attention. Try one of these, or type your own question.</p>
+                <p className="text-sm text-muted-foreground">Aura reads your church&apos;s records and tells you what needs attention. Try one of these, or type your own question.</p>
               </div>
               <div className="flex flex-wrap justify-center gap-2">
                 {SUGGESTIONS.map((suggestion) => (

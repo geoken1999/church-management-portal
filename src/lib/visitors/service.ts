@@ -6,6 +6,8 @@ import { VISITOR_FORM_RULE } from "@/lib/auth/rate-limit-rules";
 import { dateKeyInTimezone, DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 import { pushToTeam } from "@/lib/push/team";
 import { sendCatalogNotice } from "@/lib/whatsapp/catalog-send";
+import { variableCountOf } from "@/lib/whatsapp/platform-catalog";
+import { getSiteUrl } from "@/lib/site-url";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { feedbackDue, phoneKey, validateFeedback, validateVisit, type FeedbackInput, type VisitErrors, type VisitInput } from "@/lib/visitors/rules";
 import type { Visitor } from "@/types/database";
@@ -139,6 +141,8 @@ export async function sendFeedbackRequests(now: Date = new Date()): Promise<{ ch
   const { data: orgs } = orgIds.length ? await admin.from("organizations").select("id, name, timezone, country").in("id", orgIds) : { data: [] };
   const orgById = new Map((orgs ?? []).map((o) => [o.id, o]));
 
+  const { data: master } = await admin.from("platform_whatsapp_templates").select("body_text").eq("catalog_key", "visitor_feedback").maybeSingle();
+  const linkInBody = variableCountOf(master?.body_text ?? "") >= 3;
   const result = { checked: 0, sent: 0, skipped: 0, failed: 0 };
   for (const v of visitors) {
     const org = orgById.get(v.organization_id);
@@ -146,6 +150,9 @@ export async function sendFeedbackRequests(now: Date = new Date()): Promise<{ ch
     const today = dateKeyInTimezone(now, org.timezone || DEFAULT_TIMEZONE);
     if (!feedbackDue(v.first_visited_on, today)) continue;
     result.checked += 1;
+    // The approved template either carries the link as its button (2 variables) or, if it was approved before the
+    // button was added, as a third variable in the message. Send whichever the approved one expects.
+    const link = `${getSiteUrl()}/visit/feedback/${v.feedback_token}`;
     const outcome = await sendCatalogNotice({
       organizationId: v.organization_id,
       catalogKey: "visitor_feedback",
@@ -153,9 +160,10 @@ export async function sendFeedbackRequests(now: Date = new Date()): Promise<{ ch
       refId: v.id,
       rawPhone: v.phone,
       orgCountry: org.country,
-      // The link is the template's button; only its last part (the visitor's own token) is sent.
-      bodyParams: [v.name.split(" ")[0], org.name],
-      buttonUrlParam: v.feedback_token,
+      ...(linkInBody
+        ? { bodyParams: [v.name.split(" ")[0], org.name, link] }
+        : // The link is the template's button; only its last part (the visitor's own token) is sent.
+          { bodyParams: [v.name.split(" ")[0], org.name], buttonUrlParam: v.feedback_token }),
     });
     if (outcome.status === "sent" || (outcome.status === "skipped" && outcome.reason === "Already sent.")) {
       await admin.from("visitors").update({ feedback_sent_at: new Date().toISOString(), feedback_note: null }).eq("id", v.id);

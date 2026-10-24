@@ -10,9 +10,10 @@ import { getSiteUrl } from "@/lib/site-url";
 import type { PlatformWhatsAppTemplate } from "@/types/database";
 
 // The buttons a church's copy of a platform template carries (the same as the master was submitted with).
-function buttonsForMaster(catalogKey: string) {
+function buttonsForMaster(catalogKey: string, masterBody: string) {
   const definition = PLATFORM_TEMPLATE_CATALOG.find((t) => t.key === catalogKey);
-  return definition ? catalogButtons(definition, getSiteUrl()) : [];
+  // A template submitted before its button was added has none, however the catalog reads now.
+  return definition && variableCountOf(masterBody) === variableCountOf(definition.body) ? catalogButtons(definition, getSiteUrl()) : [];
 }
 
 export function catalogEntry(key: string): PlatformTemplateDefinition | undefined {
@@ -122,7 +123,7 @@ export async function syncPlatformTemplatesForOrg(organizationId: string): Promi
           variable_count: m.variable_count,
           header_type: "none" as const,
           header_image_path: null,
-          buttons: buttonsForMaster(m.catalog_key),
+          buttons: buttonsForMaster(m.catalog_key, m.body_text),
           platform_template_id: m.id,
           meta_template_id: m.meta_template_id,
           status: m.status,

@@ -9,7 +9,7 @@ import { describeWhatsAppError } from "@/lib/whatsapp/graph-error";
 import { logOutboundMessages, senderKeyFor, findBlockedRecipients } from "@/lib/whatsapp/message-log";
 import { checkMarketingAllowed } from "@/lib/whatsapp/reputation";
 import { sendTemplateMessage } from "@/lib/whatsapp/client";
-import { catalogEntry } from "@/lib/whatsapp/platform-templates";
+import { catalogEntry, syncPlatformTemplatesForOrg } from "@/lib/whatsapp/platform-templates";
 import { renderTemplateText } from "@/lib/whatsapp/template-render";
 import { normalizePhoneNumber, resolvePhoneCountry } from "@/lib/whatsapp/validation";
 import type { WhatsAppNoticeKind } from "@/types/database";
@@ -43,13 +43,23 @@ export async function sendCatalogNotice(input: {
   if (!phone) return { status: "skipped", reason: "No usable phone number." };
 
   const admin = createAdminClient();
-  const { data: template } = await admin
-    .from("whatsapp_templates")
-    .select("name, language, category, body_text, status")
-    .eq("organization_id", organizationId)
-    .eq("name", definition.name)
-    .eq("status", "approved")
-    .maybeSingle();
+  const findTemplate = async () =>
+    (
+      await admin
+        .from("whatsapp_templates")
+        .select("name, language, category, body_text, status")
+        .eq("organization_id", organizationId)
+        .eq("name", definition.name)
+        .eq("status", "approved")
+        .maybeSingle()
+    ).data;
+  let template = await findTemplate();
+  if (!template) {
+    // A church gets its copy of a newly approved platform template only when someone opens its WhatsApp page, so a
+    // message the system sends by itself would wait for that. Copy it now and look again.
+    await syncPlatformTemplatesForOrg(organizationId);
+    template = await findTemplate();
+  }
   // Not set up yet for this church (WhatsApp hasn't approved it, or it isn't added to their own
   // number): nothing is sent and nothing is recorded, so it goes out once the template is there.
   if (!template) return { status: "skipped", reason: "The WhatsApp template isn't approved for this church yet." };

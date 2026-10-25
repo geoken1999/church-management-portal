@@ -2409,6 +2409,7 @@ export type NotificationType =
   | "special_days"
   | "family_request"
   | "visitor"
+  | "online_gift"
   | "bible_school_request";
 
 export type Notification = {

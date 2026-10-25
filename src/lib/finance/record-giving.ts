@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { recordKindFor, GIVING_TYPE_LABELS, isGivingType } from "@/lib/finance/giving-types";
+import { pushToTeam } from "@/lib/push/team";
 
 export interface PaidGivingOrder {
   id: string;
@@ -17,6 +18,27 @@ export interface PaidGivingOrder {
 export function givingTitle(order: { giving_type: string }, fundraiserTitle: string | null): string {
   if (fundraiserTitle) return fundraiserTitle;
   return isGivingType(order.giving_type) ? GIVING_TYPE_LABELS[order.giving_type] : "General fund";
+}
+
+// Tells the church's team a gift has just been paid: a row in the web bell, and a push to owners, admins and anyone
+// who can open the module the gift lands in. Never allowed to fail the payment it reports.
+async function notifyGift(admin: SupabaseClient, order: PaidGivingOrder, kind: "offerings" | "donations"): Promise<void> {
+  try {
+    let fundraiserTitle: string | null = null;
+    if (order.fundraiser_id) {
+      const { data } = await admin.from("fundraisers").select("title").eq("id", order.fundraiser_id).maybeSingle();
+      fundraiserTitle = (data as { title: string } | null)?.title ?? null;
+    }
+    const what = givingTitle(order, fundraiserTitle);
+    const amount = `₹${Number(order.amount).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+    const title = `Online gift received: ${amount}`;
+    const body = `${order.donor_name || "Someone"} gave ${amount}${order.fundraiser_id ? ` to ${what}` : ` as ${what.toLowerCase()}`}.`;
+    const link = order.fundraiser_id ? "/dashboard/fundraisers" : `/dashboard/${kind}`;
+    await admin.from("notifications").insert({ organization_id: order.organization_id, type: "online_gift", title, body, link });
+    await pushToTeam({ organizationId: order.organization_id, tab: order.fundraiser_id ? "fundraisers" : kind, title, body, link });
+  } catch (err) {
+    console.error("online gift notification failed:", err);
+  }
 }
 
 // Records a paid order in the books: a donation (fundraiser gifts and
@@ -47,6 +69,7 @@ export async function recordGivingPayment(
       return { ok: false };
     }
     await admin.from("fundraiser_payment_orders").update({ offering_id: data.id }).eq("id", order.id);
+    await notifyGift(admin, order, "offerings");
     return { ok: true };
   }
 
@@ -69,5 +92,6 @@ export async function recordGivingPayment(
     return { ok: false };
   }
   await admin.from("fundraiser_payment_orders").update({ donation_id: data.id }).eq("id", order.id);
+  await notifyGift(admin, order, "donations");
   return { ok: true };
 }

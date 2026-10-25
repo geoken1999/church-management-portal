@@ -93,6 +93,8 @@ export function VisitorsManager({ visitors, orgName, link, canWrite }: { visitor
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
                     {v.wants_followup === true && (v.followed_up_at ? <Badge variant="secondary">Followed up</Badge> : <Badge>Asked for a follow-up</Badge>)}
+                    {v.pass?.state === "entered" && <Badge variant="secondary">Entered</Badge>}
+                    {v.pass?.state === "valid" && <Badge variant="outline">Pass {v.pass.code}</Badge>}
                     {v.wants_followup === false && <Badge variant="outline">No follow-up wanted</Badge>}
                     {!v.feedback_at && <Badge variant="outline">{v.feedback_sent_at ? "Feedback requested" : "Feedback not sent yet"}</Badge>}
                   </div>

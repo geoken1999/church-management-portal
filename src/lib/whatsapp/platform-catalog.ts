@@ -84,6 +84,17 @@ export const PLATFORM_TEMPLATE_CATALOG: PlatformTemplateDefinition[] = [
     urlButton: { text: "Give feedback", path: "/visit/feedback/" },
   },
   {
+    key: "visitor_pass",
+    name: "kf_visitor_pass",
+    label: "Visitor pass",
+    description: "When a guest fills in the church's visitor form, send them their pass for the day: a QR code for the church's entrance team to scan.",
+    category: "utility",
+    language: "en_US",
+    body: "Hi {{1}}, welcome to {{2}}! Your visitor pass for today is ready. Tap the button below and show it to our team at the entrance. It is valid until the end of today.",
+    examples: ["Ann", "Grace Church"],
+    urlButton: { text: "View my pass", path: "/visitor-pass/" },
+  },
+  {
     key: "thank_you_giving",
     name: "kf_thank_you_giving",
     label: "Thank you for giving",

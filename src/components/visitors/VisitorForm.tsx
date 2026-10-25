@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Ticket } from "lucide-react";
 import { submitVisit, type VisitFormState } from "@/lib/visitors/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,15 @@ export function VisitorForm({ slug, churchName }: { slug: string; churchName: st
               ? `Thank you for visiting ${churchName} again. We're glad to see you.`
               : `Thank you for visiting ${churchName}. We'll send you a short message tomorrow to hear how your visit went.`}
         </p>
+        {state.passToken && (
+          <>
+            <Button nativeButton={false} render={<a href={`/visitor-pass/${state.passToken}`} />}>
+              <Ticket className="size-4" />
+              Show my visitor pass
+            </Button>
+            <p className="max-w-sm text-xs text-muted-foreground">Show this pass to our team at the entrance. It is also on its way to your WhatsApp, and works until the end of today.</p>
+          </>
+        )}
       </div>
     );
   }

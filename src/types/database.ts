@@ -318,6 +318,21 @@ export type MemberProfileUpdateRequest = {
   updated_at: string;
 };
 
+export type VisitorPass = {
+  id: string;
+  organization_id: string;
+  visitor_id: string;
+  token: string;
+  code: string;
+  visit_date: string;
+  valid_until: string;
+  whatsapp_sent_at: string | null;
+  whatsapp_note: string | null;
+  entered_at: string | null;
+  entered_by: string | null;
+  created_at: string;
+};
+
 export type Visitor = {
   id: string;
   organization_id: string;
@@ -1695,7 +1710,7 @@ export type ScheduledCampaign = {
 };
 
 // A WhatsApp message the system sent on its own, for idempotency and plan usage (migration 0175).
-export type WhatsAppNoticeKind = "fee_request" | "fee_reminder" | "followup_member" | "followup_leader" | "visitor_feedback";
+export type WhatsAppNoticeKind = "fee_request" | "fee_reminder" | "followup_member" | "followup_leader" | "visitor_feedback" | "visitor_pass";
 export type WhatsAppNotice = {
   id: string;
   organization_id: string;
@@ -2889,6 +2904,20 @@ export type Database = {
         Insert: Partial<PlatformInvestment> & Pick<PlatformInvestment, "invested_on" | "amount" | "investor">;
         Update: Partial<PlatformInvestment>;
         Relationships: [];
+      };
+      visitor_passes: {
+        Row: VisitorPass;
+        Insert: Partial<VisitorPass> & Pick<VisitorPass, "organization_id" | "visitor_id" | "code" | "visit_date" | "valid_until">;
+        Update: Partial<VisitorPass>;
+        Relationships: [
+          {
+            foreignKeyName: "visitor_passes_visitor_id_fkey";
+            columns: ["visitor_id"];
+            isOneToOne: false;
+            referencedRelation: "visitors";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       visitors: {
         Row: Visitor;

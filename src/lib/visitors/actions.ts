@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { recordFeedback, recordVisit } from "@/lib/visitors/service";
+import { admitVisitorPass, recordFeedback, recordVisit } from "@/lib/visitors/service";
 import type { VisitErrors } from "@/lib/visitors/rules";
 
 export interface VisitFormState {
@@ -13,6 +13,7 @@ export interface VisitFormState {
   fieldErrors?: VisitErrors;
   done?: "new" | "returning" | "member";
   churchName?: string;
+  passToken?: string;
 }
 
 // The public form behind the church's QR code. Anyone can submit; the server checks, rate-limits and saves.
@@ -24,7 +25,7 @@ export async function submitVisit(slug: string, _prev: VisitFormState, formData:
     prayerRequest: String(formData.get("prayerRequest") ?? ""),
   });
   if (!result.ok) return { error: result.error, fieldErrors: result.fieldErrors };
-  return { done: result.kind, churchName: result.churchName };
+  return { done: result.kind, churchName: result.churchName, passToken: result.passToken };
 }
 
 export interface FeedbackFormState {
@@ -60,4 +61,11 @@ export async function markVisitorFollowedUp(formData: FormData): Promise<void> {
     .eq("id", id)
     .eq("organization_id", organizationId);
   revalidatePath("/dashboard/visitors");
+}
+
+// The door team's "let them in": marks a visitor's pass as used. Only the church's own team can.
+export async function admitVisitor(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const token = String(formData.get("token") ?? "");
+  if (await admitVisitorPass(token, user.id)) revalidatePath(`/visitor-pass/${token}`);
 }

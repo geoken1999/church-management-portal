@@ -10,7 +10,7 @@ import { getOrgAdminEmails } from "@/lib/organizations/admin-emails";
 // shared email account just skips silently. This is a transactional/
 // system email, not a campaign — it never touches email_campaigns or the
 // shared-email plan quota.
-async function sendBillingEmail(
+export async function sendBillingEmail(
   organizationId: string,
   subject: string,
   bodyHtml: string,

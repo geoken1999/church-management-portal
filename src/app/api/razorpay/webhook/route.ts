@@ -15,6 +15,7 @@ import {
   planNameFor,
 } from "@/lib/billing/cancellation-store";
 import { logPlatformEvent } from "@/lib/platform-events/log";
+import { handleModuleSubscriptionEvent } from "@/lib/billing/modules";
 import { finalizeAddonOrderPayment } from "@/lib/billing/addon-actions";
 import { finalizeEventRegistrationPayment } from "@/lib/events/registration-payment";
 import { finalizeMembershipPayment } from "@/lib/membership-fees/finalize";
@@ -107,6 +108,28 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (!existing) {
+    // A module a church subscribed to on its own is a subscription of its own.
+    const { data: moduleRow } = await admin
+      .from("organization_module_subscriptions")
+      .select("id, organization_id, module_key, status, monthly_amount")
+      .eq("razorpay_subscription_id", subscriptionEntity.id)
+      .maybeSingle();
+    if (moduleRow) {
+      try {
+        await handleModuleSubscriptionEvent({ event, entity: subscriptionEntity, payment: paymentEntity, row: moduleRow });
+      } catch (err) {
+        await logPlatformEvent({
+          level: "error",
+          source: "razorpay_webhook",
+          message: `${event} for a module could not be processed: ${err instanceof Error ? err.message : "unknown error"}`,
+          organizationId: moduleRow.organization_id,
+          metadata: { subscriptionId: subscriptionEntity.id, moduleKey: moduleRow.module_key },
+        });
+        // A 500 makes Razorpay retry the event.
+        return NextResponse.json({ error: "Processing failed" }, { status: 500 });
+      }
+      return NextResponse.json({ ok: true });
+    }
     // A subscription Razorpay knows about that this app didn't create
     // (e.g. set up directly in the Dashboard) — nothing here to reconcile.
     return NextResponse.json({ ok: true });

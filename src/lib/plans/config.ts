@@ -308,11 +308,38 @@ export function effectiveTabs(
   return result;
 }
 
+// Modules a church can pay for on their own when its plan leaves them out. A module is one tab, except Finance and
+// Social media, which are one switch each (their tabs always resolve together). The keys match the onboarding
+// module list (src/lib/onboarding/config.ts).
+export function tabsOfModule(moduleKey: string): TabKey[] {
+  if (moduleKey === "finance") return [...FINANCE_TABS];
+  if (moduleKey === "social") return [...SOCIAL_TABS];
+  return (TAB_KEYS as readonly string[]).includes(moduleKey) ? [moduleKey as TabKey] : [];
+}
+
+/** The module a tab belongs to (Finance and Social media cover several tabs). */
+export function moduleOfTab(tab: TabKey): string {
+  if (FINANCE_TABS.includes(tab)) return "finance";
+  if (SOCIAL_TABS.includes(tab)) return "social";
+  return tab;
+}
+
+/** The tab switches a set of paid-for modules turns on. */
+export function addonTabOverrides(addonModules: readonly string[] | null | undefined): Partial<Record<TabKey, boolean>> {
+  const result: Partial<Record<TabKey, boolean>> = {};
+  for (const key of addonModules ?? []) for (const tab of tabsOfModule(key)) result[tab] = true;
+  return result;
+}
+
+/** How many automations a church that bought the Automations module on its own may run (Growth's allowance). */
+export const AUTOMATION_ADDON_LIMIT = 5;
+
 export function resolveTabStates(
   planId: PlanId,
   customOverrides: CustomPlanOverrides | null,
+  addonModules: readonly string[] | null = null,
 ): Record<TabKey, boolean> {
-  return effectiveTabs(PLANS[planId], customOverrides?.tabOverrides);
+  return effectiveTabs(PLANS[planId], { ...(customOverrides?.tabOverrides ?? {}), ...addonTabOverrides(addonModules) });
 }
 
 // The single place "what limits does this org actually have" is
@@ -322,19 +349,22 @@ export function resolveTabStates(
 export function resolvePlanLimits(
   planId: PlanId,
   customOverrides: CustomPlanOverrides | null,
+  addonModules: readonly string[] | null = null,
 ): PlanLimits {
   const basePlan = PLANS[planId];
-  if (!customOverrides) return basePlan;
+  const addonTabs = addonTabOverrides(addonModules);
+  const hasAddons = Object.keys(addonTabs).length > 0;
+  if (!customOverrides && !hasAddons) return basePlan;
 
-  const rules: Partial<CustomPlanOverrides> = { ...customOverrides };
+  const rules: Partial<CustomPlanOverrides> = { ...(customOverrides ?? {}) };
   delete rules.tabOverrides;
   delete rules.featureCaps;
   delete rules.mobileFeatureLimit;
-  const tabs = effectiveTabs(basePlan, customOverrides.tabOverrides);
+  const tabs = effectiveTabs(basePlan, { ...(customOverrides?.tabOverrides ?? {}), ...addonTabs });
 
   let automationLimit = rules.automationLimit ?? basePlan.automationLimit;
   if (!tabs.automations) automationLimit = 0;
-  else if (automationLimit === 0) automationLimit = null;
+  else if (automationLimit === 0) automationLimit = customOverrides ? null : AUTOMATION_ADDON_LIMIT;
 
   return {
     ...basePlan,
@@ -342,7 +372,8 @@ export function resolvePlanLimits(
     financeEnabled: tabs.fundraisers,
     socialMediaEnabled: tabs.instagram,
     automationLimit,
-    name: "Custom",
+    // Paying for a module doesn't turn the plan into a custom one.
+    name: customOverrides ? "Custom" : basePlan.name,
   };
 }
 

@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthUser, getProfile } from "@/lib/auth/dal";
 import { normalizeTabPermissions, allFullTabAccess, noTabAccess, TAB_KEYS, type TabKey } from "@/lib/permissions/tabs";
-import { isPlanId, resolveTabStates, type CustomPlanOverrides } from "@/lib/plans/config";
+import { isPlanId, moduleOfTab, resolveTabStates, type CustomPlanOverrides } from "@/lib/plans/config";
+import { purchasableModuleKeys } from "@/lib/billing/modules";
 import { getDisabledFeatures } from "@/lib/platform-admin/feature-flags";
 import type { Organization, OrganizationRole, TabAccess } from "@/types/database";
 
@@ -16,6 +17,9 @@ export interface OrganizationMembership {
   // access here regardless of what's stored, so callers never need to
   // special-case the role themselves.
   tabAccess: Record<TabKey, TabAccess>;
+  // Tabs the person could use if their church's plan included them and that the church can buy as a module: shown
+  // in the menu, locked, with a way to subscribe. Never includes a tab the platform has switched off.
+  lockedTabs: TabKey[];
 }
 
 // All organizations the current user belongs to (for the org switcher).
@@ -24,9 +28,10 @@ export const getUserOrganizations = cache(async (): Promise<OrganizationMembersh
   if (!user) return [];
 
   const supabase = await createClient();
-  const [{ data }, disabledFeatures] = await Promise.all([
+  const [{ data }, disabledFeatures, purchasable] = await Promise.all([
     supabase.from("organization_members").select("role, tab_permissions, organizations(*)").eq("auth_user_id", user.id),
     getDisabledFeatures(user.email),
+    purchasableModuleKeys().catch(() => new Set<string>()),
   ]);
 
   if (!data) return [];
@@ -47,7 +52,7 @@ export const getUserOrganizations = cache(async (): Promise<OrganizationMembersh
   // in that org, owners included — same layering as the kill switch above.
   function withOrgFlags(access: Record<TabKey, TabAccess>, org: Organization): Record<TabKey, TabAccess> {
     const planId = org.plan && isPlanId(org.plan) ? org.plan : "basic";
-    const tabStates = resolveTabStates(planId, (org.custom_plan_limits ?? null) as CustomPlanOverrides | null);
+    const tabStates = resolveTabStates(planId, (org.custom_plan_limits ?? null) as CustomPlanOverrides | null, org.addon_modules);
     const result = { ...access };
     for (const tab of TAB_KEYS) {
       if (!tabStates[tab]) result[tab] = noTabAccess();
@@ -55,16 +60,24 @@ export const getUserOrganizations = cache(async (): Promise<OrganizationMembersh
     return result;
   }
 
+  // The tabs the church's plan leaves out that this person's own permissions would allow, and that can be bought.
+  function lockedFor(access: Record<TabKey, TabAccess>, org: Organization): TabKey[] {
+    const planId = org.plan && isPlanId(org.plan) ? org.plan : "basic";
+    const tabStates = resolveTabStates(planId, (org.custom_plan_limits ?? null) as CustomPlanOverrides | null, org.addon_modules);
+    return TAB_KEYS.filter((tab) => !tabStates[tab] && access[tab].read && purchasable.has(moduleOfTab(tab)));
+  }
+
   return data
     .filter((row): row is typeof row & { organizations: Organization } => Boolean(row.organizations))
-    .map((row) => ({
-      organization: row.organizations,
-      role: row.role,
-      tabAccess: withOrgFlags(
-        withGlobalFlags(row.role === "owner" || row.role === "admin" ? allFullTabAccess() : normalizeTabPermissions(row.tab_permissions)),
-        row.organizations,
-      ),
-    }));
+    .map((row) => {
+      const roleAccess = withGlobalFlags(row.role === "owner" || row.role === "admin" ? allFullTabAccess() : normalizeTabPermissions(row.tab_permissions));
+      return {
+        organization: row.organizations,
+        role: row.role,
+        tabAccess: withOrgFlags(roleAccess, row.organizations),
+        lockedTabs: lockedFor(roleAccess, row.organizations),
+      };
+    });
 });
 
 // The organization the user is currently working in. Self-heals if

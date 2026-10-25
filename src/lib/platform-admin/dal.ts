@@ -352,7 +352,7 @@ export async function getTenantUsage(organizationId: string): Promise<TenantUsag
     admin
       .from("organizations")
       .select(
-        "id, name, slug, logo_url, country, plan, trial_ends_at, branch_count, created_at, addon_sms_credits, addon_email_credits, addon_whatsapp_credits, addon_storage_bytes, custom_plan_limits",
+        "id, name, slug, logo_url, country, plan, trial_ends_at, branch_count, created_at, addon_sms_credits, addon_email_credits, addon_whatsapp_credits, addon_storage_bytes, custom_plan_limits, addon_modules",
       )
       .eq("id", organizationId)
       .maybeSingle(),
@@ -384,7 +384,7 @@ export async function getTenantUsage(organizationId: string): Promise<TenantUsag
 
   const planId = organization.plan && isPlanId(organization.plan) ? organization.plan : "basic";
   const customPlanLimits = (organization.custom_plan_limits ?? null) as CustomPlanOverrides | null;
-  const plan = resolvePlanLimits(planId, customPlanLimits);
+  const plan = resolvePlanLimits(planId, customPlanLimits, organization.addon_modules);
 
   const sumSentCount = (rows: { sent_count: number }[] | null) => (rows ?? []).reduce((sum, r) => sum + r.sent_count, 0);
   const sumAmount = (rows: { amount: number }[] | null) => (rows ?? []).reduce((sum, r) => sum + r.amount, 0);

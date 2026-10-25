@@ -18,6 +18,9 @@ import {
   ONBOARDING_MODULES,
   creditText,
 } from "@/lib/onboarding/config";
+import { ModuleSubscriptionsCard } from "@/components/billing/ModuleSubscriptionsCard";
+import { getModuleSubscriptions, moduleChargeText, moduleSummaryLabel } from "@/lib/billing/modules";
+import { dateLabel } from "@/lib/billing/cancellation";
 import { PayoutDetailsCard } from "@/components/billing/PayoutDetailsCard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -30,12 +33,16 @@ export default async function BillingPage({
 }: {
   searchParams: Promise<{
     addon?: string;
+    module?: string;
+    key?: string;
     reason?: string;
     subscription?: string;
   }>;
 }) {
   const {
     addon: addonStatus,
+    module: moduleStatus,
+    key: moduleKey,
     reason: failureReason,
     subscription: subscriptionStatus,
   } = await searchParams;
@@ -53,6 +60,7 @@ export default async function BillingPage({
     checkout,
     invoices,
     onboarding,
+    moduleSubscriptions,
   ] = await Promise.all([
     getPlanUsage(membership.organization.id),
     getOrganizationSubscription(membership.organization.id),
@@ -60,7 +68,18 @@ export default async function BillingPage({
     getCheckoutContext(membership.organization.id),
     getOrganizationInvoices(membership.organization.id),
     getOnboarding(membership.organization.id),
+    getModuleSubscriptions(membership.organization.id),
   ]);
+  const moduleRows = moduleSubscriptions
+    .filter((m) => ["authenticated", "active", "pending", "halted"].includes(m.status))
+    .map((m) => ({
+      moduleKey: m.module_key,
+      label: moduleSummaryLabel(m.module_key),
+      status: m.status,
+      chargeText: moduleChargeText(m.monthly_amount),
+      dateText: m.next_charge_at ? dateLabel(m.next_charge_at) : null,
+      cancelAtPeriodEnd: m.cancel_at_period_end,
+    }));
 
   return (
     <div className="space-y-8">
@@ -88,6 +107,24 @@ export default async function BillingPage({
               : failureReason === "declined"
                 ? "The payment wasn't completed."
                 : "Something went wrong finishing that purchase — if you were charged, contact support and we'll sort it out."}
+          </AlertDescription>
+        </Alert>
+      )}
+      {moduleStatus === "success" && (
+        <Alert>
+          <AlertDescription>
+            {moduleKey ? moduleSummaryLabel(moduleKey) : "The module"} is unlocked — it&apos;s in your menu now.
+          </AlertDescription>
+        </Alert>
+      )}
+      {moduleStatus === "failed" && (
+        <Alert variant="destructive">
+          <AlertDescription>
+            {failureReason === "unverified"
+              ? "That payment couldn't be verified, so the module wasn't unlocked — please try again."
+              : failureReason === "declined"
+                ? "The authorisation wasn't completed."
+                : "Something went wrong unlocking that module — if you were charged, contact support and we'll sort it out."}
           </AlertDescription>
         </Alert>
       )}
@@ -140,6 +177,8 @@ export default async function BillingPage({
             paymentsConfigured={isRazorpayConfigured()}
           />
         )}
+
+      {moduleRows.length > 0 && <ModuleSubscriptionsCard rows={moduleRows} />}
 
       <BillingManager
         currentPlanId={planUsage.plan.id}

@@ -8,6 +8,8 @@ import {
   resolveTabStates,
   featureCapFor,
   PLANS,
+  tabsOfModule,
+  AUTOMATION_ADDON_LIMIT,
 } from "./config";
 
 describe("kaudioMaxDurationMinutes", () => {
@@ -264,5 +266,36 @@ describe("add-on pack prices", () => {
     expect(getAddonPack("email_5000")?.priceInRupees).toBe(250);
     expect(getAddonPack("sms_100")?.priceInRupees).toBe(150);
     expect(getAddonPack("storage_100gb")?.priceInRupees).toBe(250);
+  });
+});
+
+describe("modules paid for on their own", () => {
+  it("opens the tabs of a module the plan leaves out", () => {
+    const base = resolveTabStates("basic", null);
+    expect(base.automations).toBe(false);
+    const withAutomations = resolveTabStates("basic", null, ["automations"]);
+    expect(withAutomations.automations).toBe(true);
+    expect(withAutomations.instagram).toBe(base.instagram);
+  });
+  it("treats Finance and Social media as one switch each", () => {
+    expect(tabsOfModule("finance")).toEqual(["fundraisers", "offerings", "donations", "accounting"]);
+    expect(tabsOfModule("social")).toEqual(["instagram", "youtube", "facebook"]);
+    expect(tabsOfModule("events")).toEqual(["events"]);
+    expect(tabsOfModule("nonsense")).toEqual([]);
+  });
+  it("gives the Automations module Growth's allowance and keeps the plan's name", () => {
+    const limits = resolvePlanLimits("basic", null, ["automations"]);
+    expect(limits.automationLimit).toBe(AUTOMATION_ADDON_LIMIT);
+    expect(limits.name).toBe("Starter");
+    expect(limits.memberLimit).toBe(PLANS.basic.memberLimit);
+  });
+  it("changes nothing when no module is paid for", () => {
+    expect(resolvePlanLimits("premium", null, [])).toBe(PLANS.premium);
+    expect(resolvePlanLimits("premium", null, null)).toBe(PLANS.premium);
+  });
+  it("adds to a custom plan without renaming it twice", () => {
+    const custom = resolvePlanLimits("basic", { ...PLANS.basic, tabOverrides: { youth: false } } as never, ["automations"]);
+    expect(custom.name).toBe("Custom");
+    expect(custom.automationLimit).toBeNull();
   });
 });

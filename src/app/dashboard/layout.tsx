@@ -51,6 +51,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       memberships={memberships}
       notifications={notifications}
       tabAccess={membership.tabAccess}
+      lockedTabs={membership.lockedTabs}
       featureTags={featureTags}
       planFeatures={{ finance: planUsage.plan.financeEnabled, socialMedia: planUsage.plan.socialMediaEnabled }}
       creditBalances={{

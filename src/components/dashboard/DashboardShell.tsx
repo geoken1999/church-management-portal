@@ -77,6 +77,7 @@ import { useLocale } from "@/lib/i18n/LocaleContext";
 import type { AppLocale } from "@/lib/i18n/config";
 import type { Notification, Organization, TabAccess } from "@/types/database";
 import type { OrganizationMembership } from "@/lib/organizations/dal";
+import { moduleOfTab } from "@/lib/plans/config";
 import type { TabKey } from "@/lib/permissions/tabs";
 
 const NO_TAB = null as TabKey | null;
@@ -211,6 +212,7 @@ export function DashboardShell(
     memberships: OrganizationMembership[];
     notifications: Notification[];
     tabAccess: Record<TabKey, TabAccess>;
+    lockedTabs: TabKey[];
     featureTags: Partial<Record<TabKey, FeatureTag>>;
     planFeatures: { finance: boolean; socialMedia: boolean };
     creditBalances: { sms: CreditWallet; ai: CreditWallet; email: CreditWallet };
@@ -249,6 +251,7 @@ function DashboardShellInner({
   memberships,
   notifications,
   tabAccess,
+  lockedTabs,
   featureTags,
   planFeatures,
   creditBalances,
@@ -261,6 +264,7 @@ function DashboardShellInner({
   memberships: OrganizationMembership[];
   notifications: Notification[];
   tabAccess: Record<TabKey, TabAccess>;
+  lockedTabs: TabKey[];
   featureTags: Partial<Record<TabKey, FeatureTag>>;
   planFeatures: { finance: boolean; socialMedia: boolean };
   creditBalances: { sms: CreditWallet; ai: CreditWallet; email: CreditWallet };
@@ -336,8 +340,9 @@ function DashboardShellInner({
       if (item.managerOnly && !canManage) return false;
       // K-Connect covers both video (kmeet) and audio (kaudio) calls: it shows if
       // the person can read either.
-      if (item.href === "/dashboard/kconnect") return tabAccess.kmeet?.read || tabAccess.kaudio?.read;
-      return !item.tab || tabAccess[item.tab]?.read;
+      if (item.href === "/dashboard/kconnect") return tabAccess.kmeet?.read || tabAccess.kaudio?.read || lockedTabs.includes("kmeet") || lockedTabs.includes("kaudio");
+      // A module the plan leaves out but the church can buy stays in the menu, locked.
+      return !item.tab || tabAccess[item.tab]?.read || lockedTabs.includes(item.tab);
     }),
   })).filter((group) => group.items.length > 0);
 
@@ -391,15 +396,17 @@ function DashboardShellInner({
           )}
           {sectionOpen(group.groupKey) && group.items.map((item) => {
             // A call's own page (/dashboard/kmeet/<id>, /dashboard/kaudio/<id>) belongs to K-Connect too.
-            const active = pathname === item.href || (item.href === "/dashboard/kconnect" && (pathname.startsWith("/dashboard/kmeet") || pathname.startsWith("/dashboard/kaudio")));
+            const active = pathname === item.href || (Boolean(item.tab) && pathname === `/dashboard/unlock/${moduleOfTab(item.tab as TabKey)}`) || (item.href === "/dashboard/kconnect" && (pathname.startsWith("/dashboard/kmeet") || pathname.startsWith("/dashboard/kaudio")));
             // A plan-gated item still links through to its page — that's
             // where the actual "upgrade to unlock" content lives — this
             // just signals it's locked rather than hiding it outright.
-            const locked = Boolean(item.planFeature && !planFeatures[item.planFeature]);
+            const moduleLocked = Boolean(item.tab && !tabAccess[item.tab]?.read && lockedTabs.includes(item.tab));
+            const locked = moduleLocked || Boolean(item.planFeature && !planFeatures[item.planFeature]);
+            const href = moduleLocked && item.tab ? `/dashboard/unlock/${moduleOfTab(item.tab)}` : item.href;
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={href}
                 data-tour-target={item.href}
                 onClick={() => setMobileOpen(false)}
                 className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${

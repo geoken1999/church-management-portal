@@ -71,6 +71,8 @@ export type Organization = {
   // config.ts), not duplicated here, same as custom_fields above —
   // resolvePlanLimits is the only place this gets interpreted.
   custom_plan_limits: Record<string, unknown> | null;
+  // Modules the church pays for on top of its plan, kept in step with organization_module_subscriptions (migration 0216).
+  addon_modules: string[];
   // Basic-tier access without a subscription until this passes — see
   // getPlanAccess in src/lib/plans/dal.ts.
   trial_ends_at: string | null;
@@ -336,6 +338,26 @@ export type Visitor = {
   feedback_at: string | null;
   followed_up_at: string | null;
   created_at: string;
+};
+
+export type ModuleSubscriptionStatus = "created" | "authenticated" | "active" | "pending" | "halted" | "cancelled" | "completed" | "expired";
+
+export type OrganizationModuleSubscription = {
+  id: string;
+  organization_id: string;
+  module_key: string;
+  status: ModuleSubscriptionStatus;
+  razorpay_subscription_id: string | null;
+  razorpay_customer_id: string | null;
+  monthly_amount: number;
+  short_url: string | null;
+  current_start: string | null;
+  current_end: string | null;
+  next_charge_at: string | null;
+  cancel_at_period_end: boolean;
+  cancel_requested_at: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type FamilyRequestStatus = "pending" | "approved" | "rejected";
@@ -2834,6 +2856,20 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "visitors_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      organization_module_subscriptions: {
+        Row: OrganizationModuleSubscription;
+        Insert: Partial<OrganizationModuleSubscription> & Pick<OrganizationModuleSubscription, "organization_id" | "module_key" | "monthly_amount">;
+        Update: Partial<OrganizationModuleSubscription>;
+        Relationships: [
+          {
+            foreignKeyName: "organization_module_subscriptions_organization_id_fkey";
             columns: ["organization_id"];
             isOneToOne: false;
             referencedRelation: "organizations";

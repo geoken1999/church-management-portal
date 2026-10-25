@@ -63,7 +63,7 @@ export const getPlanAccess = cache(
       supabase
         .from("organizations")
         .select(
-          "plan, trial_ends_at, addon_sms_credits, addon_email_credits, addon_whatsapp_credits, addon_storage_bytes, addon_ai_credits, custom_plan_limits",
+          "plan, trial_ends_at, addon_sms_credits, addon_email_credits, addon_whatsapp_credits, addon_storage_bytes, addon_ai_credits, custom_plan_limits, addon_modules",
         )
         .eq("id", organizationId)
         .maybeSingle(),
@@ -94,6 +94,7 @@ export const getPlanAccess = cache(
         plan: resolvePlanLimits(
           planId && isPlanId(planId) ? planId : "basic",
           customOverrides,
+          org?.addon_modules,
         ),
         accessStatus: "active",
         trialEndsAt: org?.trial_ends_at ?? null,
@@ -107,7 +108,7 @@ export const getPlanAccess = cache(
       : false;
 
     return {
-      plan: resolvePlanLimits("basic", customOverrides),
+      plan: resolvePlanLimits("basic", customOverrides, org?.addon_modules),
       accessStatus: stillTrialing ? "trial" : "expired",
       trialEndsAt,
       ...addonBalances,
@@ -695,7 +696,7 @@ async function resolveEffectivePlanForWebhook(
   const [{ data: org }, { data: subscription }] = await Promise.all([
     admin
       .from("organizations")
-      .select("plan, custom_plan_limits")
+      .select("plan, custom_plan_limits, addon_modules")
       .eq("id", organizationId)
       .maybeSingle(),
     admin
@@ -707,10 +708,11 @@ async function resolveEffectivePlanForWebhook(
   const customOverrides = (org?.custom_plan_limits ??
     null) as CustomPlanOverrides | null;
   if (subscription?.status !== "active")
-    return resolvePlanLimits("basic", customOverrides);
+    return resolvePlanLimits("basic", customOverrides, org?.addon_modules);
   return resolvePlanLimits(
     org?.plan && isPlanId(org.plan) ? org.plan : "basic",
     customOverrides,
+    org?.addon_modules,
   );
 }
 
@@ -904,14 +906,14 @@ export const getOrgFeatureState = cache(
     const supabase = createAdminClient();
     const { data: org } = await supabase
       .from("organizations")
-      .select("plan, custom_plan_limits")
+      .select("plan, custom_plan_limits, addon_modules")
       .eq("id", organizationId)
       .maybeSingle();
     const planId = org?.plan && isPlanId(org.plan) ? org.plan : "basic";
     const custom = (org?.custom_plan_limits ??
       null) as CustomPlanOverrides | null;
     return {
-      tabs: resolveTabStates(planId, custom),
+      tabs: resolveTabStates(planId, custom, org?.addon_modules),
       featureCaps: custom?.featureCaps ?? {},
     };
   },

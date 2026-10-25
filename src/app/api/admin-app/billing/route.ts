@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformEarningsReport } from "@/lib/platform-admin/finance";
 import {
   getCourseLedgerAdmin,
+  getGivingLedgerAdmin,
   getEventPayoutLedgerAdmin,
   getMembershipLedgerAdmin,
   getSharedFundraiserLedger,
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic";
 export const GET = (request: Request) =>
   withAdminScope(request, "billing", async () => {
     const admin = createAdminClient();
-    const [earnings, subs, payments, fundraisers, events, membership, courses] =
+    const [earnings, subs, payments, fundraisers, events, membership, courses, giving] =
       await Promise.all([
         getPlatformEarningsReport(),
         admin.from("organization_subscriptions").select("status"),
@@ -29,6 +30,7 @@ export const GET = (request: Request) =>
         getEventPayoutLedgerAdmin(),
         getMembershipLedgerAdmin(),
         getCourseLedgerAdmin(),
+        getGivingLedgerAdmin(),
       ]);
 
     const orgIds = [
@@ -74,6 +76,13 @@ export const GET = (request: Request) =>
         stream: "Course fees",
         church: e.organizationName,
         what: "Course fees",
+        owed: e.owed,
+        requested: e.pendingRequest?.amount ?? null,
+      })),
+      ...giving.map((e) => ({
+        stream: "Online giving",
+        church: e.organizationName,
+        what: "Online giving",
         owed: e.owed,
         requested: e.pendingRequest?.amount ?? null,
       })),

@@ -62,7 +62,7 @@ export default async function PayoutsPage() {
           </Button>
           <h1 className="font-heading text-3xl font-bold tracking-tight">Payouts</h1>
           <p className="mt-1 text-muted-foreground">
-            Everything collected through KingdomFlow&apos;s shared account, from Fund Raisers, paid events, membership fees and course fees, less the 2.5% fee.
+            Everything collected through KingdomFlow&apos;s shared account, from Fund Raisers, paid events, membership fees, course fees and online giving, less the 2.5% fee.
             Payouts are sent manually, so they aren&apos;t instant.
           </p>
         </div>

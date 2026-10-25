@@ -11,13 +11,14 @@ import type { TabKey } from "@/lib/permissions/tabs";
 // because the platform wires each one separately. The fee is the same 2.5% in
 // every stream.
 
-export type PayoutStream = "fundraisers" | "events" | "membership" | "courses";
+export type PayoutStream = "fundraisers" | "events" | "membership" | "courses" | "giving";
 
 export const PAYOUT_STREAMS: { key: PayoutStream; label: string; tab: TabKey }[] = [
   { key: "fundraisers", label: "Fund Raisers", tab: "fundraisers" },
   { key: "events", label: "Paid events", tab: "events" },
   { key: "membership", label: "Membership fees", tab: "donations" },
   { key: "courses", label: "Course fees", tab: "bibleschool" },
+  { key: "giving", label: "Online giving", tab: "donations" },
 ];
 
 export const STREAM_LABEL: Record<PayoutStream, string> = {
@@ -25,6 +26,7 @@ export const STREAM_LABEL: Record<PayoutStream, string> = {
   events: "Paid events",
   membership: "Membership fees",
   courses: "Course fees",
+  giving: "Online giving",
 };
 
 export interface PayoutSourceBalance {
@@ -220,6 +222,33 @@ export async function getOrganizationPayoutLedger(organizationId: string, stream
     const pending = (reqs ?? []).find((r) => r.status === "pending");
     if (collected > 0 || paidOut > 0) {
       balances.push(balanceRow("courses", null, label, collected, paidOut, pending ? { id: pending.id, amount: Number(pending.amount) } : null));
+    }
+  }
+
+  if (wanted.has("giving")) {
+    // Offerings, tithes and donations given through the church's giving link on the shared account, outside any
+    // fundraiser (those are counted with their fundraiser above).
+    const [{ data: orders }, { data: payouts }, { data: reqs }] = await Promise.all([
+      admin.from("fundraiser_payment_orders").select("id, amount, giving_type, updated_at").eq("organization_id", organizationId).eq("status", "paid").eq("payment_mode", "shared").is("fundraiser_id", null),
+      admin.from("giving_payouts").select("id, amount, note, created_at").eq("organization_id", organizationId),
+      admin.from("giving_payout_requests").select("id, amount, status, created_at").eq("organization_id", organizationId),
+    ]);
+    const label = "Online giving";
+    for (const o of orders ?? []) {
+      const gross = Number(o.amount);
+      collections.push({ id: o.id, stream: "giving", source: label, date: dayOf(o.updated_at), gross: round2(gross), fee: round2(sharedServiceFee(gross)), net: round2(sharedServiceNetAmount(gross)) });
+    }
+    for (const p of payouts ?? []) {
+      transactions.push({ id: p.id, stream: "giving", source: label, date: dayOf(p.created_at), amount: Number(p.amount), note: p.note });
+    }
+    for (const r of reqs ?? []) {
+      requests.push({ id: r.id, stream: "giving", source: label, date: dayOf(r.created_at), amount: Number(r.amount), status: r.status });
+    }
+    const collected = (orders ?? []).reduce((s, o) => s + Number(o.amount), 0);
+    const paidOut = (payouts ?? []).reduce((s, p) => s + Number(p.amount), 0);
+    const pending = (reqs ?? []).find((r) => r.status === "pending");
+    if (collected > 0 || paidOut > 0) {
+      balances.push(balanceRow("giving", null, label, collected, paidOut, pending ? { id: pending.id, amount: Number(pending.amount) } : null));
     }
   }
 

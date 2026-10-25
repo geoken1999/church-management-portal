@@ -60,6 +60,8 @@ export async function requestAllPayoutsCore(organizationId: string, userId: stri
       ({ error } = await admin.from("event_payout_requests").insert({ ...snapshot, amount, event_id: balance.sourceId! }));
     } else if (balance.stream === "courses") {
       ({ error } = await admin.from("course_payout_requests").insert({ ...snapshot, amount }));
+    } else if (balance.stream === "giving") {
+      ({ error } = await admin.from("giving_payout_requests").insert({ ...snapshot, amount }));
     } else {
       ({ error } = await admin.from("membership_payout_requests").insert({ ...snapshot, amount }));
     }

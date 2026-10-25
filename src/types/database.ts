@@ -1596,6 +1596,25 @@ export type CoursePayoutRequest = {
   updated_at: string;
 };
 
+export type GivingPayout = { id: string; organization_id: string; amount: number; note: string | null; paid_by: string | null; created_at: string };
+
+export type GivingPayoutRequest = {
+  id: string;
+  organization_id: string;
+  amount: number;
+  status: "pending" | "paid" | "cancelled";
+  payout_method: "upi" | "bank_transfer";
+  upi_id: string | null;
+  bank_account_holder: string | null;
+  bank_account_number: string | null;
+  bank_ifsc: string | null;
+  bank_name: string | null;
+  requested_by: string | null;
+  resolved_payout_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type LmsLiveSession = {
   id: string;
   organization_id: string;
@@ -4243,6 +4262,18 @@ export type Database = {
         Row: CoursePayoutRequest;
         Insert: Partial<CoursePayoutRequest> & Pick<CoursePayoutRequest, "organization_id" | "amount" | "payout_method">;
         Update: Partial<CoursePayoutRequest>;
+        Relationships: [];
+      };
+      giving_payouts: {
+        Row: GivingPayout;
+        Insert: Partial<GivingPayout> & Pick<GivingPayout, "organization_id" | "amount">;
+        Update: Partial<GivingPayout>;
+        Relationships: [];
+      };
+      giving_payout_requests: {
+        Row: GivingPayoutRequest;
+        Insert: Partial<GivingPayoutRequest> & Pick<GivingPayoutRequest, "organization_id" | "amount" | "payout_method">;
+        Update: Partial<GivingPayoutRequest>;
         Relationships: [];
       };
       lms_student_applications: {

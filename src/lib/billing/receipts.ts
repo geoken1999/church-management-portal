@@ -165,6 +165,17 @@ export async function sendCoursePayoutProcessedEmail(
   );
 }
 
+export async function sendGivingPayoutProcessedEmail(
+  organizationId: string,
+  amountRupees: number,
+): Promise<void> {
+  await sendBillingEmail(
+    organizationId,
+    "Online giving payout sent",
+    `<p>A payout of <strong>${formatRupees(amountRupees)}</strong> from online giving (offerings, tithes and donations) has been processed and wired to you.</p>`,
+  );
+}
+
 // Sent when the platform admin finishes a tenant's onboarding: what was chosen, what it costs, and
 // where to authorize the subscription.
 export async function sendOnboardingReadyEmail(

@@ -21,7 +21,7 @@ const BUCKETS = [
   "prayer-audio",
 ];
 
-/** How much a church is still owed by KingdomFlow (fundraisers, paid events, membership fees). */
+/** How much a church is still owed by KingdomFlow (fundraisers, paid events, membership fees, course fees, online giving). */
 export async function amountOwedToChurch(organizationId: string): Promise<number> {
   const ledger = await getOrganizationPayoutLedger(organizationId, PAYOUT_STREAMS.map((s) => s.key));
   return ledger.totals.owed;

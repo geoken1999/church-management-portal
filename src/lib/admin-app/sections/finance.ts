@@ -16,6 +16,7 @@ import {
 } from "@/lib/platform-admin/finance-config";
 import {
   getCourseLedgerAdmin,
+  getGivingLedgerAdmin,
   getEventPayoutLedgerAdmin,
   getMembershipLedgerAdmin,
   getSharedFundraiserLedger,
@@ -23,6 +24,7 @@ import {
 } from "@/lib/platform-admin/dal";
 import {
   sendCoursePayoutProcessedEmail,
+  sendGivingPayoutProcessedEmail,
   sendEventPayoutProcessedEmail,
   sendMembershipPayoutProcessedEmail,
 } from "@/lib/billing/receipts";
@@ -333,18 +335,20 @@ const payouts: AdminSection = {
   description: "What the platform holds for churches, and payout requests",
   icon: "account_balance",
   async load() {
-    const [fund, event, membership, course] = await Promise.all([
+    const [fund, event, membership, course, giving] = await Promise.all([
       getSharedFundraiserLedger(),
       getEventPayoutLedgerAdmin(),
       getMembershipLedgerAdmin(),
       getCourseLedgerAdmin(),
+      getGivingLedgerAdmin(),
     ]);
     const requests =
       fund.filter((e) => e.pendingRequest).length +
       event.filter((e) => e.pendingRequest).length +
       membership.filter((e) => e.pendingRequest).length +
-      course.filter((e) => e.pendingRequest).length;
-    const owed = [...fund, ...event, ...membership, ...course].reduce((s, e) => s + e.owed, 0);
+      course.filter((e) => e.pendingRequest).length +
+      giving.filter((e) => e.pendingRequest).length;
+    const owed = [...fund, ...event, ...membership, ...course, ...giving].reduce((s, e) => s + e.owed, 0);
     return {
       title: "Payouts",
       note: "Recording a payout is bookkeeping only: wire the money first, then record it here.",
@@ -368,6 +372,10 @@ const payouts: AdminSection = {
         {
           title: "Course fees",
           items: course.map((e) => ledgerItem(`course:${e.organizationId}`, e.organizationName, "Course fees", e)),
+        },
+        {
+          title: "Online giving",
+          items: giving.map((e) => ledgerItem(`giving:${e.organizationId}`, e.organizationName, "Online giving", e)),
         },
       ].filter((g) => g.items.length > 0),
       empty: "Nothing is being held for churches.",
@@ -413,9 +421,9 @@ const payouts: AdminSection = {
       await log(b, "event", data.id);
       return ok("Payout recorded.");
     }
-    if (kind === "membership" || kind === "course") {
-      const table = kind === "membership" ? "membership_payouts" : "course_payouts";
-      const requests = kind === "membership" ? "membership_payout_requests" : "course_payout_requests";
+    if (kind === "membership" || kind === "course" || kind === "giving") {
+      const table = kind === "membership" ? "membership_payouts" : kind === "giving" ? "giving_payouts" : "course_payouts";
+      const requests = kind === "membership" ? "membership_payout_requests" : kind === "giving" ? "giving_payout_requests" : "course_payout_requests";
       const { data, error } = await admin
         .from(table)
         .insert({ organization_id: a, amount, note, paid_by: caller.userId })
@@ -424,6 +432,7 @@ const payouts: AdminSection = {
       if (error || !data) return fail("Couldn't record that payout. Please try again.");
       await admin.from(requests).update({ status: "paid", resolved_payout_id: data.id }).eq("organization_id", a).eq("status", "pending");
       if (kind === "membership") await sendMembershipPayoutProcessedEmail(a, amount);
+      else if (kind === "giving") await sendGivingPayoutProcessedEmail(a, amount);
       else await sendCoursePayoutProcessedEmail(a, amount);
       await log(a, kind, data.id);
       return ok("Payout recorded.");

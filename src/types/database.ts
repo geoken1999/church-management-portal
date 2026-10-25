@@ -342,6 +342,27 @@ export type Visitor = {
 
 export type ModuleSubscriptionStatus = "created" | "authenticated" | "active" | "pending" | "halted" | "cancelled" | "completed" | "expired";
 
+export type CustomReport = {
+  id: string;
+  organization_id: string;
+  created_by: string | null;
+  name: string;
+  source: string;
+  columns: string[];
+  filters: { branchId?: string; status?: string; method?: string };
+  date_window: "all" | "last_7_days" | "last_30_days" | "this_month" | "last_month" | "this_year" | "custom";
+  date_from: string | null;
+  date_to: string | null;
+  format: "excel" | "pdf";
+  frequency: "none" | "daily" | "weekly" | "monthly";
+  schedule_day: number | null;
+  recipients: string[];
+  last_run_at: string | null;
+  last_status: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type OrganizationModuleSubscription = {
   id: string;
   organization_id: string;
@@ -2856,6 +2877,20 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "visitors_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      custom_reports: {
+        Row: CustomReport;
+        Insert: Partial<CustomReport> & Pick<CustomReport, "organization_id" | "name" | "source">;
+        Update: Partial<CustomReport>;
+        Relationships: [
+          {
+            foreignKeyName: "custom_reports_organization_id_fkey";
             columns: ["organization_id"];
             isOneToOne: false;
             referencedRelation: "organizations";

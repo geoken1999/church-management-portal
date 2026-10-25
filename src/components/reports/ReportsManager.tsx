@@ -29,7 +29,7 @@ function downloadFile(base64: string, mimeType: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function ReportFilterFields({
+export function ReportFilterFields({
   definition,
   filters,
   branches,

@@ -7,6 +7,9 @@ import { ReportsManager } from "@/components/reports/ReportsManager";
 import { MonthlyReportsPanel } from "@/components/reports/MonthlyReportsPanel";
 import { getMonthlyReports, getReportTemplates } from "@/lib/reports/monthly-dal";
 import { EMPTY_LETTERHEAD, MONTHLY_SECTIONS, periodOf } from "@/lib/reports/monthly";
+import { CustomReportsPanel } from "@/components/reports/CustomReportsPanel";
+import { createAdminClient } from "@/lib/supabase/admin";
+import type { CustomReport } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 
@@ -24,8 +27,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   }
 
   const advanced = view === "advanced";
+  const custom = view === "custom";
   const reports = advanced ? await getMonthlyReports(organizationId) : [];
   const branches = advanced ? [] : await getBranches(organizationId);
+  const customReports = custom
+    ? (((await createAdminClient().from("custom_reports").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false })).data ?? []) as CustomReport[])
+    : [];
 
   // Only surface reports whose underlying data module the user can
   // actually read — access to Reports itself doesn't imply access to
@@ -37,16 +44,26 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       <div>
         <h1 className="font-heading text-3xl font-bold tracking-tight">Reports</h1>
         <p className="mt-1 text-muted-foreground">
-          {advanced ? "Monthly and annual reports of the whole church or a branch, which you can show to your members in the app." : "Filter and view your data, then export it to Excel or PDF."}
+          {custom ? "Build your own reports and have them emailed to you on a schedule." : advanced ? "Monthly and annual reports of the whole church or a branch, which you can show to your members in the app." : "Filter and view your data, then export it to Excel or PDF."}
         </p>
       </div>
 
       <div className="flex gap-2">
-        <Button variant={advanced ? "outline" : "default"} nativeButton={false} render={<Link href="/dashboard/reports">Standard reports</Link>} />
+        <Button variant={advanced || custom ? "outline" : "default"} nativeButton={false} render={<Link href="/dashboard/reports">Standard reports</Link>} />
+        <Button variant={custom ? "default" : "outline"} nativeButton={false} render={<Link href="/dashboard/reports?view=custom">Custom reports</Link>} />
         <Button variant={advanced ? "default" : "outline"} nativeButton={false} render={<Link href="/dashboard/reports?view=advanced">Advanced: church reports</Link>} />
       </div>
 
-      {advanced ? (
+      {custom ? (
+        <CustomReportsPanel
+          organizationId={organizationId}
+          reports={customReports}
+          sources={availableReports}
+          branches={branches}
+          canWrite={membership.tabAccess.reports.write}
+          canDelete={membership.tabAccess.reports.delete}
+        />
+      ) : advanced ? (
         <MonthlyReportsPanel
           reports={reports}
           templates={await getReportTemplates(organizationId)}

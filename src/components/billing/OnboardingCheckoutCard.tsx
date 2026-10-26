@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { startOnboardingCheckout } from "@/lib/onboarding/tenant-actions";
 import { openRazorpaySubscription } from "@/lib/razorpay/browser";
+import { showPaymentLoading, hidePaymentLoading } from "@/lib/razorpay/loading";
 import { formatPrice, withGst } from "@/lib/billing/gst";
 import type { BillingDetailsInput } from "@/lib/billing/billing-details";
 import {
@@ -43,12 +44,15 @@ export function OnboardingCheckoutCard({
   }
 
   async function start(details: BillingDetailsInput): Promise<CheckoutResult> {
+    showPaymentLoading();
     const result = await startOnboardingCheckout(details);
-    if (result.error || !result.checkout)
+    if (result.error || !result.checkout) {
+      hidePaymentLoading();
       return {
         error: result.error ?? "Couldn't start checkout.",
         billingErrors: result.billingErrors,
       };
+    }
     // Closing the dialog leaves Razorpay's payment window over the page; the return route takes it from there.
     setOpen(false);
     try {

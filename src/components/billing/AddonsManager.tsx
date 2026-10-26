@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { createAddonOrder } from "@/lib/billing/addon-actions";
 import { openRazorpayCheckout } from "@/lib/razorpay/browser";
+import { showPaymentLoading, hidePaymentLoading } from "@/lib/razorpay/loading";
 import {
   ADDON_TYPE_LABELS,
   addonPacksFor,
@@ -64,12 +65,15 @@ export function PackCard({
   async function handleBuy(
     details: BillingDetailsInput,
   ): Promise<CheckoutResult> {
+    showPaymentLoading();
     const result = await createAddonOrder(pack.id, details);
-    if (result.error || !result.checkout)
+    if (result.error || !result.checkout) {
+      hidePaymentLoading();
       return {
         error: result.error ?? "Couldn't start the payment.",
         billingErrors: result.billingErrors,
       };
+    }
     try {
       await openRazorpayCheckout(result.checkout);
     } catch {

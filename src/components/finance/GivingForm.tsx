@@ -7,6 +7,7 @@ import { createGivingOrder, createChurchGivingOrder, confirmGivingPayment } from
 import { GIVING_TYPE_LABELS, type GivingType } from "@/lib/finance/giving-types";
 import { redirectToPayU } from "@/lib/payu/browser";
 import { openRazorpayCheckout } from "@/lib/razorpay/browser";
+import { showPaymentLoading, hidePaymentLoading } from "@/lib/razorpay/loading";
 import { useLocale } from "@/lib/i18n/LocaleContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,13 +103,16 @@ export function GivingForm({
     event.preventDefault();
     setError(null);
     setSubmitting(true);
+    showPaymentLoading();
 
     const result = church
       ? await createChurchGivingOrder(church.token, givingType ?? "", amount, donorName, donorEmail, donorPhone)
       : await createGivingOrder(shareToken ?? "", amount, donorName, donorEmail, donorPhone);
     if (result.error) {
+      hidePaymentLoading();
       setError(result.error);
       setSubmitting(false);
+        hidePaymentLoading();
       return;
     }
 
@@ -116,16 +120,20 @@ export function GivingForm({
       try {
         await openRazorpayCheckout(result.checkout, () => setSubmitting(false));
       } catch {
+        hidePaymentLoading();
         setError(t.publicGive.paymentFormLoadError);
         setSubmitting(false);
+        hidePaymentLoading();
       }
       return;
     }
 
     if (result.gateway === "payu") {
       if (!result.payuFields || !result.payuActionUrl) {
+        hidePaymentLoading();
         setError("Couldn't start the payment.");
         setSubmitting(false);
+        hidePaymentLoading();
         return;
       }
       redirectToPayU(result.payuActionUrl, result.payuFields);
@@ -134,8 +142,10 @@ export function GivingForm({
 
     if (result.gateway === "cashfree") {
       if (!result.cashfreeSessionId) {
+        hidePaymentLoading();
         setError("Couldn't start the payment.");
         setSubmitting(false);
+        hidePaymentLoading();
         return;
       }
       try {
@@ -146,6 +156,7 @@ export function GivingForm({
       } catch {
         setError(t.publicGive.paymentFormLoadError);
         setSubmitting(false);
+        hidePaymentLoading();
       }
       return;
     }
@@ -153,6 +164,7 @@ export function GivingForm({
     if (!result.orderId || !result.keyId) {
       setError("Couldn't start the payment.");
       setSubmitting(false);
+        hidePaymentLoading();
       return;
     }
 
@@ -161,11 +173,13 @@ export function GivingForm({
     } catch {
       setError(t.publicGive.paymentFormLoadError);
       setSubmitting(false);
+        hidePaymentLoading();
       return;
     }
     if (!window.Razorpay) {
       setError(t.publicGive.paymentFormStillLoading);
       setSubmitting(false);
+        hidePaymentLoading();
       return;
     }
 
@@ -179,12 +193,14 @@ export function GivingForm({
       prefill: { name: donorName, email: donorEmail || undefined, contact: donorPhone || undefined },
       theme: { color: "#6C47FF" },
       handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
+        showPaymentLoading("Confirming your payment…");
         const confirmResult = await confirmGivingPayment(
           response.razorpay_order_id,
           response.razorpay_payment_id,
           response.razorpay_signature,
         );
         setSubmitting(false);
+        hidePaymentLoading();
         if (confirmResult.error) {
           setError(confirmResult.error);
           return;
@@ -192,10 +208,14 @@ export function GivingForm({
         setGivingSuccess(true);
       },
       modal: {
-        ondismiss: () => setSubmitting(false),
+        ondismiss: () => {
+          setSubmitting(false);
+          hidePaymentLoading();
+        },
       },
     });
     razorpay.open();
+    hidePaymentLoading();
   }
 
   if (paymentResult === "success" || givingSuccess) {

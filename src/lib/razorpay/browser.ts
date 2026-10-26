@@ -4,6 +4,7 @@ import type {
   RazorpayCheckout,
   RazorpaySubscriptionCheckout,
 } from "@/lib/razorpay/checkout";
+import { hidePaymentLoading, showPaymentLoading } from "@/lib/razorpay/loading";
 
 // Opens Razorpay's checkout in the browser. On success the result is posted to checkout.callbackUrl from THIS
 // tab (a full navigation, so the page that calls this does not stay open): the return route decides where the
@@ -23,6 +24,8 @@ declare global {
 
 /** Sends Razorpay's signed result to the return route as a form post, in the tab the person paid from. */
 function postResultHere(callbackUrl: string, response: unknown): void {
+  // The page is about to navigate to the return route, which confirms the payment: keep the person informed.
+  showPaymentLoading("Confirming your payment…");
   const form = document.createElement("form");
   form.method = "POST";
   form.action = callbackUrl;
@@ -91,9 +94,16 @@ function loadCashfree(): Promise<void> {
 // The backup gateway. Cashfree's checkout takes over this tab and, once the person has paid (or given up), sends
 // the browser back to the same return route Razorpay uses, which asks Cashfree whether the order was paid.
 async function openCashfreeCheckout(cashfree: NonNullable<RazorpayCheckout["cashfree"]>): Promise<void> {
-  await loadCashfree();
-  if (!window.Cashfree) throw new Error("Couldn't load the payment window.");
-  await window.Cashfree({ mode: cashfree.mode }).checkout({ paymentSessionId: cashfree.paymentSessionId, redirectTarget: "_self" });
+  showPaymentLoading("Taking you to the secure payment page…");
+  try {
+    await loadCashfree();
+    if (!window.Cashfree) throw new Error("Couldn't load the payment window.");
+    // Cashfree takes over this tab, so the cover stays until the page changes.
+    await window.Cashfree({ mode: cashfree.mode }).checkout({ paymentSessionId: cashfree.paymentSessionId, redirectTarget: "_self" });
+  } catch (err) {
+    hidePaymentLoading();
+    throw err;
+  }
 }
 
 /** Opens the checkout. Resolves when it is open; `onDismiss` runs if the person closes it without paying. */
@@ -102,21 +112,34 @@ export async function openRazorpayCheckout(
   onDismiss?: () => void,
 ): Promise<void> {
   if (checkout.cashfree) return openCashfreeCheckout(checkout.cashfree);
-  await loadRazorpay();
-  if (!window.Razorpay) throw new Error("Couldn't load the payment window.");
-  const razorpay = new window.Razorpay({
-    key: checkout.keyId,
-    order_id: checkout.orderId,
-    amount: checkout.amountPaise,
-    currency: checkout.currency,
-    name: checkout.name,
-    description: checkout.description,
-    prefill: checkout.prefill,
-    handler: (response: unknown) => postResultHere(checkout.callbackUrl, response),
-    theme: { color: "#2d4a7a" },
-    modal: { ondismiss: () => onDismiss?.() },
-  });
-  razorpay.open();
+  showPaymentLoading();
+  try {
+    await loadRazorpay();
+    if (!window.Razorpay) throw new Error("Couldn't load the payment window.");
+    const razorpay = new window.Razorpay({
+      key: checkout.keyId,
+      order_id: checkout.orderId,
+      amount: checkout.amountPaise,
+      currency: checkout.currency,
+      name: checkout.name,
+      description: checkout.description,
+      prefill: checkout.prefill,
+      handler: (response: unknown) => postResultHere(checkout.callbackUrl, response),
+      theme: { color: "#2d4a7a" },
+      modal: {
+        ondismiss: () => {
+          hidePaymentLoading();
+          onDismiss?.();
+        },
+      },
+    });
+    razorpay.open();
+    // The payment window is up; the cover would only sit behind it.
+    hidePaymentLoading();
+  } catch (err) {
+    hidePaymentLoading();
+    throw err;
+  }
 }
 
 /** Opens the checkout that authorises a subscription. Same behaviour as openRazorpayCheckout. */
@@ -124,17 +147,29 @@ export async function openRazorpaySubscription(
   checkout: RazorpaySubscriptionCheckout,
   onDismiss?: () => void,
 ): Promise<void> {
-  await loadRazorpay();
-  if (!window.Razorpay) throw new Error("Couldn't load the payment window.");
-  const razorpay = new window.Razorpay({
-    key: checkout.keyId,
-    subscription_id: checkout.subscriptionId,
-    name: checkout.name,
-    description: checkout.description,
-    prefill: checkout.prefill,
-    handler: (response: unknown) => postResultHere(checkout.callbackUrl, response),
-    theme: { color: "#2d4a7a" },
-    modal: { ondismiss: () => onDismiss?.() },
-  });
-  razorpay.open();
+  showPaymentLoading();
+  try {
+    await loadRazorpay();
+    if (!window.Razorpay) throw new Error("Couldn't load the payment window.");
+    const razorpay = new window.Razorpay({
+      key: checkout.keyId,
+      subscription_id: checkout.subscriptionId,
+      name: checkout.name,
+      description: checkout.description,
+      prefill: checkout.prefill,
+      handler: (response: unknown) => postResultHere(checkout.callbackUrl, response),
+      theme: { color: "#2d4a7a" },
+      modal: {
+        ondismiss: () => {
+          hidePaymentLoading();
+          onDismiss?.();
+        },
+      },
+    });
+    razorpay.open();
+    hidePaymentLoading();
+  } catch (err) {
+    hidePaymentLoading();
+    throw err;
+  }
 }

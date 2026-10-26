@@ -4,6 +4,7 @@ import NextTopLoader from "nextjs-toploader";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { AppToaster } from "@/components/ui/app-toaster";
+import { PaymentLoadingOverlay } from "@/components/PaymentLoadingOverlay";
 import "./globals.css";
 
 // DM Sans: matches the KingdomFlow reference design (launchpados.in) — one
@@ -63,6 +64,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               covers "any page is loading" uniformly from one place. */}
           <NextTopLoader color="var(--primary)" showSpinner={false} />
           <ConnectionStatus />
+          <PaymentLoadingOverlay />
           {children}
         </ThemeProvider>
       </body>

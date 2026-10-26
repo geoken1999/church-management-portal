@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { createMembershipInvoiceOrder } from "@/lib/membership-fees/actions";
 import { openRazorpayCheckout } from "@/lib/razorpay/browser";
+import { showPaymentLoading, hidePaymentLoading } from "@/lib/razorpay/loading";
 import { Button } from "@/components/ui/button";
 import { ErrorToast } from "@/components/ui/error-toast";
 
@@ -25,14 +26,17 @@ export function MembershipPayButton({
   async function handlePay() {
     setError(null);
     setSubmitting(true);
+    showPaymentLoading();
 
     const result = await createMembershipInvoiceOrder(token);
     if (result.alreadyPaid) {
+      hidePaymentLoading();
       setAlreadyPaid(true);
       setSubmitting(false);
       return;
     }
     if (result.error || !result.checkout) {
+      hidePaymentLoading();
       setError(result.error ?? "Couldn't start the payment.");
       setSubmitting(false);
       return;

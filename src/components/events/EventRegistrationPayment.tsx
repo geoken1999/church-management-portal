@@ -5,6 +5,7 @@ import { CheckCircle2 } from "lucide-react";
 import { createEventRegistrationOrder } from "@/lib/events/registration-payment";
 import { deferEventRegistrationToCheckin } from "@/lib/events/public-registration-actions";
 import { openRazorpayCheckout } from "@/lib/razorpay/browser";
+import { showPaymentLoading, hidePaymentLoading } from "@/lib/razorpay/loading";
 import { useLocale } from "@/lib/i18n/LocaleContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,9 +46,11 @@ export function EventRegistrationPayment({
   async function handlePay() {
     setError(null);
     setSubmitting(true);
+    showPaymentLoading();
 
     const result = await createEventRegistrationOrder(registrationId);
     if (result.error || !result.checkout) {
+      hidePaymentLoading();
       setError(result.error ?? "Couldn't start the payment.");
       setSubmitting(false);
       return;

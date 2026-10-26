@@ -9,6 +9,7 @@ import {
   keepSubscription,
 } from "@/lib/billing/actions";
 import { openRazorpaySubscription } from "@/lib/razorpay/browser";
+import { showPaymentLoading, hidePaymentLoading } from "@/lib/razorpay/loading";
 import {
   PLANS,
   priceForInterval,
@@ -105,16 +106,19 @@ export function BillingManager({
     details: BillingDetailsInput,
   ): Promise<CheckoutResult> {
     if (!checkoutPlanId) return { error: "Choose a plan." };
+    showPaymentLoading();
     const result = await startSubscriptionCheckout(
       checkoutPlanId,
       details,
       cycle,
     );
-    if (result.error || !result.checkout)
+    if (result.error || !result.checkout) {
+      hidePaymentLoading();
       return {
         error: result.error ?? "Couldn't start checkout.",
         billingErrors: result.billingErrors,
       };
+    }
     setCheckoutPlanId(null);
     try {
       await openRazorpaySubscription(result.checkout);

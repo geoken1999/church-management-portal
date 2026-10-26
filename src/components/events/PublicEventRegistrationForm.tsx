@@ -11,6 +11,7 @@ import {
 import { EventRegistrationPayment } from "@/components/events/EventRegistrationPayment";
 import { createEventRegistrationOrder } from "@/lib/events/registration-payment";
 import { openRazorpayCheckout } from "@/lib/razorpay/browser";
+import { showPaymentLoading, hidePaymentLoading } from "@/lib/razorpay/loading";
 import { useLocale } from "@/lib/i18n/LocaleContext";
 import type { FormField } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -187,8 +188,10 @@ function PaymentFailedCard({
     if (!registrationId) return;
     setError(null);
     setRetrying(true);
+    showPaymentLoading();
     const result = await createEventRegistrationOrder(registrationId);
     if (result.error || !result.checkout) {
+      hidePaymentLoading();
       setError(result.error ?? "Couldn't start the payment.");
       setRetrying(false);
       return;

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Lock } from "lucide-react";
 import { startModuleCheckout } from "@/lib/billing/module-actions";
 import { openRazorpaySubscription } from "@/lib/razorpay/browser";
+import { showPaymentLoading, hidePaymentLoading } from "@/lib/razorpay/loading";
 import { formatPrice, withGst } from "@/lib/billing/gst";
 import type { BillingDetailsInput } from "@/lib/billing/billing-details";
 import { BillingDetailsDialog, type CheckoutResult } from "@/components/billing/BillingDetailsDialog";
@@ -37,8 +38,12 @@ export function UnlockModuleCard({
   const price = withGst(monthlyBase);
 
   async function start(details: BillingDetailsInput): Promise<CheckoutResult> {
+    showPaymentLoading();
     const result = await startModuleCheckout(moduleKey, details);
-    if (result.error || !result.checkout) return { error: result.error ?? "Couldn't start checkout.", billingErrors: result.billingErrors };
+    if (result.error || !result.checkout) {
+      hidePaymentLoading();
+      return { error: result.error ?? "Couldn't start checkout.", billingErrors: result.billingErrors };
+    }
     // Closing the dialog leaves Razorpay's payment window over the page; the return route takes it from there.
     setOpen(false);
     try {

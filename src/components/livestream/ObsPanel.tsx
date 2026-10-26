@@ -116,6 +116,9 @@ export function ObsPanel({ streamId, whipUrl, initialKey, connected }: { streamI
             </li>
           </ol>
           <p className="text-xs text-muted-foreground">
+            If OBS keeps showing <strong>encoder errors</strong>, reconnecting, or skipped frames, the computer cannot keep up. In OBS open <strong>Stats</strong> (View → Docks → Stats) and look at <strong>Skipped frames due to encoding lag</strong>: it should stay at 0%. To fix it: on a Mac set the encoder to <strong>Apple VT H264 Hardware Encoder</strong> (on Windows <strong>NVENC</strong> or <strong>QuickSync</strong>) with Rate control CBR, Bitrate 2500 Kbps, Keyframe interval 2 s and a profile without B-frames (main or baseline); close other heavy programs such as extra browser windows; remove sources you don&apos;t need (a full-screen capture is the heaviest); and lower the output to 1280×720 at 30 fps.
+          </p>
+          <p className="text-xs text-muted-foreground">
             If OBS says it can&apos;t connect, check the key and that the stream hasn&apos;t ended. If the stream goes live but the picture is black, check that a source is visible in OBS and that Start Streaming is still on.
           </p>
         </div>

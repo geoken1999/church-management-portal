@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { streamForIngest } from "@/lib/livestream/whip";
 import { whipOffer } from "@/lib/livestream/videosdk";
-import { getSiteUrl } from "@/lib/site-url";
 
 // The address OBS (30 or newer: Settings → Stream → Service "WHIP") sends the picture to.
 // The stream key is the bearer token. This only trades the WebRTC offer and answer;
@@ -22,9 +21,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   await createAdminClient().from("live_streams").update({ ingest_active: true, ingest_session: result.sessionId }).eq("id", id);
   await createAdminClient().from("kmeet_meetings").update({ last_active_at: new Date().toISOString() }).eq("id", found.stream.meeting_id);
 
+  // The session address must be on the same host OBS just used. OBS does not follow a redirect when it later stops
+  // (it sends a DELETE here), so an address on the other of kingdomflow.in / www.kingdomflow.in would never be closed.
   return new NextResponse(result.answer, {
     status: 201,
-    headers: { "Content-Type": "application/sdp", Location: `${getSiteUrl()}/api/whip/${id}/session` },
+    headers: { "Content-Type": "application/sdp", Location: `${new URL(request.url).origin}/api/whip/${id}/session` },
   });
 }
 

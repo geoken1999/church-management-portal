@@ -2,6 +2,8 @@ import Link from "next/link";
 import { BookOpen } from "lucide-react";
 import { NetworkCheck } from "@/components/livestream/NetworkCheck";
 import { QUALITY_NEEDS } from "@/lib/livestream/netcheck";
+import { ExternalLivePanel } from "@/components/livestream/ExternalLivePanel";
+import type { ExternalPlatform } from "@/lib/livestream/external-link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -23,12 +25,14 @@ function Step({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-export function LiveStreamInstructions({ canUseProjection }: { canUseProjection: boolean }) {
+export function LiveStreamInstructions({ canUseProjection, canWrite, active }: { canUseProjection: boolean; canWrite: boolean; active: { title: string; platform: ExternalPlatform; url: string } | null }) {
   return (
     <div className="max-w-3xl space-y-6">
       <p className="text-sm text-muted-foreground">
         Your church can go live on YouTube and Facebook from OBS Studio (free, from obsproject.com) using their standard settings. Nothing passes through KingdomFlow, and viewers watch on YouTube or Facebook. Streaming inside the KingdomFlow app is set up separately, by request (see the In-app streaming tab).
       </p>
+
+      <ExternalLivePanel active={active} canWrite={canWrite} />
 
       <Step title="1. Go live on YouTube or Facebook">
         <div className="grid gap-3 sm:grid-cols-2">
@@ -57,7 +61,7 @@ export function LiveStreamInstructions({ canUseProjection }: { canUseProjection:
             Add your sources (camera, microphone, slides), press <strong>Start Streaming</strong>, then press <strong>Go live</strong> on YouTube Studio or Facebook when it shows that it is receiving your video.
           </li>
           <li>
-            To finish, end the broadcast on YouTube or Facebook, then press <strong>Stop Streaming</strong> in OBS.
+            Paste the stream&apos;s link in <strong>Tell your members you&apos;re live</strong> above, so members see it in the app. To finish, end the broadcast on YouTube or Facebook, press <strong>Stop Streaming</strong> in OBS, and remove the Live now card.
           </li>
         </ol>
       </Step>

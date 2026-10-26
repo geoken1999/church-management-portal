@@ -6,6 +6,7 @@ import { getLiveStreams } from "@/lib/livestream/dal";
 import { isVideoSdkConfigured } from "@/lib/kmeet/env";
 import { endIdleMeetings } from "@/lib/kmeet/idle";
 import { getLiveStreamAccess } from "@/lib/livestream/access";
+import { getActiveExternalLive } from "@/lib/livestream/external";
 import { LiveStreamInstructions } from "@/components/livestream/LiveStreamInstructions";
 import { LiveStreamLocked } from "@/components/livestream/LiveStreamLocked";
 import { LiveStreamManager } from "@/components/livestream/LiveStreamManager";
@@ -29,6 +30,7 @@ export default async function LiveStreamPage({ searchParams }: { searchParams: P
   const tab = requested === "in-app" ? "in-app" : requested === "instructions" ? "instructions" : live.enabled ? "in-app" : "instructions";
   const tabClass = (active: boolean) => `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`;
 
+  const external = tab === "instructions" ? await getActiveExternalLive(membership.organization.id) : null;
   const streams = tab === "in-app" && live.enabled ? await getLiveStreams(membership.organization.id) : [];
   if (tab === "in-app" && live.enabled) await endIdleMeetings(membership.organization.id);
 
@@ -53,7 +55,7 @@ export default async function LiveStreamPage({ searchParams }: { searchParams: P
       </div>
 
       {tab === "instructions" ? (
-        <LiveStreamInstructions canUseProjection />
+        <LiveStreamInstructions canUseProjection canWrite={access.write} active={external ? { title: external.title, platform: external.platform, url: external.url } : null} />
       ) : live.enabled ? (
         <LiveStreamManager streams={streams.map((s) => ({ ...s, rtmp_outputs: s.rtmp_outputs.map((o) => ({ ...o, streamKey: "" })), ingest_key: "" }))} canWrite={access.write} canDelete={access.delete} available={isVideoSdkConfigured()} />
       ) : (

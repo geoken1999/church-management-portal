@@ -318,6 +318,18 @@ export type MemberProfileUpdateRequest = {
   updated_at: string;
 };
 
+export type ExternalLiveStream = {
+  id: string;
+  organization_id: string;
+  title: string;
+  platform: "youtube" | "facebook";
+  url: string;
+  started_at: string;
+  ended_at: string | null;
+  notified_at: string | null;
+  created_by: string | null;
+};
+
 export type ProjectionSlide = { kind: "bible" | "song" | "announcement" | "custom" | "presentation"; title: string; text: string; footer: string; /** A picture to show across the whole screen (a PowerPoint slide). */ image?: string };
 export type ProjectionTheme = { background?: string; color?: string; font?: "sans" | "serif" };
 export type ProjectionScreen = {
@@ -2930,6 +2942,12 @@ export type Database = {
         Row: PlatformInvestment;
         Insert: Partial<PlatformInvestment> & Pick<PlatformInvestment, "invested_on" | "amount" | "investor">;
         Update: Partial<PlatformInvestment>;
+        Relationships: [];
+      };
+      external_live_streams: {
+        Row: ExternalLiveStream;
+        Insert: Partial<ExternalLiveStream> & Pick<ExternalLiveStream, "organization_id" | "title" | "platform" | "url">;
+        Update: Partial<ExternalLiveStream>;
         Relationships: [];
       };
       projection_screens: {

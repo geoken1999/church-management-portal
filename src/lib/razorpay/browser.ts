@@ -13,6 +13,7 @@ import type {
 
 declare global {
   interface Window {
+    Cashfree?: (options: { mode: string }) => { checkout: (options: { paymentSessionId: string; redirectTarget: string }) => Promise<unknown> };
     Razorpay?: new (options: Record<string, unknown>) => {
       open: () => void;
       on: (event: string, handler: (response: unknown) => void) => void;
@@ -66,11 +67,41 @@ export function loadRazorpay(): Promise<void> {
   });
 }
 
+const CASHFREE_SCRIPT_SRC = "https://sdk.cashfree.com/js/v3/cashfree.js";
+
+function loadCashfree(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (window.Cashfree) return resolve();
+    const fail = () => reject(new Error("Couldn't load the payment window."));
+    const existing = document.querySelector(`script[src="${CASHFREE_SCRIPT_SRC}"]`);
+    if (existing) {
+      existing.addEventListener("load", () => (window.Cashfree ? resolve() : fail()));
+      existing.addEventListener("error", fail);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = CASHFREE_SCRIPT_SRC;
+    script.async = true;
+    script.onload = () => (window.Cashfree ? resolve() : fail());
+    script.onerror = fail;
+    document.body.appendChild(script);
+  });
+}
+
+// The backup gateway. Cashfree's checkout takes over this tab and, once the person has paid (or given up), sends
+// the browser back to the same return route Razorpay uses, which asks Cashfree whether the order was paid.
+async function openCashfreeCheckout(cashfree: NonNullable<RazorpayCheckout["cashfree"]>): Promise<void> {
+  await loadCashfree();
+  if (!window.Cashfree) throw new Error("Couldn't load the payment window.");
+  await window.Cashfree({ mode: cashfree.mode }).checkout({ paymentSessionId: cashfree.paymentSessionId, redirectTarget: "_self" });
+}
+
 /** Opens the checkout. Resolves when it is open; `onDismiss` runs if the person closes it without paying. */
 export async function openRazorpayCheckout(
   checkout: RazorpayCheckout,
   onDismiss?: () => void,
 ): Promise<void> {
+  if (checkout.cashfree) return openCashfreeCheckout(checkout.cashfree);
   await loadRazorpay();
   if (!window.Razorpay) throw new Error("Couldn't load the payment window.");
   const razorpay = new window.Razorpay({

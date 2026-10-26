@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cashfreeReturnAsPost } from "@/lib/cashfree/platform";
 import { confirmReturn } from "@/lib/razorpay/platform";
 import { finalizeEventRegistrationPayment } from "@/lib/events/registration-payment";
 import { logPlatformEvent } from "@/lib/platform-events/log";
@@ -69,4 +70,10 @@ export async function POST(request: Request) {
     });
     return registerUrl("failed", "reason=error");
   }
+}
+
+// The backup gateway (Cashfree) sends the browser back with a GET and ?order_id=; it is handled exactly like the
+// Razorpay POST above, after Cashfree itself has been asked whether the order is paid.
+export async function GET(request: Request) {
+  return cashfreeReturnAsPost(request, POST);
 }

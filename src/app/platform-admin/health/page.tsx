@@ -8,6 +8,10 @@ import { getPortalResponseTime } from "@/lib/platform-admin/portal-speed";
 import { getIntegrationHealth, type IntegrationHealthStatus } from "@/lib/platform-admin/integration-health";
 import { formatBytes } from "@/lib/plans/format";
 import { Card, CardContent } from "@/components/ui/card";
+import { PaymentGatewayCard } from "@/components/platform-admin/PaymentGatewayCard";
+import { getGatewayPolicy } from "@/lib/payments/gateway-settings";
+import { isPlatformCashfreeConfigured } from "@/lib/cashfree/platform";
+import { isRazorpayConfigured } from "@/lib/billing/env";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatPlatformDateTime } from "@/lib/platform-admin/format";
@@ -42,7 +46,7 @@ const INTEGRATION_STATUS_LABELS: Record<IntegrationHealthStatus, string> = {
 
 export default async function PlatformAdminHealthPage() {
   await requirePlatformAdmin();
-  const [integrations, overview, recentErrors, dbHealth, storageStats, deployment, supabaseStatus, portalSpeed] = await Promise.all([
+  const [integrations, overview, recentErrors, dbHealth, storageStats, deployment, supabaseStatus, portalSpeed, gatewayPolicy] = await Promise.all([
     getIntegrationHealth(),
     getPlatformOverview(),
     getPlatformEventsWithChurch({ level: "error", limit: 10 }),
@@ -51,6 +55,7 @@ export default async function PlatformAdminHealthPage() {
     getLatestProductionDeployment(),
     getSupabaseProjectStatus(),
     getPortalResponseTime(),
+    getGatewayPolicy(),
   ]);
 
   const speedLabel =
@@ -79,6 +84,8 @@ export default async function PlatformAdminHealthPage() {
           directly.
         </AlertDescription>
       </Alert>
+
+      <PaymentGatewayCard policy={gatewayPolicy} configured={{ razorpay: isRazorpayConfigured(), cashfree: isPlatformCashfreeConfigured() }} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card>

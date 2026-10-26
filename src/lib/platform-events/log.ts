@@ -26,7 +26,8 @@ export type PlatformEventSource =
   | "membership_fee"
   | "subscription_billing"
   | "member_mobile_login"
-  | "scheduled_campaign";
+  | "scheduled_campaign"
+  | "payment_gateway";
 
 // Fire-and-forget: a logging failure must never break the real
 // request/action it's describing, so every call site awaits this but

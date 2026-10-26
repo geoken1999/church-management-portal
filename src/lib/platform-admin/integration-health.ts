@@ -7,6 +7,8 @@ import { parseGraphError } from "@/lib/whatsapp/graph-error";
 import { isEmailConfigured, getEmailEnv } from "@/lib/email/env";
 import { isRazorpayConfigured } from "@/lib/billing/env";
 import { cronSecretMissingIsFatal } from "@/lib/cron/auth";
+import { getPlatformCashfreeCredentials } from "@/lib/cashfree/platform";
+import { cashfreeApiBase } from "@/lib/payments/gateways";
 import { createRazorpayClient } from "@/lib/billing/razorpay";
 import { expectedChargePaise, planEnvVar, planMismatch, razorpayPlanIdFor } from "@/lib/billing/razorpay-plans";
 import { PLANS, type BillingInterval, type PlanId } from "@/lib/plans/config";
@@ -183,6 +185,25 @@ async function checkRazorpay(): Promise<IntegrationHealth> {
   }
 }
 
+// The backup payment gateway. Asking for an order that can't exist is a read-only call: Cashfree answers "not found"
+// (404) when the keys are good and refuses (401/403) when they aren't.
+async function checkCashfree(): Promise<IntegrationHealth> {
+  const name = "Cashfree (backup payments)";
+  const creds = getPlatformCashfreeCredentials();
+  if (!creds) return unconfigured(name);
+  try {
+    const res = await fetch(`${cashfreeApiBase(creds.environment)}/orders/kf_health_probe`, {
+      headers: { "x-api-version": "2023-08-01", "x-client-id": creds.appId, "x-client-secret": creds.secretKey },
+      signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
+    });
+    if (res.status === 401 || res.status === 403) return { name, status: "down", detail: "Cashfree rejected the App ID / Secret Key.", liveChecked: true };
+    if (res.status >= 500) return { name, status: "degraded", detail: `Cashfree answered HTTP ${res.status}.`, liveChecked: true };
+    return { name, status: "operational", detail: creds.environment === "test" ? "Using the Cashfree sandbox (CASHFREE_ENV=test)." : undefined, liveChecked: true };
+  } catch (err) {
+    return { name, status: "down", detail: err instanceof Error ? err.message : "Couldn't reach Cashfree.", liveChecked: true };
+  }
+}
+
 // Meta's Graph API accepts an "app access token" — the literal string
 // "{app-id}|{app-secret}" — for server-to-server calls that verify the
 // app's own credentials without needing any tenant's per-account OAuth
@@ -241,14 +262,15 @@ function checkYouTube(): IntegrationHealth {
 // deliberately excluded, since the Health page already has dedicated,
 // live-checked cards for both elsewhere on the same page.
 export async function getIntegrationHealth(): Promise<IntegrationHealth[]> {
-  const [twilioSms, whatsapp, resend, razorpay, instagram, facebook] = await Promise.all([
+  const [twilioSms, whatsapp, resend, razorpay, cashfree, instagram, facebook] = await Promise.all([
     checkTwilioSms(),
     checkMetaWhatsApp(),
     checkResend(),
     checkRazorpay(),
+    checkCashfree(),
     checkMetaApp("Instagram", process.env.INSTAGRAM_APP_ID, process.env.INSTAGRAM_APP_SECRET),
     checkMetaApp("Facebook", process.env.FACEBOOK_APP_ID, process.env.FACEBOOK_APP_SECRET),
   ]);
 
-  return [checkScheduledJobs(), twilioSms, whatsapp, resend, razorpay, instagram, facebook, checkYouTube()];
+  return [checkScheduledJobs(), twilioSms, whatsapp, resend, razorpay, cashfree, instagram, facebook, checkYouTube()];
 }

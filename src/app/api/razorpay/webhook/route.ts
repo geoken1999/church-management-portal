@@ -16,11 +16,7 @@ import {
 } from "@/lib/billing/cancellation-store";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { handleModuleSubscriptionEvent } from "@/lib/billing/modules";
-import { finalizeAddonOrderPayment } from "@/lib/billing/addon-actions";
-import { finalizeEventRegistrationPayment } from "@/lib/events/registration-payment";
-import { finalizeMembershipPayment } from "@/lib/membership-fees/finalize";
-import { finalizeProgramPayment } from "@/lib/lms/payments";
-import { finalizePayUGivingOrderPayment } from "@/lib/finance/payu-giving";
+import { finalizeByReference } from "@/lib/payments/finalize-by-reference";
 
 // The source of truth for plan changes — startSubscriptionCheckout's DB
 // write only records what checkout was *started*; this is what confirms
@@ -70,7 +66,7 @@ export async function POST(request: Request) {
     const paymentId: string = paymentEntity?.id ?? "";
     if (receipt && paymentId) {
       try {
-        const error = await finalizeByReceipt(receipt, paymentId);
+        const error = await finalizeByReference(receipt, paymentId);
         if (error)
           await logPlatformEvent({
             level: "error",
@@ -245,26 +241,4 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: true });
-}
-
-// The reference each flow puts on its Razorpay order starts with the flow's own prefix. Returns an error
-// message, or null when done (finalizers are idempotent, so a payment the return route already handled is
-// a no-op here).
-async function finalizeByReceipt(
-  receipt: string,
-  paymentId: string,
-): Promise<string | null> {
-  const run = async (fn: () => Promise<{ error?: string }>) =>
-    (await fn()).error ?? null;
-  if (receipt.startsWith("addon"))
-    return run(() => finalizeAddonOrderPayment(receipt, paymentId));
-  if (receipt.startsWith("evreg"))
-    return run(() => finalizeEventRegistrationPayment(receipt, paymentId));
-  if (receipt.startsWith("mship"))
-    return run(() => finalizeMembershipPayment(receipt, paymentId));
-  if (receipt.startsWith("lms"))
-    return run(() => finalizeProgramPayment(receipt, paymentId));
-  if (receipt.startsWith("giving"))
-    return run(() => finalizePayUGivingOrderPayment(receipt, paymentId));
-  return null;
 }

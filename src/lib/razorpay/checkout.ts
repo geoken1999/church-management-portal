@@ -1,6 +1,10 @@
 // What the browser needs to open Razorpay's checkout for one payment. Shared by every one-time payment on
 // KingdomFlow's own Razorpay account (add-on packs, paid events, membership fees, Bible School programs).
 export interface RazorpayCheckout {
+  /** Which gateway took the order. Absent means Razorpay. A payment the backup (Cashfree) took carries `cashfree` too. */
+  gateway?: "razorpay" | "cashfree";
+  /** Cashfree only: what the browser opens Cashfree's checkout with. */
+  cashfree?: { paymentSessionId: string; mode: "production" | "sandbox" };
   keyId: string;
   orderId: string;
   /** In paise: Razorpay counts money in the smallest unit. */

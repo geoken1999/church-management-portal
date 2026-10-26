@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cashfreeReturnAsPost } from "@/lib/cashfree/platform";
 import { confirmReturn } from "@/lib/razorpay/platform";
 import { finalizeProgramPayment } from "@/lib/lms/payments";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -84,4 +85,10 @@ async function handleReturn(request: Request) {
     return back("failed");
   }
   return back("success");
+}
+
+// The backup gateway (Cashfree) sends the browser back with a GET and ?order_id=; it is handled exactly like the
+// Razorpay POST above, after Cashfree itself has been asked whether the order is paid.
+export async function GET(request: Request) {
+  return cashfreeReturnAsPost(request, POST);
 }

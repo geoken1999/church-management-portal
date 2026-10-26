@@ -109,7 +109,7 @@ async function startGivingPayment(
       });
       return { error: "Couldn't start the payment. Please try again." };
     }
-    const { error: insertError } = await admin.from("fundraiser_payment_orders").insert({ ...orderBase, gateway: "razorpay", payu_txnid: txnid });
+    const { error: insertError } = await admin.from("fundraiser_payment_orders").insert({ ...orderBase, gateway: checkout.gateway ?? "razorpay", payu_txnid: txnid });
     if (insertError) {
       console.error("fundraiser_payment_orders insert failed:", insertError.message);
       return { error: "Couldn't start the payment. Please try again." };

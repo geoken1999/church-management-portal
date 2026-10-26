@@ -56,3 +56,12 @@ export async function getCashfreeOrderStatus(creds: CashfreeCredentials, orderId
   if (!response.ok || !body.order_status) return { error: body.message ?? "Couldn't check the payment with Cashfree." };
   return { status: body.order_status, amount: Number(body.order_amount ?? 0) };
 }
+
+// The successful payment on an order, if any: its id is what the receipts and the books refer to.
+export async function getCashfreeSuccessfulPaymentId(creds: CashfreeCredentials, orderId: string): Promise<string | null> {
+  const response = await fetch(`${cashfreeApiBase(creds.environment)}/orders/${encodeURIComponent(orderId)}/payments`, { headers: headers(creds) });
+  const body = (await response.json().catch(() => [])) as { payment_status?: string; cf_payment_id?: string | number }[];
+  if (!response.ok || !Array.isArray(body)) return null;
+  const paid = body.find((p) => p.payment_status === "SUCCESS");
+  return paid?.cf_payment_id != null ? String(paid.cf_payment_id) : null;
+}

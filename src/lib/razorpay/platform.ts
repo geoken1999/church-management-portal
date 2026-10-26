@@ -2,8 +2,12 @@ import "server-only";
 
 import crypto from "node:crypto";
 import { createRazorpayClient } from "@/lib/billing/razorpay";
-import { getRazorpayEnv } from "@/lib/billing/env";
+import { getRazorpayEnv, isRazorpayConfigured } from "@/lib/billing/env";
 import { toPaise, type RazorpayCheckout } from "@/lib/razorpay/checkout";
+import { gatewayAttemptOrder, type PlatformGateway } from "@/lib/payments/gateway-policy";
+import { getGatewayPolicy } from "@/lib/payments/gateway-settings";
+import { confirmCashfreeReturn, createPlatformCashfreeCheckout, isPlatformCashfreeConfigured } from "@/lib/cashfree/platform";
+import { logPlatformEvent } from "@/lib/platform-events/log";
 
 // One-time payments on KingdomFlow's own Razorpay account.
 //
@@ -25,7 +29,42 @@ export interface CreateCheckoutInput {
   notes?: Record<string, string>;
 }
 
+/**
+ * Creates the order for a one-time payment on whichever of KingdomFlow's gateways the platform admin has chosen,
+ * falling back to the other when the first can't create it (and failover is on). Every caller hands the result to
+ * openRazorpayCheckout, which opens the right checkout for the gateway that took the order.
+ */
 export async function createCheckout(
+  input: CreateCheckoutInput,
+): Promise<RazorpayCheckout> {
+  const policy = await getGatewayPolicy();
+  const order = gatewayAttemptOrder(policy, { razorpay: isRazorpayConfigured(), cashfree: isPlatformCashfreeConfigured() });
+  if (order.length === 0) throw new Error("No payment gateway is configured.");
+
+  let lastError: unknown;
+  for (const [index, gateway] of order.entries()) {
+    try {
+      const checkout = gateway === "cashfree" ? await createPlatformCashfreeCheckout(input) : await createRazorpayCheckout(input);
+      // The payment went to the backup: leave a trail so the platform admin can see Razorpay was struggling.
+      if (index > 0) {
+        await logPlatformEvent({
+          level: "warning",
+          source: "payment_gateway",
+          message: `Razorpay couldn't create the order, so the payment was taken on ${gateway}: ${lastError instanceof Error ? lastError.message : "unknown error"}`,
+          metadata: { receipt: input.receipt, gateway },
+        });
+      }
+      return checkout;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Couldn't create the payment.");
+}
+
+export type { PlatformGateway };
+
+async function createRazorpayCheckout(
   input: CreateCheckoutInput,
 ): Promise<RazorpayCheckout> {
   const { keyId } = getRazorpayEnv();
@@ -119,6 +158,10 @@ export async function confirmReturn(
   lookup: RazorpayLookup = liveLookup(),
 ): Promise<ReturnOutcome> {
   const text = (name: string) => String(form.get(name) ?? "");
+  // The browser came back from Cashfree (the backup gateway): see Cashfree's own word on the order.
+  const cashfreeOrder = text("cf_order_id");
+  const cashfreeField = form.get("cf_order_id");
+  if (cashfreeField !== null && cashfreeField !== undefined) return confirmCashfreeReturn(cashfreeOrder);
   const orderId = text("razorpay_order_id");
   const paymentId = text("razorpay_payment_id");
   const signature = text("razorpay_signature");

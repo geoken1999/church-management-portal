@@ -103,6 +103,9 @@ export function ObsPanel({ streamId, whipUrl, initialKey, connected }: { streamI
               To put Bible verses and song words on the video, open <strong>Verse projection</strong> (button at the top of this page), copy the <strong>OBS browser source</strong> link, and in OBS add a <strong>Browser</strong> source with that address, width <strong>1280</strong> and height <strong>720</strong> (match your canvas). Choose <strong>Lower third</strong> in the console for a bar over the picture, or <strong>Full screen</strong> to fill it.
             </li>
             <li>
+              To go live on YouTube or Facebook at the same time, send to them straight from OBS. KingdomFlow does not relay to them. OBS has one main stream output, which here goes to the app, so add a free plugin such as <strong>Multiple RTMP Outputs</strong> and give it the <strong>server address and stream key</strong> from YouTube Studio (Go live → Stream settings) or Facebook Live. Sending twice uses roughly double your upload speed, so run Check my connection first.
+            </li>
+            <li>
               Press <strong>Start Streaming</strong>. This page shows <strong>OBS connected</strong> within a few seconds.
             </li>
             <li>

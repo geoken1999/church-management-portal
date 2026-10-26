@@ -92,7 +92,6 @@ export function LiveStudio({ stream, canWrite, whipUrl }: { stream: LiveStream; 
         <p className="text-xs text-muted-foreground">
           {LAYOUT_NAMES[stream.layout]} layout · {QUALITY_NAMES[stream.quality]} · {stream.orientation} · {stream.audio_only ? "audio only" : "video"}
           {stream.record && " · recording"}
-          {stream.rtmp_outputs.length > 0 && ` · also to ${stream.rtmp_outputs.map((o) => o.name).join(", ")}`}
         </p>
       </div>
 

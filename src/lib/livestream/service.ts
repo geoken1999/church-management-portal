@@ -12,7 +12,6 @@ import { resolveAudienceAuthIds } from "@/lib/push/audience";
 import {
   endRoomSession,
   startHls,
-  startRtmp,
   stopHls,
   stopRtmp,
   whipEnd,
@@ -140,12 +139,8 @@ export async function goLive(
     };
   }
 
-  let warning: string | undefined;
-  if (stream.rtmp_outputs.length > 0) {
-    const rtmp = await startRtmp(roomId, stream.rtmp_outputs, stream);
-    if (rtmp.error)
-      warning = `You're live in the app, but sending to ${stream.rtmp_outputs.map((o) => o.name).join(", ")} failed: ${rtmp.error}`;
-  }
+  // Only the in-app broadcast runs on the video service. YouTube and Facebook are not relayed through it: a church that
+  // wants them sends from its own encoder (OBS) straight to their servers.
 
   const admin = createAdminClient();
   await admin
@@ -172,7 +167,7 @@ export async function goLive(
       // Notifying is best-effort; the stream is live either way.
     }
   }
-  return { warning };
+  return {};
 }
 
 // Stops the broadcast and the restream and marks the stream ended.

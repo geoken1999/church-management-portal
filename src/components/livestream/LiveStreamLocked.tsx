@@ -12,7 +12,7 @@ import { ErrorToast } from "@/components/ui/error-toast";
 const FEATURES = [
   "Members watch live inside the app, with live chat and a viewer count",
   "Broadcast from a camera in the browser, or from OBS with a stream key",
-  "Also send to YouTube and Facebook at the same time",
+  "Go live on YouTube or Facebook too, straight from OBS",
   "Record the stream and notify members when you go live",
 ];
 

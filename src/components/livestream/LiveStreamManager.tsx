@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Radio, Plus, Trash2, Eye } from "lucide-react";
 import { createLiveStreamAction, deleteLiveStreamAction } from "@/lib/livestream/actions";
-import { LAYOUTS, MAX_OUTPUTS, QUALITIES, THEMES } from "@/lib/livestream/validation";
-import type { LiveStream, LiveStreamOutput } from "@/types/database";
+import { LAYOUTS, QUALITIES, THEMES } from "@/lib/livestream/validation";
+import type { LiveStream } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,12 +17,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ErrorToast } from "@/components/ui/error-toast";
 
 const SELECT_CLASS = "h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
-
-const PRESETS: { name: string; url: string }[] = [
-  { name: "YouTube", url: "rtmp://a.rtmp.youtube.com/live2" },
-  { name: "Facebook", url: "rtmps://live-api-s.facebook.com:443/rtmp/" },
-  { name: "Other", url: "" },
-];
 
 function Check({ id, label, hint, checked, onChange }: { id: string; label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -50,18 +44,11 @@ export function LiveStreamManager({ streams, canWrite, canDelete, available }: {
   const [record, setRecord] = useState(false);
   const [notifyMembers, setNotifyMembers] = useState(true);
   const [chatEnabled, setChatEnabled] = useState(true);
-  const [outputs, setOutputs] = useState<LiveStreamOutput[]>([]);
-
-  function addOutput(preset: (typeof PRESETS)[number]) {
-    if (outputs.length >= MAX_OUTPUTS) return;
-    setOutputs([...outputs, { name: preset.name, url: preset.url, streamKey: "" }]);
-  }
-  const setOutput = (i: number, patch: Partial<LiveStreamOutput>) => setOutputs(outputs.map((o, n) => (n === i ? { ...o, ...patch } : o)));
 
   function create() {
     setError(null);
     startTransition(async () => {
-      const result = await createLiveStreamAction({ title, description, outputs, settings: { layout, quality, theme, orientation, audioOnly, record, notifyMembers, chatEnabled } });
+      const result = await createLiveStreamAction({ title, description, settings: { layout, quality, theme, orientation, audioOnly, record, notifyMembers, chatEnabled } });
       if (result.error || !result.id) {
         setError(result.error ?? "Couldn't create the live stream.");
         return;
@@ -157,32 +144,9 @@ export function LiveStreamManager({ streams, canWrite, canDelete, available }: {
               <Check id="ls-audio" label="Audio only" hint="Broadcast sound without video" checked={audioOnly} onChange={setAudioOnly} />
             </div>
 
-            <div className="space-y-3">
-              <div>
-                <p className="text-sm font-medium">Also send to YouTube, Facebook and more (optional)</p>
-                <p className="text-xs text-muted-foreground">Copy the stream address and key from the platform. They are kept private to your team.</p>
-              </div>
-              {outputs.map((o, i) => (
-                <div key={i} className="grid gap-2 rounded-lg border border-border p-3 sm:grid-cols-[8rem_1fr_1fr_auto]">
-                  <Input value={o.name} maxLength={40} aria-label="Name" onChange={(e) => setOutput(i, { name: e.target.value })} />
-                  <Input value={o.url} placeholder="rtmp://…" aria-label="Stream address" onChange={(e) => setOutput(i, { url: e.target.value })} />
-                  <Input value={o.streamKey} type="password" placeholder="Stream key" aria-label="Stream key" autoComplete="off" onChange={(e) => setOutput(i, { streamKey: e.target.value })} />
-                  <Button type="button" variant="ghost" size="icon" onClick={() => setOutputs(outputs.filter((_, n) => n !== i))} aria-label="Remove">
-                    <Trash2 className="size-4" />
-                  </Button>
-                </div>
-              ))}
-              {outputs.length < MAX_OUTPUTS && (
-                <div className="flex flex-wrap gap-2">
-                  {PRESETS.map((p) => (
-                    <Button key={p.name} type="button" variant="outline" size="sm" onClick={() => addOutput(p)}>
-                      <Plus className="size-3.5" />
-                      {p.name}
-                    </Button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <p className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+              Members watch in the app. To also go live on YouTube or Facebook, send from OBS straight to them. The stream page explains how, once the stream is created.
+            </p>
 
             <Button type="button" onClick={create} disabled={pending || !title.trim()}>
               <Radio className="size-4" />

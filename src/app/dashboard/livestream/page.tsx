@@ -37,7 +37,7 @@ export default async function LiveStreamPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-3xl font-bold tracking-tight">Live stream</h1>
-        <p className="mt-1 text-muted-foreground">Broadcast your service. Members watch live inside the app, with chat, and you can also send it to YouTube or Facebook.</p>
+        <p className="mt-1 text-muted-foreground">Broadcast your service. Members watch live inside the app, with chat, and from OBS you can also go live on YouTube or Facebook yourself.</p>
         <Button className="mt-3" variant="outline" size="sm" nativeButton={false} render={<Link href="/dashboard/livestream/projection" />}>
           <BookOpen className="size-4" />
           Verse projection

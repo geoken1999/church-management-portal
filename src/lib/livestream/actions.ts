@@ -5,7 +5,7 @@ import { requireUser, getProfile } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { cleanOutputs, cleanSettings } from "@/lib/livestream/validation";
+import { cleanSettings } from "@/lib/livestream/validation";
 import { createLiveStream, endLiveStream, goLive, countViewers, getStreamHealth } from "@/lib/livestream/service";
 import type { StreamHealth } from "@/lib/livestream/health-assess";
 import { roomRecordings } from "@/lib/livestream/videosdk";
@@ -21,7 +21,7 @@ export interface StreamResult {
   warning?: string;
 }
 
-export async function createLiveStreamAction(input: { title: string; description: string; outputs: unknown; settings: Record<string, unknown> }): Promise<StreamResult> {
+export async function createLiveStreamAction(input: { title: string; description: string; settings: Record<string, unknown> }): Promise<StreamResult> {
   const user = await requireUser();
   const membership = await requireOrganization();
   const organizationId = membership.organization.id;
@@ -30,8 +30,6 @@ export async function createLiveStreamAction(input: { title: string; description
 
   const title = input.title.trim().slice(0, 100);
   if (!title) return { error: "Give the live stream a title." };
-  const outputs = cleanOutputs(input.outputs);
-  if ("error" in outputs) return { error: outputs.error };
 
   const created = await createLiveStream({
     organizationId,
@@ -39,7 +37,7 @@ export async function createLiveStreamAction(input: { title: string; description
     title,
     description: input.description.trim().slice(0, 500) || null,
     settings: cleanSettings(input.settings),
-    outputs,
+    outputs: [],
   });
   if ("error" in created) return { error: created.error };
   revalidatePath(PATH);

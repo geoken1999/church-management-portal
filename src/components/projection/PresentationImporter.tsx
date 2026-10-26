@@ -3,61 +3,15 @@
 import { useRef, useState } from "react";
 import { FileUp, ImagePlus, Loader2 } from "lucide-react";
 import { savePresentationAction, saveItemAction, startSlideUploadAction } from "@/lib/projection/actions";
+import { drawPresentation, type Drawn } from "@/lib/projection/pptx-draw";
 import { extractSlideTexts } from "@/lib/projection/pptx-text";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-interface Drawn {
-  blob: Blob;
-  url: string;
-  text: string;
-}
-
 const MAX_WIDTH = 1920;
 const JPEG_QUALITY = 0.85;
-
-const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 60)));
-
-// Draws each slide of a .pptx in this browser and turns it into a picture. Done here, not on the server, because the
-// browser already has the fonts the deck was written with, and nothing has to be installed anywhere.
-async function drawPresentation(file: File, onProgress: (done: number, total: number) => void): Promise<Drawn[]> {
-  const buffer = await file.arrayBuffer();
-  const [{ init }, { toJpeg }, texts] = await Promise.all([import("pptx-preview"), import("html-to-image"), extractSlideTexts(buffer.slice(0)).catch(() => [] as string[])]);
-  const host = document.createElement("div");
-  host.style.cssText = "position:fixed;left:-10000px;top:0;width:1280px;height:720px;pointer-events:none;overflow:hidden";
-  document.body.appendChild(host);
-  try {
-    const previewer = init(host, { width: 1280, height: 720, mode: "slide" });
-    await previewer.preview(buffer);
-    const total = previewer.slideCount;
-    const drawn: Drawn[] = [];
-    for (let i = 0; i < total; i++) {
-      onProgress(i, total);
-      previewer.renderSingleSlide(i);
-      await frame();
-      const element = host.querySelector<HTMLElement>(".pptx-preview-slide-wrapper");
-      if (!element) throw new Error("A slide could not be drawn.");
-      const width = element.offsetWidth || 1280;
-      const height = element.offsetHeight || 720;
-      const url = await toJpeg(element, {
-        quality: JPEG_QUALITY,
-        pixelRatio: 1,
-        width,
-        height,
-        backgroundColor: "#ffffff",
-        // The previewer places a slide with its own offsets; the picture must start at the slide's corner.
-        style: { position: "relative", top: "0", left: "0", margin: "0", transform: "none" },
-      });
-      drawn.push({ blob: await (await fetch(url)).blob(), url, text: texts[i] ?? "" });
-    }
-    onProgress(total, total);
-    return drawn;
-  } finally {
-    host.remove();
-  }
-}
 
 // A picture file, scaled down to a sensible size and saved as a JPEG.
 async function drawImageFile(file: File): Promise<Drawn> {
@@ -73,7 +27,7 @@ async function drawImageFile(file: File): Promise<Drawn> {
   context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY));
   if (!blob) throw new Error("Couldn't prepare that picture.");
-  return { blob, url: URL.createObjectURL(blob), text: "" };
+  return { blob, url: URL.createObjectURL(blob), text: "", width: canvas.width, height: canvas.height };
 }
 
 const naturalCompare = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
@@ -98,7 +52,7 @@ export function PresentationImporter({ onDone }: { onDone: () => void }) {
         setTitle(first.name.replace(/\.pptx$/i, ""));
         setPptxFile(first);
         setBusy("Drawing the slides… this can take a minute for a long presentation.");
-        setSlides(await drawPresentation(first, (done, total) => setBusy(`Drawing slide ${Math.min(done + 1, total)} of ${total}…`)));
+        setSlides(await drawPresentation(await first.arrayBuffer(), (done, total) => setBusy(`Drawing slide ${Math.min(done + 1, total)} of ${total}…`)));
       } else if (list.every((f) => f.type.startsWith("image/"))) {
         setTitle(list.length === 1 ? first.name.replace(/\.[a-z0-9]+$/i, "") : "");
         setBusy("Preparing the pictures…");

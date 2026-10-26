@@ -43,7 +43,7 @@ function Meter({
 }
 
 // This month's K-Connect minutes: the video and audio pools of the plan, any minutes bought on top, and a way
-// to buy more. Live classes and live stream rooms use the same minutes.
+// to buy more. Live classes use the same minutes; live streams do not.
 export function KmeetMinutesCard({
   minutes,
   canBuy,
@@ -87,8 +87,8 @@ export function KmeetMinutesCard({
           />
         </div>
         <p className="text-xs text-muted-foreground">
-          Meetings, Bible School live classes and live streams all use these
-          minutes, which start again at the beginning of each month.
+          Meetings and Bible School live classes use these minutes, which start
+          again at the beginning of each month. Live streams don&apos;t use them.
           {minutes.extraBought > 0
             ? ` You also bought ${minutesLabel(minutes.extraBought)} this month, used once your plan minutes run out (${minutesLabel(minutes.extraLeft)} left); they end with the month.`
             : ""}

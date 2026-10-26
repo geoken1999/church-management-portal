@@ -15,6 +15,7 @@ import {
   type CallRecord,
   type MinutesSummary,
 } from "@/lib/kmeet/minutes";
+import { streamRoomIds } from "@/lib/kmeet/stream-rooms";
 import type { KmeetMode } from "@/types/database";
 
 /** "2025-03" for the church's current month. */
@@ -57,12 +58,14 @@ export async function getKmeetMinutes(
 
   const { data: calls } = await admin
     .from("kmeet_meetings")
-    .select("mode, started_at, ended_at")
+    .select("id, mode, started_at, ended_at")
     .eq("organization_id", organizationId)
     .not("started_at", "is", null)
     .lt("started_at", to.toISOString())
     .or(`ended_at.is.null,ended_at.gte.${from.toISOString()}`);
-  const records: CallRecord[] = (calls ?? []).map((c) => ({
+  // Live streams are not metered: their rooms don't count as K-Connect call time.
+  const streamRooms = await streamRoomIds((calls ?? []).map((c) => c.id));
+  const records: CallRecord[] = (calls ?? []).filter((c) => !streamRooms.has(c.id)).map((c) => ({
     mode: c.mode,
     startedAt: c.started_at,
     endedAt: c.ended_at,

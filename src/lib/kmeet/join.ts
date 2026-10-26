@@ -6,6 +6,7 @@ import { endIdleMeetings } from "@/lib/kmeet/idle";
 import { minutesAvailableFor } from "@/lib/kmeet/minutes-service";
 import { NO_MINUTES_MESSAGE } from "@/lib/kmeet/minutes";
 import { notifyCallStarted } from "@/lib/kmeet/notify";
+import { streamRoomIds } from "@/lib/kmeet/stream-rooms";
 import type { KmeetMode } from "@/types/database";
 
 // A moderator (anyone with write access to the kmeet tab — same bar as
@@ -53,7 +54,8 @@ export async function resolveMeetingRoom(
 
   let roomId = meeting.room_id;
   let startedAt = meeting.started_at;
-  let maxDurationMinutes = meeting.max_duration_minutes;
+  // A live stream's room has no time limit (a stream made before that was the rule may still carry one).
+  let maxDurationMinutes = (await streamRoomIds([meetingId])).has(meetingId) ? null : meeting.max_duration_minutes;
 
   if (!roomId) {
     // The call may run for the minutes the church has left this month; none left means it cannot start.

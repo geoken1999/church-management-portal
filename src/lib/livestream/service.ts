@@ -3,8 +3,6 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createVideoSdkRoom } from "@/lib/kmeet/client";
 import { isVideoSdkConfigured } from "@/lib/kmeet/env";
-import { minutesAvailableFor } from "@/lib/kmeet/minutes-service";
-import { NO_MINUTES_MESSAGE } from "@/lib/kmeet/minutes";
 import {
   isLiveStreamEnabled,
   LIVE_STREAM_NOT_ENABLED,
@@ -48,10 +46,7 @@ export async function createLiveStream(input: {
     };
   const admin = createAdminClient();
 
-  // A live stream's room is a video call: it uses the church's K-Connect video minutes for the month.
-  const minutesLeft = await minutesAvailableFor(input.organizationId, "video");
-  if (minutesLeft === 0) return { error: NO_MINUTES_MESSAGE("video") };
-
+  // A stream's room is not metered: it doesn't use the church's K-Connect minutes and has no time limit.
   let roomId: string;
   try {
     roomId = await createVideoSdkRoom();
@@ -74,7 +69,7 @@ export async function createLiveStream(input: {
       require_admission: true,
       started_at: now,
       last_active_at: now,
-      max_duration_minutes: minutesLeft,
+      max_duration_minutes: null,
       mode: "video",
       created_by: input.userId,
     })

@@ -2,6 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { endStreamsForMeetings } from "@/lib/livestream/service";
+import { streamRoomIds } from "@/lib/kmeet/stream-rooms";
 
 // A live call that nobody has been connected to for this long is ended.
 export const IDLE_END_MINUTES = 3;
@@ -47,8 +48,11 @@ export async function endIdleMeetings(organizationId?: string): Promise<void> {
   if (organizationId)
     liveQuery = liveQuery.eq("organization_id", organizationId);
   const { data: live } = await liveQuery;
+  // A live stream's room has no time limit, even if it was created with one.
+  const streamRooms = await streamRoomIds((live ?? []).map((m) => m.id));
   const overrun = (live ?? []).filter(
     (m) =>
+      !streamRooms.has(m.id) &&
       new Date(m.started_at as string).getTime() +
         (m.max_duration_minutes as number) * 60_000 +
         OVERRUN_GRACE_MS <

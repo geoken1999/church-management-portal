@@ -1,5 +1,5 @@
 // K-Connect is sold as minutes per calendar month, not as a cap on one call. The plan gives a pool for video
-// and a pool for audio (live classes and live-stream rooms are calls too, so they use the same pools). Minutes
+// and a pool for audio (live classes are calls too, so they use the same pools; live streams are not metered and never use them). Minutes
 // bought on top are one shared pool that is used once a plan pool runs out, and they too last only for the
 // month they were bought in. Everything here is pure so it can be tested; the database reads are in
 // minutes-service.ts.

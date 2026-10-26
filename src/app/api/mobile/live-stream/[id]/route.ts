@@ -2,6 +2,7 @@ import { after, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { publicStream, requireStreamMember } from "@/lib/livestream/mobile";
 import { reportViewer } from "@/lib/livestream/service";
+import { viewerSlide } from "@/lib/projection/service";
 import type { LiveStream } from "@/types/database";
 
 // Polled every few seconds while a member watches: counts them as a viewer and
@@ -59,11 +60,13 @@ export async function GET(
     buffering: q.get("buffering") === "1",
     resolution: q.get("res"),
   };
-  const [report, chat] = await Promise.all([
+  const [report, chat, projected] = await Promise.all([
     stream.status === "live"
       ? reportViewer(id, member.authUserId, metrics, stream.peak_viewers)
       : Promise.resolve(null),
     stream.chat_enabled ? messagesQuery() : Promise.resolve(null),
+    // The verse or song words on the church's projector, shown under the video while the stream is live.
+    stream.status === "live" ? viewerSlide(member.organizationId) : Promise.resolve(null),
   ]);
   if (report) after(report.save);
 
@@ -82,5 +85,6 @@ export async function GET(
     stream: publicStream(stream),
     viewers: report?.count ?? 0,
     messages,
+    projection: projected ? { title: projected.slide.title, text: projected.slide.text, footer: projected.slide.footer, kind: projected.slide.kind, at: projected.updatedAt } : null,
   });
 }

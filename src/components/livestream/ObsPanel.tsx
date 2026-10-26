@@ -100,6 +100,9 @@ export function ObsPanel({ streamId, whipUrl, initialKey, connected }: { streamI
               In the main window add your sources: <strong>Video Capture Device</strong> for a camera, <strong>Audio Input Capture</strong> for a microphone, and <strong>Window Capture</strong> or <strong>Media Source</strong> for slides or songs. Check the audio meters move.
             </li>
             <li>
+              To put Bible verses and song words on the video, open <strong>Verse projection</strong> (button at the top of this page), copy the <strong>OBS browser source</strong> link, and in OBS add a <strong>Browser</strong> source with that address, width <strong>1280</strong> and height <strong>720</strong> (match your canvas). Choose <strong>Lower third</strong> in the console for a bar over the picture, or <strong>Full screen</strong> to fill it.
+            </li>
+            <li>
               Press <strong>Start Streaming</strong>. This page shows <strong>OBS connected</strong> within a few seconds.
             </li>
             <li>

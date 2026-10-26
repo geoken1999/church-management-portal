@@ -318,6 +318,31 @@ export type MemberProfileUpdateRequest = {
   updated_at: string;
 };
 
+export type ProjectionSlide = { kind: "bible" | "song" | "announcement" | "custom"; title: string; text: string; footer: string };
+export type ProjectionTheme = { background?: string; color?: string; font?: "sans" | "serif" };
+export type ProjectionScreen = {
+  id: string;
+  organization_id: string;
+  token: string;
+  visible: boolean;
+  mode: "full" | "lower_third";
+  slide: ProjectionSlide | null;
+  theme: ProjectionTheme;
+  updated_at: string;
+};
+export type ProjectionItem = {
+  id: string;
+  organization_id: string;
+  kind: "song" | "announcement" | "custom";
+  title: string;
+  body: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+export type BibleTranslation = { id: string; organization_id: string; code: string; name: string; created_at: string };
+export type BibleCustomVerse = { translation_id: string; book: number; chapter: number; verse: number; text: string };
+
 export type VisitorPass = {
   id: string;
   organization_id: string;
@@ -2903,6 +2928,30 @@ export type Database = {
         Row: PlatformInvestment;
         Insert: Partial<PlatformInvestment> & Pick<PlatformInvestment, "invested_on" | "amount" | "investor">;
         Update: Partial<PlatformInvestment>;
+        Relationships: [];
+      };
+      projection_screens: {
+        Row: ProjectionScreen;
+        Insert: Partial<ProjectionScreen> & Pick<ProjectionScreen, "organization_id">;
+        Update: Partial<ProjectionScreen>;
+        Relationships: [];
+      };
+      projection_items: {
+        Row: ProjectionItem;
+        Insert: Partial<ProjectionItem> & Pick<ProjectionItem, "organization_id" | "kind" | "title" | "body">;
+        Update: Partial<ProjectionItem>;
+        Relationships: [];
+      };
+      bible_translations: {
+        Row: BibleTranslation;
+        Insert: Partial<BibleTranslation> & Pick<BibleTranslation, "organization_id" | "code" | "name">;
+        Update: Partial<BibleTranslation>;
+        Relationships: [];
+      };
+      bible_custom_verses: {
+        Row: BibleCustomVerse;
+        Insert: Partial<BibleCustomVerse> & Pick<BibleCustomVerse, "translation_id" | "book" | "chapter" | "verse" | "text">;
+        Update: Partial<BibleCustomVerse>;
         Relationships: [];
       };
       visitor_passes: {

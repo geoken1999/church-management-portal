@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { Radio, Square, ExternalLink, Send, Users, Film } from "lucide-react";
+import Link from "next/link";
+import { Radio, Square, ExternalLink, Send, Users, Film, BookOpen } from "lucide-react";
 import { endStreamAndRoomAction, getLiveStateAction, getRecordingsAction, goLiveAction, sendHostChatAction, type LiveState } from "@/lib/livestream/actions";
 import type { LiveStream } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -93,6 +94,13 @@ export function LiveStudio({ stream, canWrite, whipUrl }: { stream: LiveStream; 
           {stream.record && " · recording"}
           {stream.rtmp_outputs.length > 0 && ` · also to ${stream.rtmp_outputs.map((o) => o.name).join(", ")}`}
         </p>
+      </div>
+
+      <div>
+        <Button type="button" variant="outline" size="sm" nativeButton={false} render={<Link href="/dashboard/livestream/projection" />}>
+          <BookOpen className="size-4" />
+          Verse projection
+        </Button>
       </div>
 
       <ErrorToast message={notice?.kind === "error" ? notice.text : null} />

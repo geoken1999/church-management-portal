@@ -327,6 +327,7 @@ export type ExternalLiveStream = {
   started_at: string;
   ended_at: string | null;
   notified_at: string | null;
+  last_checked_at: string | null;
   created_by: string | null;
 };
 

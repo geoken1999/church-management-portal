@@ -44,6 +44,7 @@ export function ExternalLivePanel({ active, canWrite }: { active: { title: strin
               <span className="font-medium">{active.title}</span> is showing to members as live on {PLATFORM_NAMES[active.platform]}.
             </p>
             <p className="break-all text-xs text-muted-foreground">{active.url}</p>
+            <p className="text-xs text-muted-foreground">A YouTube stream is removed from the app by itself soon after it ends on YouTube. Press the button to remove it sooner, or for a Facebook stream.</p>
             {canWrite && (
               <Button type="button" variant="destructive" disabled={pending} onClick={() => run(endExternalLiveAction)}>
                 <Square className="size-4" />

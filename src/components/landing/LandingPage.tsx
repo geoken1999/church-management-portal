@@ -378,7 +378,7 @@ const FAQS = [
   {
     question: "Can we live stream our service to members?",
     answer:
-      "Yes. Live streaming plays inside the app, with live chat and a viewer count, and you can go live from a camera or from OBS using a stream key, and also send it to YouTube or Facebook. It isn't switched on by default: use Contact us to enable on the Live stream page and we will set it up with you.",
+      "Yes. Every church on Growth or Pro can go live on YouTube or Facebook from OBS, with step-by-step instructions in the Live stream tab. Streaming inside the app, with live chat and a viewer count, is switched on by request: use Request in-app streaming on the Live stream page and we will set it up with you. Starter can add Live stream as a module.",
   },
   {
     question: "Can we make a report for our church board in Tamil or Hindi?",

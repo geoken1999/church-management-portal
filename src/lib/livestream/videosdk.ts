@@ -46,8 +46,8 @@ export async function startHls(roomId: string, stream: Parameters<typeof hlsConf
   return { playbackUrl: typeof url === "string" ? url : null };
 }
 
-export async function stopHls(roomId: string): Promise<void> {
-  await call("/hls/end", { method: "POST", body: { roomId } });
+export async function stopHls(roomId: string): Promise<boolean> {
+  return (await call("/hls/end", { method: "POST", body: { roomId } })).ok;
 }
 
 // The playback link of the HLS currently running in a room, if VideoSDK has one yet.
@@ -70,8 +70,8 @@ export async function startRtmp(roomId: string, outputs: { url: string; streamKe
   return r.ok ? {} : { error: reason(r) };
 }
 
-export async function stopRtmp(roomId: string): Promise<void> {
-  await call("/livestreams/end", { method: "POST", body: { roomId } });
+export async function stopRtmp(roomId: string): Promise<boolean> {
+  return (await call("/livestreams/end", { method: "POST", body: { roomId } })).ok;
 }
 
 // Recordings of a room (when "record" was on), newest first.
@@ -141,6 +141,6 @@ export async function roomUsage(roomId: string): Promise<{ participantSeconds: n
 
 // Closes a room's running session at the video service, so nobody stays connected (and counted)
 // after the church has ended it. Best effort: an already-empty room just says so.
-export async function endRoomSession(roomId: string): Promise<void> {
-  await call("/sessions/end", { method: "POST", body: { roomId } }).catch(() => {});
+export async function endRoomSession(roomId: string): Promise<boolean> {
+  return (await call("/sessions/end", { method: "POST", body: { roomId } }).catch(() => null))?.ok ?? false;
 }

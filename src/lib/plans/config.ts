@@ -292,6 +292,9 @@ function planTabDefault(base: PlanLimits, tab: TabKey): boolean {
   if (FINANCE_TABS.includes(tab)) return base.financeEnabled;
   if (SOCIAL_TABS.includes(tab)) return base.socialMediaEnabled;
   if (tab === "automations") return base.automationLimit !== 0;
+  // Growth and Pro include Live stream (the Instructions for going live on YouTube or Facebook from OBS, Verse
+  // projection, and a request for in-app streaming). Starter can add it as a module of its own.
+  if (tab === "livestream") return base.id !== "basic";
   return true;
 }
 

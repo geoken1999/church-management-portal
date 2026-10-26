@@ -3,14 +3,12 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getLiveStreamAccess } from "@/lib/livestream/access";
 import { listTranslations } from "@/lib/projection/bible";
 import { ensureScreen } from "@/lib/projection/service";
 import { cleanTheme } from "@/lib/projection/theme";
 import { presentationSlides } from "@/lib/projection/slides";
 import { getSiteUrl } from "@/lib/site-url";
 import { ProjectionConsole, type ConsoleItem } from "@/components/projection/ProjectionConsole";
-import { LiveStreamLocked } from "@/components/livestream/LiveStreamLocked";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 import { Button } from "@/components/ui/button";
 import type { ProjectionItem } from "@/types/database";
@@ -24,16 +22,6 @@ export default async function ProjectionPage() {
   const access = membership.tabAccess.livestream;
   if (!access.read) return <AccessRestricted label="Live stream" />;
   const organizationId = membership.organization.id;
-
-  const live = await getLiveStreamAccess(organizationId);
-  if (!live.enabled) {
-    return (
-      <div className="space-y-6">
-        <h1 className="font-heading text-3xl font-bold tracking-tight">Verse projection</h1>
-        <LiveStreamLocked requestedAt={live.requestedAt} canRequest={membership.role === "owner" || membership.role === "admin"} />
-      </div>
-    );
-  }
 
   const [screen, translations, { data: items }, { data: custom }] = await Promise.all([
     ensureScreen(organizationId),

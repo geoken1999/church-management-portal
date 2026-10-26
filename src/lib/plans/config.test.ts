@@ -299,3 +299,18 @@ describe("modules paid for on their own", () => {
     expect(custom.automationLimit).toBeNull();
   });
 });
+
+describe("the Live stream tab", () => {
+  it("is included from Growth up, and not on Starter", () => {
+    expect(resolveTabStates("basic", null).livestream).toBe(false);
+    expect(resolveTabStates("premium", null).livestream).toBe(true);
+    expect(resolveTabStates("pro", null).livestream).toBe(true);
+  });
+  it("opens on Starter when the church pays for the module", () => {
+    expect(resolveTabStates("basic", null, ["livestream"]).livestream).toBe(true);
+    expect(tabsOfModule("livestream")).toEqual(["livestream"]);
+  });
+  it("can still be switched off for one church", () => {
+    expect(resolveTabStates("pro", { ...PLANS.pro, tabOverrides: { livestream: false } } as never).livestream).toBe(false);
+  });
+});

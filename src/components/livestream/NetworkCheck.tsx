@@ -39,7 +39,7 @@ async function measure(): Promise<NetResult> {
 }
 
 // Tests this computer's connection, and says whether it can carry the stream's quality.
-export function NetworkCheck({ quality }: { quality: "low" | "med" | "high" }) {
+export function NetworkCheck({ quality, description }: { quality: "low" | "med" | "high"; description?: string }) {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<NetResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +68,7 @@ export function NetworkCheck({ quality }: { quality: "low" | "med" | "high" }) {
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          Run this on the computer you will broadcast from, at the venue, before you go live. This stream is set to {QUALITY_NEEDS[quality].label}, which needs about {QUALITY_NEEDS[quality].needMbps} Mbps of upload.
+          {description ?? `Run this on the computer you will broadcast from, at the venue, before you go live. This stream is set to ${QUALITY_NEEDS[quality].label}, which needs about ${QUALITY_NEEDS[quality].needMbps} Mbps of upload.`}
         </p>
         <Button type="button" variant="outline" size="sm" disabled={running} onClick={run}>
           {running ? <Loader2 className="size-3.5 animate-spin" /> : <Gauge className="size-3.5" />}

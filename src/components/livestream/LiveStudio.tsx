@@ -56,7 +56,11 @@ export function LiveStudio({ stream, canWrite, whipUrl }: { stream: LiveStream; 
       try {
         const result = await fn();
         if (result.error) setNotice({ kind: "error", text: result.error });
-        else if (result.warning) setNotice({ kind: "info", text: result.warning });
+        else {
+          // Ending is final, so show it at once instead of waiting for the next refresh.
+          if (kind === "end") setState((s) => ({ ...s, status: "ended", ingestActive: false }));
+          if (result.warning) setNotice({ kind: "info", text: result.warning });
+        }
       } catch {
         setNotice({ kind: "error", text: "Something went wrong. Please try again." });
       } finally {

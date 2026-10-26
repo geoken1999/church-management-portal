@@ -7,7 +7,6 @@ import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isLiveStreamEnabled, LIVE_STREAM_NOT_ENABLED } from "@/lib/livestream/access";
 import { lookupPassage, searchVerses, type VerseHit } from "@/lib/projection/bible";
 import { MAX_IMPORT_VERSES, parseVerseLines } from "@/lib/projection/import";
 import { updateScreen } from "@/lib/projection/service";
@@ -31,7 +30,6 @@ async function gate(level: "read" | "write"): Promise<{ organizationId: string; 
   const organizationId = membership.organization.id;
   const access = await checkTabAccess(organizationId, "livestream", level);
   if (!access.ok) return { error: access.message };
-  if (!(await isLiveStreamEnabled(organizationId))) return { error: LIVE_STREAM_NOT_ENABLED };
   return { organizationId, userId: user.id };
 }
 

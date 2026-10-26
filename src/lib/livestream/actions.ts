@@ -6,10 +6,9 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cleanSettings } from "@/lib/livestream/validation";
-import { createLiveStream, endLiveStream, goLive, countViewers, getStreamHealth } from "@/lib/livestream/service";
+import { createLiveStream, endLiveStream, endStreamQuick, goLive, countViewers, getStreamHealth } from "@/lib/livestream/service";
 import type { StreamHealth } from "@/lib/livestream/health-assess";
 import { roomRecordings } from "@/lib/livestream/videosdk";
-import { endStreamsForMeetings } from "@/lib/livestream/service";
 import type { LiveStreamMessage } from "@/types/database";
 
 const PATH = "/dashboard/livestream";
@@ -71,12 +70,9 @@ export async function endStreamAndRoomAction(streamId: string): Promise<StreamRe
   const organizationId = membership.organization.id;
   const access = await checkTabAccess(organizationId, "livestream", "write");
   if (!access.ok) return { error: access.message };
-  const admin = createAdminClient();
-  const { data: stream } = await admin.from("live_streams").select("meeting_id").eq("id", streamId).eq("organization_id", organizationId).maybeSingle();
-  if (!stream) return { error: "That live stream could not be found." };
-  await endLiveStream(organizationId, streamId);
-  const { data: meeting } = await admin.from("kmeet_meetings").update({ status: "ended", ended_at: new Date().toISOString() }).eq("id", stream.meeting_id).select("id, room_id").maybeSingle();
-  if (meeting) await endStreamsForMeetings([meeting]);
+  // Marks the stream and its room ended at once and stops the broadcast at the video service after replying.
+  const result = await endStreamQuick(organizationId, streamId);
+  if (result.error) return result;
   revalidatePath(PATH);
   return {};
 }

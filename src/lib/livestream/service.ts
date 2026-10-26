@@ -1,5 +1,6 @@
 import "server-only";
 
+import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createVideoSdkRoom } from "@/lib/kmeet/client";
 import { isVideoSdkConfigured } from "@/lib/kmeet/env";
@@ -8,6 +9,7 @@ import {
   LIVE_STREAM_NOT_ENABLED,
 } from "@/lib/livestream/access";
 import { sendPushToUsers } from "@/lib/push/client";
+import { logPlatformEvent } from "@/lib/platform-events/log";
 import { resolveAudienceAuthIds } from "@/lib/push/audience";
 import {
   endRoomSession,
@@ -195,6 +197,48 @@ export async function endLiveStream(
       ingest_session: null,
     })
     .eq("id", streamId);
+}
+
+// Ends a stream from its page. The stream and its room are marked ended at once, so the button answers straight away and
+// viewers see it end; the calls that stop the broadcast at the video service (each a round trip to another country) run
+// after the reply has gone, side by side, and are tried once more if one is refused. Anything still refused is logged so
+// a broadcast left running does not go unnoticed.
+export async function endStreamQuick(organizationId: string, streamId: string): Promise<{ error?: string }> {
+  const loaded = await loadStream(organizationId, streamId);
+  if (!loaded) return { error: "That live stream could not be found." };
+  const { stream, roomId } = loaded;
+  const alreadyEnded = stream.status === "ended" && loaded.meetingStatus === "ended";
+  if (alreadyEnded) return {};
+
+  const now = new Date().toISOString();
+  const admin = createAdminClient();
+  await Promise.all([
+    admin.from("live_streams").update({ status: "ended", ended_at: stream.ended_at ?? now, ingest_active: false, ingest_session: null }).eq("id", streamId),
+    admin.from("kmeet_meetings").update({ status: "ended", ended_at: now }).eq("id", stream.meeting_id).neq("status", "ended"),
+  ]);
+
+  const wasLive = stream.status === "live";
+  const hadRelay = stream.rtmp_outputs.length > 0;
+  after(async () => {
+    const attempt = async () => {
+      const tasks: [string, Promise<boolean>][] = [];
+      if (roomId && wasLive) tasks.push(["stop the broadcast", stopHls(roomId)]);
+      if (roomId && wasLive && hadRelay) tasks.push(["stop the relay", stopRtmp(roomId)]);
+      if (roomId) tasks.push(["close the room", endRoomSession(roomId)]);
+      const results = await Promise.allSettled(tasks.map(([, task]) => task));
+      return tasks.filter((_, i) => !(results[i].status === "fulfilled" && (results[i] as PromiseFulfilledResult<boolean>).value)).map(([name]) => name);
+    };
+    const ingest = stream.ingest_session ? whipEnd(stream.ingest_session) : Promise.resolve();
+    let failed = await attempt();
+    if (failed.length > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      failed = await attempt();
+    }
+    await ingest;
+    if (failed.length > 0)
+      await logPlatformEvent({ level: "warning", source: "platform_admin", message: `Live stream ended, but the video service did not confirm it could ${failed.join(" or ")}. Check VideoSDK for a room left open.`, organizationId, metadata: { streamId, roomId } });
+  });
+  return {};
 }
 
 // Called when K-Connect rooms end (by the host or for being empty): their streams end too.

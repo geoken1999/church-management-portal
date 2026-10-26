@@ -22,6 +22,17 @@ export function SlideView({
 
   if (!slide) return <div style={{ ...root, background: transparent || mode === "lower_third" ? "transparent" : t.background }} />;
 
+  // A PowerPoint slide is a picture, and always fills the whole screen, whatever the mode: a lower-third bar has no
+  // place for a song slide that was designed as a full page.
+  if (slide.image) {
+    return (
+      <div style={{ ...root, background: transparent ? "transparent" : "#000", position: "relative" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img key={slide.image} src={slide.image} alt={slide.text} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", animation: "pv-fade 0.25s ease-out" }} />
+      </div>
+    );
+  }
+
   const size = fontScale(slide.text.length, mode);
   const label = slide.kind === "bible" ? slide.title : slide.title;
 

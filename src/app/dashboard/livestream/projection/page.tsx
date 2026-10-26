@@ -7,8 +7,9 @@ import { getLiveStreamAccess } from "@/lib/livestream/access";
 import { listTranslations } from "@/lib/projection/bible";
 import { ensureScreen } from "@/lib/projection/service";
 import { cleanTheme } from "@/lib/projection/theme";
+import { presentationSlides } from "@/lib/projection/slides";
 import { getSiteUrl } from "@/lib/site-url";
-import { ProjectionConsole } from "@/components/projection/ProjectionConsole";
+import { ProjectionConsole, type ConsoleItem } from "@/components/projection/ProjectionConsole";
 import { LiveStreamLocked } from "@/components/livestream/LiveStreamLocked";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,19 @@ export default async function ProjectionPage() {
     createAdminClient().from("bible_translations").select("id").eq("organization_id", organizationId),
   ]);
   const customIds = new Set((custom ?? []).map((c) => c.id));
+  // A presentation's slides are stored pictures; the console gets them as ready-to-show slides.
+  const slideStore = createAdminClient().storage.from("projection-slides");
+  const consoleItems: ConsoleItem[] = ((items ?? []) as ProjectionItem[]).map((item) =>
+    item.kind === "presentation"
+      ? {
+          ...item,
+          imageSlides: presentationSlides(
+            item.title,
+            (item.slide_images ?? []).map((s) => ({ url: slideStore.getPublicUrl(s.path).data.publicUrl, text: s.text })),
+          ),
+        }
+      : item,
+  );
 
   return (
     <div className="space-y-6">
@@ -57,7 +71,7 @@ export default async function ProjectionPage() {
         token={screen.token}
         siteUrl={getSiteUrl()}
         initial={{ visible: screen.visible, mode: screen.mode, slide: screen.slide, theme: cleanTheme(screen.theme) }}
-        items={(items ?? []) as ProjectionItem[]}
+        items={consoleItems}
         translations={translations.map((t) => ({ key: t.key, name: t.name, customId: t.key.startsWith("custom:") && customIds.has(t.key.slice(7)) ? t.key.slice(7) : undefined }))}
         canWrite={access.write}
       />

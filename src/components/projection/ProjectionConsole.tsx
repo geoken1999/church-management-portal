@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { BookOpen, ChevronLeft, ChevronRight, Copy, EyeOff, ExternalLink, ListPlus, Monitor, MonitorOff, Music, Plus, Search, Trash2, X } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, Copy, EyeOff, ExternalLink, FileUp, ListPlus, Monitor, MonitorOff, Music, Plus, Search, Trash2, X } from "lucide-react";
 import {
   deleteItemAction,
   deleteTranslationAction,
@@ -21,12 +21,16 @@ import { withDefaults } from "@/lib/projection/theme";
 import type { VerseHit } from "@/lib/projection/bible";
 import type { ProjectionItem, ProjectionSlide, ProjectionTheme } from "@/types/database";
 import { SlideView } from "@/components/projection/SlideView";
+import { PresentationImporter } from "@/components/projection/PresentationImporter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ErrorToast } from "@/components/ui/error-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+
+/** A library item; a presentation also carries its slides as pictures, ready to show. */
+export type ConsoleItem = ProjectionItem & { imageSlides?: Slide[] };
 
 export interface ConsoleTranslation {
   key: string;
@@ -58,7 +62,7 @@ export function ProjectionConsole({
   token: string;
   siteUrl: string;
   initial: ScreenState;
-  items: ProjectionItem[];
+  items: ConsoleItem[];
   translations: ConsoleTranslation[];
   canWrite: boolean;
 }) {
@@ -257,9 +261,13 @@ function SlideButtons({ slides, active, canWrite, onProject, onQueue }: { slides
     <div className="space-y-2">
       {slides.map((slide, i) => (
         <div key={i} className={`flex items-start gap-2 rounded-lg border p-3 ${i === active ? "border-primary bg-primary/5" : "border-border"}`}>
+          {slide.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={slide.image} alt={slide.text} className="h-16 w-28 shrink-0 rounded border border-border object-cover" loading="lazy" />
+          ) : null}
           <div className="min-w-0 flex-1 text-sm">
             <p className="font-medium">{slide.title}</p>
-            <p className="line-clamp-4 whitespace-pre-line text-muted-foreground">{slide.text}</p>
+            <p className="line-clamp-4 whitespace-pre-line text-muted-foreground">{slide.image ? `${slide.footer}${slide.text && !slide.text.startsWith("Slide ") ? ` · ${slide.text}` : ""}` : slide.text}</p>
           </div>
           <div className="flex shrink-0 flex-col gap-1.5">
             {canWrite && (
@@ -419,13 +427,14 @@ function LibraryPanel({
   onQueue,
   run,
 }: {
-  items: ProjectionItem[];
+  items: ConsoleItem[];
   canWrite: boolean;
   onProject: (slide: Slide) => void;
   onQueue: (slides: Slide[]) => void;
   run: (task: () => Promise<{ error?: string }>) => void;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
   const [editing, setEditing] = useState<{ id?: string; kind: "song" | "announcement" | "custom"; title: string; body: string } | null>(null);
 
   if (editing) {
@@ -466,23 +475,30 @@ function LibraryPanel({
     );
   }
 
+  if (importing) return <PresentationImporter onDone={() => setImporting(false)} />;
+
   return (
     <div className="space-y-3">
       {canWrite && (
-        <Button type="button" size="sm" onClick={() => setEditing({ kind: "song", title: "", body: "" })}>
-          <Plus className="size-4" /> New song or announcement
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" onClick={() => setEditing({ kind: "song", title: "", body: "" })}>
+            <Plus className="size-4" /> New song or announcement
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => setImporting(true)}>
+            <FileUp className="size-4" /> Add a PowerPoint
+          </Button>
+        </div>
       )}
       {items.length === 0 && <p className="text-sm text-muted-foreground">Nothing here yet. Add the songs and announcements you project, then show them a slide at a time.</p>}
       {items.map((item) => {
-        const slides = itemSlides(item.kind, item.title, item.body);
+        const slides = item.kind === "presentation" ? (item.imageSlides ?? []) : itemSlides(item.kind, item.title, item.body);
         return (
           <div key={item.id} className="rounded-lg border border-border">
             <div className="flex items-center gap-2 p-3">
               <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setOpenId(openId === item.id ? null : item.id)}>
                 <span className="block truncate font-medium">{item.title}</span>
                 <span className="text-xs text-muted-foreground">
-                  {item.kind === "song" ? "Song" : item.kind === "announcement" ? "Announcement" : "Slide"} · {slides.length} slide{slides.length === 1 ? "" : "s"}
+                  {item.kind === "song" ? "Song" : item.kind === "announcement" ? "Announcement" : item.kind === "presentation" ? "Presentation" : "Slide"} · {slides.length} slide{slides.length === 1 ? "" : "s"}
                 </span>
               </button>
               <Button type="button" size="sm" variant="outline" aria-label="Add all slides to order of service" onClick={() => onQueue(slides)}>
@@ -490,9 +506,11 @@ function LibraryPanel({
               </Button>
               {canWrite && (
                 <>
-                  <Button type="button" size="sm" variant="outline" onClick={() => setEditing({ id: item.id, kind: item.kind, title: item.title, body: item.body })}>
-                    Edit
-                  </Button>
+                  {item.kind !== "presentation" && (
+                    <Button type="button" size="sm" variant="outline" onClick={() => setEditing({ id: item.id, kind: item.kind as "song" | "announcement" | "custom", title: item.title, body: item.body })}>
+                      Edit
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     size="icon-sm"

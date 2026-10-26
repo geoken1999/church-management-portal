@@ -85,6 +85,6 @@ export async function GET(
     stream: publicStream(stream),
     viewers: report?.count ?? 0,
     messages,
-    projection: projected ? { title: projected.slide.title, text: projected.slide.text, footer: projected.slide.footer, kind: projected.slide.kind, at: projected.updatedAt } : null,
+    projection: projected ? { title: projected.slide.title, text: projected.slide.text, footer: projected.slide.footer, kind: projected.slide.kind, image: projected.slide.image ?? null, at: projected.updatedAt } : null,
   });
 }

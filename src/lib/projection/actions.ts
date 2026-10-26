@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
+import { checkStorageQuota } from "@/lib/plans/dal";
 import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
@@ -15,6 +16,9 @@ import type { ProjectionSlide, ProjectionTheme } from "@/types/database";
 import type { Slide } from "@/lib/projection/slides";
 
 const PATH = "/dashboard/livestream/projection";
+const SLIDE_BUCKET = "projection-slides";
+const MAX_SLIDES = 150;
+const MAX_SLIDE_BYTES = 3 * 1024 * 1024;
 
 export interface ProjectionResult {
   error?: string;
@@ -45,18 +49,25 @@ export async function searchVersesAction(translation: string, text: string): Pro
   return Array.isArray(result) ? { hits: result } : { error: result.error };
 }
 
-const cleanSlide = (slide: Slide): ProjectionSlide | null => {
+// A slide's picture must be one stored for this feature: the projector page loads whatever address it is given, so
+// nothing else is allowed through.
+const slideImageBase = () => `${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/${SLIDE_BUCKET}/`;
+const ownSlideImage = (url: unknown, organizationId: string): string | undefined =>
+  typeof url === "string" && url.startsWith(`${slideImageBase()}${organizationId}/`) && !url.includes("..") && url.length < 300 ? url : undefined;
+
+const cleanSlide = (slide: Slide, organizationId: string): ProjectionSlide | null => {
   const text = String(slide.text ?? "").slice(0, 2000);
   if (!text.trim()) return null;
-  const kind = slide.kind === "bible" || slide.kind === "song" || slide.kind === "announcement" ? slide.kind : "custom";
-  return { kind, title: String(slide.title ?? "").slice(0, 120), text, footer: String(slide.footer ?? "").slice(0, 80) };
+  const kind = slide.kind === "bible" || slide.kind === "song" || slide.kind === "announcement" || slide.kind === "presentation" ? slide.kind : "custom";
+  const image = ownSlideImage(slide.image, organizationId);
+  return { kind: image ? "presentation" : kind === "presentation" ? "custom" : kind, title: String(slide.title ?? "").slice(0, 120), text, footer: String(slide.footer ?? "").slice(0, 80), ...(image ? { image } : {}) };
 };
 
 /** Puts a slide on the screen and makes the screen visible. */
 export async function showSlideAction(slide: Slide): Promise<ProjectionResult> {
   const g = await gate("write");
   if ("error" in g) return g;
-  const clean = cleanSlide(slide);
+  const clean = cleanSlide(slide, g.organizationId);
   if (!clean) return { error: "There is nothing to show on that slide." };
   await updateScreen(g.organizationId, { slide: clean, visible: true });
   return {};
@@ -120,7 +131,54 @@ export async function saveItemAction(input: ItemInput): Promise<ProjectionResult
 export async function deleteItemAction(id: string): Promise<ProjectionResult> {
   const g = await gate("write");
   if ("error" in g) return g;
-  await createAdminClient().from("projection_items").delete().eq("id", id).eq("organization_id", g.organizationId);
+  const admin = createAdminClient();
+  const { data: item } = await admin.from("projection_items").select("slide_images").eq("id", id).eq("organization_id", g.organizationId).maybeSingle();
+  await admin.from("projection_items").delete().eq("id", id).eq("organization_id", g.organizationId);
+  // The pictures of a presentation go with it, so they stop using the church's storage.
+  const paths = ((item?.slide_images as { path: string }[] | null) ?? []).map((s) => s.path).filter((p) => p.startsWith(`${g.organizationId}/`));
+  if (paths.length > 0) await admin.storage.from(SLIDE_BUCKET).remove(paths);
+  revalidatePath(PATH);
+  return {};
+}
+
+export interface UploadSlot {
+  path: string;
+  token: string;
+}
+
+/** Signed links the browser uploads slide pictures to, one per slide. The church's storage allowance is checked first. */
+export async function startSlideUploadAction(count: number, totalBytes: number): Promise<{ error?: string; slots?: UploadSlot[] }> {
+  const g = await gate("write");
+  if ("error" in g) return g;
+  if (!Number.isInteger(count) || count < 1) return { error: "There are no slides to upload." };
+  if (count > MAX_SLIDES) return { error: `A presentation can have up to ${MAX_SLIDES} slides.` };
+  if (!Number.isFinite(totalBytes) || totalBytes <= 0 || totalBytes > count * MAX_SLIDE_BYTES) return { error: "Those slides are too large." };
+  const quota = await checkStorageQuota(g.organizationId, totalBytes);
+  if (quota) return { error: quota };
+  const admin = createAdminClient();
+  const slots: UploadSlot[] = [];
+  for (let i = 0; i < count; i++) {
+    const path = `${g.organizationId}/${randomUUID()}.jpg`;
+    const { data, error } = await admin.storage.from(SLIDE_BUCKET).createSignedUploadUrl(path);
+    if (error || !data) return { error: "Couldn't start the upload. Please try again." };
+    slots.push({ path, token: data.token });
+  }
+  return { slots };
+}
+
+/** Saves an uploaded presentation to the library: its slide pictures in order, each with its text. */
+export async function savePresentationAction(title: string, slides: { path: string; text: string }[]): Promise<ProjectionResult> {
+  const g = await gate("write");
+  if ("error" in g) return g;
+  const cleanTitle = title.trim().slice(0, 120);
+  if (!cleanTitle) return { error: "Give the presentation a title." };
+  if (slides.length === 0 || slides.length > MAX_SLIDES) return { error: "There are no slides to save." };
+  const pattern = new RegExp(`^${g.organizationId}/[0-9a-f-]{36}\\.jpg$`);
+  if (!slides.every((s) => pattern.test(s.path))) return { error: "Those slides weren't uploaded correctly. Please try again." };
+  const images = slides.map((s) => ({ path: s.path, text: String(s.text ?? "").slice(0, 1000) }));
+  const body = images.map((s) => s.text).filter(Boolean).join("\n\n").slice(0, 19000) || cleanTitle;
+  const { error } = await createAdminClient().from("projection_items").insert({ organization_id: g.organizationId, kind: "presentation", title: cleanTitle, body, slide_images: images, created_by: g.userId });
+  if (error) return { error: "Couldn't save the presentation. Please try again." };
   revalidatePath(PATH);
   return {};
 }

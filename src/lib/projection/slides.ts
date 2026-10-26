@@ -1,6 +1,6 @@
 // Turning text into the slides that go on the screen. Pure.
 
-export type SlideKind = "bible" | "song" | "announcement" | "custom";
+export type SlideKind = "bible" | "song" | "announcement" | "custom" | "presentation";
 
 export interface Slide {
   kind: SlideKind;
@@ -10,6 +10,8 @@ export interface Slide {
   text: string;
   /** Small line underneath: the translation, or the slide number. */
   footer: string;
+  /** A picture shown across the whole screen instead of text (a PowerPoint slide). */
+  image?: string;
 }
 
 export interface VerseLine {
@@ -60,9 +62,20 @@ export function splitSlides(body: string): string[] {
     .filter(Boolean);
 }
 
-export function itemSlides(kind: Exclude<SlideKind, "bible">, title: string, body: string): Slide[] {
+export function itemSlides(kind: Exclude<SlideKind, "bible" | "presentation">, title: string, body: string): Slide[] {
   const parts = splitSlides(body);
   return parts.map((text, i) => ({ kind, title, text, footer: parts.length > 1 ? `${i + 1} / ${parts.length}` : "" }));
+}
+
+/** A presentation's slides: each is a picture, with the slide's own text kept for reading aloud and for the app. */
+export function presentationSlides(title: string, images: { url: string; text: string }[]): Slide[] {
+  return images.map((image, i) => ({
+    kind: "presentation" as const,
+    title,
+    text: image.text.trim() || `Slide ${i + 1}`,
+    footer: `${i + 1} / ${images.length}`,
+    image: image.url,
+  }));
 }
 
 /** Lines of the form "John 3:16 For God so loved..." for a church's own translation. */

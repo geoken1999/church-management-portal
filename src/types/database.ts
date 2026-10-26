@@ -318,7 +318,7 @@ export type MemberProfileUpdateRequest = {
   updated_at: string;
 };
 
-export type ProjectionSlide = { kind: "bible" | "song" | "announcement" | "custom"; title: string; text: string; footer: string };
+export type ProjectionSlide = { kind: "bible" | "song" | "announcement" | "custom" | "presentation"; title: string; text: string; footer: string; /** A picture to show across the whole screen (a PowerPoint slide). */ image?: string };
 export type ProjectionTheme = { background?: string; color?: string; font?: "sans" | "serif" };
 export type ProjectionScreen = {
   id: string;
@@ -333,9 +333,11 @@ export type ProjectionScreen = {
 export type ProjectionItem = {
   id: string;
   organization_id: string;
-  kind: "song" | "announcement" | "custom";
+  kind: "song" | "announcement" | "custom" | "presentation";
   title: string;
   body: string;
+  /** A presentation's slides: the stored pictures in order, each with the text found on the slide. */
+  slide_images: { path: string; text: string }[] | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

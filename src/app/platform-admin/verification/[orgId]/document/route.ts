@@ -16,7 +16,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ org
 
   const { data: blob, error } = await admin.storage.from(PROOF_BUCKET).download(org.proof_document_path);
   if (error || !blob) return new NextResponse("Couldn't open the document.", { status: 502 });
-  let bytes = Buffer.from(await blob.arrayBuffer());
+  let bytes: Buffer = Buffer.from(await blob.arrayBuffer());
   if (isEncryptedPath(org.proof_document_path)) {
     const key = parseProofKey(process.env.PROOF_ENCRYPTION_KEY);
     if (!key) return new NextResponse("PROOF_ENCRYPTION_KEY is not set on this server.", { status: 500 });

@@ -478,6 +478,11 @@ export async function approveMember(formData: FormData) {
     .from("members")
     .update({ status: "active" })
     .eq("id", memberId);
+  // Approving the person by hand settles their verification too.
+  await supabase
+    .from("members")
+    .update({ verification_status: "verified", verified_at: new Date().toISOString() })
+    .eq("id", memberId);
 
   revalidatePath("/dashboard/members");
 }

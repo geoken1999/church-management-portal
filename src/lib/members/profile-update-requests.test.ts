@@ -24,6 +24,13 @@ const BASE_MEMBER: Member = {
   custom_fields: {},
   created_by: null,
   auth_user_id: "auth-1",
+  self_registered: false,
+  verification_status: "verified",
+  verification_started_at: null,
+  proof_document_path: null,
+  proof_submitted_at: null,
+  verification_note: null,
+  verified_at: null,
   created_at: "2024-01-01T00:00:00Z",
   updated_at: "2024-01-01T00:00:00Z",
 };

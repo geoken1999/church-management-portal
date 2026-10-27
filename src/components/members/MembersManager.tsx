@@ -11,6 +11,7 @@ import {
   bulkDeleteMembers,
   type MemberFormState,
 } from "@/lib/members/actions";
+import { getProofDocumentLink, reviewProofDocument } from "@/lib/members/proof-actions";
 import { ReviewButtons } from "@/components/ui/review-buttons";
 import { approveMemberProfileUpdateRequest, rejectMemberProfileUpdateRequest } from "@/lib/members/profile-update-actions";
 import { downloadMemberTemplate, bulkImportMembers } from "@/lib/members/bulk-actions";
@@ -555,8 +556,83 @@ function PendingRequestCard({ member }: { member: MemberWithBranch }) {
           </div>
         </div>
         <ReviewButtons approve={approveMember} reject={deleteMember} field="memberId" value={member.id} rejectLabel="Reject" rejectVariant="ghost" />
+        {member.self_registered && <ProofReview member={member} />}
       </CardContent>
     </Card>
+  );
+}
+
+const PROOF_STATUS_LABEL: Record<Member["verification_status"], string> = {
+  not_submitted: "No document yet",
+  under_review: "Document to review",
+  verified: "Verified",
+  rejected: "Document rejected",
+};
+
+// Proof of identity sent from the app by someone who joined through the public form.
+function ProofReview({ member }: { member: MemberWithBranch }) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const [rejecting, setRejecting] = useState(false);
+
+  function view() {
+    setError(null);
+    startTransition(async () => {
+      const result = await getProofDocumentLink(member.id);
+      if (result.url) window.open(result.url, "_blank", "noopener");
+      else setError(result.error ?? "Couldn't open the document.");
+    });
+  }
+
+  function decide(decision: "verify" | "reject") {
+    setError(null);
+    startTransition(async () => {
+      const result = await reviewProofDocument(member.id, decision, reason);
+      if (result.error) setError(result.error);
+      else setRejecting(false);
+    });
+  }
+
+  return (
+    <div className="basis-full space-y-2 border-t pt-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant={member.verification_status === "verified" ? "secondary" : "outline"}>
+          {PROOF_STATUS_LABEL[member.verification_status]}
+        </Badge>
+        {member.proof_document_path && (
+          <Button type="button" variant="outline" size="sm" disabled={pending} onClick={view}>
+            View document
+          </Button>
+        )}
+        {member.verification_status === "under_review" && (
+          <>
+            <Button type="button" size="sm" disabled={pending} onClick={() => decide("verify")}>
+              Verify and approve
+            </Button>
+            <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => setRejecting((v) => !v)}>
+              Reject document
+            </Button>
+          </>
+        )}
+      </div>
+      {rejecting && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Why (the member sees this)"
+            maxLength={300}
+            className="min-w-56 flex-1"
+            aria-label="Reason for rejecting"
+          />
+          <Button type="button" variant="destructive" size="sm" disabled={pending} onClick={() => decide("reject")}>
+            Send
+          </Button>
+        </div>
+      )}
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
   );
 }
 

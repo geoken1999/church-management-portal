@@ -37,12 +37,10 @@ export async function matchMemberOrgsByPhone(
   const { data: candidates } = await admin
     .from("members")
     .select(
-      "id, organization_id, phone, first_name, last_name, status, self_registered, organizations(name)",
+      "id, organization_id, phone, first_name, last_name, status, organizations(name)",
     )
     .like("phone", `%${tail}`)
-    // A person who joined through the church's public form can open the app while waiting for approval; they send
-    // a proof document there (migration 0224). Anyone else still pending is not let in.
-    .or("status.in.(active,student),and(status.eq.pending,self_registered.eq.true)");
+    .in("status", ["active", "student"]);
 
   const matches = (candidates ?? []).filter(
     (m) => m.phone && isSameNumber(m.phone, phone),

@@ -50,12 +50,7 @@ async function recordJoinWhatsAppChoice(
     if (request)
       await admin
         .from("members")
-        .update({
-          whatsapp_opt_in: optIn,
-          // Self-registered: they send a proof document from the app (migration 0224).
-          self_registered: true,
-          verification_status: "not_submitted",
-        })
+        .update({ whatsapp_opt_in: optIn })
         .eq("id", request.id);
   } catch (err) {
     console.error("recordJoinWhatsAppChoice failed:", err);

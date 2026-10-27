@@ -288,15 +288,6 @@ export type Member = {
   // /api/mobile/member-auth/complete. Unrelated to organization_members
   // (team/staff logins).
   auth_user_id: string | null;
-  // Proof of identity for people who join through the public form (migration 0224). Members the church adds itself
-  // are 'verified' from the start.
-  self_registered: boolean;
-  verification_status: "not_submitted" | "under_review" | "verified" | "rejected";
-  verification_started_at: string | null;
-  proof_document_path: string | null;
-  proof_submitted_at: string | null;
-  verification_note: string | null;
-  verified_at: string | null;
   created_at: string;
   updated_at: string;
 };

@@ -18,6 +18,7 @@ import {
 } from "@/lib/plans/config";
 import type { TabKey } from "@/lib/permissions/tabs";
 import { formatBytes } from "@/lib/plans/format";
+import { PROOF_LIMITED_TABS, proofLimited, statusOf } from "@/lib/organizations/proof";
 import { MOBILE_FEATURE_LIMIT } from "@/lib/organizations/mobile-features";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 
@@ -902,19 +903,31 @@ export const getOrgFeatureState = cache(
   ): Promise<{
     tabs: Record<TabKey, boolean>;
     featureCaps: Partial<Record<CappableTab, number | null>>;
+    proofLimited: boolean;
   }> => {
     const supabase = createAdminClient();
     const { data: org } = await supabase
       .from("organizations")
-      .select("plan, custom_plan_limits, addon_modules")
+      .select("*")
       .eq("id", organizationId)
       .maybeSingle();
     const planId = org?.plan && isPlanId(org.plan) ? org.plan : "basic";
     const custom = (org?.custom_plan_limits ??
       null) as CustomPlanOverrides | null;
+    const tabs = resolveTabStates(planId, custom, org?.addon_modules);
+    // Until the church has sent its registration document (or after a rejection) the money and messaging tabs stay closed.
+    const proofClosed = org
+      ? proofLimited({
+          status: statusOf(org.verification_status),
+          startedAt: org.verification_started_at ?? null,
+          now: Date.now(),
+        })
+      : false;
+    if (proofClosed) for (const tab of PROOF_LIMITED_TABS) tabs[tab] = false;
     return {
-      tabs: resolveTabStates(planId, custom, org?.addon_modules),
+      tabs,
       featureCaps: custom?.featureCaps ?? {},
+      proofLimited: proofClosed,
     };
   },
 );

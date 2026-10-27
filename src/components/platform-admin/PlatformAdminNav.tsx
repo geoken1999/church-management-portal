@@ -28,6 +28,7 @@ import {
   KanbanSquare,
   UserRoundX,
   Gauge,
+  BadgeCheck,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -41,6 +42,12 @@ const NAV_ITEMS = [
     href: "/platform-admin/tenants",
     label: "Tenants",
     icon: Building2,
+    exact: false,
+  },
+  {
+    href: "/platform-admin/verification",
+    label: "Verification",
+    icon: BadgeCheck,
     exact: false,
   },
   {

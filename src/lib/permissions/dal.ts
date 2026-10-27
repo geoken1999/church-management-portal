@@ -1,5 +1,6 @@
 import "server-only";
 
+import { PROOF_LIMITED_MESSAGE, PROOF_LIMITED_TABS } from "@/lib/organizations/proof";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/dal";
 import { normalizeTabPermissions, fullTabAccess, type TabKey } from "@/lib/permissions/tabs";
@@ -39,7 +40,10 @@ export async function checkTabAccess(
   // for everyone in the org, owners included — same as the kill switch above.
   const orgState = await getOrgFeatureState(organizationId);
   if (!orgState.tabs[tab]) {
-    return { ok: false, message: "This feature isn't included in your plan." };
+    return {
+      ok: false,
+      message: orgState.proofLimited && PROOF_LIMITED_TABS.includes(tab) ? PROOF_LIMITED_MESSAGE : "This feature isn't included in your plan.",
+    };
   }
 
   const user = currentUser;

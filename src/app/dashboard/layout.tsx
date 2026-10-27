@@ -11,6 +11,9 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { TrialExpiredScreen } from "@/components/billing/TrialExpiredScreen";
 import { toAppLocale } from "@/lib/i18n/config";
 import { getFeatureTags } from "@/lib/platform-admin/feature-flags";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { ProofBanner } from "@/components/organizations/ProofBanner";
+import { proofDeadline, statusOf } from "@/lib/organizations/proof";
 import { getCheckoutContext } from "@/lib/billing/checkout-context";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
@@ -22,6 +25,18 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     getProfile(),
   ]);
   const canManage = membership.role === "owner" || membership.role === "admin";
+  // The 2 minutes for the registration document start the first time the church opens the dashboard.
+  const proofOrg = membership.organization;
+  const proofStatus = statusOf(proofOrg.verification_status);
+  let proofStartedAt = proofOrg.verification_started_at ?? null;
+  if (proofStatus === "not_submitted" && !proofStartedAt) {
+    proofStartedAt = new Date().toISOString();
+    await createAdminClient()
+      .from("organizations")
+      .update({ verification_started_at: proofStartedAt })
+      .eq("id", proofOrg.id)
+      .is("verification_started_at", null);
+  }
   const [notifications, planUsage, featureTags] = await Promise.all([
     getNotifications(membership.organization.id),
     getPlanUsage(membership.organization.id),
@@ -75,6 +90,14 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       initialLocale={toAppLocale(profile?.locale)}
       initialMenuPrefs={menuPrefs}
     >
+      {proofStatus !== "verified" && (
+        <ProofBanner
+          status={proofStatus}
+          deadlineAt={proofStartedAt ? proofDeadline(proofStartedAt) : null}
+          serverNow={new Date().toISOString()}
+          canManage={canManage}
+        />
+      )}
       {children}
     </DashboardShell>
   );

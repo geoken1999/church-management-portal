@@ -14,6 +14,8 @@ import { ChangePasswordForm } from "@/components/profile/ChangePasswordForm";
 import { QrLogoUpload } from "@/components/organizations/QrLogoUpload";
 import { getSiteUrl } from "@/lib/site-url";
 import { EditOrganizationDetailsForm } from "@/components/organizations/EditOrganizationDetailsForm";
+import { ProofCard } from "@/components/organizations/ProofCard";
+import { statusOf } from "@/lib/organizations/proof";
 import { MenuPreferences } from "@/components/profile/MenuPreferences";
 import { cookies } from "next/headers";
 import { MENU_COOKIE, parseMenuPrefs } from "@/lib/menu-prefs";
@@ -40,6 +42,13 @@ export default async function ProfilePage() {
         <h1 className="font-heading text-3xl font-bold tracking-tight">Profile</h1>
         <p className="mt-1 text-muted-foreground">Your KingdomFlow account details.</p>
       </div>
+
+      <ProofCard
+        status={statusOf(membership.organization.verification_status)}
+        note={membership.organization.verification_note ?? null}
+        documentName={membership.organization.proof_document_name ?? null}
+        canManage={canManage}
+      />
 
       <MenuPreferences initial={menuPrefs} />
 

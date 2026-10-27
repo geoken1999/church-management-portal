@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireFinancePlan } from "@/lib/finance/actions";
+import { getOrgFeatureState } from "@/lib/plans/dal";
 import { validateGivingAmount, validateDonorName } from "@/lib/finance/validation";
 import {
   getGivingCredentials,
@@ -71,6 +72,10 @@ async function startGivingPayment(
   const admin = createAdminClient();
   const planError = await requireFinancePlan(target.organizationId);
   if (planError) {
+    return { error: "This giving link is temporarily unavailable." };
+  }
+  // A church that has not sent its registration document cannot take online gifts yet.
+  if ((await getOrgFeatureState(target.organizationId)).proofLimited) {
     return { error: "This giving link is temporarily unavailable." };
   }
 

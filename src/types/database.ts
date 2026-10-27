@@ -34,6 +34,14 @@ export type Organization = {
   logo_url: string | null;
   // Centre mark for generated QR codes (migration 0131); null = plain QRs.
   qr_logo_url: string | null;
+  // Proof document for the church (migration 0225), checked by the platform admin.
+  verification_status: "not_submitted" | "under_review" | "verified" | "rejected";
+  verification_started_at: string | null;
+  proof_document_path: string | null;
+  proof_document_name: string | null;
+  proof_submitted_at: string | null;
+  verification_note: string | null;
+  verified_at: string | null;
   // What to do when WhatsApp can't deliver, and a platform override for a
   // church whose delivery record would otherwise pause its marketing sends
   // (migration 0145).
@@ -2465,7 +2473,8 @@ export type NotificationType =
   | "family_request"
   | "visitor"
   | "online_gift"
-  | "bible_school_request";
+  | "bible_school_request"
+  | "verification";
 
 export type Notification = {
   id: string;

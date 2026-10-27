@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthUser, getProfile } from "@/lib/auth/dal";
 import { normalizeTabPermissions, allFullTabAccess, noTabAccess, TAB_KEYS, type TabKey } from "@/lib/permissions/tabs";
 import { isPlanId, moduleOfTab, resolveTabStates, type CustomPlanOverrides } from "@/lib/plans/config";
+import { PROOF_LIMITED_TABS, proofLimited, statusOf } from "@/lib/organizations/proof";
 import { purchasableModuleKeys } from "@/lib/billing/modules";
 import { getDisabledFeatures } from "@/lib/platform-admin/feature-flags";
 import type { Organization, OrganizationRole, TabAccess } from "@/types/database";
@@ -20,6 +21,13 @@ export interface OrganizationMembership {
   // Tabs the person could use if their church's plan included them and that the church can buy as a module: shown
   // in the menu, locked, with a way to subscribe. Never includes a tab the platform has switched off.
   lockedTabs: TabKey[];
+  // The church has not sent its registration document in time, so money and messaging tabs are closed (see
+  // src/lib/organizations/proof.ts). Profile stays open so the document can be uploaded.
+  proofLimited: boolean;
+}
+
+function proofLimitedFor(org: Organization): boolean {
+  return proofLimited({ status: statusOf(org.verification_status), startedAt: org.verification_started_at ?? null, now: Date.now() });
 }
 
 // All organizations the current user belongs to (for the org switcher).
@@ -57,6 +65,7 @@ export const getUserOrganizations = cache(async (): Promise<OrganizationMembersh
     for (const tab of TAB_KEYS) {
       if (!tabStates[tab]) result[tab] = noTabAccess();
     }
+    if (proofLimitedFor(org)) for (const tab of PROOF_LIMITED_TABS) result[tab] = noTabAccess();
     return result;
   }
 
@@ -76,6 +85,7 @@ export const getUserOrganizations = cache(async (): Promise<OrganizationMembersh
         role: row.role,
         tabAccess: withOrgFlags(roleAccess, row.organizations),
         lockedTabs: lockedFor(roleAccess, row.organizations),
+        proofLimited: proofLimitedFor(row.organizations),
       };
     });
 });

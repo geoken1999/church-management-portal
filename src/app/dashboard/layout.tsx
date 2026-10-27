@@ -25,7 +25,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     getProfile(),
   ]);
   const canManage = membership.role === "owner" || membership.role === "admin";
-  // The 2 minutes for the registration document start the first time the church opens the dashboard.
+  // The 2 months for the registration document start the first time the church opens the dashboard.
   const proofOrg = membership.organization;
   const proofStatus = statusOf(proofOrg.verification_status);
   let proofStartedAt = proofOrg.verification_started_at ?? null;

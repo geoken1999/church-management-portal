@@ -1,12 +1,8 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { BadgeCheck } from "lucide-react";
 import type { VerificationStatus } from "@/lib/organizations/proof";
 
-// Above every dashboard page until the church is verified: the 2-minute countdown, then what is closed and why.
+// Above every dashboard page until the church is verified: the days left of the 2 months, then what is closed and why.
 export function ProofBanner({
   status,
   deadlineAt,
@@ -18,34 +14,20 @@ export function ProofBanner({
   serverNow: string;
   canManage: boolean;
 }) {
-  const router = useRouter();
-  // The server's clock decides when the 2 minutes end, so a wrong clock on this computer changes nothing.
-  const [skew] = useState(() => Date.now() - new Date(serverNow).getTime());
-  const [left, setLeft] = useState(() => secondsLeft(deadlineAt, skew));
-
-  useEffect(() => {
-    if (status !== "not_submitted" || !deadlineAt) return;
-    const timer = setInterval(() => {
-      const next = secondsLeft(deadlineAt, skew);
-      setLeft(next);
-      if (next === 0) {
-        clearInterval(timer);
-        router.refresh();
-      }
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [status, deadlineAt, skew, router]);
+  const days = deadlineAt ? Math.max(0, Math.ceil((new Date(deadlineAt).getTime() - new Date(serverNow).getTime()) / 86_400_000)) : 0;
+  const closed = deadlineAt !== null && days === 0;
 
   if (status === "verified") return null;
 
+  const dayText = `${days} ${days === 1 ? "day" : "days"}`;
   const message =
     status === "under_review"
       ? "Your registration document is being checked."
-      : status === "rejected"
-        ? "Your registration document wasn't accepted. Online giving, SMS, WhatsApp, email and Live stream are closed until you send a new one."
-        : left > 0
-          ? `Send your church's registration document within ${left}s to keep everything open.`
-          : "Online giving, SMS, WhatsApp, email and Live stream are closed until you send your registration document.";
+      : closed
+        ? "Online giving, SMS, WhatsApp, email and Live stream are closed until you send your registration document."
+        : status === "rejected"
+          ? `Your registration document wasn't accepted. Please send a new one within ${dayText} to keep everything open.`
+          : `Send your church's registration document within ${dayText} to keep everything open.`;
 
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/60 px-4 py-2.5 text-sm">
@@ -67,7 +49,3 @@ export function ProofBanner({
   );
 }
 
-function secondsLeft(deadlineAt: string | null, skew: number): number {
-  if (!deadlineAt) return 0;
-  return Math.max(0, Math.ceil((new Date(deadlineAt).getTime() + skew - Date.now()) / 1000));
-}

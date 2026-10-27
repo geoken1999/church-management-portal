@@ -2,7 +2,7 @@
 import type { TabKey } from "@/lib/permissions/tabs";
 
 export const PROOF_BUCKET = "org-proofs";
-export const PROOF_WINDOW_SECONDS = 120;
+export const PROOF_WINDOW_MONTHS = 2;
 export const MAX_PROOF_BYTES = 5 * 1024 * 1024;
 
 export type VerificationStatus = "not_submitted" | "under_review" | "verified" | "rejected";
@@ -46,14 +46,15 @@ export function statusOf(value: string | null | undefined): VerificationStatus {
 }
 
 export function proofDeadline(startedAt: string): string {
-  return new Date(new Date(startedAt).getTime() + PROOF_WINDOW_SECONDS * 1000).toISOString();
+  const deadline = new Date(startedAt);
+  deadline.setUTCMonth(deadline.getUTCMonth() + PROOF_WINDOW_MONTHS);
+  return deadline.toISOString();
 }
 
-// Closed once the 2 minutes are over with no document, or after a rejection. A document under review lifts the limit
+// Closed once the 2 months are over with no document, or with a rejected one. A document under review lifts the limit
 // while the platform admin looks at it. A church that has not opened the dashboard yet has no clock running.
 export function proofLimited(input: { status: VerificationStatus; startedAt: string | null; now: number }): boolean {
   if (input.status === "verified" || input.status === "under_review") return false;
-  if (input.status === "rejected") return true;
   if (!input.startedAt) return false;
   return input.now >= new Date(proofDeadline(input.startedAt)).getTime();
 }

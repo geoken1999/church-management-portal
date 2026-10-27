@@ -21,15 +21,17 @@ describe("church proof document rules", () => {
     expect(isOwnProofPath("other/abc.png", "org")).toBe(false);
     expect(isOwnProofPath("org/../x.png", "org")).toBe(false);
   });
-  it("gives 2 minutes, then closes features until a document is sent", () => {
+  it("gives 2 months, then closes features until a document is sent", () => {
     const startedAt = "2026-10-27T10:00:00.000Z";
-    expect(proofDeadline(startedAt)).toBe("2026-10-27T10:02:00.000Z");
+    expect(proofDeadline(startedAt)).toBe("2026-12-27T10:00:00.000Z");
     const t = (s: string) => new Date(s).getTime();
     expect(proofLimited({ status: "not_submitted", startedAt: null, now: Infinity })).toBe(false);
-    expect(proofLimited({ status: "not_submitted", startedAt, now: t("2026-10-27T10:01:59.000Z") })).toBe(false);
-    expect(proofLimited({ status: "not_submitted", startedAt, now: t("2026-10-27T10:02:00.000Z") })).toBe(true);
-    expect(proofLimited({ status: "under_review", startedAt, now: t("2026-10-27T12:00:00.000Z") })).toBe(false);
-    expect(proofLimited({ status: "verified", startedAt, now: t("2026-10-27T12:00:00.000Z") })).toBe(false);
-    expect(proofLimited({ status: "rejected", startedAt, now: t("2026-10-27T10:00:05.000Z") })).toBe(true);
+    expect(proofLimited({ status: "not_submitted", startedAt, now: t("2026-12-27T09:59:59.000Z") })).toBe(false);
+    expect(proofLimited({ status: "not_submitted", startedAt, now: t("2026-12-27T10:00:00.000Z") })).toBe(true);
+    expect(proofLimited({ status: "under_review", startedAt, now: t("2027-03-01T00:00:00.000Z") })).toBe(false);
+    expect(proofLimited({ status: "verified", startedAt, now: t("2027-03-01T00:00:00.000Z") })).toBe(false);
+    // A rejection inside the 2 months does not close anything yet; the church still has time to send another.
+    expect(proofLimited({ status: "rejected", startedAt, now: t("2026-11-01T00:00:00.000Z") })).toBe(false);
+    expect(proofLimited({ status: "rejected", startedAt, now: t("2026-12-28T00:00:00.000Z") })).toBe(true);
   });
 });

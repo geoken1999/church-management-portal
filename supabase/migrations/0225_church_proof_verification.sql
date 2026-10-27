@@ -1,7 +1,7 @@
 -- Proof document for a church (registration certificate), checked by the platform admin.
 --
--- A church gets 2 minutes from the first time it opens the dashboard to upload its document. Without one (or after a
--- rejection) the money and messaging features stay closed; the Profile page always stays open so it can be uploaded.
+-- A church gets 2 months from the first time it opens the dashboard to upload its document. Without one (or with a
+-- rejected one) the money and messaging features stay closed; the Profile page always stays open so it can be uploaded.
 -- Existing churches start as 'not_submitted' too; the platform admin can mark a church verified without a document.
 alter table public.organizations
   add column if not exists verification_status text not null default 'not_submitted'

@@ -29,6 +29,7 @@ import {
   UserRoundX,
   Gauge,
   BadgeCheck,
+  Headset,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -42,6 +43,12 @@ const NAV_ITEMS = [
     href: "/platform-admin/tenants",
     label: "Tenants",
     icon: Building2,
+    exact: false,
+  },
+  {
+    href: "/platform-admin/support-team",
+    label: "Support team",
+    icon: Headset,
     exact: false,
   },
   {

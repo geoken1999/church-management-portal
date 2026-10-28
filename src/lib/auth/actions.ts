@@ -1,5 +1,6 @@
 "use server";
 
+import { getActiveSupportStaff } from "@/lib/support-staff/access";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthErrorMessage } from "@/lib/auth/errors";
@@ -118,6 +119,11 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
   }
   await clearAttempts(LOGIN_RULE, email);
 
+  if (!next) {
+    // Support staff have no church of their own; they start in the Support console.
+    const { data: userData } = await supabase.auth.getUser();
+    if (userData.user && (await getActiveSupportStaff(userData.user.id))) redirect("/support-desk");
+  }
   redirect(next && next.startsWith("/") ? next : "/dashboard");
 }
 

@@ -300,6 +300,17 @@ export type Member = {
   updated_at: string;
 };
 
+// Support-console accounts (migration 0227): can reply to tickets and view a church read-only, nothing else.
+export type SupportStaff = {
+  id: string;
+  auth_user_id: string;
+  email: string;
+  name: string;
+  active: boolean;
+  created_by: string | null;
+  created_at: string;
+};
+
 export type MemberProfileUpdateRequestStatus = "pending" | "approved" | "rejected";
 
 // Only the fields a member is actually allowed to propose — see
@@ -2630,6 +2641,12 @@ export type Database = {
         Row: Organization;
         Insert: Partial<Organization> & Pick<Organization, "name" | "slug">;
         Update: Partial<Organization>;
+        Relationships: [];
+      };
+      support_staff: {
+        Row: SupportStaff;
+        Insert: Partial<SupportStaff> & Pick<SupportStaff, "auth_user_id" | "email" | "name">;
+        Update: Partial<SupportStaff>;
         Relationships: [];
       };
       organization_members: {

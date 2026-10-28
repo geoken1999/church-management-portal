@@ -7,6 +7,7 @@ import { getAuthUser, getProfile } from "@/lib/auth/dal";
 import { normalizeTabPermissions, allFullTabAccess, noTabAccess, TAB_KEYS, type TabKey } from "@/lib/permissions/tabs";
 import { isPlanId, moduleOfTab, resolveTabStates, type CustomPlanOverrides } from "@/lib/plans/config";
 import { PROOF_LIMITED_TABS, proofLimited, statusOf } from "@/lib/organizations/proof";
+import { redirectIfSupportStaff } from "@/lib/support-staff/access";
 import { purchasableModuleKeys } from "@/lib/billing/modules";
 import { getDisabledFeatures } from "@/lib/platform-admin/feature-flags";
 import type { Organization, OrganizationRole, TabAccess } from "@/types/database";
@@ -119,6 +120,7 @@ export const getActiveOrganization = cache(async (): Promise<OrganizationMembers
 export async function requireOrganization() {
   const membership = await getActiveOrganization();
   if (!membership) {
+    await redirectIfSupportStaff();
     redirect("/onboarding");
   }
   return membership;

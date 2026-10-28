@@ -4,6 +4,7 @@ import { defaultStatusFor, FEATURE_STATUS_LABELS, isFeatureStatus, nextNewUntil,
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformAdmin } from "@/lib/platform-admin/auth";
+import { requireSupportAccess } from "@/lib/support-staff/access";
 import {
   isPlanId,
   PLANS,
@@ -351,7 +352,8 @@ export async function extendTenantTrial(_prevState: ExtendTenantTrialState, form
 }
 
 export async function updateSupportTicketStatus(formData: FormData) {
-  const platformAdmin = await requirePlatformAdmin();
+  const access = await requireSupportAccess();
+  const platformAdmin = access.user;
   const ticketId = String(formData.get("ticketId") ?? "");
   const status = String(formData.get("status") ?? "");
 
@@ -384,7 +386,9 @@ export async function addPlatformSupportReply(
   _prevState: AddPlatformSupportReplyState,
   formData: FormData,
 ): Promise<AddPlatformSupportReplyState> {
-  const platformAdmin = await requirePlatformAdmin();
+  // Super Admin or an active support-staff account; either way the reply is written as "admin" on the ticket.
+  const access = await requireSupportAccess();
+  const platformAdmin = access.user;
   const ticketId = String(formData.get("ticketId") ?? "");
   const body = String(formData.get("body") ?? "").trim();
 

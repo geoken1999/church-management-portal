@@ -10,6 +10,7 @@ const PROTECTED_PREFIXES = [
   "/onboarding",
   "/broadcast",
   "/class-room",
+  "/support-desk",
 ];
 
 function isPublicRoute(pathname: string) {

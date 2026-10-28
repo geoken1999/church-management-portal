@@ -15,6 +15,13 @@ import {
   proofProblem,
 } from "@/lib/organizations/proof";
 
+// Who is emailed when a church sends its document: the company admin mailbox, not the personal sign-in addresses.
+// PROOF_NOTIFY_EMAILS (comma separated) overrides it.
+function proofAlertRecipients(): string[] {
+  const configured = (process.env.PROOF_NOTIFY_EMAILS ?? "").split(",").map((e) => e.trim()).filter(Boolean);
+  return configured.length > 0 ? configured : ["admin@kingdomflow.in"];
+}
+
 async function requireOwnerOrAdmin() {
   const membership = await requireOrganization();
   if (membership.role !== "owner" && membership.role !== "admin") return null;
@@ -91,6 +98,7 @@ export async function submitProof(path: string, fileName: string): Promise<{ err
   await notifyPlatformAdmins(
     `Proof document to check: ${org.name}`,
     `<p><strong>${org.name.replace(/</g, "&lt;")}</strong> sent its registration document. Open Super Admin → Verification to check it.</p>`,
+    proofAlertRecipients(),
   );
   revalidatePath("/dashboard", "layout");
   return {};

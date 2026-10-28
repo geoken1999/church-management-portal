@@ -9,9 +9,9 @@ import { logPlatformEvent } from "@/lib/platform-events/log";
 // to break the ticket action it's called from, so failures are logged
 // (not thrown) and a missing/unconfigured shared email account just skips
 // silently rather than erroring out the ticket create/reply itself.
-export async function notifyPlatformAdmins(subject: string, bodyHtml: string): Promise<void> {
-  const recipients = (process.env.PLATFORM_ADMIN_EMAILS ?? "")
-    .split(",")
+export async function notifyPlatformAdmins(subject: string, bodyHtml: string, to?: string[]): Promise<void> {
+  // Without an explicit list it goes to the Super Admin sign-in emails.
+  const recipients = (to ?? (process.env.PLATFORM_ADMIN_EMAILS ?? "").split(","))
     .map((email) => email.trim())
     .filter(Boolean);
 

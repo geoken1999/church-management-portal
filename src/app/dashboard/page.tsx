@@ -14,8 +14,14 @@ export const metadata: Metadata = {
   title: "Dashboard | KingdomFlow",
 };
 
-function getGreeting() {
-  const hour = new Date().getHours();
+// The server runs in UTC, so the hour is read in the church's own timezone.
+function getGreeting(timeZone: string) {
+  let hour: number;
+  try {
+    hour = Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hourCycle: "h23", timeZone }).format(new Date()));
+  } catch {
+    hour = new Date().getHours();
+  }
   if (hour < 12) return "Good morning";
   if (hour < 18) return "Good afternoon";
   return "Good evening";
@@ -33,7 +39,7 @@ export default async function DashboardPage() {
     <div className="space-y-8">
       <div>
         <h1 className="font-heading text-3xl font-bold tracking-tight">
-          {getGreeting()}, {profile?.first_name}
+          {getGreeting(membership.organization.timezone || "Asia/Kolkata")}, {profile?.first_name}
         </h1>
         <p className="mt-1 text-muted-foreground">You are successfully authenticated.</p>
       </div>

@@ -291,7 +291,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
         title: "What automation does and what it costs",
         body: [
           "Automation runs recurring tasks without anyone having to remember them. Find it under Automation in the sidebar, then pick the feature you want to set up.",
-          "Starter doesn't include automation. Growth allows 5 active automations at a time, and Pro allows 10. Drafts and paused automations don't count toward the limit — only active ones do.",
+          "Starter allows 1 active automation at a time, across birthday and anniversary wishes, the staff digest and member follow-up. Growth allows 5 active automations at a time, and Pro allows 10. Drafts and paused automations don't count toward the limit — only active ones do.",
         ],
       },
       {

@@ -77,7 +77,8 @@ describe("resolveTabStates", () => {
     const tabs = resolveTabStates("basic", null);
     expect(tabs.fundraisers).toBe(true);
     expect(tabs.instagram).toBe(true);
-    expect(tabs.automations).toBe(false);
+    expect(tabs.automations).toBe(true);
+    expect(tabs.livestream).toBe(false);
   });
 
   it("applies overrides on top of the plan default in both directions", () => {
@@ -129,8 +130,8 @@ describe("PLANS.basic (Starter)", () => {
     expect(PLANS.basic.formsLimit).toBe(20);
   });
 
-  it("disables Automation", () => {
-    expect(PLANS.basic.automationLimit).toBe(0);
+  it("allows one active automation", () => {
+    expect(PLANS.basic.automationLimit).toBe(1);
   });
 });
 
@@ -272,9 +273,9 @@ describe("add-on pack prices", () => {
 describe("modules paid for on their own", () => {
   it("opens the tabs of a module the plan leaves out", () => {
     const base = resolveTabStates("basic", null);
-    expect(base.automations).toBe(false);
-    const withAutomations = resolveTabStates("basic", null, ["automations"]);
-    expect(withAutomations.automations).toBe(true);
+    expect(base.livestream).toBe(false);
+    const withAutomations = resolveTabStates("basic", null, ["livestream"]);
+    expect(withAutomations.livestream).toBe(true);
     expect(withAutomations.instagram).toBe(base.instagram);
   });
   it("treats Finance and Social media as one switch each", () => {
@@ -294,7 +295,7 @@ describe("modules paid for on their own", () => {
     expect(resolvePlanLimits("premium", null, null)).toBe(PLANS.premium);
   });
   it("adds to a custom plan without renaming it twice", () => {
-    const custom = resolvePlanLimits("basic", { ...PLANS.basic, tabOverrides: { youth: false } } as never, ["automations"]);
+    const custom = resolvePlanLimits("basic", { ...PLANS.basic, automationLimit: 0, tabOverrides: { youth: false } } as never, ["automations"]);
     expect(custom.name).toBe("Custom");
     expect(custom.automationLimit).toBeNull();
   });

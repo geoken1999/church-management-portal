@@ -148,7 +148,8 @@ export const PLANS: Record<PlanId, PlanLimits> = {
       ownPaymentGatewayEnabled: false,
       socialMediaEnabled: true,
       customSmtpEnabled: false,
-      automationLimit: 0,
+      // One active automation, across all the automation types.
+      automationLimit: 1,
       supportSlaDays: 5,
     },
     // Explicit override: the 17%-off formula rounds to ₹14,990, one
@@ -368,6 +369,10 @@ export function resolvePlanLimits(
   let automationLimit = rules.automationLimit ?? basePlan.automationLimit;
   if (!tabs.automations) automationLimit = 0;
   else if (automationLimit === 0) automationLimit = customOverrides ? null : AUTOMATION_ADDON_LIMIT;
+  // Paying for the Automations module gives at least Growth's allowance, even on a plan that already includes one.
+  else if (addonTabs.automations && rules.automationLimit == null && automationLimit !== null && automationLimit < AUTOMATION_ADDON_LIMIT) {
+    automationLimit = AUTOMATION_ADDON_LIMIT;
+  }
 
   return {
     ...basePlan,

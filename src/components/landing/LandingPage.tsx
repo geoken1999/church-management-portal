@@ -1,4 +1,4 @@
-import { ForceLightTheme } from "@/components/landing/ForceLightTheme";
+import { LandingShell } from "@/components/landing/LandingShell";
 import Link from "next/link";
 import {
   Contact,
@@ -39,7 +39,6 @@ import {
   Cake,
   Megaphone,
 } from "lucide-react";
-import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -55,7 +54,6 @@ import { AiAutomationSection } from "@/components/landing/AiAutomationSection";
 import { MobileAppPreview } from "@/components/landing/MobileAppPreview";
 import { DevicesShowcase } from "@/components/landing/DevicesShowcase";
 import { AppStoreButtons } from "@/components/landing/AppStoreButtons";
-import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/app-links";
 
 const STATS = [
   { value: "30+", label: "built-in modules" },
@@ -399,45 +397,7 @@ const FAQS = [
 
 export function LandingPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <ForceLightTheme />
-      <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <Logo />
-          <nav className="flex items-center gap-6">
-            <a
-              href="#features"
-              className="hidden text-sm font-medium text-muted-foreground hover:text-foreground sm:inline"
-            >
-              Features
-            </a>
-            <a
-              href="#how-it-works"
-              className="hidden text-sm font-medium text-muted-foreground hover:text-foreground sm:inline"
-            >
-              How it works
-            </a>
-            <a
-              href="#pricing"
-              className="hidden text-sm font-medium text-muted-foreground hover:text-foreground sm:inline"
-            >
-              Pricing
-            </a>
-            <Link
-              href="/login"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground"
-            >
-              Sign in
-            </Link>
-            <Button
-              nativeButton={false}
-              render={<Link href="/login">Get Started</Link>}
-            />
-          </nav>
-        </div>
-      </header>
-
-      <main>
+    <LandingShell>
         <section className="relative overflow-hidden px-4 pt-20 pb-24 sm:px-6 sm:pt-28 sm:pb-32">
           <div
             className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[36rem] bg-[radial-gradient(ellipse_60%_60%_at_50%_-10%,var(--color-accent),transparent)]"
@@ -478,7 +438,7 @@ export function LandingPage() {
                 size="lg"
                 variant="outline"
                 nativeButton={false}
-                render={<a href="#pricing">See pricing</a>}
+                render={<Link href="/pricing">See pricing</Link>}
               />
             </div>
             <div className="mt-6 flex justify-center">
@@ -545,6 +505,123 @@ export function LandingPage() {
           </div>
         </section>
 
+        <section className="bg-muted/40 px-4 py-20 sm:px-6">
+          <div className="mx-auto max-w-6xl">
+            <div className="mx-auto max-w-2xl text-center">
+              <Badge variant="secondary" className="mb-4">
+                Everything in one place
+              </Badge>
+              <h2 className="font-heading text-3xl font-bold tracking-tight">
+                Every module your church needs, connected
+              </h2>
+              <p className="mt-3 text-muted-foreground">
+                Built specifically for how churches actually run — not a generic CRM bolted onto a spreadsheet.
+              </p>
+            </div>
+            <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {FEATURE_CATEGORIES.map((category) => {
+                const Icon = category.items[0].icon;
+                return (
+                  <Card key={category.title} className="transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:ring-primary/20">
+                    <CardHeader>
+                      <div className="flex size-10 items-center justify-center rounded-lg bg-accent">
+                        <Icon className="size-5 text-primary" />
+                      </div>
+                      <CardTitle className="mt-2">{category.title}</CardTitle>
+                      <CardDescription>{category.blurb}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="space-y-1.5">
+                        {category.items.slice(0, 3).map((item) => (
+                          <li key={item.title} className="flex items-start gap-2 text-sm text-muted-foreground">
+                            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
+                            {item.title}
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+            <div className="mt-10 flex justify-center">
+              <Button
+                size="lg"
+                variant="outline"
+                nativeButton={false}
+                render={
+                  <Link href="/features">
+                    See all features
+                    <ArrowRight className="size-4" />
+                  </Link>
+                }
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="px-4 py-20 sm:px-6">
+          <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 sm:grid-cols-2">
+            <Card size="lg">
+              <CardHeader>
+                <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+                  <Smartphone className="size-6" />
+                </div>
+                <CardTitle className="mt-3 text-xl">Your church in everyone&apos;s pocket</CardTitle>
+                <CardDescription>
+                  One app for your team to run the church, and the same app for members to belong to it.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" nativeButton={false} render={<Link href="/apps">Explore the apps<ArrowRight className="size-4" /></Link>} />
+              </CardContent>
+            </Card>
+            <Card size="lg">
+              <CardHeader>
+                <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+                  <Wallet className="size-6" />
+                </div>
+                <CardTitle className="mt-3 text-xl">Simple, transparent pricing</CardTitle>
+                <CardDescription>Start with a 14-day free trial. Upgrade as your church and ministry grow.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" nativeButton={false} render={<Link href="/pricing">See pricing<ArrowRight className="size-4" /></Link>} />
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        <section className="px-4 pb-24 sm:px-6">
+          <div className="mx-auto max-w-5xl overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-primary/70 px-6 py-16 text-center shadow-2xl shadow-primary/20 sm:px-16">
+            <h2 className="font-heading text-3xl font-bold tracking-tight text-balance text-primary-foreground sm:text-4xl">
+              Ready to bring it all together?
+            </h2>
+            <p className="mt-3 text-primary-foreground/80">
+              Create your church&apos;s account in minutes — no credit card
+              required.
+            </p>
+            <div className="mt-8 flex justify-center">
+              <Button
+                size="lg"
+                variant="secondary"
+                nativeButton={false}
+                render={
+                  <Link href="/login">
+                    Get Started
+                    <ArrowRight className="size-4" />
+                  </Link>
+                }
+              />
+            </div>
+          </div>
+        </section>
+    </LandingShell>
+  );
+}
+
+export function FeaturesPage() {
+  return (
+    <LandingShell>
         <section id="features" className="bg-muted/40 px-4 py-20 sm:px-6">
           <div className="mx-auto max-w-6xl">
             <div className="mx-auto max-w-2xl text-center">
@@ -730,8 +807,39 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* Church listing is hidden for now — re-enable by restoring <ChurchesSection />. */}
+        <AiAutomationSection />
 
+        <section className="px-4 pb-24 sm:px-6">
+          <div className="mx-auto max-w-5xl overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-primary/70 px-6 py-16 text-center shadow-2xl shadow-primary/20 sm:px-16">
+            <h2 className="font-heading text-3xl font-bold tracking-tight text-balance text-primary-foreground sm:text-4xl">
+              Ready to bring it all together?
+            </h2>
+            <p className="mt-3 text-primary-foreground/80">
+              Create your church&apos;s account in minutes — no credit card
+              required.
+            </p>
+            <div className="mt-8 flex justify-center">
+              <Button
+                size="lg"
+                variant="secondary"
+                nativeButton={false}
+                render={
+                  <Link href="/login">
+                    Get Started
+                    <ArrowRight className="size-4" />
+                  </Link>
+                }
+              />
+            </div>
+          </div>
+        </section>
+    </LandingShell>
+  );
+}
+
+export function AppsPage() {
+  return (
+    <LandingShell>
         <section id="devices" className="bg-muted/40 px-4 py-20 sm:px-6">
           <div className="mx-auto max-w-6xl">
             <div className="mx-auto max-w-2xl text-center">
@@ -797,30 +905,6 @@ export function LandingPage() {
           </div>
         </section>
 
-        <AiAutomationSection />
-
-        <section id="pricing" className="bg-muted/40 px-4 py-20 sm:px-6">
-          <div className="mx-auto max-w-6xl">
-            <div className="mx-auto max-w-2xl text-center">
-              <Badge variant="secondary" className="mb-4">
-                Pricing
-              </Badge>
-              <h2 className="font-heading text-3xl font-bold tracking-tight">
-                Simple, transparent pricing
-              </h2>
-              <p className="mt-3 text-muted-foreground">
-                Start small. Upgrade as your church and ministry grow.
-              </p>
-            </div>
-            <div className="mt-12">
-              <PricingSection />
-            </div>
-            <p className="mt-8 text-center text-xs text-muted-foreground">
-              Secure payments via Razorpay. Cancel anytime from your dashboard.
-            </p>
-          </div>
-        </section>
-
         <section id="branded-app" className="px-4 py-20 sm:px-6">
           <div className="mx-auto grid max-w-5xl items-center gap-10 rounded-3xl border border-border bg-card p-8 shadow-sm sm:p-12 lg:grid-cols-[1fr_auto]">
             <div>
@@ -859,6 +943,59 @@ export function LandingPage() {
                 </Link>
               }
             />
+          </div>
+        </section>
+
+        <section className="px-4 pb-24 sm:px-6">
+          <div className="mx-auto max-w-5xl overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-primary/70 px-6 py-16 text-center shadow-2xl shadow-primary/20 sm:px-16">
+            <h2 className="font-heading text-3xl font-bold tracking-tight text-balance text-primary-foreground sm:text-4xl">
+              Ready to bring it all together?
+            </h2>
+            <p className="mt-3 text-primary-foreground/80">
+              Create your church&apos;s account in minutes — no credit card
+              required.
+            </p>
+            <div className="mt-8 flex justify-center">
+              <Button
+                size="lg"
+                variant="secondary"
+                nativeButton={false}
+                render={
+                  <Link href="/login">
+                    Get Started
+                    <ArrowRight className="size-4" />
+                  </Link>
+                }
+              />
+            </div>
+          </div>
+        </section>
+    </LandingShell>
+  );
+}
+
+export function PricingPage() {
+  return (
+    <LandingShell>
+        <section id="pricing" className="bg-muted/40 px-4 py-20 sm:px-6">
+          <div className="mx-auto max-w-6xl">
+            <div className="mx-auto max-w-2xl text-center">
+              <Badge variant="secondary" className="mb-4">
+                Pricing
+              </Badge>
+              <h2 className="font-heading text-3xl font-bold tracking-tight">
+                Simple, transparent pricing
+              </h2>
+              <p className="mt-3 text-muted-foreground">
+                Start small. Upgrade as your church and ministry grow.
+              </p>
+            </div>
+            <div className="mt-12">
+              <PricingSection />
+            </div>
+            <p className="mt-8 text-center text-xs text-muted-foreground">
+              Secure payments via Razorpay. Cancel anytime from your dashboard.
+            </p>
           </div>
         </section>
 
@@ -917,95 +1054,6 @@ export function LandingPage() {
             </div>
           </div>
         </section>
-      </main>
-
-      <footer className="border-t border-border px-4 py-10 sm:px-6">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-6">
-          <div>
-            <Logo size="sm" />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Built for the churches, by the church.
-            </p>
-          </div>
-          <nav className="flex flex-wrap items-center gap-6">
-            <a
-              href="#features"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              Features
-            </a>
-            <a
-              href={PLAY_STORE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              Android app
-            </a>
-            {APP_STORE_URL && (
-              <a
-                href={APP_STORE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-muted-foreground hover:text-foreground"
-              >
-                iPhone app
-              </a>
-            )}
-            <a
-              href="#pricing"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              Pricing
-            </a>
-            <Link
-              href="/login"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/about"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              About Us
-            </Link>
-            <Link
-              href="/privacy"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              Privacy Policy
-            </Link>
-            <Link
-              href="/terms"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              Terms of Use
-            </Link>
-            <Link
-              href="/refund"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              Refund Policy
-            </Link>
-            <Link
-              href="/contact"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              Contact Us
-            </Link>
-          </nav>
-          <div className="space-y-0.5 text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">KingdomFlow</p>
-            <p>Operated by PHILOMINA VINCENT KOUNDER</p>
-            <p>
-              Mother Theresa Society, Anthony Church Road, Tembipada, Bhandup
-              West, Mumbai 400078
-            </p>
-            <p>© {new Date().getFullYear()} All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
-    </div>
+    </LandingShell>
   );
 }

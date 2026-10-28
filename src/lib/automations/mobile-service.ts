@@ -126,16 +126,18 @@ export async function upsertDestination(
   organizationId: string,
   f: { automationId: string; kind: AutomationDestinationKind; isActive: boolean; recipientLeaderIds?: string[]; digestTemplateId?: string | null },
 ): Promise<AutomationResult> {
-  const recipientLeaderIds = f.kind === "staff_digest" ? [...new Set(f.recipientLeaderIds ?? [])] : [];
-  if (recipientLeaderIds.length > MAX_DIGEST_LEADERS) return fail(`Pick at most ${MAX_DIGEST_LEADERS} leaders.`);
+  let recipientLeaderIds = f.kind === "staff_digest" ? [...new Set(f.recipientLeaderIds ?? [])] : [];
 
   const admin = createAdminClient();
   const { data: automation } = await admin.from("automations").select("id").eq("id", f.automationId).eq("organization_id", organizationId).maybeSingle();
   if (!automation) return fail("That automation could not be found.");
   if (recipientLeaderIds.length > 0) {
-    const { count } = await admin.from("leaders").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).in("id", recipientLeaderIds);
-    if (count !== recipientLeaderIds.length) return fail("One of the selected leaders no longer exists.");
+    // Leaders removed since they were picked are dropped rather than blocking the save.
+    const { data: found } = await admin.from("leaders").select("id").eq("organization_id", organizationId).in("id", recipientLeaderIds);
+    const existing = new Set((found ?? []).map((l) => l.id));
+    recipientLeaderIds = recipientLeaderIds.filter((id) => existing.has(id));
   }
+  if (recipientLeaderIds.length > MAX_DIGEST_LEADERS) return fail(`Pick at most ${MAX_DIGEST_LEADERS} leaders.`);
   if (f.kind === "staff_digest" && f.digestTemplateId) {
     const { data: template } = await admin.from("automation_templates").select("id").eq("id", f.digestTemplateId).eq("organization_id", organizationId).maybeSingle();
     if (!template) return fail("That template could not be found.");

@@ -183,18 +183,20 @@ export async function upsertAutomationDestinationAction(params: {
   const access = await checkTabAccess(organizationId, "automations", "write");
   if (!access.ok) return { error: access.message };
 
-  const recipientLeaderIds = params.kind === "staff_digest" ? [...new Set(params.recipientLeaderIds ?? [])] : [];
-  if (recipientLeaderIds.length > MAX_DIGEST_LEADERS) return { error: `Pick at most ${MAX_DIGEST_LEADERS} leaders.` };
+  let recipientLeaderIds = params.kind === "staff_digest" ? [...new Set(params.recipientLeaderIds ?? [])] : [];
 
   const admin = createAdminClient();
   if (recipientLeaderIds.length > 0) {
-    const { count } = await admin
+    // Leaders removed since they were picked are dropped rather than blocking the save.
+    const { data: found } = await admin
       .from("leaders")
-      .select("id", { count: "exact", head: true })
+      .select("id")
       .eq("organization_id", organizationId)
       .in("id", recipientLeaderIds);
-    if (count !== recipientLeaderIds.length) return { error: "One of the selected leaders no longer exists." };
+    const existing = new Set((found ?? []).map((l) => l.id));
+    recipientLeaderIds = recipientLeaderIds.filter((id) => existing.has(id));
   }
+  if (recipientLeaderIds.length > MAX_DIGEST_LEADERS) return { error: `Pick at most ${MAX_DIGEST_LEADERS} leaders.` };
 
   const row = {
     automation_id: params.automationId,

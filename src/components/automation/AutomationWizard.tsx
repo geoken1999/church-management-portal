@@ -284,7 +284,10 @@ export function AutomationWizard({
   const [directEnabled, setDirectEnabled] = useState(directDestination?.is_active ?? false);
   const [digestEnabled, setDigestEnabled] = useState(digestDestination?.is_active ?? false);
   const [digestTemplateId, setDigestTemplateId] = useState<string | null>(digestDestination?.digest_template_id ?? null);
-  const [recipientLeaderIds, setRecipientLeaderIds] = useState<string[]>(digestDestination?.recipient_leader_ids ?? []);
+  const [recipientLeaderIds, setRecipientLeaderIds] = useState<string[]>(
+    // A leader who was removed after being picked stays in the saved list; drop them so they don't use up a slot.
+    (digestDestination?.recipient_leader_ids ?? []).filter((id) => leaders.some((l) => l.id === id)),
+  );
   const [destinationPending, startDestinationTransition] = useTransition();
   const [destinationError, setDestinationError] = useState<string | null>(null);
   const [destinationSaved, setDestinationSaved] = useState(true);

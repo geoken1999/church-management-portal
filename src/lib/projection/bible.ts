@@ -134,12 +134,12 @@ export async function lookupPassage(organizationId: string, translationKeys: str
     return { slides: paginateVerses(found[0].verses).map((page) => ({ kind: "bible" as const, title: pageReference(bookName, ref.chapter, page), text: pageText(page), footer: short })) };
   }
 
-  // Cut the pages on the verses all the translations share, sized by the longest side so each column still fits.
+  // Cut the pages on the verses all the translations share, sized by the longest one, so that all of them stacked still fit.
   const numbers = [...new Set(found.flatMap((f) => f.verses.map((v) => v.verse)))].sort((a, b) => a - b);
   const byVerse = found.map((f) => new Map(f.verses.map((v) => [v.verse, v.text])));
   const sizing: VerseLine[] = numbers.map((verse) => ({ verse, text: byVerse.reduce((longest, m) => ((m.get(verse) ?? "").length > longest.length ? m.get(verse)! : longest), "") }));
   const footer = found.map((f) => shortName(f.name)).join(" · ");
-  const maxChars = found.length === 2 ? MAX_SLIDE_CHARS : Math.round(MAX_SLIDE_CHARS * 0.8);
+  const maxChars = Math.round((MAX_SLIDE_CHARS * 1.1) / found.length);
   return {
     slides: paginateVerses(sizing, maxChars).map((page) => {
       const versions = found

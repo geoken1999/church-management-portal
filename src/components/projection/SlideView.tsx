@@ -34,11 +34,9 @@ export function SlideView({
   }
 
   const versions = slide.kind === "bible" && slide.versions && slide.versions.length > 1 ? slide.versions : null;
-  const longest = versions ? Math.max(...versions.map((v) => v.text.length)) : 0;
   const total = versions ? versions.reduce((sum, v) => sum + v.text.length, 0) : 0;
-  // Two translations sit side by side (each column is about half as wide, so its letters are smaller); more are stacked.
-  const sideBySide = !!versions && versions.length === 2 && mode === "full";
-  const size = !versions ? fontScale(slide.text.length, mode) : sideBySide ? Math.max(1.9, fontScale(longest, "full") * 0.62) : mode === "full" ? Math.max(1.7, fontScale(total, "full") * 0.8) : fontScale(total, mode);
+  // Translations are shown one below the other, so the letters are sized for all of them together.
+  const size = !versions ? fontScale(slide.text.length, mode) : mode === "full" ? Math.max(1.9, fontScale(total, "full") * 0.85) : fontScale(total, mode);
   const label = slide.title;
 
   if (mode === "lower_third") {
@@ -76,7 +74,7 @@ export function SlideView({
     <div style={{ ...root, background: transparent ? "transparent" : t.background, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "5cqw 7cqw", textAlign: "center", boxSizing: "border-box" }}>
       <div key={slide.text + slide.title} style={{ animation: "pv-fade 0.35s ease-out", width: "100%" }}>
         {versions ? (
-          <div style={{ display: "grid", gridTemplateColumns: sideBySide ? "1fr 1fr" : "1fr", gap: sideBySide ? "4cqw" : "1.8cqw", fontSize: `${size}cqw`, lineHeight: 1.25, textAlign: sideBySide ? "left" : "center" }}>
+          <div style={{ display: "grid", gap: "2cqw", fontSize: `${size}cqw`, lineHeight: 1.25 }}>
             {versions.map((v) => (
               <div key={v.name}>
                 <div style={{ fontSize: "0.55em", fontWeight: 700, letterSpacing: "0.08em", opacity: 0.6, marginBottom: "0.4em" }}>{v.name}</div>

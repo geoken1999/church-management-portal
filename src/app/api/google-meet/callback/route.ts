@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { checkOAuthState } from "@/lib/conferencing/oauth-state";
 import { requireUser } from "@/lib/auth/dal";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { exchangeMeetCode, fetchGoogleUser } from "@/lib/conferencing/google-meet";
@@ -7,7 +7,6 @@ import { sealSecret } from "@/lib/security/connection-secrets";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteUrl } from "@/lib/site-url";
 
-const STATE_COOKIE = "meet_oauth_state";
 const back = (status: string) => NextResponse.redirect(`${getSiteUrl()}/dashboard/kconnect/conferencing?status=${status}`);
 
 export async function GET(request: Request) {
@@ -18,12 +17,8 @@ export async function GET(request: Request) {
   const membership = await requireOrganization();
   if (membership.role !== "owner" && membership.role !== "admin") return back("forbidden");
 
-  const cookieStore = await cookies();
-  const expected = cookieStore.get(STATE_COOKIE)?.value;
-  cookieStore.delete(STATE_COOKIE);
   const code = searchParams.get("code");
-  const state = searchParams.get("state");
-  if (!code || !state || !expected || state !== expected) return back("invalid_state");
+  if (!code || !checkOAuthState(searchParams.get("state"), user.id, membership.organization.id, "google_meet")) return back("invalid_state");
 
   try {
     const tokens = await exchangeMeetCode(code);

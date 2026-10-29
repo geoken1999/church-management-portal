@@ -30,7 +30,10 @@ const STATUS: Record<string, string> = {
   forbidden: "Only an owner or admin can connect an account.",
   invalid_state: "That sign-in expired. Please try again.",
   failed: "Couldn't connect the account. Please try again.",
-  save_failed: "Connected, but it couldn't be saved. Please try again.",
+  token_failed: "The provider didn't accept the sign-in. Check that the redirect URL and the Client ID and Secret in the app match the server's settings, then try again.",
+  profile_failed: "Signed in, but the account's details couldn't be read. Check that the app has the user:read:user scope (Zoom) or that the Google Meet API is enabled.",
+  encryption_failed: "The server's CONNECTION_SECRETS_KEY is missing or not valid (it must be 32 bytes in base64: openssl rand -base64 32).",
+  save_failed: "Connected, but it couldn't be saved. Make sure the database update for Zoom and Google Meet (migration 0233) has been applied.",
   not_configured: "This isn't set up on the server yet.",
 };
 

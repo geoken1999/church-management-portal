@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Building2,
   LifeBuoy,
+  MessageSquareHeart,
   HeartPulse,
   ScrollText,
   HandCoins,
@@ -85,6 +86,12 @@ const NAV_ITEMS = [
     href: "/platform-admin/support",
     label: "Support",
     icon: LifeBuoy,
+    exact: false,
+  },
+  {
+    href: "/platform-admin/feedback",
+    label: "Feedback",
+    icon: MessageSquareHeart,
     exact: false,
   },
   {

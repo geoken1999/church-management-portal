@@ -2389,6 +2389,24 @@ export type PayrollEntry = {
   created_at: string;
 };
 
+export type AppFeedbackRow = {
+  id: string;
+  source: "web" | "android" | "ios";
+  organization_id: string | null;
+  auth_user_id: string | null;
+  user_name: string | null;
+  user_email: string | null;
+  role: string | null;
+  rating: number;
+  category: "praise" | "idea" | "problem" | "other";
+  message: string;
+  screen: string | null;
+  app_version: string | null;
+  device: string | null;
+  status: "new" | "reviewed" | "archived";
+  created_at: string;
+};
+
 export type DesignRow = {
   id: string;
   organization_id: string;
@@ -3383,6 +3401,12 @@ export type Database = {
         Row: PayrollEntry;
         Insert: Partial<PayrollEntry> & Pick<PayrollEntry, "run_id" | "organization_id" | "employee_name" | "basic" | "net">;
         Update: Partial<PayrollEntry>;
+        Relationships: [];
+      };
+      app_feedback: {
+        Row: AppFeedbackRow;
+        Insert: Partial<AppFeedbackRow> & Pick<AppFeedbackRow, "source" | "rating">;
+        Update: Partial<AppFeedbackRow>;
         Relationships: [];
       };
       designs: {

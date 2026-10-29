@@ -68,6 +68,7 @@ import { WelcomeTour } from "@/components/dashboard/WelcomeTour";
 import { SpotlightTour, type SpotlightStep } from "@/components/dashboard/SpotlightTour";
 import { completeTour } from "@/lib/organizations/actions";
 import { LogoutButton } from "@/components/auth/LogoutButton";
+import { FeedbackButton } from "@/components/feedback/FeedbackButton";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggleLoader";
 import { CreditBalances, type CreditWallet } from "@/components/dashboard/CreditBalances";
@@ -499,6 +500,7 @@ function DashboardShellInner({
               <CreditBalances sms={creditBalances.sms} ai={creditBalances.ai} email={creditBalances.email} />
               <ThemeToggle />
               <LanguageSwitcher />
+              <FeedbackButton />
               <NotificationBell organizationId={organization.id} initialNotifications={notifications} />
               <Link
                 href="/dashboard/profile"

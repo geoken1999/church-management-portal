@@ -67,6 +67,42 @@ const ASSIGN_PLAN_ITEM_TOOL: ToolDefinition = {
   },
 };
 
+const RESCHEDULE_PLAN_TOOL: ToolDefinition = {
+  type: "function",
+  function: {
+    name: "reschedule_plan",
+    description:
+      "Move a whole Planner schedule so its first timed step starts at a new time of day. Every timed step moves by the same amount, so the gaps between steps stay the same. Use it for 'start the service at 10 AM'.",
+    parameters: {
+      type: "object",
+      properties: {
+        plan_title: { type: "string", description: "The title of the plan (or part of it)." },
+        new_start_time: { type: "string", description: 'The new start of the first step, "HH:MM" 24-hour (10 AM is "10:00", 6:30 PM is "18:30").' },
+      },
+      required: ["plan_title", "new_start_time"],
+    },
+  },
+};
+
+const UPDATE_PLAN_ITEM_TOOL: ToolDefinition = {
+  type: "function",
+  function: {
+    name: "update_plan_item",
+    description: "Change one existing step of a Planner plan: its wording and/or its start and end time. Give only what should change.",
+    parameters: {
+      type: "object",
+      properties: {
+        plan_title: { type: "string", description: "The title of the plan (or part of it)." },
+        item_text: { type: "string", description: "The current text of the step (or part of it)." },
+        new_text: { type: "string", description: "New wording. Optional." },
+        start_time: { type: "string", description: 'New start, "HH:MM" 24-hour. Optional.' },
+        end_time: { type: "string", description: 'New end, "HH:MM" 24-hour. Optional.' },
+      },
+      required: ["plan_title", "item_text"],
+    },
+  },
+};
+
 const EVENT_TOOL: ToolDefinition = {
   type: "function",
   function: {
@@ -148,7 +184,7 @@ export function getWriteTools(actor: AuraActor | undefined): ToolDefinition[] {
   return [
     ...(actor.canWrite.events ? [EVENT_TOOL] : []),
     ...(actor.canWrite.todos ? [TODO_TOOL, ASSIGN_TODO_TOOL] : []),
-    ...(actor.canWrite.planner ? [PLAN_TOOL, PLAN_ITEM_TOOL, ASSIGN_PLAN_ITEM_TOOL] : []),
+    ...(actor.canWrite.planner ? [PLAN_TOOL, PLAN_ITEM_TOOL, ASSIGN_PLAN_ITEM_TOOL, RESCHEDULE_PLAN_TOOL, UPDATE_PLAN_ITEM_TOOL] : []),
   ];
 }
 
@@ -290,6 +326,55 @@ async function assignPlanItem(organizationId: string, args: ToolArgs) {
   return { ok: true, assigned: "plan step", step: item.person.name, plan: row.title, to: leader.person.name };
 }
 
+const TIME_OF_DAY = /^([01]\d|2[0-3]):[0-5]\d$/;
+const toMinutes = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
+const fromMinutes = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+
+async function findPlan(organizationId: string, title: string) {
+  const admin = createAdminClient();
+  const { data: plans } = await admin.from("plans").select("id, title, items").eq("organization_id", organizationId);
+  const found = pickByName((plans ?? []).map((p) => ({ id: p.id, name: p.title })), title, "plan");
+  if ("error" in found) return found;
+  const row = (plans ?? []).find((p) => p.id === found.person.id)!;
+  return { row: { id: row.id, title: row.title, items: (row.items ?? []) as PlanItem[] } };
+}
+
+async function reschedulePlan(organizationId: string, args: ToolArgs) {
+  const newStart = text(args.new_start_time);
+  if (!TIME_OF_DAY.test(newStart)) return { error: 'The new start time must look like "10:00" (24-hour).' };
+  const plan = await findPlan(organizationId, text(args.plan_title));
+  if ("error" in plan) return plan;
+  const { row } = plan;
+  const timed = row.items.filter((i) => i.startTime);
+  if (timed.length === 0) return { error: "That plan has no timed steps to move." };
+  const shift = toMinutes(newStart) - Math.min(...timed.map((i) => toMinutes(i.startTime!)));
+  const moved = (t: string | null) => (t ? toMinutes(t) + shift : null);
+  const all = row.items.flatMap((i) => [moved(i.startTime), moved(i.endTime)]).filter((m): m is number => m !== null);
+  if (all.some((m) => m < 0 || m >= 24 * 60)) return { error: "Moving it to that time would push some steps past midnight, so nothing was changed." };
+  const items = row.items.map((i) => ({ ...i, startTime: i.startTime ? fromMinutes(moved(i.startTime)!) : null, endTime: i.endTime ? fromMinutes(moved(i.endTime)!) : null }));
+  const { error } = await createAdminClient().from("plans").update({ items }).eq("id", row.id);
+  if (error) return { error: "Couldn't change that schedule." };
+  return { ok: true, plan: row.title, shifted_by_minutes: shift, schedule: items.map((i) => ({ time: i.startTime, step: i.text })) };
+}
+
+async function updatePlanItem(organizationId: string, args: ToolArgs) {
+  const plan = await findPlan(organizationId, text(args.plan_title));
+  if ("error" in plan) return plan;
+  const { row } = plan;
+  const item = pickByName(row.items.map((i) => ({ id: i.id, name: i.text })), text(args.item_text), "step in that plan");
+  if ("error" in item) return item;
+  const current = row.items.find((i) => i.id === item.person.id)!;
+  const newText = text(args.new_text) || current.text;
+  const startTime = args.start_time !== undefined && text(args.start_time) ? text(args.start_time) : current.startTime ?? "";
+  const endTime = args.end_time !== undefined && text(args.end_time) ? text(args.end_time) : current.endTime ?? "";
+  const timeError = validateItemTimeRange(startTime, endTime);
+  if (timeError) return { error: timeError };
+  const items = row.items.map((i) => (i.id === current.id ? { ...i, text: newText, startTime: startTime || null, endTime: endTime || null } : i));
+  const { error } = await createAdminClient().from("plans").update({ items }).eq("id", row.id);
+  if (error) return { error: "Couldn't change that step." };
+  return { ok: true, plan: row.title, step: newText, start: startTime || null, end: endTime || null };
+}
+
 async function createTodo(organizationId: string, actor: AuraActor, args: ToolArgs) {
   let assignee = "";
   let assigneeName: string | null = null;
@@ -382,11 +467,13 @@ async function addPlanItem(organizationId: string, args: ToolArgs) {
 
 // undefined = not a write tool.
 export async function executeWriteTool(organizationId: string, actor: AuraActor | undefined, name: string, args: ToolArgs): Promise<unknown> {
-  const need = name === "create_event" ? "events" : name === "create_todo" || name === "assign_todo" ? "todos" : name === "create_plan" || name === "add_plan_item" || name === "assign_plan_item" ? "planner" : null;
+  const need = name === "create_event" ? "events" : name === "create_todo" || name === "assign_todo" ? "todos" : name === "create_plan" || name === "add_plan_item" || name === "assign_plan_item" || name === "reschedule_plan" || name === "update_plan_item" ? "planner" : null;
   if (!need) return undefined;
   if (!actor?.canWrite[need]) return { error: "You don't have permission to add that." };
   if (name === "create_event") return createEvent(organizationId, actor, args);
   if (name === "create_todo") return createTodo(organizationId, actor, args);
+  if (name === "reschedule_plan") return reschedulePlan(organizationId, args);
+  if (name === "update_plan_item") return updatePlanItem(organizationId, args);
   if (name === "assign_todo") return assignTodo(organizationId, actor, args);
   if (name === "assign_plan_item") return assignPlanItem(organizationId, args);
   if (name === "add_plan_item") return addPlanItem(organizationId, args);

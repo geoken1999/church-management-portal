@@ -20,6 +20,15 @@ export function SlideView({
   const font = t.font === "serif" ? "Georgia, 'Times New Roman', serif" : "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
   const root: CSSProperties = { containerType: "inline-size", width: "100%", height: "100%", fontFamily: font, color: t.color };
 
+  // The church's banner can stay up on its own between verses, in lower-third mode.
+  if (!slide && mode === "lower_third" && t.bannerImage && t.bannerAlways) {
+    return (
+      <div style={{ ...root, background: "transparent", position: "relative" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={t.bannerImage} alt="" style={{ position: "absolute", left: 0, right: 0, bottom: 0, width: "100%", height: "auto", display: "block" }} />
+      </div>
+    );
+  }
   if (!slide) return <div style={{ ...root, background: transparent || mode === "lower_third" ? "transparent" : t.background }} />;
 
   // A PowerPoint slide is a picture, and always fills the whole screen, whatever the mode: a lower-third bar has no
@@ -43,12 +52,13 @@ export function SlideView({
     // A bar along the bottom, over the video. A banner picture, when the church chose one, fills the bar behind the
     // words, under a wash of the screen colour so they stay readable.
     const wash = Math.round((t.bannerShade / 100) * 255).toString(16).padStart(2, "0");
-    const bar: CSSProperties = t.bannerImage
+    const strip = !!t.bannerImage && t.bannerStyle === "below";
+    const bar: CSSProperties = t.bannerImage && !strip
       ? { background: `linear-gradient(${t.background}${wash}, ${t.background}${wash}), url("${t.bannerImage}") center / cover no-repeat` }
       : { background: `${t.background}e6` };
     return (
       <div style={{ ...root, background: "transparent", position: "relative" }}>
-        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, ...bar, padding: "1.6cqw 4cqw 1.8cqw", borderTop: `0.3cqw solid ${t.color}33`, animation: "pv-fade 0.35s ease-out" }}>
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, ...bar, padding: strip ? "1.6cqw 4cqw 0" : "1.6cqw 4cqw 1.8cqw", borderTop: `0.3cqw solid ${t.color}33`, animation: "pv-fade 0.35s ease-out" }}>
           {versions ? (
             <div style={{ fontSize: `${size}cqw`, lineHeight: 1.25, display: "grid", gap: "0.6cqw" }}>
               {versions.map((v) => (
@@ -65,6 +75,10 @@ export function SlideView({
             <span style={{ fontWeight: 700 }}>{label}</span>
             <span>{slide.footer}</span>
           </div>
+          {strip && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={t.bannerImage} alt="" style={{ display: "block", width: "calc(100% + 8cqw)", marginLeft: "-4cqw", marginTop: "1.4cqw", height: "auto" }} />
+          )}
         </div>
       </div>
     );

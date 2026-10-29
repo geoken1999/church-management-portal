@@ -17,12 +17,15 @@ export function cleanTheme(input: unknown): ProjectionTheme {
   // The banner address ends up inside url("..."), so only a plain https address is let through.
   if (typeof raw.bannerImage === "string" && raw.bannerImage.length < 300 && /^https:\/\/[^\s"'()\\<>]+$/.test(raw.bannerImage)) theme.bannerImage = raw.bannerImage;
   if (typeof raw.bannerShade === "number" && Number.isFinite(raw.bannerShade)) theme.bannerShade = Math.min(100, Math.max(0, Math.round(raw.bannerShade)));
+  if (raw.bannerStyle === "behind" || raw.bannerStyle === "below") theme.bannerStyle = raw.bannerStyle;
+  if (raw.bannerAlways === true) theme.bannerAlways = true;
   return theme;
 }
 
-export const withDefaults = (theme: ProjectionTheme | null | undefined): Required<Pick<ProjectionTheme, "background" | "color" | "font">> & Pick<ProjectionTheme, "bannerImage"> & { bannerShade: number } => ({
+export const withDefaults = (theme: ProjectionTheme | null | undefined): Required<Pick<ProjectionTheme, "background" | "color" | "font">> & Pick<ProjectionTheme, "bannerImage" | "bannerAlways"> & { bannerShade: number; bannerStyle: "behind" | "below" } => ({
   ...DEFAULT_THEME,
   bannerShade: DEFAULT_BANNER_SHADE,
+  bannerStyle: "behind" as const,
   ...(theme ?? {}),
 });
 

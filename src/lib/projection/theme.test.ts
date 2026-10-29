@@ -29,6 +29,13 @@ describe("banner", () => {
   });
 });
 
+describe("banner placement", () => {
+  it("keeps only known placements", () => {
+    expect(cleanTheme({ bannerStyle: "below", bannerAlways: true })).toEqual({ bannerStyle: "below", bannerAlways: true });
+    expect(cleanTheme({ bannerStyle: "over", bannerAlways: "yes" })).toEqual({});
+  });
+});
+
 describe("fontScale", () => {
   it("is smaller for longer text, and smaller in the lower third", () => {
     expect(fontScale(30, "full")).toBeGreaterThan(fontScale(300, "full"));

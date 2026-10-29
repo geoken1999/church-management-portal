@@ -720,7 +720,7 @@ function BannerSetting({ theme, canWrite, onTheme }: { theme: ProjectionTheme; c
       const storage = createBrowserClient().storage.from("projection-slides");
       const { error: uploadError } = await storage.uploadToSignedUrl(start.slots[0].path, start.slots[0].token, blob, { contentType: "image/jpeg" });
       if (uploadError) return setError(`The upload failed (${uploadError.message}). Check your connection and try again.`);
-      onTheme({ ...theme, bannerImage: storage.getPublicUrl(start.slots[0].path).data.publicUrl, bannerShade: shade });
+      onTheme({ ...theme, bannerImage: storage.getPublicUrl(start.slots[0].path).data.publicUrl, bannerShade: shade, bannerStyle: theme.bannerStyle ?? "below" });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't use that picture.");
     } finally {
@@ -731,7 +731,7 @@ function BannerSetting({ theme, canWrite, onTheme }: { theme: ProjectionTheme; c
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
       <p className="text-sm font-medium">Lower-third banner picture <span className="font-normal text-muted-foreground">(optional)</span></p>
-      <p className="text-xs text-muted-foreground">Shown behind the words when the screen is in lower-third mode. A wide picture works best.</p>
+      <p className="text-xs text-muted-foreground">Your church&apos;s banner for the lower-third screen: a wide picture, such as the church name and logo. It can sit as a strip under the verse or behind it.</p>
       <div className="flex flex-wrap items-center gap-3">
         {t.bannerImage && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -750,6 +750,21 @@ function BannerSetting({ theme, canWrite, onTheme }: { theme: ProjectionTheme; c
         )}
       </div>
       {t.bannerImage && (
+        <div className="space-y-2">
+          <label className="flex items-center gap-3 text-sm">
+            <span className="w-28 shrink-0">Placed</span>
+            <select value={t.bannerStyle} disabled={!canWrite} onChange={(e) => onTheme({ ...theme, bannerStyle: e.target.value === "below" ? "below" : "behind" })} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+              <option value="below">As a strip under the verse (shown whole)</option>
+              <option value="behind">Behind the verse words</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={!!t.bannerAlways} disabled={!canWrite} onChange={(e) => onTheme({ ...theme, bannerAlways: e.target.checked })} />
+            Keep the banner on screen between verses
+          </label>
+        </div>
+      )}
+      {t.bannerImage && t.bannerStyle === "behind" && (
         <label className="flex items-center gap-3 text-sm">
           <span className="w-28 shrink-0">Darken for reading</span>
           <input

@@ -7,6 +7,7 @@ const PUBLIC_ROUTES = ["/login", "/signup"];
 const PUBLIC_PREFIXES = ["/auth"];
 const PROTECTED_PREFIXES = [
   "/dashboard",
+  "/projection-dock",
   "/onboarding",
   "/broadcast",
   "/class-room",

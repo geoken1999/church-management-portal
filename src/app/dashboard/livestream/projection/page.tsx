@@ -2,16 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { requireOrganization } from "@/lib/organizations/dal";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { listTranslations } from "@/lib/projection/bible";
-import { ensureScreen } from "@/lib/projection/service";
-import { cleanTheme } from "@/lib/projection/theme";
-import { presentationSlides } from "@/lib/projection/slides";
 import { getSiteUrl } from "@/lib/site-url";
-import { ProjectionConsole, type ConsoleItem } from "@/components/projection/ProjectionConsole";
+import { loadConsoleData } from "@/lib/projection/console-data";
+import { ProjectionConsole } from "@/components/projection/ProjectionConsole";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 import { Button } from "@/components/ui/button";
-import type { ProjectionItem } from "@/types/database";
 
 export const metadata: Metadata = { title: "Verse projection | KingdomFlow" };
 export const dynamic = "force-dynamic";
@@ -23,26 +18,7 @@ export default async function ProjectionPage() {
   if (!access.read) return <AccessRestricted label="Live stream" />;
   const organizationId = membership.organization.id;
 
-  const [screen, translations, { data: items }, { data: custom }] = await Promise.all([
-    ensureScreen(organizationId),
-    listTranslations(organizationId),
-    createAdminClient().from("projection_items").select("*").eq("organization_id", organizationId).order("title"),
-    createAdminClient().from("bible_translations").select("id").eq("organization_id", organizationId),
-  ]);
-  const customIds = new Set((custom ?? []).map((c) => c.id));
-  // A presentation's slides are stored pictures; the console gets them as ready-to-show slides.
-  const slideStore = createAdminClient().storage.from("projection-slides");
-  const consoleItems: ConsoleItem[] = ((items ?? []) as ProjectionItem[]).map((item) =>
-    item.kind === "presentation"
-      ? {
-          ...item,
-          imageSlides: presentationSlides(
-            item.title,
-            (item.slide_images ?? []).map((s) => ({ url: slideStore.getPublicUrl(s.path).data.publicUrl, text: s.text })),
-          ),
-        }
-      : item,
-  );
+  const data = await loadConsoleData(organizationId);
 
   return (
     <div className="space-y-6">
@@ -56,11 +32,11 @@ export default async function ProjectionPage() {
       </div>
       <ProjectionConsole
         organizationId={organizationId}
-        token={screen.token}
+        token={data.token}
         siteUrl={getSiteUrl()}
-        initial={{ visible: screen.visible, mode: screen.mode, slide: screen.slide, theme: cleanTheme(screen.theme) }}
-        items={consoleItems}
-        translations={translations.map((t) => ({ key: t.key, name: t.name, note: t.note, customId: t.key.startsWith("custom:") && customIds.has(t.key.slice(7)) ? t.key.slice(7) : undefined }))}
+        initial={data.initial}
+        items={data.items}
+        translations={data.translations}
         canWrite={access.write}
       />
     </div>

@@ -50,7 +50,7 @@ interface ScreenState {
   theme: ProjectionTheme;
 }
 
-type Tab = "bible" | "library" | "settings";
+type Tab = "bible" | "library" | "settings" | "queue";
 
 // The operator's side of verse projection: look up a verse, pick a song slide or announcement, and put it on the screen.
 export function ProjectionConsole({
@@ -61,7 +61,10 @@ export function ProjectionConsole({
   items,
   translations,
   canWrite,
+  dock = false,
 }: {
+  /** The compact single-column layout for an OBS custom browser dock. */
+  dock?: boolean;
   organizationId: string;
   token: string;
   siteUrl: string;
@@ -129,11 +132,95 @@ export function ProjectionConsole({
 
   const projectorUrl = `${siteUrl}/projector/${token}`;
   const obsUrl = `${projectorUrl}?bg=transparent`;
+  const dockUrl = `${siteUrl}/projection-dock`;
   function copy(label: string, text: string) {
     navigator.clipboard?.writeText(text).then(() => {
       setCopied(label);
       setTimeout(() => setCopied(null), 1500);
     });
+  }
+
+  const queueCard = (
+    <Card>
+      <CardContent className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="font-medium">Order of service</p>
+          {queue.length > 0 && (
+            <Button type="button" size="sm" variant="ghost" onClick={() => saveQueue([])}>
+              Clear
+            </Button>
+          )}
+        </div>
+        {queue.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Add verses and slides here before the service, then tap them in turn. It is kept in this browser.</p>
+        ) : (
+          <ol className="grid gap-2 sm:grid-cols-2">
+            {queue.map((slide, i) => (
+              <li key={`${slide.title}-${i}`} className="flex items-center gap-2 rounded-lg border border-border p-2 text-sm">
+                <span className="w-5 shrink-0 text-center text-xs text-muted-foreground">{i + 1}</span>
+                <button type="button" className="min-w-0 flex-1 text-left" disabled={!canWrite} onClick={() => project(slide)}>
+                  <span className="block truncate font-medium">{slide.title}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{slide.text}</span>
+                </button>
+                <Button type="button" size="icon-sm" variant="ghost" aria-label="Remove" onClick={() => saveQueue(queue.filter((_, j) => j !== i))}>
+                  <X className="size-4" />
+                </Button>
+              </li>
+            ))}
+          </ol>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  if (dock) {
+    return (
+      <div className="space-y-3 p-3">
+        <ErrorToast message={error} />
+        <div className="overflow-hidden rounded-lg border border-border" style={{ aspectRatio: "16 / 9", background: withDefaults(screen.theme).background }}>
+          <SlideView slide={screen.visible ? screen.slide : null} mode={screen.mode} theme={screen.theme} />
+        </div>
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          {screen.visible && screen.slide ? <Monitor className="size-3.5 text-primary" /> : <MonitorOff className="size-3.5" />}
+          {screen.visible && screen.slide ? `On screen: ${screen.slide.title}` : "Screen is blank"}
+        </p>
+        {canWrite && (
+          <div className="flex flex-wrap gap-1.5">
+            <Button type="button" size="sm" variant={screen.visible ? "destructive" : "default"} onClick={toggleVisible} disabled={!screen.slide && !screen.visible}>
+              {screen.visible ? (
+                <>
+                  <EyeOff className="size-4" /> Blank
+                </>
+              ) : (
+                "Show again"
+              )}
+            </Button>
+            <Button type="button" size="sm" variant={screen.mode === "full" ? "default" : "outline"} onClick={() => changeMode("full")}>
+              Full
+            </Button>
+            <Button type="button" size="sm" variant={screen.mode === "lower_third" ? "default" : "outline"} onClick={() => changeMode("lower_third")}>
+              Lower third
+            </Button>
+          </div>
+        )}
+        <div className="flex flex-wrap gap-1.5">
+          {(
+            [
+              ["bible", "Bible", BookOpen],
+              ["library", "Songs", Music],
+              ["queue", `Order${queue.length ? ` (${queue.length})` : ""}`, ListPlus],
+            ] as const
+          ).map(([key, label, Icon]) => (
+            <Button key={key} type="button" size="sm" variant={tab === key ? "default" : "outline"} onClick={() => setTab(key)}>
+              <Icon className="size-4" /> {label}
+            </Button>
+          ))}
+        </div>
+        {tab === "bible" && <BiblePanel translations={translations} canWrite={canWrite} onProject={project} onQueue={(s) => saveQueue([...queue, ...s])} onError={setError} />}
+        {tab === "library" && <LibraryPanel items={items} canWrite={canWrite} onProject={project} onQueue={(s) => saveQueue([...queue, ...s])} run={run} />}
+        {tab === "queue" && queueCard}
+      </div>
+    );
   }
 
   return (
@@ -172,7 +259,9 @@ export function ProjectionConsole({
             <p className="font-medium">Projector links</p>
             <LinkRow label="Screen in the hall" url={projectorUrl} copied={copied === "screen"} onCopy={() => copy("screen", projectorUrl)} />
             <LinkRow label="OBS browser source (over video)" url={obsUrl} copied={copied === "obs"} onCopy={() => copy("obs", obsUrl)} />
-            <p className="text-muted-foreground">Anyone with a link can see what is on the screen. {canWrite && "If one is shared by mistake, reset the link in Settings."}</p>
+            <LinkRow label="OBS control dock (sign in once inside OBS)" url={dockUrl} copied={copied === "dock"} onCopy={() => copy("dock", dockUrl)} />
+            <p className="text-muted-foreground">In OBS: View → Docks → Custom Browser Docks, add this link, and the controls sit beside your scenes.</p>
+            <p className="text-muted-foreground">Anyone with the first two links can see what is on the screen. {canWrite && "If one is shared by mistake, reset the link in Settings."}</p>
           </div>
         </div>
 
@@ -208,36 +297,7 @@ export function ProjectionConsole({
         </div>
       </div>
 
-      <Card>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="font-medium">Order of service</p>
-            {queue.length > 0 && (
-              <Button type="button" size="sm" variant="ghost" onClick={() => saveQueue([])}>
-                Clear
-              </Button>
-            )}
-          </div>
-          {queue.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Add verses and slides here before the service, then tap them in turn. It is kept in this browser.</p>
-          ) : (
-            <ol className="grid gap-2 sm:grid-cols-2">
-              {queue.map((slide, i) => (
-                <li key={`${slide.title}-${i}`} className="flex items-center gap-2 rounded-lg border border-border p-2 text-sm">
-                  <span className="w-5 shrink-0 text-center text-xs text-muted-foreground">{i + 1}</span>
-                  <button type="button" className="min-w-0 flex-1 text-left" disabled={!canWrite} onClick={() => project(slide)}>
-                    <span className="block truncate font-medium">{slide.title}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{slide.text}</span>
-                  </button>
-                  <Button type="button" size="icon-sm" variant="ghost" aria-label="Remove" onClick={() => saveQueue(queue.filter((_, j) => j !== i))}>
-                    <X className="size-4" />
-                  </Button>
-                </li>
-              ))}
-            </ol>
-          )}
-        </CardContent>
-      </Card>
+      {queueCard}
     </div>
   );
 }

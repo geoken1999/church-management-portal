@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { ProjectionSlide, ProjectionTheme } from "@/types/database";
 import { fontScale, withDefaults } from "@/lib/projection/theme";
+import { BANNER_HEIGHT_FRACTION } from "@/lib/projection/banner-crop";
 
 // One slide as it appears on the screen. Sizes are in container-width units (cqw), so the same view is the full-screen
 // projector, the OBS overlay and the small preview in the console: it scales with whatever box it is placed in.
@@ -31,13 +32,13 @@ export function SlideView({
   }
   if (!slide) return <div style={{ ...root, background: transparent || mode === "lower_third" ? "transparent" : t.background }} />;
 
-  // A banner picture (contact details, a welcome strip) runs along the bottom, at full width and its own height, in
-  // either mode; over video it has nothing behind it, so a transparent picture lets the video show through.
+  // A banner picture (contact details, a welcome strip) runs along the bottom, full width and 18% of the screen's height,
+  // in either mode; over video it has nothing behind it, so a transparent picture lets the video show through.
   if (slide.kind === "banner" && slide.image) {
     return (
       <div style={{ ...root, background: transparent || mode === "lower_third" ? "transparent" : t.background, position: "relative" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img key={slide.image} src={slide.image} alt={slide.text} style={{ position: "absolute", left: 0, right: 0, bottom: 0, width: "100%", height: "auto", display: "block", animation: "pv-fade 0.35s ease-out" }} />
+        <img key={slide.image} src={slide.image} alt={slide.text} style={{ position: "absolute", left: 0, right: 0, bottom: 0, width: "100%", height: `${BANNER_HEIGHT_FRACTION * 100}%`, objectFit: "cover", display: "block", animation: "pv-fade 0.35s ease-out" }} />
       </div>
     );
   }

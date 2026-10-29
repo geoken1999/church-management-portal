@@ -19,11 +19,10 @@ export function cleanTheme(input: unknown): ProjectionTheme {
   if (typeof raw.bannerShade === "number" && Number.isFinite(raw.bannerShade)) theme.bannerShade = Math.min(100, Math.max(0, Math.round(raw.bannerShade)));
   if (raw.bannerStyle === "behind" || raw.bannerStyle === "below") theme.bannerStyle = raw.bannerStyle;
   if (raw.bannerAlways === true) theme.bannerAlways = true;
-  if (raw.bannerFull === true) theme.bannerFull = true;
   return theme;
 }
 
-export const withDefaults = (theme: ProjectionTheme | null | undefined): Required<Pick<ProjectionTheme, "background" | "color" | "font">> & Pick<ProjectionTheme, "bannerImage" | "bannerAlways" | "bannerFull"> & { bannerShade: number; bannerStyle: "behind" | "below" } => ({
+export const withDefaults = (theme: ProjectionTheme | null | undefined): Required<Pick<ProjectionTheme, "background" | "color" | "font">> & Pick<ProjectionTheme, "bannerImage" | "bannerAlways"> & { bannerShade: number; bannerStyle: "behind" | "below" } => ({
   ...DEFAULT_THEME,
   bannerShade: DEFAULT_BANNER_SHADE,
   bannerStyle: "behind" as const,

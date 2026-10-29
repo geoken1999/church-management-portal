@@ -23,6 +23,7 @@ import type { VerseHit } from "@/lib/projection/bible";
 import type { ProjectionItem, ProjectionSlide, ProjectionTheme } from "@/types/database";
 import { SlideView } from "@/components/projection/SlideView";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
+import { BannerItemForm } from "@/components/projection/BannerItemForm";
 import { PresentationImporter } from "@/components/projection/PresentationImporter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -327,7 +328,7 @@ function SlideButtons({ slides, active, canWrite, onProject, onQueue }: { slides
         <div key={i} className={`flex items-start gap-2 rounded-lg border p-3 ${i === active ? "border-primary bg-primary/5" : "border-border"}`}>
           {slide.image ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={slide.image} alt={slide.text} className="h-16 w-28 shrink-0 rounded border border-border object-cover" loading="lazy" />
+            <img src={slide.image} alt={slide.text} className={`h-16 w-28 shrink-0 rounded border border-border ${slide.kind === "banner" ? "bg-muted object-contain" : "object-cover"}`} loading="lazy" />
           ) : null}
           <div className="min-w-0 flex-1 text-sm">
             <p className="font-medium">{slide.title}</p>
@@ -517,6 +518,7 @@ function LibraryPanel({
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [addingBanner, setAddingBanner] = useState(false);
   const [editing, setEditing] = useState<{ id?: string; kind: "song" | "announcement" | "custom"; title: string; body: string } | null>(null);
 
   if (editing) {
@@ -558,6 +560,7 @@ function LibraryPanel({
   }
 
   if (importing) return <PresentationImporter onDone={() => setImporting(false)} />;
+  if (addingBanner) return <BannerItemForm onDone={() => setAddingBanner(false)} />;
 
   return (
     <div className="space-y-3">
@@ -569,18 +572,21 @@ function LibraryPanel({
           <Button type="button" size="sm" variant="outline" onClick={() => setImporting(true)}>
             <FileUp className="size-4" /> Add a PowerPoint
           </Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => setAddingBanner(true)}>
+            <ImagePlus className="size-4" /> Add a banner picture
+          </Button>
         </div>
       )}
       {items.length === 0 && <p className="text-sm text-muted-foreground">Nothing here yet. Add the songs and announcements you project, then show them a slide at a time.</p>}
       {items.map((item) => {
-        const slides = item.kind === "presentation" ? (item.imageSlides ?? []) : itemSlides(item.kind, item.title, item.body);
+        const slides = item.kind === "presentation" || item.kind === "banner" ? (item.imageSlides ?? []) : itemSlides(item.kind, item.title, item.body);
         return (
           <div key={item.id} className="rounded-lg border border-border">
             <div className="flex items-center gap-2 p-3">
               <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setOpenId(openId === item.id ? null : item.id)}>
                 <span className="block truncate font-medium">{item.title}</span>
                 <span className="text-xs text-muted-foreground">
-                  {item.kind === "song" ? "Song" : item.kind === "announcement" ? "Announcement" : item.kind === "presentation" ? "Presentation" : "Slide"} · {slides.length} slide{slides.length === 1 ? "" : "s"}
+                  {item.kind === "song" ? "Song" : item.kind === "announcement" ? "Announcement" : item.kind === "presentation" ? "Presentation" : item.kind === "banner" ? "Banner picture" : "Slide"} · {slides.length} slide{slides.length === 1 ? "" : "s"}
                 </span>
               </button>
               <Button type="button" size="sm" variant="outline" aria-label="Add all slides to order of service" onClick={() => onQueue(slides)}>
@@ -588,7 +594,7 @@ function LibraryPanel({
               </Button>
               {canWrite && (
                 <>
-                  {item.kind !== "presentation" && (
+                  {item.kind !== "presentation" && item.kind !== "banner" && (
                     <Button type="button" size="sm" variant="outline" onClick={() => setEditing({ id: item.id, kind: item.kind as "song" | "announcement" | "custom", title: item.title, body: item.body })}>
                       Edit
                     </Button>
@@ -820,11 +826,7 @@ function BannerSetting({ theme, canWrite, onTheme }: { theme: ProjectionTheme; c
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={!!t.bannerAlways} disabled={!canWrite} onChange={(e) => onTheme({ ...theme, bannerAlways: e.target.checked })} />
-            Keep the banner on screen between verses (lower third)
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={!!t.bannerFull} disabled={!canWrite} onChange={(e) => onTheme({ ...theme, bannerFull: e.target.checked })} />
-            Also show the banner along the bottom in full screen
+            Keep the banner on screen between verses
           </label>
         </div>
       )}

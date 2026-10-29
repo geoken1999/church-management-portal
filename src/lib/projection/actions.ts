@@ -56,13 +56,13 @@ const ownSlideImage = (url: unknown, organizationId: string): string | undefined
 const cleanSlide = (slide: Slide, organizationId: string): ProjectionSlide | null => {
   const text = String(slide.text ?? "").slice(0, 2000);
   if (!text.trim()) return null;
-  const kind = slide.kind === "bible" || slide.kind === "song" || slide.kind === "announcement" || slide.kind === "presentation" ? slide.kind : "custom";
+  const kind = slide.kind === "bible" || slide.kind === "song" || slide.kind === "announcement" || slide.kind === "presentation" || slide.kind === "banner" ? slide.kind : "custom";
   const image = ownSlideImage(slide.image, organizationId);
   const versions = Array.isArray(slide.versions)
     ? slide.versions.slice(0, 4).map((v) => ({ name: String(v?.name ?? "").slice(0, 40), text: String(v?.text ?? "").slice(0, 2000) })).filter((v) => v.text.trim())
     : [];
   return {
-    kind: image ? "presentation" : kind === "presentation" ? "custom" : kind,
+    kind: image ? (kind === "banner" ? "banner" : "presentation") : kind === "presentation" || kind === "banner" ? "custom" : kind,
     title: String(slide.title ?? "").slice(0, 120),
     text,
     footer: String(slide.footer ?? "").slice(0, 160),
@@ -164,7 +164,7 @@ export interface UploadSlot {
 }
 
 /** Signed links the browser uploads slide pictures to, one per slide. The church's storage allowance is checked first. */
-export async function startSlideUploadAction(count: number, totalBytes: number): Promise<{ error?: string; slots?: UploadSlot[] }> {
+export async function startSlideUploadAction(count: number, totalBytes: number, format: "jpg" | "png" = "jpg"): Promise<{ error?: string; slots?: UploadSlot[] }> {
   const g = await gate("write");
   if ("error" in g) return g;
   if (!Number.isInteger(count) || count < 1) return { error: "There are no slides to upload." };
@@ -175,7 +175,7 @@ export async function startSlideUploadAction(count: number, totalBytes: number):
   const admin = createAdminClient();
   const slots: UploadSlot[] = [];
   for (let i = 0; i < count; i++) {
-    const path = `${g.organizationId}/${randomUUID()}.jpg`;
+    const path = `${g.organizationId}/${randomUUID()}.${format === "png" ? "png" : "jpg"}`;
     const { data, error } = await admin.storage.from(SLIDE_BUCKET).createSignedUploadUrl(path);
     if (error || !data) return { error: "Couldn't start the upload. Please try again." };
     slots.push({ path, token: data.token });
@@ -196,6 +196,21 @@ export async function savePresentationAction(title: string, slides: { path: stri
   const body = images.map((s) => s.text).filter(Boolean).join("\n\n").slice(0, 19000) || cleanTitle;
   const { error } = await createAdminClient().from("projection_items").insert({ organization_id: g.organizationId, kind: "presentation", title: cleanTitle, body, slide_images: images, created_by: g.userId });
   if (error) return { error: "Couldn't save the presentation. Please try again." };
+  revalidatePath(PATH);
+  return {};
+}
+
+/** Saves a banner picture to the library (contact details, a welcome strip), shown along the bottom of the screen. */
+export async function saveBannerItemAction(title: string, path: string): Promise<ProjectionResult> {
+  const g = await gate("write");
+  if ("error" in g) return g;
+  const cleanTitle = title.trim().slice(0, 120);
+  if (!cleanTitle) return { error: "Give the banner a title." };
+  if (!new RegExp(`^${g.organizationId}/[0-9a-f-]{36}\\.(jpg|png)$`).test(path)) return { error: "That picture wasn't uploaded correctly. Please try again." };
+  const { error } = await createAdminClient()
+    .from("projection_items")
+    .insert({ organization_id: g.organizationId, kind: "banner", title: cleanTitle, body: cleanTitle, slide_images: [{ path, text: cleanTitle }], created_by: g.userId });
+  if (error) return { error: "Couldn't save the banner. Please try again." };
   revalidatePath(PATH);
   return {};
 }

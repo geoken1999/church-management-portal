@@ -1,6 +1,6 @@
 // Turning text into the slides that go on the screen. Pure.
 
-export type SlideKind = "bible" | "song" | "announcement" | "custom" | "presentation";
+export type SlideKind = "bible" | "song" | "announcement" | "custom" | "presentation" | "banner";
 
 export interface Slide {
   kind: SlideKind;
@@ -67,7 +67,7 @@ export function splitSlides(body: string): string[] {
     .filter(Boolean);
 }
 
-export function itemSlides(kind: Exclude<SlideKind, "bible" | "presentation">, title: string, body: string): Slide[] {
+export function itemSlides(kind: Exclude<SlideKind, "bible" | "presentation" | "banner">, title: string, body: string): Slide[] {
   const parts = splitSlides(body);
   return parts.map((text, i) => ({ kind, title, text, footer: parts.length > 1 ? `${i + 1} / ${parts.length}` : "" }));
 }
@@ -81,6 +81,11 @@ export function presentationSlides(title: string, images: { url: string; text: s
     footer: `${i + 1} / ${images.length}`,
     image: image.url,
   }));
+}
+
+/** A banner item: one picture shown along the bottom of the screen, like an announcement made as a picture. */
+export function bannerSlide(title: string, url: string): Slide {
+  return { kind: "banner", title, text: title, footer: "", image: url };
 }
 
 /** Lines of the form "John 3:16 For God so loved..." for a church's own translation. */

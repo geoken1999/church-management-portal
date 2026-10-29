@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { resolveBook } from "@/lib/projection/books";
 import { formatReference, parseReference } from "@/lib/projection/reference";
-import { itemSlides, pageReference, pageText, paginateVerses, splitSlides } from "@/lib/projection/slides";
+import { bannerSlide, itemSlides, pageReference, pageText, paginateVerses, splitSlides } from "@/lib/projection/slides";
 import { parseVerseLines } from "@/lib/projection/import";
 
 describe("resolveBook", () => {
@@ -87,5 +87,11 @@ describe("parseVerseLines", () => {
     expect(problems).toHaveLength(2);
     expect(problems[0]).toContain("Line 1");
     expect(problems[1]).toContain("appears twice");
+  });
+});
+
+describe("bannerSlide", () => {
+  it("is one picture slide with the title as its words", () => {
+    expect(bannerSlide("Contact us", "https://x/a.png")).toEqual({ kind: "banner", title: "Contact us", text: "Contact us", footer: "", image: "https://x/a.png" });
   });
 });

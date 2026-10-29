@@ -350,8 +350,8 @@ export type ExternalLiveStream = {
   created_by: string | null;
 };
 
-export type ProjectionSlide = { kind: "bible" | "song" | "announcement" | "custom" | "presentation"; title: string; text: string; footer: string; /** A picture to show across the whole screen (a PowerPoint slide). */ image?: string; /** A Bible passage in several translations at once; `text` holds them joined, for screens that only show text. */ versions?: { name: string; text: string }[] };
-export type ProjectionTheme = { background?: string; color?: string; font?: "sans" | "serif"; /** A picture behind the lower-third bar (an address in the projection-slides storage). */ bannerImage?: string; /** How strongly the bar's colour covers the banner picture, 0-100, so the words stay readable. */ bannerShade?: number; /** "behind": the picture fills the bar behind the words; "below": it is a strip along the bottom of the bar, under them. */ bannerStyle?: "behind" | "below"; /** Keep the banner on screen (lower-third mode) even when no verse is showing. */ bannerAlways?: boolean; /** Also run the banner along the bottom of full-screen slides. */ bannerFull?: boolean };
+export type ProjectionSlide = { kind: "bible" | "song" | "announcement" | "custom" | "presentation" | "banner"; title: string; text: string; footer: string; /** A picture to show across the whole screen (a PowerPoint slide). */ image?: string; /** A Bible passage in several translations at once; `text` holds them joined, for screens that only show text. */ versions?: { name: string; text: string }[] };
+export type ProjectionTheme = { background?: string; color?: string; font?: "sans" | "serif"; /** A picture behind the lower-third bar (an address in the projection-slides storage). */ bannerImage?: string; /** How strongly the bar's colour covers the banner picture, 0-100, so the words stay readable. */ bannerShade?: number; /** "behind": the picture fills the bar behind the words; "below": it is a strip along the bottom of the bar, under them. */ bannerStyle?: "behind" | "below"; /** Keep the banner on screen (lower-third mode) even when no verse is showing. */ bannerAlways?: boolean; };
 export type ProjectionScreen = {
   id: string;
   organization_id: string;
@@ -365,7 +365,7 @@ export type ProjectionScreen = {
 export type ProjectionItem = {
   id: string;
   organization_id: string;
-  kind: "song" | "announcement" | "custom" | "presentation";
+  kind: "song" | "announcement" | "custom" | "presentation" | "banner";
   title: string;
   body: string;
   /** A presentation's slides: the stored pictures in order, each with the text found on the slide. */

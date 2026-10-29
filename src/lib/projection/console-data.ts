@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { listTranslations } from "@/lib/projection/bible";
 import { ensureScreen } from "@/lib/projection/service";
 import { cleanTheme } from "@/lib/projection/theme";
-import { presentationSlides } from "@/lib/projection/slides";
+import { bannerSlide, presentationSlides } from "@/lib/projection/slides";
 import type { ConsoleItem, ConsoleTranslation } from "@/components/projection/ProjectionConsole";
 import type { ProjectionItem } from "@/types/database";
 
@@ -20,7 +20,9 @@ export async function loadConsoleData(organizationId: string) {
   // A presentation's slides are stored pictures; the console gets them as ready-to-show slides.
   const slideStore = createAdminClient().storage.from("projection-slides");
   const consoleItems: ConsoleItem[] = ((items ?? []) as ProjectionItem[]).map((item) =>
-    item.kind === "presentation"
+    item.kind === "banner" && item.slide_images?.[0]
+      ? { ...item, imageSlides: [bannerSlide(item.title, slideStore.getPublicUrl(item.slide_images[0].path).data.publicUrl)] }
+      : item.kind === "presentation"
       ? {
           ...item,
           imageSlides: presentationSlides(

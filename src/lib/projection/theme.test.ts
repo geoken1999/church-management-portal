@@ -33,7 +33,6 @@ describe("banner placement", () => {
   it("keeps only known placements", () => {
     expect(cleanTheme({ bannerStyle: "below", bannerAlways: true })).toEqual({ bannerStyle: "below", bannerAlways: true });
     expect(cleanTheme({ bannerStyle: "over", bannerAlways: "yes" })).toEqual({});
-    expect(cleanTheme({ bannerFull: true })).toEqual({ bannerFull: true });
   });
 });
 

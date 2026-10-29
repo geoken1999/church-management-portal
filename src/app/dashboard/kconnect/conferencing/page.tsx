@@ -15,6 +15,9 @@ export const dynamic = "force-dynamic";
 
 // Zoom and Google Meet meetings, made from KingdomFlow with the church's own accounts. Zoom opens inside KingdomFlow
 // with all of Zoom's controls; Google Meet opens in its own tab.
+// What is missing from the server's settings, for an owner or admin to pass on (never shown to other people).
+const missing = (providerKeys: boolean, names: string) => [providerKeys ? null : names, isConnectionSecretsConfigured() ? null : "CONNECTION_SECRETS_KEY"].filter(Boolean).join(" and ");
+
 export default async function ConferencingPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const { status } = await searchParams;
   const membership = await requireOrganization();
@@ -38,8 +41,8 @@ export default async function ConferencingPage({ searchParams }: { searchParams:
         status={status ?? null}
         canWrite={access.write}
         canConnect={membership.role === "owner" || membership.role === "admin"}
-        zoom={{ available: !!getZoomEnv() && isConnectionSecretsConfigured(), account: zoom }}
-        meet={{ available: !!getMeetEnv() && isConnectionSecretsConfigured(), account: meet }}
+        zoom={{ available: !!getZoomEnv() && isConnectionSecretsConfigured(), missing: missing(!!getZoomEnv(), "ZOOM_CLIENT_ID and ZOOM_CLIENT_SECRET"), account: zoom }}
+        meet={{ available: !!getMeetEnv() && isConnectionSecretsConfigured(), missing: missing(!!getMeetEnv(), "GOOGLE_MEET_CLIENT_ID and GOOGLE_MEET_CLIENT_SECRET (or the YouTube ones)"), account: meet }}
         meetings={meetings.map((m) => ({ id: m.id, provider: m.provider, title: m.title, startTime: m.start_time, durationMinutes: m.duration_minutes, joinUrl: m.join_url, passcode: m.passcode }))}
         timezone={membership.organization.timezone}
       />

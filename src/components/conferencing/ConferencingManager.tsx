@@ -46,8 +46,8 @@ export function ConferencingManager({
   status: string | null;
   canWrite: boolean;
   canConnect: boolean;
-  zoom: { available: boolean; account: Account | null };
-  meet: { available: boolean; account: Account | null };
+  zoom: { available: boolean; missing: string; account: Account | null };
+  meet: { available: boolean; missing: string; account: Account | null };
   meetings: Item[];
   timezone: string;
 }) {
@@ -74,8 +74,8 @@ export function ConferencingManager({
       {status === "connected" && <p className="rounded-lg bg-primary/10 px-3 py-2 text-sm text-primary">Account connected.</p>}
 
       <div className="grid gap-4 md:grid-cols-2">
-        <ZoomCard available={zoom.available} account={zoom.account} canWrite={canWrite} canConnect={canConnect} pending={pending} timezone={timezone} run={run} />
-        <MeetCard available={meet.available} account={meet.account} canWrite={canWrite} canConnect={canConnect} pending={pending} run={run} />
+        <ZoomCard missing={zoom.missing} available={zoom.available} account={zoom.account} canWrite={canWrite} canConnect={canConnect} pending={pending} timezone={timezone} run={run} />
+        <MeetCard missing={meet.missing} available={meet.available} account={meet.account} canWrite={canWrite} canConnect={canConnect} pending={pending} run={run} />
       </div>
 
       <div className="space-y-2">
@@ -135,8 +135,14 @@ export function ConferencingManager({
 
 type Run = (task: () => Promise<{ error?: string }>) => void;
 
-function ConnectRow({ label, available, account, canConnect, connectHref, provider, pending, run }: { label: string; available: boolean; account: Account | null; canConnect: boolean; connectHref: string; provider: "zoom" | "google_meet"; pending: boolean; run: Run }) {
-  if (!available) return <p className="text-sm text-muted-foreground">{label} isn&apos;t set up on this server yet. Ask the KingdomFlow team.</p>;
+function ConnectRow({ label, missing, available, account, canConnect, connectHref, provider, pending, run }: { label: string; missing: string; available: boolean; account: Account | null; canConnect: boolean; connectHref: string; provider: "zoom" | "google_meet"; pending: boolean; run: Run }) {
+  if (!available)
+    return (
+      <p className="text-sm text-muted-foreground">
+        {label} isn&apos;t set up on this server yet.{" "}
+        {canConnect && missing ? `The server needs ${missing} in its settings (see .env.example), then a redeploy.` : "Ask the KingdomFlow team."}
+      </p>
+    );
   if (!account)
     return canConnect ? (
       <Button size="sm" nativeButton={false} render={<a href={connectHref} />}>
@@ -160,14 +166,14 @@ function ConnectRow({ label, available, account, canConnect, connectHref, provid
   );
 }
 
-function ZoomCard({ available, account, canWrite, canConnect, pending, timezone, run }: { available: boolean; account: Account | null; canWrite: boolean; canConnect: boolean; pending: boolean; timezone: string; run: Run }) {
+function ZoomCard({ missing, available, account, canWrite, canConnect, pending, timezone, run }: { missing: string; available: boolean; account: Account | null; canWrite: boolean; canConnect: boolean; pending: boolean; timezone: string; run: Run }) {
   const [title, setTitle] = useState("");
   const [startsAt, setStartsAt] = useState("");
   const [minutes, setMinutes] = useState(60);
   return (
     <div className="space-y-3 rounded-xl border border-border p-4">
       <p className="font-medium">Zoom</p>
-      <ConnectRow label="Zoom" available={available} account={account} canConnect={canConnect} connectHref="/api/zoom/connect" provider="zoom" pending={pending} run={run} />
+      <ConnectRow label="Zoom" missing={missing} available={available} account={account} canConnect={canConnect} connectHref="/api/zoom/connect" provider="zoom" pending={pending} run={run} />
       {account && canWrite && (
         <form
           className="space-y-2"
@@ -207,12 +213,12 @@ function ZoomCard({ available, account, canWrite, canConnect, pending, timezone,
   );
 }
 
-function MeetCard({ available, account, canWrite, canConnect, pending, run }: { available: boolean; account: Account | null; canWrite: boolean; canConnect: boolean; pending: boolean; run: Run }) {
+function MeetCard({ missing, available, account, canWrite, canConnect, pending, run }: { missing: string; available: boolean; account: Account | null; canWrite: boolean; canConnect: boolean; pending: boolean; run: Run }) {
   const [title, setTitle] = useState("");
   return (
     <div className="space-y-3 rounded-xl border border-border p-4">
       <p className="font-medium">Google Meet</p>
-      <ConnectRow label="Google Meet" available={available} account={account} canConnect={canConnect} connectHref="/api/google-meet/connect" provider="google_meet" pending={pending} run={run} />
+      <ConnectRow label="Google Meet" missing={missing} available={available} account={account} canConnect={canConnect} connectHref="/api/google-meet/connect" provider="google_meet" pending={pending} run={run} />
       {account && canWrite && (
         <form
           className="space-y-2"

@@ -23,6 +23,7 @@ export default async function DesignerPage() {
       <DesignerGallery
         organizationId={membership.organization.id}
         churchName={membership.organization.name}
+        logoUrl={membership.organization.logo_url}
         designs={designs}
         canWrite={membership.tabAccess.designer.write}
         canDelete={membership.tabAccess.designer.delete}

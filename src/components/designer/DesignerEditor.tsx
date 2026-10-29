@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Pointer
 import Link from "next/link";
 import { ArrowLeft, Download, Image as ImageIcon, Lock, Minus, Plus, Redo2, Square, Circle, Star, Type, Undo2, Save, Building2, Layers, Check } from "lucide-react";
 import { saveDesign } from "@/lib/designer/actions";
+import { readImage } from "@/lib/designer/image-utils";
 import { ICONS, ICON_KEYS, type IconKey } from "@/lib/designer/icons";
 import {
   MAX_ELEMENTS,
@@ -48,34 +49,6 @@ type Mode = "move" | "rotate" | Handle;
 type Status = "saved" | "saving" | "unsaved" | "error";
 
 const rad = (deg: number) => (deg * Math.PI) / 180;
-
-// Reads a picture, shrinks it so the saved design stays light, and returns it as an embedded data URL.
-async function readImage(file: File): Promise<{ src: string; w: number; h: number }> {
-  const bitmapUrl = URL.createObjectURL(file);
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const image = new window.Image();
-      image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error("That picture couldn't be opened."));
-      image.src = bitmapUrl;
-    });
-    const scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
-    const w = Math.max(1, Math.round(img.naturalWidth * scale));
-    const h = Math.max(1, Math.round(img.naturalHeight * scale));
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Your browser can't process pictures.");
-    ctx.drawImage(img, 0, 0, w, h);
-    // Keep transparency for PNGs unless that makes the picture too heavy.
-    let src = file.type === "image/png" ? canvas.toDataURL("image/png") : canvas.toDataURL("image/jpeg", 0.85);
-    if (src.length > 2_000_000) src = canvas.toDataURL("image/jpeg", 0.8);
-    return { src, w, h };
-  } finally {
-    URL.revokeObjectURL(bitmapUrl);
-  }
-}
 
 function fileSlug(name: string): string {
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "design";

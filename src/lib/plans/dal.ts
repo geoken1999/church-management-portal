@@ -660,7 +660,7 @@ export async function checkAiCreditQuota(
 // row-level authorization here.
 export async function recordAiReplyUsage(
   organizationId: string,
-  source: "instagram" | "ask_aura" | "report",
+  source: "instagram" | "ask_aura" | "report" | "design",
   participantId: string | null = null,
 ): Promise<void> {
   const usage = await getPlanUsage(organizationId);

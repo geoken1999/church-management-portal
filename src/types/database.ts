@@ -778,7 +778,7 @@ export type AiReplyUsage = {
   // 'instagram'/'whatsapp' (DM auto-replies) or 'ask_aura' (internal chat
   // tool) — all three draw from the same shared monthly quota/addon pool,
   // tagged here purely for observability.
-  source: "instagram" | "ask_aura" | "whatsapp" | "report";
+  source: "instagram" | "ask_aura" | "whatsapp" | "report" | "design";
   created_at: string;
 };
 

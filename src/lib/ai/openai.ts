@@ -133,3 +133,35 @@ export async function generateJsonCompletion(systemPrompt: string, userContent: 
   const data = (await res.json()) as { choices?: { message?: { content?: string | null } }[] };
   return data.choices?.[0]?.message?.content ?? null;
 }
+
+// Like generateJsonCompletion, but the model can also look at pictures (small previews or public https links).
+// Needs a vision-capable model; the default gpt-4o-mini is one.
+export async function generateVisionJsonCompletion(systemPrompt: string, userText: string, imageUrls: string[], maxTokens = 4000): Promise<string | null> {
+  const { apiKey, model } = getOpenAiEnv();
+
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: [{ type: "text", text: userText }, ...imageUrls.map((url) => ({ type: "image_url", image_url: { url, detail: "low" } }))],
+        },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.8,
+      max_tokens: maxTokens,
+    }),
+    signal: AbortSignal.timeout(90_000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`OpenAI request failed (${res.status}): ${await res.text()}`);
+  }
+
+  const data = (await res.json()) as { choices?: { message?: { content?: string | null } }[] };
+  return data.choices?.[0]?.message?.content ?? null;
+}

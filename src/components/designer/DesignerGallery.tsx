@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Copy, Trash2, Pencil } from "lucide-react";
+import { Plus, Copy, Trash2, Pencil, Sparkles } from "lucide-react";
 import { createDesign, duplicateDesign, deleteDesign } from "@/lib/designer/actions";
 import { SIZE_PRESETS } from "@/lib/designer/model";
 import { TEMPLATES } from "@/lib/designer/templates";
@@ -15,18 +15,21 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ErrorToast } from "@/components/ui/error-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DesignView } from "./DesignView";
+import { AiDesignDialog } from "./AiDesignDialog";
 
 const THUMB = 220;
 
 export function DesignerGallery({
   organizationId,
   churchName,
+  logoUrl,
   designs,
   canWrite,
   canDelete,
 }: {
   organizationId: string;
   churchName: string;
+  logoUrl: string | null;
   designs: DesignListItem[];
   canWrite: boolean;
   canDelete: boolean;
@@ -35,6 +38,7 @@ export function DesignerGallery({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
   const [name, setName] = useState("");
   const [template, setTemplate] = useState("sunday");
   const [size, setSize] = useState("a4");
@@ -84,10 +88,16 @@ export function DesignerGallery({
     <div className="space-y-6">
       <ErrorToast message={error} />
       {canWrite && (
-        <Button onClick={() => setCreating(true)}>
-          <Plus className="size-4" /> New design
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => setAiOpen(true)}>
+            <Sparkles className="size-4" /> Design with AI
+          </Button>
+          <Button variant="outline" onClick={() => setCreating(true)}>
+            <Plus className="size-4" /> New design
+          </Button>
+        </div>
       )}
+      <AiDesignDialog open={aiOpen} onOpenChange={setAiOpen} organizationId={organizationId} churchName={churchName} logoUrl={logoUrl} onError={setError} />
 
       {designs.length === 0 ? (
         <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">

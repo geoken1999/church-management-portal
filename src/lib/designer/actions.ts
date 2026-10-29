@@ -6,6 +6,9 @@ import { requireUser } from "@/lib/auth/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { SIZE_PRESETS, cleanDesignName, normalizeKind, sanitizeDoc, type DesignDoc } from "./model";
 import { buildTemplate } from "./templates";
+import { checkAiCreditQuota, recordAiReplyUsage } from "@/lib/plans/dal";
+import { generateDesignLayout, type AiImageInput } from "./ai";
+import type { ImageSlot } from "./ai-layout";
 
 const DESIGNER_PATH = "/dashboard/studio";
 
@@ -14,18 +17,19 @@ export interface DesignActionResult {
   id?: string;
 }
 
-export async function createDesign(input: { organizationId: string; name: string; template: string; size: string; customWidth?: number; customHeight?: number; churchName: string }): Promise<DesignActionResult> {
+export async function createDesign(input: { organizationId: string; name: string; template: string; size: string; customWidth?: number; customHeight?: number; churchName: string; doc?: DesignDoc }): Promise<DesignActionResult> {
   const user = await requireUser();
   const access = await checkTabAccess(input.organizationId, "designer", "write");
   if (!access.ok) return { error: access.message };
 
   const preset = SIZE_PRESETS.find((p) => p.key === input.size);
-  const width = preset?.width ?? Math.round(Number(input.customWidth));
-  const height = preset?.height ?? Math.round(Number(input.customHeight));
+  const width = input.doc?.width ?? preset?.width ?? Math.round(Number(input.customWidth));
+  const height = input.doc?.height ?? preset?.height ?? Math.round(Number(input.customHeight));
   const kind = preset?.kind ?? "custom";
   const name = cleanDesignName(input.name) || "Untitled design";
 
-  const checked = sanitizeDoc(buildTemplate(input.template, width, height, input.churchName.slice(0, 80)));
+  // A finished design (from the AI designer) arrives with its own pictures; otherwise start from the template.
+  const checked = sanitizeDoc(input.doc ?? buildTemplate(input.template, width, height, input.churchName.slice(0, 80)));
   if ("error" in checked) return { error: checked.error };
 
   const { data, error } = await createAdminClient()
@@ -101,4 +105,63 @@ export async function deleteDesign(id: string): Promise<DesignActionResult> {
   if (error) return { error: "Couldn't delete the design. Please try again." };
   revalidatePath(DESIGNER_PATH);
   return {};
+}
+
+export interface AiDesignInput {
+  organizationId: string;
+  prompt: string;
+  size: string;
+  churchName: string;
+  /** Small previews only; the full pictures never leave the browser. */
+  images: AiImageInput[];
+}
+
+export interface AiDesignResult {
+  error?: string;
+  name?: string;
+  doc?: DesignDoc;
+  slots?: ImageSlot[];
+  /** The size the design was made at (a preset), so the browser can create it. */
+  size?: string;
+}
+
+const MAX_AI_IMAGES = 4;
+const MAX_PREVIEW_CHARS = 450_000;
+
+// One AI credit per design. The layout comes back with placeholders where the person's pictures go.
+export async function generateAiDesign(input: AiDesignInput): Promise<AiDesignResult> {
+  await requireUser();
+  const access = await checkTabAccess(input.organizationId, "designer", "write");
+  if (!access.ok) return { error: access.message };
+
+  const prompt = input.prompt.trim();
+  if (prompt.length < 8) return { error: "Describe what the design is for, for example the event, date and mood." };
+  if (prompt.length > 1500) return { error: "That description is too long. Keep it under 1,500 characters." };
+  const preset = SIZE_PRESETS.find((p) => p.key === input.size);
+  if (!preset) return { error: "Choose a size for the design." };
+  if (!process.env.OPENAI_API_KEY) return { error: "The AI designer isn't set up yet." };
+
+  const images: AiImageInput[] = [];
+  for (const img of (input.images ?? []).slice(0, MAX_AI_IMAGES)) {
+    const isLogo = img.ref === "logo";
+    const okRef = isLogo || /^image[1-9]$/.test(img.ref);
+    const okPreview = isLogo ? /^https:\/\//.test(img.preview) : /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(img.preview) && img.preview.length <= MAX_PREVIEW_CHARS;
+    if (!okRef || !okPreview) return { error: "One of the pictures couldn't be used. Remove it and add it again." };
+    images.push({
+      ref: img.ref,
+      label: String(img.label ?? "").slice(0, 60),
+      width: Math.max(1, Math.round(Number(img.width) || 1)),
+      height: Math.max(1, Math.round(Number(img.height) || 1)),
+      preview: img.preview,
+    });
+  }
+
+  const quotaError = await checkAiCreditQuota(input.organizationId);
+  if (quotaError) return { error: quotaError };
+
+  const result = await generateDesignLayout({ prompt, width: preset.width, height: preset.height, churchName: input.churchName.slice(0, 80), images });
+  if ("error" in result) return { error: result.error };
+
+  await recordAiReplyUsage(input.organizationId, "design");
+  return { name: result.name, doc: result.doc, slots: result.slots, size: preset.key };
 }

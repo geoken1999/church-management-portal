@@ -23,6 +23,7 @@ import type { VerseHit } from "@/lib/projection/bible";
 import type { ProjectionItem, ProjectionSlide, ProjectionTheme } from "@/types/database";
 import { SlideView } from "@/components/projection/SlideView";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
+import { BannerCropper, cropToBlob, type BannerCrop } from "@/components/projection/BannerCropper";
 import { BannerItemForm } from "@/components/projection/BannerItemForm";
 import { PresentationImporter } from "@/components/projection/PresentationImporter";
 import { Button } from "@/components/ui/button";
@@ -756,37 +757,31 @@ function SettingsPanel({
   );
 }
 
-const BANNER_WIDTH = 1920;
-
-// A picture for the lower-third bar (a church banner, a pattern). Shrunk in the browser, stored with the church's
-// other projector pictures, and shown behind the words under a wash of the screen colour.
+// A picture for the lower-third bar (a church banner, a pattern). Cropped to the banner strip (full width, 18% of the
+// screen's height), stored with the church's other projector pictures, and shown under the verse or behind its words.
 function BannerSetting({ theme, canWrite, onTheme }: { theme: ProjectionTheme; canWrite: boolean; onTheme: (theme: ProjectionTheme) => void }) {
   const t = withDefaults(theme);
   const [busy, setBusy] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [crop, setCrop] = useState<BannerCrop | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [shade, setShade] = useState(t.bannerShade);
 
-  async function upload(file: File | undefined) {
-    if (!file) return;
+  async function upload() {
+    if (!crop) return;
     setError(null);
     setBusy(true);
     try {
-      const bitmap = await createImageBitmap(file);
-      const scale = Math.min(1, BANNER_WIDTH / bitmap.width);
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.round(bitmap.width * scale);
-      canvas.height = Math.round(bitmap.height * scale);
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("This browser can't prepare pictures.");
-      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
-      if (!blob) throw new Error("Couldn't prepare that picture.");
-      const start = await startSlideUploadAction(1, blob.size);
+      const blob = await cropToBlob(crop);
+      if (blob.size > 3 * 1024 * 1024) return setError("That banner is too large (over 3 MB). Crop a smaller part or use a simpler picture.");
+      const start = await startSlideUploadAction(1, blob.size, crop.png ? "png" : "jpg");
       if (start.error || !start.slots) return setError(start.error ?? "Couldn't start the upload.");
       const storage = createBrowserClient().storage.from("projection-slides");
-      const { error: uploadError } = await storage.uploadToSignedUrl(start.slots[0].path, start.slots[0].token, blob, { contentType: "image/jpeg" });
+      const { error: uploadError } = await storage.uploadToSignedUrl(start.slots[0].path, start.slots[0].token, blob, { contentType: crop.png ? "image/png" : "image/jpeg" });
       if (uploadError) return setError(`The upload failed (${uploadError.message}). Check your connection and try again.`);
       onTheme({ ...theme, bannerImage: storage.getPublicUrl(start.slots[0].path).data.publicUrl, bannerShade: shade, bannerStyle: theme.bannerStyle ?? "below" });
+      setAdding(false);
+      setCrop(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't use that picture.");
     } finally {
@@ -797,17 +792,16 @@ function BannerSetting({ theme, canWrite, onTheme }: { theme: ProjectionTheme; c
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
       <p className="text-sm font-medium">Lower-third banner picture <span className="font-normal text-muted-foreground">(optional)</span></p>
-      <p className="text-xs text-muted-foreground">Your church&apos;s banner for the lower-third screen: a wide picture, such as the church name and logo. It can sit as a strip under the verse or behind it.</p>
+      <p className="text-xs text-muted-foreground">Your church&apos;s banner for the lower-third screen, such as the church name and logo. It is cropped to a wide strip (full width, 18% of the screen height) and can sit under the verse or behind it.</p>
       <div className="flex flex-wrap items-center gap-3">
         {t.bannerImage && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={t.bannerImage} alt="Banner" className="h-12 w-32 rounded border border-border object-cover" />
         )}
-        {canWrite && (
-          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-input px-3 py-1.5 text-sm hover:bg-muted">
-            <ImagePlus className="size-4" /> {busy ? "Uploading…" : t.bannerImage ? "Change picture" : "Add a picture"}
-            <input type="file" accept="image/*" className="sr-only" disabled={busy} onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ""; }} />
-          </label>
+        {canWrite && !adding && (
+          <Button type="button" size="sm" variant="outline" onClick={() => setAdding(true)}>
+            <ImagePlus className="size-4" /> {t.bannerImage ? "Change picture" : "Add a picture"}
+          </Button>
         )}
         {canWrite && t.bannerImage && (
           <Button type="button" size="sm" variant="ghost" onClick={() => { const { bannerImage: _removed, ...rest } = theme; void _removed; onTheme(rest); }}>
@@ -815,6 +809,20 @@ function BannerSetting({ theme, canWrite, onTheme }: { theme: ProjectionTheme; c
           </Button>
         )}
       </div>
+      {adding && (
+        <div className="space-y-3 rounded-md border border-border p-3">
+          <p className="text-xs text-muted-foreground">The strip is the full width of the screen and 18% of its height. Drag the box to pick the part of your picture to show.</p>
+          <BannerCropper disabled={busy} onChange={setCrop} />
+          <div className="flex gap-2">
+            <Button type="button" size="sm" disabled={busy || !crop} onClick={() => void upload()}>
+              {busy ? "Uploading…" : "Use this banner"}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => { setAdding(false); setCrop(null); }}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
       {t.bannerImage && (
         <div className="space-y-2">
           <label className="flex items-center gap-3 text-sm">

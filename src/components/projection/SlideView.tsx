@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import type { ProjectionSlide, ProjectionTheme } from "@/types/database";
 import { fontScale, withDefaults } from "@/lib/projection/theme";
-import { BANNER_HEIGHT_FRACTION } from "@/lib/projection/banner-crop";
+import { BANNER_ASPECT, BANNER_HEIGHT_FRACTION } from "@/lib/projection/banner-crop";
 
 // One slide as it appears on the screen. Sizes are in container-width units (cqw), so the same view is the full-screen
 // projector, the OBS overlay and the small preview in the console: it scales with whatever box it is placed in.
@@ -26,7 +26,7 @@ export function SlideView({
     return (
       <div style={{ ...root, background: "transparent", position: "relative" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={t.bannerImage} alt="" style={{ position: "absolute", left: 0, right: 0, bottom: 0, width: "100%", height: "auto", display: "block" }} />
+        <img src={t.bannerImage} alt="" style={{ position: "absolute", left: 0, right: 0, bottom: 0, width: "100%", aspectRatio: String(BANNER_ASPECT), objectFit: "cover", display: "block" }} />
       </div>
     );
   }
@@ -89,7 +89,7 @@ export function SlideView({
           </div>
           {strip && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={t.bannerImage} alt="" style={{ display: "block", width: "calc(100% + 8cqw)", marginLeft: "-4cqw", marginTop: "1.4cqw", height: "auto" }} />
+            <img src={t.bannerImage} alt="" style={{ display: "block", width: "calc(100% + 8cqw)", marginLeft: "-4cqw", marginTop: "1.4cqw", aspectRatio: String(BANNER_ASPECT), objectFit: "cover" }} />
           )}
         </div>
       </div>

@@ -2389,6 +2389,20 @@ export type PayrollEntry = {
   created_at: string;
 };
 
+export type DesignRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  kind: "flyer" | "poster" | "social" | "custom";
+  width: number;
+  height: number;
+  // The design document (see src/lib/designer/model.ts), validated on every save.
+  doc: import("@/lib/designer/model").DesignDoc;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type BudgetLine = {
   id: string;
   organization_id: string;
@@ -3369,6 +3383,12 @@ export type Database = {
         Row: PayrollEntry;
         Insert: Partial<PayrollEntry> & Pick<PayrollEntry, "run_id" | "organization_id" | "employee_name" | "basic" | "net">;
         Update: Partial<PayrollEntry>;
+        Relationships: [];
+      };
+      designs: {
+        Row: DesignRow;
+        Insert: Partial<DesignRow> & Pick<DesignRow, "organization_id" | "name" | "width" | "height" | "doc">;
+        Update: Partial<DesignRow>;
         Relationships: [];
       };
       budget_lines: {

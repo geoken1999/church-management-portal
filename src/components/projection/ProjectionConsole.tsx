@@ -820,7 +820,11 @@ function BannerSetting({ theme, canWrite, onTheme }: { theme: ProjectionTheme; c
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={!!t.bannerAlways} disabled={!canWrite} onChange={(e) => onTheme({ ...theme, bannerAlways: e.target.checked })} />
-            Keep the banner on screen between verses
+            Keep the banner on screen between verses (lower third)
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={!!t.bannerFull} disabled={!canWrite} onChange={(e) => onTheme({ ...theme, bannerFull: e.target.checked })} />
+            Also show the banner along the bottom in full screen
           </label>
         </div>
       )}

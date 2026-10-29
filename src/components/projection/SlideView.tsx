@@ -84,9 +84,12 @@ export function SlideView({
     );
   }
 
+  // The church's banner can also run along the bottom of a full-screen slide (verse, song or announcement), at the same
+  // width and natural height as in the lower third; the words are centred in the space above it.
+  const bottomBanner = !!t.bannerImage && t.bannerFull;
   return (
-    <div style={{ ...root, background: transparent ? "transparent" : t.background, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "5cqw 7cqw", textAlign: "center", boxSizing: "border-box" }}>
-      <div key={slide.text + slide.title} style={{ animation: "pv-fade 0.35s ease-out", width: "100%" }}>
+    <div style={{ ...root, background: transparent ? "transparent" : t.background, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: bottomBanner ? "flex-start" : "center", padding: bottomBanner ? 0 : "5cqw 7cqw", textAlign: "center", boxSizing: "border-box" }}>
+      <div key={slide.text + slide.title} style={{ animation: "pv-fade 0.35s ease-out", width: "100%", ...(bottomBanner ? { flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "4cqw 7cqw", boxSizing: "border-box", minHeight: 0 } : {}) }}>
         {versions ? (
           <div style={{ display: "grid", gap: "2cqw", fontSize: `${size}cqw`, lineHeight: 1.25 }}>
             {versions.map((v) => (
@@ -102,6 +105,10 @@ export function SlideView({
         <div style={{ marginTop: "3cqw", fontSize: "3cqw", fontWeight: 700, opacity: 0.9 }}>{label}</div>
         {slide.footer && !versions && <div style={{ marginTop: "0.6cqw", fontSize: "2.2cqw", opacity: 0.7 }}>{slide.footer}</div>}
       </div>
+      {bottomBanner && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={t.bannerImage} alt="" style={{ display: "block", width: "100%", height: "auto", flexShrink: 0 }} />
+      )}
     </div>
   );
 }

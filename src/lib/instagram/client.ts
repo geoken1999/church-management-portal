@@ -124,6 +124,10 @@ interface RawProfile {
   profile_picture_url?: string;
 }
 
+// A Graph call that hangs shouldn't hold the whole page; each call gives up after this long.
+const GRAPH_TIMEOUT_MS = 10_000;
+const INSIGHTS_CACHE_SECONDS = 600;
+
 export async function fetchProfile(accessToken: string): Promise<InstagramProfile> {
   const url = new URL(`${GRAPH_BASE}/me`);
   url.searchParams.set("fields", "id,username,account_type,media_count,followers_count,profile_picture_url");
@@ -189,7 +193,7 @@ export async function fetchMedia(accessToken: string, after?: string | null): Pr
   url.searchParams.set("limit", "12");
   if (after) url.searchParams.set("after", after);
 
-  const res = await fetch(url.toString(), { cache: "no-store" });
+  const res = await fetch(url.toString(), { cache: "no-store", signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS) });
   if (!res.ok) {
     throw new Error(`Couldn't fetch Instagram posts: ${await readGraphError(res)}`);
   }
@@ -242,7 +246,8 @@ export async function fetchMediaInsights(
   url.searchParams.set("metric", metrics.join(","));
   url.searchParams.set("access_token", accessToken);
 
-  const res = await fetch(url.toString(), { cache: "no-store" });
+  // Totals move slowly and are the slowest call on the page, so a few minutes old is fine.
+  const res = await fetch(url.toString(), { next: { revalidate: INSIGHTS_CACHE_SECONDS }, signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS) });
   if (!res.ok) return [];
 
   const data = (await res.json()) as RawPage<RawInsight>;
@@ -261,7 +266,7 @@ export async function fetchAccountInsights(accessToken: string): Promise<Instagr
   url.searchParams.set("metric_type", "total_value");
   url.searchParams.set("access_token", accessToken);
 
-  const res = await fetch(url.toString(), { cache: "no-store" });
+  const res = await fetch(url.toString(), { next: { revalidate: INSIGHTS_CACHE_SECONDS }, signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS) });
   if (!res.ok) return [];
 
   const data = (await res.json()) as RawPage<RawInsight>;
@@ -290,8 +295,10 @@ const TIME_SERIES_LOOKBACK_DAYS = 14;
 // Those others remain available only as a single current-total snapshot
 // (see fetchAccountInsights above), not a trend.
 export async function fetchAccountInsightsTimeSeries(accessToken: string): Promise<InstagramDailyInsight[]> {
-  const since = Math.floor((Date.now() - TIME_SERIES_LOOKBACK_DAYS * 24 * 60 * 60 * 1000) / 1000);
-  const until = Math.floor(Date.now() / 1000);
+  // Rounded down to the hour so the request is identical for a while and can be served from cache.
+  const nowHour = Math.floor(Date.now() / 3_600_000) * 3_600_000;
+  const since = Math.floor((nowHour - TIME_SERIES_LOOKBACK_DAYS * 24 * 60 * 60 * 1000) / 1000);
+  const until = Math.floor(nowHour / 1000);
 
   const url = new URL(`${GRAPH_BASE}/me/insights`);
   url.searchParams.set("metric", "reach,follower_count");
@@ -301,7 +308,7 @@ export async function fetchAccountInsightsTimeSeries(accessToken: string): Promi
   url.searchParams.set("until", String(until));
   url.searchParams.set("access_token", accessToken);
 
-  const res = await fetch(url.toString(), { cache: "no-store" });
+  const res = await fetch(url.toString(), { next: { revalidate: INSIGHTS_CACHE_SECONDS }, signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS) });
   if (!res.ok) return [];
 
   const data = (await res.json()) as RawPage<{ name: string; values?: { value: number; end_time: string }[] }>;
@@ -381,7 +388,7 @@ export async function fetchConversations(
   url.searchParams.set("access_token", accessToken);
   if (after) url.searchParams.set("after", after);
 
-  const res = await fetch(url.toString(), { cache: "no-store" });
+  const res = await fetch(url.toString(), { cache: "no-store", signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS) });
   if (!res.ok) {
     throw new Error(`Couldn't fetch Instagram conversations: ${await readGraphError(res)}`);
   }

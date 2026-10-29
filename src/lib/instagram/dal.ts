@@ -193,35 +193,36 @@ export async function getInstagramDashboardData(
     followersCount: connection.followers_count,
   };
 
-  // Independent of the Graph API calls below (a local DB read, not an
-  // external call that can fail the whole page) — fetched unconditionally
-  // rather than inside the try/catch.
-  const automations = await getCommentAutomations(organizationId);
-
+  // Each Graph call runs on its own so one slow or failing call (Instagram's insights are the
+  // flakiest) doesn't blank the whole page; whatever came back is shown with the sync notice.
+  const automationsPromise = getCommentAutomations(organizationId);
   try {
     const accessToken = await getValidAccessToken(connection);
-    const [media, insights, dailyInsights, conversationsPage] =
-      await Promise.all([
+    const [mediaResult, insightsResult, dailyResult, conversationsResult] =
+      await Promise.allSettled([
         fetchMedia(accessToken),
         fetchAccountInsights(accessToken),
         fetchAccountInsightsTimeSeries(accessToken),
         fetchConversations(accessToken, connection.username),
       ]);
-    const items = await attachReadState(
-      organizationId,
-      conversationsPage.items,
-    );
-    await ensureMessagingUserId(connection, conversationsPage.ownerMessagingId);
-    const conversations = { items, nextCursor: conversationsPage.nextCursor };
+    const automations = await automationsPromise;
+    const conversationsPage =
+      conversationsResult.status === "fulfilled"
+        ? conversationsResult.value
+        : { items: [], nextCursor: null, ownerMessagingId: null };
+    const [items] = await Promise.all([
+      attachReadState(organizationId, conversationsPage.items),
+      ensureMessagingUserId(connection, conversationsPage.ownerMessagingId),
+    ]);
     return {
       connected: true,
       profile,
-      media,
-      insights,
-      dailyInsights,
-      conversations,
+      media: mediaResult.status === "fulfilled" ? mediaResult.value : { items: [], nextCursor: null },
+      insights: insightsResult.status === "fulfilled" ? insightsResult.value : [],
+      dailyInsights: dailyResult.status === "fulfilled" ? dailyResult.value : [],
+      conversations: { items, nextCursor: conversationsPage.nextCursor },
       automations,
-      syncError: false,
+      syncError: [mediaResult, insightsResult, dailyResult, conversationsResult].some((r) => r.status === "rejected"),
     };
   } catch {
     return {
@@ -231,7 +232,7 @@ export async function getInstagramDashboardData(
       insights: [],
       dailyInsights: [],
       conversations: { items: [], nextCursor: null },
-      automations,
+      automations: await automationsPromise,
       syncError: true,
     };
   }

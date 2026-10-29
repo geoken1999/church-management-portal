@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getInstagramDashboardData, getInstagramConnections } from "@/lib/instagram/dal";
 import { InstagramManagerClient } from "@/components/instagram/InstagramManagerClient";
@@ -41,10 +42,6 @@ export default async function InstagramPage({
     return <AccessRestricted label="Instagram" />;
   }
 
-  const [data, accounts] = await Promise.all([
-    getInstagramDashboardData(organizationId),
-    getInstagramConnections(organizationId),
-  ]);
   const statusNotice =
     status === "account_limit_reached"
       ? {
@@ -70,7 +67,32 @@ export default async function InstagramPage({
         </Alert>
       )}
 
-      <InstagramManagerClient organizationId={organizationId} canManage={canManage} canWrite={canWrite} data={data} accounts={accounts} />
+      {/* The heading above shows at once; the Instagram data (several calls to Instagram) streams in below. */}
+      <Suspense fallback={<InstagramSkeleton />}>
+        <InstagramData organizationId={organizationId} canManage={canManage} canWrite={canWrite} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function InstagramData({ organizationId, canManage, canWrite }: { organizationId: string; canManage: boolean; canWrite: boolean }) {
+  const [data, accounts] = await Promise.all([
+    getInstagramDashboardData(organizationId),
+    getInstagramConnections(organizationId),
+  ]);
+  return <InstagramManagerClient organizationId={organizationId} canManage={canManage} canWrite={canWrite} data={data} accounts={accounts} />;
+}
+
+function InstagramSkeleton() {
+  return (
+    <div className="space-y-6" aria-busy="true" aria-label="Loading Instagram">
+      <div className="h-24 animate-pulse rounded-xl bg-muted" />
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="h-20 animate-pulse rounded-xl bg-muted" />
+        ))}
+      </div>
+      <div className="h-64 animate-pulse rounded-xl bg-muted" />
     </div>
   );
 }

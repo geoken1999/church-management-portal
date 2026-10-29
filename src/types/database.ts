@@ -2389,6 +2389,35 @@ export type PayrollEntry = {
   created_at: string;
 };
 
+export type ConferenceProvider = "zoom" | "google_meet";
+export type ConferenceConnection = {
+  id: string;
+  organization_id: string;
+  provider: ConferenceProvider;
+  account_id: string;
+  account_email: string | null;
+  account_name: string | null;
+  access_token: string;
+  refresh_token: string;
+  token_expires_at: string;
+  connected_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+export type ConferenceMeeting = {
+  id: string;
+  organization_id: string;
+  provider: ConferenceProvider;
+  external_id: string;
+  title: string;
+  start_time: string | null;
+  duration_minutes: number | null;
+  join_url: string;
+  passcode: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
 export type AppFeedbackRow = {
   id: string;
   source: "web" | "android" | "ios";
@@ -3401,6 +3430,18 @@ export type Database = {
         Row: PayrollEntry;
         Insert: Partial<PayrollEntry> & Pick<PayrollEntry, "run_id" | "organization_id" | "employee_name" | "basic" | "net">;
         Update: Partial<PayrollEntry>;
+        Relationships: [];
+      };
+      conference_connections: {
+        Row: ConferenceConnection;
+        Insert: Partial<ConferenceConnection> & Pick<ConferenceConnection, "organization_id" | "provider" | "account_id" | "access_token" | "refresh_token" | "token_expires_at">;
+        Update: Partial<ConferenceConnection>;
+        Relationships: [];
+      };
+      conference_meetings: {
+        Row: ConferenceMeeting;
+        Insert: Partial<ConferenceMeeting> & Pick<ConferenceMeeting, "organization_id" | "provider" | "external_id" | "title" | "join_url">;
+        Update: Partial<ConferenceMeeting>;
         Relationships: [];
       };
       app_feedback: {

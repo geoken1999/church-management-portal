@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Headphones, Webcam } from "lucide-react";
+import { Headphones, Video, Webcam } from "lucide-react";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getKmeetMeetings, getUpcomingEventOptions } from "@/lib/kmeet/dal";
 import { isVideoSdkConfigured } from "@/lib/kmeet/env";
@@ -59,6 +59,9 @@ export default async function KconnectPage({
             instantly or schedule one for later.
           </p>
         </div>
+        <Link href="/dashboard/kconnect/conferencing" className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
+          <Video className="size-4" /> Zoom and Google Meet
+        </Link>
         {allowed.length > 1 && (
           <div className="inline-flex rounded-lg border border-border p-1">
             {allowed.map((m) => (

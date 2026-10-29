@@ -31,13 +31,14 @@ const appVersion = (
 // legitimate being flagged, switch the header name below to "Content-Security-Policy" to enforce it.
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://sdk.cashfree.com https://checkout.razorpay.com",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://sdk.cashfree.com https://checkout.razorpay.com https://source.zoom.us https://*.zoom.us",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data: blob: https:",
   "media-src 'self' blob: https:",
   "font-src 'self' data: https://fonts.gstatic.com",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.videosdk.live wss://*.videosdk.live https://api.razorpay.com https://sdk.cashfree.com https://fonts.googleapis.com https://fonts.gstatic.com",
-  "frame-src https://checkout.razorpay.com https://api.razorpay.com https://sdk.cashfree.com https://www.youtube.com https://www.youtube-nocookie.com",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.videosdk.live wss://*.videosdk.live https://api.razorpay.com https://sdk.cashfree.com https://fonts.googleapis.com https://fonts.gstatic.com https://*.zoom.us wss://*.zoom.us https://*.zoom.com wss://*.zoom.com",
+  "worker-src 'self' blob:",
+  "frame-src https://*.zoom.us https://checkout.razorpay.com https://api.razorpay.com https://sdk.cashfree.com https://www.youtube.com https://www.youtube-nocookie.com",
   "form-action 'self' https://secure.payu.in https://test.payu.in",
   "base-uri 'self'",
   "object-src 'none'",

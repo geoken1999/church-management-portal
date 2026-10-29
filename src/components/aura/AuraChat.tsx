@@ -24,6 +24,8 @@ const SUGGESTIONS = [
   "What is waiting for me to approve or do?",
   "Whose birthdays are coming up?",
   "How many people attended last Sunday's service?",
+  "Add an event: Youth meet next Saturday at 5 PM",
+  "Add a to-do to book the hall for Easter, due Friday",
 ];
 
 export function AuraChat({
@@ -87,7 +89,7 @@ export function AuraChat({
               </div>
               <div>
                 <p className="font-heading font-semibold">Ask Aura about your church</p>
-                <p className="text-sm text-muted-foreground">Aura reads your church&apos;s records and tells you what needs attention. Try one of these, or type your own question.</p>
+                <p className="text-sm text-muted-foreground">Aura reads your church&apos;s records and tells you what needs attention, and can add events, to-dos and plans for you. Try one of these, or type your own question.</p>
               </div>
               <div className="flex flex-wrap justify-center gap-2">
                 {SUGGESTIONS.map((suggestion) => (

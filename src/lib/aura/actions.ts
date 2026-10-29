@@ -55,7 +55,11 @@ export async function sendAuraMessage(content: string): Promise<SendAuraMessageR
 
   let reply: string;
   try {
-    reply = await runAuraQuery(organizationId, history);
+    const actor = {
+      userId: user.id,
+      canWrite: { events: membership.tabAccess.events.write, todos: membership.tabAccess.todos.write, planner: membership.tabAccess.planner.write },
+    };
+    reply = await runAuraQuery(organizationId, history, actor);
   } catch (err) {
     console.error("Ask Aura query failed:", err);
     return { error: "Aura couldn't answer that just now. Please try again in a moment." };

@@ -168,7 +168,13 @@ export async function POST(request: Request) {
 
   let reply: string;
   try {
-    reply = await runAuraQuery(organizationId, history);
+    const canWrite = async (tab: "events" | "todos" | "planner") =>
+      !((await requireMobileTabAccess(request, organizationId, tab, "write")) instanceof NextResponse);
+    const actor = {
+      userId: auth.userId,
+      canWrite: { events: await canWrite("events"), todos: await canWrite("todos"), planner: await canWrite("planner") },
+    };
+    reply = await runAuraQuery(organizationId, history, actor);
   } catch (err) {
     console.error("Ask Aura (mobile) query failed:", err);
     return NextResponse.json({

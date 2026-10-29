@@ -2,6 +2,9 @@ import "server-only";
 
 import { generateToolCompletion, type ToolMessage } from "@/lib/ai/openai";
 import { getAuraTools, executeAuraTool } from "@/lib/aura/tools";
+import type { AuraActor } from "@/lib/aura/write-tools";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 
 // Deliberately doesn't hardcode which categories (attendance, members,
 // finance, etc.) are available — an org's AI Rules settings (see
@@ -36,6 +39,12 @@ const SYSTEM_PROMPT = [
   "When asked who missed church or how many attended, use list_attendance_sessions to find the session and",
   "get_attendance_detail for the breakdown. Use find_member to look up one person.",
   "",
+  "If you have create_event, create_todo or create_plan tools, you can add those for the person. Use them only when",
+  "they clearly ask you to add something. If the title or (for an event) the date and time is missing, ask for just",
+  "that first; never invent details. Work out relative dates ('next Sunday', 'tomorrow at 5') from the current date",
+  "and time given below. After adding, say in one line exactly what you added and when. If a tool returns an error,",
+  "tell the person what went wrong and do not claim it was added. You cannot edit or delete anything.",
+  "",
   "Style: warm, clear and concise. Short paragraphs; a list only when listing names or several actions helps.",
   "Amounts are in the church's own currency as stored (rupees unless told otherwise). Do not repeat raw JSON.",
 ].join("\n");
@@ -46,12 +55,16 @@ const MAX_TOOL_ITERATIONS = 8;
 // answering, run each requested tool against this org and feed the results
 // back in, repeating until it gives a plain-text answer or we hit the
 // iteration cap (a guard against a model that keeps calling tools forever).
-export async function runAuraQuery(organizationId: string, history: ToolMessage[]): Promise<string> {
+export async function runAuraQuery(organizationId: string, history: ToolMessage[], actor?: AuraActor): Promise<string> {
   const messages: ToolMessage[] = [...history];
-  const tools = await getAuraTools(organizationId);
+  const tools = await getAuraTools(organizationId, actor);
+  const { data: org } = await createAdminClient().from("organizations").select("timezone").eq("id", organizationId).maybeSingle();
+  const timeZone = org?.timezone || DEFAULT_TIMEZONE;
+  const now = new Intl.DateTimeFormat("en-GB", { dateStyle: "full", timeStyle: "short", timeZone }).format(new Date());
+  const systemPrompt = `${SYSTEM_PROMPT}\n\nThe current date and time at the church is ${now} (${timeZone}).`;
 
   for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
-    const completion = await generateToolCompletion(SYSTEM_PROMPT, messages, tools);
+    const completion = await generateToolCompletion(systemPrompt, messages, tools);
 
     if (!completion.toolCalls) {
       return completion.content ?? "I wasn't able to come up with an answer to that — try rephrasing your question.";
@@ -68,7 +81,7 @@ export async function runAuraQuery(organizationId: string, history: ToolMessage[
         // tool itself reports back what's missing rather than throwing.
       }
       // A tool that fails is reported to the model like any other result, so one broken lookup doesn't lose the answer.
-      const result = await executeAuraTool(organizationId, call.function.name, args).catch((err: unknown) => ({
+      const result = await executeAuraTool(organizationId, call.function.name, args, actor).catch((err: unknown) => ({
         error: `That lookup failed${err instanceof Error ? `: ${err.message}` : "."}`,
       }));
       messages.push({ role: "tool", tool_call_id: call.id, name: call.function.name, content: JSON.stringify(result) });

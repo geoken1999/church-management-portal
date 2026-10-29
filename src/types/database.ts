@@ -2343,6 +2343,63 @@ export type Expense = {
   updated_at: string;
 };
 
+export type PayrollEmployee = {
+  id: string;
+  organization_id: string;
+  name: string;
+  job_title: string | null;
+  branch_id: string | null;
+  monthly_salary: number;
+  default_allowances: number;
+  default_deductions: number;
+  joined_on: string | null;
+  active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PayrollRunStatus = "draft" | "paid";
+
+export type PayrollRun = {
+  id: string;
+  organization_id: string;
+  // "YYYY-MM"
+  pay_month: string;
+  status: PayrollRunStatus;
+  paid_on: string | null;
+  payment_method: ExpensePaymentMethod | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PayrollEntry = {
+  id: string;
+  run_id: string;
+  organization_id: string;
+  employee_id: string | null;
+  employee_name: string;
+  job_title: string | null;
+  basic: number;
+  allowances: number;
+  deductions: number;
+  net: number;
+  expense_id: string | null;
+  created_at: string;
+};
+
+export type BudgetLine = {
+  id: string;
+  organization_id: string;
+  // "YYYY-MM"
+  budget_month: string;
+  category_id: string;
+  amount: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type InvoiceStatus = "unpaid" | "paid" | "cancelled";
 
 export type Invoice = {
@@ -3295,6 +3352,30 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      payroll_employees: {
+        Row: PayrollEmployee;
+        Insert: Partial<PayrollEmployee> & Pick<PayrollEmployee, "organization_id" | "name" | "monthly_salary">;
+        Update: Partial<PayrollEmployee>;
+        Relationships: [];
+      };
+      payroll_runs: {
+        Row: PayrollRun;
+        Insert: Partial<PayrollRun> & Pick<PayrollRun, "organization_id" | "pay_month">;
+        Update: Partial<PayrollRun>;
+        Relationships: [];
+      };
+      payroll_entries: {
+        Row: PayrollEntry;
+        Insert: Partial<PayrollEntry> & Pick<PayrollEntry, "run_id" | "organization_id" | "employee_name" | "basic" | "net">;
+        Update: Partial<PayrollEntry>;
+        Relationships: [];
+      };
+      budget_lines: {
+        Row: BudgetLine;
+        Insert: Partial<BudgetLine> & Pick<BudgetLine, "organization_id" | "budget_month" | "category_id" | "amount">;
+        Update: Partial<BudgetLine>;
+        Relationships: [];
       };
       invoices: {
         Row: Invoice;

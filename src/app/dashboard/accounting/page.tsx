@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { Wallet, PiggyBank, ChevronRight } from "lucide-react";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getBranches } from "@/lib/branches/dal";
 import { getPlanUsage } from "@/lib/plans/dal";
@@ -54,6 +56,24 @@ export default async function AccountingPage({
         <p className="mt-1 text-muted-foreground">
           Income and expenses for {membership.organization.name}, by branch and by period.
         </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {[
+          { href: "/dashboard/accounting/payroll", icon: Wallet, title: "Payroll", text: "Pay your pastors and staff each month. Paid salaries are added to your expenses." },
+          { href: "/dashboard/accounting/budget", icon: PiggyBank, title: "Budget planner", text: "Plan monthly spending by category and see how you are doing against it." },
+        ].map((card) => (
+          <Link key={card.href} href={card.href} className="group flex items-start gap-4 rounded-xl border border-border p-4 transition-colors hover:bg-muted/40">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent">
+              <card.icon className="size-5 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="font-heading font-semibold">{card.title}</p>
+              <p className="text-sm text-muted-foreground">{card.text}</p>
+            </div>
+            <ChevronRight className="mt-1 size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+          </Link>
+        ))}
       </div>
 
       <AccountingManager

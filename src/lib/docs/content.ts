@@ -403,6 +403,22 @@ export const DOC_CATEGORIES: DocCategory[] = [
           "Accounting is included on every plan — same gate as the rest of Finance.",
         ],
       },
+      {
+        id: "accounting-payroll",
+        title: "Payroll",
+        body: [
+          "Open Payroll from the Accounting page. First add the people you pay (name, role, monthly salary, and any regular allowances or deductions). Then pick a month and choose Run payroll: it makes a draft with everyone who is active, and you can change one person's salary, allowances or deductions for that month (for example for unpaid leave).",
+          "When the amounts are right, choose Mark as paid and give the date and how you paid. Each person's net pay is added to your expenses under a Salaries category, so Accounting and the Budget planner include it. A paid payroll can't be edited. You can print the payroll sheet from the page. Anyone who can see Accounting can see payroll, so give that access carefully.",
+        ],
+      },
+      {
+        id: "accounting-budget",
+        title: "Budget planner",
+        body: [
+          "Open Budget planner from the Accounting page. For a month, enter how much you plan to spend in each expense category. Each line shows what has actually been spent so far, how much is left, and turns amber when 85% is used and red when it is over.",
+          "Copy last month fills this month from the one before, and Repeat for the year copies this month's budget into every later month of the year. Add or rename categories in Accounting; each expense category gets its own budget line.",
+        ],
+      },
     ],
   },
   {

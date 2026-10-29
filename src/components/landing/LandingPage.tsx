@@ -34,7 +34,6 @@ import {
   HandHeart,
   ClipboardList,
   Radio,
-  Palette,
   BadgeCheck,
   GraduationCap,
   Cake,

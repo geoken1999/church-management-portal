@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles, Send, UserRound } from "lucide-react";
 import { sendAuraMessage } from "@/lib/aura/actions";
@@ -47,6 +47,12 @@ export function AuraChat({
 
   const outOfCredits = aiRepliesRemaining <= 0;
   const disabled = !canWrite || pending || outOfCredits;
+
+  // Opening the chat lands on the latest message, not the start of a long history.
+  useEffect(() => {
+    const list = listRef.current;
+    if (list) list.scrollTop = list.scrollHeight;
+  }, []);
 
   function scrollToBottom() {
     requestAnimationFrame(() => {

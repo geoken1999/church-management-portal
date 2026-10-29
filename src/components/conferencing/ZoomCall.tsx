@@ -17,15 +17,31 @@ declare global {
   }
 }
 
-function loadSdk(version: string): Promise<void> {
-  if (window.ZoomMtgEmbedded) return Promise.resolve();
+function loadScript(src: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = `https://source.zoom.us/${version}/zoom-meeting-embedded-${version}.min.js`;
-    script.onload = () => resolve();
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`);
+    if (existing?.dataset.loaded === "1") return resolve();
+    const script = existing ?? document.createElement("script");
+    script.onload = () => {
+      script.dataset.loaded = "1";
+      resolve();
+    };
     script.onerror = () => reject(new Error("Couldn't load Zoom. Check your connection and try again."));
-    document.head.appendChild(script);
+    if (!existing) {
+      script.src = src;
+      document.head.appendChild(script);
+    }
   });
+}
+
+// Zoom's SDK expects React and ReactDOM to be on the page already (it does not bring its own), so Zoom's own copies
+// are loaded first, in order, then the SDK. They are separate from this app's React and don't affect it.
+async function loadSdk(version: string): Promise<void> {
+  if (window.ZoomMtgEmbedded) return;
+  const base = `https://source.zoom.us/${version}`;
+  await loadScript(`${base}/lib/vendor/react.min.js`);
+  await loadScript(`${base}/lib/vendor/react-dom.min.js`);
+  await loadScript(`${base}/zoom-meeting-embedded-${version}.min.js`);
 }
 
 export function ZoomCall({ meetingId, as }: { meetingId: string; as: "host" | "guest" }) {
@@ -41,7 +57,7 @@ export function ZoomCall({ meetingId, as }: { meetingId: string; as: "host" | "g
       const details = await getZoomJoinAction(meetingId, as);
       if (details.error || !details.signature || !details.meetingNumber || !details.sdkVersion) throw new Error(details.error ?? "Couldn't join the meeting.");
       await loadSdk(details.sdkVersion);
-      if (!window.ZoomMtgEmbedded || !root.current) throw new Error("Zoom didn't load.");
+      if (!window.ZoomMtgEmbedded || !root.current) throw new Error("Zoom loaded but didn't start. Reload the page and try again.");
       const client = window.ZoomMtgEmbedded.createClient();
       clientRef.current = client;
       await client.init({

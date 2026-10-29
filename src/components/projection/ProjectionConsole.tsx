@@ -757,7 +757,7 @@ function SettingsPanel({
   );
 }
 
-// A picture for the lower-third bar (a church banner, a pattern). Cropped to the banner strip (full width, 18% of the
+// A picture for the lower-third bar (a church banner, a pattern). Cropped to the banner strip (full width, 22% of the
 // screen's height), stored with the church's other projector pictures, and shown under the verse or behind its words.
 function BannerSetting({ theme, canWrite, onTheme }: { theme: ProjectionTheme; canWrite: boolean; onTheme: (theme: ProjectionTheme) => void }) {
   const t = withDefaults(theme);
@@ -792,7 +792,7 @@ function BannerSetting({ theme, canWrite, onTheme }: { theme: ProjectionTheme; c
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
       <p className="text-sm font-medium">Lower-third banner picture <span className="font-normal text-muted-foreground">(optional)</span></p>
-      <p className="text-xs text-muted-foreground">Your church&apos;s banner for the lower-third screen, such as the church name and logo. It is cropped to a wide strip (full width, 18% of the screen height) and can sit under the verse or behind it.</p>
+      <p className="text-xs text-muted-foreground">Your church&apos;s banner for the lower-third screen, such as the church name and logo. It is cropped to a wide strip (full width, 22% of the screen height) and can sit under the verse or behind it.</p>
       <div className="flex flex-wrap items-center gap-3">
         {t.bannerImage && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -811,7 +811,7 @@ function BannerSetting({ theme, canWrite, onTheme }: { theme: ProjectionTheme; c
       </div>
       {adding && (
         <div className="space-y-3 rounded-md border border-border p-3">
-          <p className="text-xs text-muted-foreground">The strip is the full width of the screen and 18% of its height. Drag the box to pick the part of your picture to show.</p>
+          <p className="text-xs text-muted-foreground">The strip is the full width of the screen and 22% of its height. Drag the box to pick the part of your picture to show.</p>
           <BannerCropper disabled={busy} onChange={setCrop} />
           <div className="flex gap-2">
             <Button type="button" size="sm" disabled={busy || !crop} onClick={() => void upload()}>

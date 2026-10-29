@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { BANNER_ASPECT, cropRect, maxCropWidth, outputSize } from "@/lib/projection/banner-crop";
 
 describe("banner crop", () => {
-  it("is 18% of a 16:9 screen's height, full width", () => {
-    expect(1920 / BANNER_ASPECT).toBeCloseTo(1080 * 0.18, 5);
+  it("is 22% of a 16:9 screen's height, full width", () => {
+    expect(1920 / BANNER_ASPECT).toBeCloseTo(1080 * 0.22, 5);
   });
   it("uses the full width of a tall picture and the full height of an already-wide one", () => {
     expect(maxCropWidth(1000, 1000)).toBe(1000);
@@ -17,7 +17,7 @@ describe("banner crop", () => {
     expect(cropRect(1000, 1000, 1, -50, -50)).toMatchObject({ x: 0, y: 0 });
   });
   it("saves at most 1920 wide and never enlarges", () => {
-    expect(outputSize({ x: 0, y: 0, w: 4000, h: 405 })).toEqual({ width: 1920, height: 194 });
-    expect(outputSize({ x: 0, y: 0, w: 800, h: 81 })).toEqual({ width: 800, height: 81 });
+    expect(outputSize({ x: 0, y: 0, w: 4000, h: 485 })).toEqual({ width: 1920, height: 238 });
+    expect(outputSize({ x: 0, y: 0, w: 800, h: 99 })).toEqual({ width: 800, height: 99 });
   });
 });

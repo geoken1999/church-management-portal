@@ -32,7 +32,7 @@ export function SlideView({
   }
   if (!slide) return <div style={{ ...root, background: transparent || mode === "lower_third" ? "transparent" : t.background }} />;
 
-  // A banner picture (contact details, a welcome strip) runs along the bottom, full width and 18% of the screen's height,
+  // A banner picture (contact details, a welcome strip) runs along the bottom, full width and 22% of the screen's height,
   // in either mode; over video it has nothing behind it, so a transparent picture lets the video show through.
   if (slide.kind === "banner" && slide.image) {
     return (

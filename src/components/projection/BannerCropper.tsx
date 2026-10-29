@@ -35,7 +35,7 @@ interface Source {
   png: boolean;
 }
 
-// Choose a picture and cut a banner out of it. The banner strip is the full width of the screen and 18% of its height,
+// Choose a picture and cut a banner out of it. The banner strip is the full width of the screen and 22% of its height,
 // so the picture is cropped to that shape: drag the box to choose the part, and the slider to choose how much.
 export function BannerCropper({ disabled, onChange, onFileName }: { disabled?: boolean; onChange: (crop: BannerCrop | null) => void; onFileName?: (name: string) => void }) {
   const input = useRef<HTMLInputElement>(null);

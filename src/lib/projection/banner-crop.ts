@@ -1,7 +1,7 @@
-// The banner picture is shown along the bottom of the screen and is 18% of the screen's height, full width. On a 16:9
+// The banner picture is shown along the bottom of the screen and is 22% of the screen's height, full width. On a 16:9
 // screen that is a very wide strip, so a picture is cropped to that shape when it is added. Pure.
 
-export const BANNER_HEIGHT_FRACTION = 0.18;
+export const BANNER_HEIGHT_FRACTION = 0.22;
 /** Width divided by height of a banner on a 16:9 screen (about 9.9 : 1). */
 export const BANNER_ASPECT = 16 / 9 / BANNER_HEIGHT_FRACTION;
 /** The widest the saved picture needs to be (a full HD screen). */

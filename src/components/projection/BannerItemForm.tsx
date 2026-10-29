@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 // Adds a picture to the library that is shown along the bottom of the screen, like an announcement made as a picture
-// (contact details, a welcome strip). The strip is the full width of the screen and 18% of its height, so the picture
+// (contact details, a welcome strip). The strip is the full width of the screen and 22% of its height, so the picture
 // is cropped to that shape here.
 export function BannerItemForm({ onDone }: { onDone: () => void }) {
   const [title, setTitle] = useState("");
@@ -47,7 +47,7 @@ export function BannerItemForm({ onDone }: { onDone: () => void }) {
       <div>
         <p className="font-medium">Add a banner picture</p>
         <p className="text-sm text-muted-foreground">
-          Shown along the bottom of the screen at full width and 18% of its height (a wide strip, about 1920 × 194 pixels on a full-HD screen). Choose a picture, then drag the box to pick the part to show. Use a PNG with a transparent background to let the video show through.
+          Shown along the bottom of the screen at full width and 22% of its height (a wide strip, about 1920 × 238 pixels on a full-HD screen). Choose a picture, then drag the box to pick the part to show. Use a PNG with a transparent background to let the video show through.
         </p>
       </div>
       <div className="space-y-1.5">

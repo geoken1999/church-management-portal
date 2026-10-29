@@ -6,6 +6,7 @@ import { createTodoForMobile } from "@/lib/todos/mobile-service";
 import { validateTodo } from "@/lib/todos/validation";
 import { validatePlan, validateItemTimeRange, PLAN_STATUSES } from "@/lib/planner/validation";
 import { notifyMember } from "@/lib/push/member-notice";
+import { sendPushToUsers } from "@/lib/push/client";
 import { DEFAULT_TIMEZONE, zonedTimeToUtc } from "@/lib/organizations/timezone";
 import type { ToolDefinition } from "@/lib/ai/openai";
 import type { PlanItem, PlanStatus } from "@/types/database";
@@ -31,6 +32,39 @@ const PLAN_ITEM_SCHEMA = {
     assignee_name: { type: "string", description: "Name of the leader it is assigned to. Optional." },
   },
   required: ["text"],
+};
+
+const ASSIGN_TODO_TOOL: ToolDefinition = {
+  type: "function",
+  function: {
+    name: "assign_todo",
+    description: "Assign (or reassign) an existing open to-do to a leader or team member. Find the to-do by its title.",
+    parameters: {
+      type: "object",
+      properties: {
+        todo_title: { type: "string", description: "The title of the existing to-do (or part of it)." },
+        assignee_name: { type: "string", description: "Name of the leader or team member." },
+      },
+      required: ["todo_title", "assignee_name"],
+    },
+  },
+};
+
+const ASSIGN_PLAN_ITEM_TOOL: ToolDefinition = {
+  type: "function",
+  function: {
+    name: "assign_plan_item",
+    description: "Assign (or reassign) an existing step of a Planner plan to a leader. Find the step by its plan's title and the step's text.",
+    parameters: {
+      type: "object",
+      properties: {
+        plan_title: { type: "string", description: "The title of the plan (or part of it)." },
+        item_text: { type: "string", description: "The text of the step (or part of it)." },
+        assignee_name: { type: "string", description: "Name of the leader." },
+      },
+      required: ["plan_title", "item_text", "assignee_name"],
+    },
+  },
 };
 
 const EVENT_TOOL: ToolDefinition = {
@@ -113,8 +147,8 @@ export function getWriteTools(actor: AuraActor | undefined): ToolDefinition[] {
   if (!actor) return [];
   return [
     ...(actor.canWrite.events ? [EVENT_TOOL] : []),
-    ...(actor.canWrite.todos ? [TODO_TOOL] : []),
-    ...(actor.canWrite.planner ? [PLAN_TOOL, PLAN_ITEM_TOOL] : []),
+    ...(actor.canWrite.todos ? [TODO_TOOL, ASSIGN_TODO_TOOL] : []),
+    ...(actor.canWrite.planner ? [PLAN_TOOL, PLAN_ITEM_TOOL, ASSIGN_PLAN_ITEM_TOOL] : []),
   ];
 }
 
@@ -203,21 +237,67 @@ async function createEvent(organizationId: string, actor: AuraActor, args: ToolA
   return { ok: true, created: "event", title, starts: startAt, repeats: repeats || null, managed_by: managedBy?.name ?? null };
 }
 
+// A to-do goes to a leader first, then to someone with a team login.
+async function findTodoAssignee(organizationId: string, wanted: string): Promise<{ value: string; name: string; leaderMemberId: string | null; userId: string | null } | { error: string }> {
+  const leader = await findLeader(organizationId, wanted);
+  if ("person" in leader) return { value: `m:${leader.person.id}`, name: leader.person.name, leaderMemberId: leader.person.id, userId: null };
+  const member = await findTeamMember(organizationId, wanted);
+  if ("person" in member) return { value: `u:${member.person.id}`, name: member.person.name, leaderMemberId: null, userId: member.person.id };
+  return { error: `${leader.error} (and no team member matches either)` };
+}
+
+async function assignTodo(organizationId: string, actor: AuraActor, args: ToolArgs) {
+  const admin = createAdminClient();
+  const { data: todos } = await admin.from("todos").select("id, title").eq("organization_id", organizationId).eq("status", "pending");
+  const found = pickByName((todos ?? []).map((t) => ({ id: t.id, name: t.title })), text(args.todo_title), "open to-do");
+  if ("error" in found) return found;
+  const who = await findTodoAssignee(organizationId, text(args.assignee_name));
+  if ("error" in who) return who;
+  const { error } = await admin
+    .from("todos")
+    .update({ assigned_to: who.userId, assigned_member_id: who.leaderMemberId })
+    .eq("id", found.person.id)
+    .eq("organization_id", organizationId);
+  if (error) return { error: "Couldn't assign that to-do." };
+  let pushTarget = who.userId;
+  if (who.leaderMemberId) {
+    const { data: m } = await admin.from("members").select("auth_user_id").eq("id", who.leaderMemberId).maybeSingle();
+    pushTarget = m?.auth_user_id ?? null;
+  }
+  if (pushTarget && pushTarget !== actor.userId) {
+    await sendPushToUsers([pushTarget], "todo_assigned", { title: "New to-do assigned to you", body: found.person.name, data: { type: "todo_assigned" } });
+  }
+  return { ok: true, assigned: "to-do", title: found.person.name, to: who.name };
+}
+
+async function assignPlanItem(organizationId: string, args: ToolArgs) {
+  const admin = createAdminClient();
+  const { data: plans } = await admin.from("plans").select("id, title, items").eq("organization_id", organizationId);
+  const plan = pickByName((plans ?? []).map((p) => ({ id: p.id, name: p.title })), text(args.plan_title), "plan");
+  if ("error" in plan) return plan;
+  const row = (plans ?? []).find((p) => p.id === plan.person.id)!;
+  const items: PlanItem[] = row.items ?? [];
+  const item = pickByName(items.map((i) => ({ id: i.id, name: i.text })), text(args.item_text), "step in that plan");
+  if ("error" in item) return item;
+  const leader = await findLeader(organizationId, text(args.assignee_name));
+  if ("error" in leader) return leader;
+  const { error } = await admin
+    .from("plans")
+    .update({ items: items.map((i) => (i.id === item.person.id ? { ...i, assignedTo: leader.person.id } : i)) })
+    .eq("id", row.id);
+  if (error) return { error: "Couldn't assign that step." };
+  await notifyMember(leader.person.id, "New task assigned to you", `${item.person.name} (${row.title})`);
+  return { ok: true, assigned: "plan step", step: item.person.name, plan: row.title, to: leader.person.name };
+}
+
 async function createTodo(organizationId: string, actor: AuraActor, args: ToolArgs) {
   let assignee = "";
   let assigneeName: string | null = null;
   if (text(args.assignee_name)) {
-    const wanted = text(args.assignee_name);
-    const leader = await findLeader(organizationId, wanted);
-    if ("person" in leader) {
-      assignee = `m:${leader.person.id}`;
-      assigneeName = leader.person.name;
-    } else {
-      const member = await findTeamMember(organizationId, wanted);
-      if ("error" in member) return { error: `${leader.error} (and no team member matches either)` };
-      assignee = `u:${member.person.id}`;
-      assigneeName = member.person.name;
-    }
+    const resolved = await findTodoAssignee(organizationId, text(args.assignee_name));
+    if ("error" in resolved) return resolved;
+    assignee = resolved.value;
+    assigneeName = resolved.name;
   }
   const input = { title: text(args.title), description: text(args.description), dueAt: text(args.due_at), assignee, eventId: "", remindDayBefore: false, remindDueDay: false };
   const errors = validateTodo(input);
@@ -302,11 +382,13 @@ async function addPlanItem(organizationId: string, args: ToolArgs) {
 
 // undefined = not a write tool.
 export async function executeWriteTool(organizationId: string, actor: AuraActor | undefined, name: string, args: ToolArgs): Promise<unknown> {
-  const need = name === "create_event" ? "events" : name === "create_todo" ? "todos" : name === "create_plan" || name === "add_plan_item" ? "planner" : null;
+  const need = name === "create_event" ? "events" : name === "create_todo" || name === "assign_todo" ? "todos" : name === "create_plan" || name === "add_plan_item" || name === "assign_plan_item" ? "planner" : null;
   if (!need) return undefined;
   if (!actor?.canWrite[need]) return { error: "You don't have permission to add that." };
   if (name === "create_event") return createEvent(organizationId, actor, args);
   if (name === "create_todo") return createTodo(organizationId, actor, args);
+  if (name === "assign_todo") return assignTodo(organizationId, actor, args);
+  if (name === "assign_plan_item") return assignPlanItem(organizationId, args);
   if (name === "add_plan_item") return addPlanItem(organizationId, args);
   return createPlan(organizationId, actor, args);
 }

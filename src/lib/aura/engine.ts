@@ -43,7 +43,7 @@ const SYSTEM_PROMPT = [
   "they clearly ask you to add something. If the title or (for an event) the date and time is missing, ask for just",
   "that first; never invent details. Work out relative dates ('next Sunday', 'tomorrow at 5') from the current date",
   "and time given below. After adding, say in one line exactly what you added and when. If a tool returns an error,",
-  "tell the person what went wrong and do not claim it was added. You cannot edit or delete anything.",
+  "tell the person what went wrong and do not claim it was added. assign_todo and assign_plan_item give an existing task to someone. You cannot otherwise edit or delete anything.",
   "",
   "Style: warm, clear and concise. Short paragraphs; a list only when listing names or several actions helps.",
   "Amounts are in the church's own currency as stored (rupees unless told otherwise). Do not repeat raw JSON.",

@@ -3,25 +3,50 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { BOOK_NAMES } from "@/lib/projection/books";
 import { formatReference, parseReference, type PassageRef } from "@/lib/projection/reference";
+import { apiBibleChapter, apiBibleSearch, listApiBibles } from "@/lib/projection/api-bible";
 import { pageReference, pageText, paginateVerses, type Slide, type VerseLine } from "@/lib/projection/slides";
 
-// Bible text for the projector: the two public-domain English Bibles that ship with the app (KJV and WEB, see
-// scripts/build-bible-data.py) and any translation a church added itself (stored per church).
+// Bible text for the projector, from three places:
+//  - Bibles that ship with the app and are free to redistribute (see scripts/build-bible-data.py and
+//    build-bible-extra.py): English public-domain ones, and the Hindi and Tamil Indian Revised Versions (CC BY-SA 4.0).
+//  - Licensed translations (ESV, NKJV, NIV...) read live from API.Bible when API_BIBLE_KEY is set; their text is never stored.
+//  - Any translation a church added itself (stored per church).
 
 export const BUILT_IN_TRANSLATIONS = [
-  { key: "kjv", name: "King James Version (KJV)" },
-  { key: "web", name: "World English Bible (WEB)" },
+  { key: "kjv", name: "King James Version (KJV)", note: "public domain" },
+  { key: "web", name: "World English Bible (WEB)", note: "public domain" },
+  { key: "bsb", name: "Berean Standard Bible (BSB)", note: "public domain" },
+  { key: "asv", name: "American Standard Version (ASV)", note: "public domain" },
+  { key: "ylt", name: "Young's Literal Translation (YLT)", note: "public domain" },
+  { key: "darby", name: "Darby Bible (DARBY)", note: "public domain" },
+  { key: "bbe", name: "Bible in Basic English (BBE)", note: "public domain" },
+  { key: "hin", name: "हिन्दी – Indian Revised Version (IRV-HI)", note: "© Bridge Connectivity Solutions, CC BY-SA 4.0" },
+  { key: "tam", name: "தமிழ் – Indian Revised Version (IRV-TA)", note: "© Bridge Connectivity Solutions, CC BY-SA 4.0" },
 ] as const;
 
 type Compact = { books: string[][][] };
 const cache = new Map<string, Compact>();
 
+// Each is its own import so the bundler can find the file; loaded on first use, so a request that never
+// touches the Bible doesn't carry its 4-12 MB.
+const LOADERS: Record<string, () => Promise<{ default: unknown }>> = {
+  kjv: () => import("@/data/bible/kjv.json"),
+  web: () => import("@/data/bible/web.json"),
+  bsb: () => import("@/data/bible/bsb.json"),
+  asv: () => import("@/data/bible/asv.json"),
+  ylt: () => import("@/data/bible/ylt.json"),
+  darby: () => import("@/data/bible/darby.json"),
+  bbe: () => import("@/data/bible/bbe.json"),
+  hin: () => import("@/data/bible/hin.json"),
+  tam: () => import("@/data/bible/tam.json"),
+};
+
 async function builtIn(key: string): Promise<Compact | null> {
-  if (key !== "kjv" && key !== "web") return null;
+  const load = LOADERS[key];
+  if (!load) return null;
   const cached = cache.get(key);
   if (cached) return cached;
-  // Loaded on first use, so a request that never touches the Bible doesn't carry its 4 MB.
-  const data = (key === "kjv" ? await import("@/data/bible/kjv.json") : await import("@/data/bible/web.json")).default as Compact;
+  const data = (await load()).default as Compact;
   cache.set(key, data);
   return data;
 }
@@ -29,11 +54,20 @@ async function builtIn(key: string): Promise<Compact | null> {
 export interface TranslationOption {
   key: string;
   name: string;
+  /** Where it comes from / its licence, shown in the settings. */
+  note: string;
 }
 
 export async function listTranslations(organizationId: string): Promise<TranslationOption[]> {
-  const { data } = await createAdminClient().from("bible_translations").select("id, name").eq("organization_id", organizationId).order("name");
-  return [...BUILT_IN_TRANSLATIONS.map((t) => ({ key: t.key, name: t.name })), ...(data ?? []).map((t) => ({ key: `custom:${t.id}`, name: t.name }))];
+  const [{ data }, licensed] = await Promise.all([
+    createAdminClient().from("bible_translations").select("id, name").eq("organization_id", organizationId).order("name"),
+    listApiBibles(),
+  ]);
+  return [
+    ...BUILT_IN_TRANSLATIONS.map((t) => ({ key: t.key, name: t.name, note: t.note })),
+    ...licensed.map((b) => ({ key: `api:${b.id}`, name: b.name, note: "licensed, via API.Bible" })),
+    ...(data ?? []).map((t) => ({ key: `custom:${t.id}`, name: t.name, note: "your own" })),
+  ];
 }
 
 async function translationName(organizationId: string, key: string): Promise<string | null> {
@@ -54,6 +88,12 @@ async function versesOf(organizationId: string, key: string, ref: PassageRef): P
     if (ref.to !== null) query = query.lte("verse", ref.to);
     const { data } = await query;
     const rows = (data ?? []).map((v) => ({ verse: v.verse, text: v.text }));
+    return rows.length > 0 ? rows : { error: `${formatReference(ref)} isn't in this translation.` };
+  }
+  if (key.startsWith("api:")) {
+    const chapter = await apiBibleChapter(key.slice(4), ref.book, ref.chapter);
+    if ("error" in chapter) return chapter;
+    const rows = chapter.verses.filter((v) => v.verse >= ref.from && (ref.to === null || v.verse <= ref.to));
     return rows.length > 0 ? rows : { error: `${formatReference(ref)} isn't in this translation.` };
   }
   const bible = await builtIn(key);
@@ -100,6 +140,7 @@ export async function searchVerses(organizationId: string, translationKey: strin
     const { data } = await query.order("book").order("chapter").order("verse").limit(limit);
     return (data ?? []).map((v) => ({ reference: `${BOOK_NAMES[v.book - 1]} ${v.chapter}:${v.verse}`, text: v.text }));
   }
+  if (translationKey.startsWith("api:")) return apiBibleSearch(translationKey.slice(4), text, limit);
   const bible = await builtIn(translationKey);
   if (!bible) return { error: "Choose a translation." };
   const hits: VerseHit[] = [];

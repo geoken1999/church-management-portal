@@ -35,6 +35,8 @@ export type ConsoleItem = ProjectionItem & { imageSlides?: Slide[] };
 export interface ConsoleTranslation {
   key: string;
   name: string;
+  /** Where it comes from, shown in the settings. */
+  note?: string;
   /** Set for a translation the church added, which can be removed. */
   customId?: string;
 }
@@ -600,7 +602,7 @@ function SettingsPanel({
           {translations.map((tr) => (
             <li key={tr.key} className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2">
               <span>
-                {tr.name} <span className="text-xs text-muted-foreground">{tr.customId ? "your own" : "built in, public domain"}</span>
+                {tr.name} <span className="text-xs text-muted-foreground">{tr.note}</span>
               </span>
               {tr.customId && canWrite && (
                 <Button

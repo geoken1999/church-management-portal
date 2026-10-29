@@ -60,7 +60,7 @@ export default async function ProjectionPage() {
         siteUrl={getSiteUrl()}
         initial={{ visible: screen.visible, mode: screen.mode, slide: screen.slide, theme: cleanTheme(screen.theme) }}
         items={consoleItems}
-        translations={translations.map((t) => ({ key: t.key, name: t.name, customId: t.key.startsWith("custom:") && customIds.has(t.key.slice(7)) ? t.key.slice(7) : undefined }))}
+        translations={translations.map((t) => ({ key: t.key, name: t.name, note: t.note, customId: t.key.startsWith("custom:") && customIds.has(t.key.slice(7)) ? t.key.slice(7) : undefined }))}
         canWrite={access.write}
       />
     </div>

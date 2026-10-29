@@ -53,6 +53,7 @@ export const hi: Dictionary = {
       ministries: "सेवकाई",
       worship: "आराधना",
       media: "मीडिया",
+      designStudio: "डिज़ाइन स्टूडियो",
       events: "कार्यक्रम",
       bibleSchool: "बाइबल स्कूल",
       prayer: "प्रार्थना",

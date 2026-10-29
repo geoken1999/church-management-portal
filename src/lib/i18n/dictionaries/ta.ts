@@ -53,6 +53,7 @@ export const ta: Dictionary = {
       ministries: "ஊழியங்கள்",
       worship: "வழிபாடு",
       media: "ஊடகம்",
+      designStudio: "வடிவமைப்பு ஸ்டூடியோ",
       events: "நிகழ்வுகள்",
       bibleSchool: "வேத பள்ளி",
       prayer: "ஜெபம்",

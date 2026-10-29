@@ -2,7 +2,9 @@
 // elements (back to front). It is stored as JSON and drawn as plain absolutely-positioned HTML, so the editor, the
 // thumbnails and the PNG/PDF export all render from the same data.
 
-export type ElementType = "text" | "rect" | "ellipse" | "line" | "image";
+import { isIconKey, type IconKey } from "./icons";
+
+export type ElementType = "text" | "rect" | "ellipse" | "line" | "image" | "icon";
 
 export interface DesignElement {
   id: string;
@@ -31,6 +33,8 @@ export interface DesignElement {
   stroke?: string;
   strokeWidth?: number;
   radius?: number;
+  // Shape or symbol from the icon library (filled with `fill`)
+  icon?: IconKey;
   // Image
   src?: string;
   fit?: "cover" | "contain";
@@ -53,14 +57,41 @@ export interface DesignDoc {
 
 export type DesignKind = "flyer" | "poster" | "social" | "custom";
 
+export interface FontDef {
+  label: string;
+  css: string;
+  /** Google Fonts family and the weights to load. Missing for fonts every device already has. */
+  google?: { family: string; weights: number[] };
+}
+
 export const FONTS = {
   sans: { label: "Modern", css: "'Helvetica Neue', Arial, sans-serif" },
   serif: { label: "Classic", css: "Georgia, 'Times New Roman', serif" },
-  display: { label: "Bold", css: "Impact, 'Arial Black', sans-serif" },
+  display: { label: "Bold (Impact)", css: "Impact, 'Arial Black', sans-serif" },
   script: { label: "Script", css: "'Brush Script MT', 'Segoe Script', cursive" },
   mono: { label: "Typewriter", css: "'Courier New', monospace" },
-} as const;
+  montserrat: { label: "Montserrat", css: "'Montserrat', sans-serif", google: { family: "Montserrat", weights: [400, 700, 900] } },
+  poppins: { label: "Poppins", css: "'Poppins', sans-serif", google: { family: "Poppins", weights: [400, 700, 900] } },
+  oswald: { label: "Oswald", css: "'Oswald', sans-serif", google: { family: "Oswald", weights: [400, 700] } },
+  bebas: { label: "Bebas Neue", css: "'Bebas Neue', sans-serif", google: { family: "Bebas Neue", weights: [400] } },
+  anton: { label: "Anton", css: "'Anton', sans-serif", google: { family: "Anton", weights: [400] } },
+  playfair: { label: "Playfair Display", css: "'Playfair Display', serif", google: { family: "Playfair Display", weights: [400, 700, 900] } },
+  lora: { label: "Lora", css: "'Lora', serif", google: { family: "Lora", weights: [400, 700] } },
+  merriweather: { label: "Merriweather", css: "'Merriweather', serif", google: { family: "Merriweather", weights: [400, 700, 900] } },
+  dancing: { label: "Dancing Script", css: "'Dancing Script', cursive", google: { family: "Dancing Script", weights: [400, 700] } },
+  pacifico: { label: "Pacifico", css: "'Pacifico', cursive", google: { family: "Pacifico", weights: [400] } },
+  lobster: { label: "Lobster", css: "'Lobster', cursive", google: { family: "Lobster", weights: [400] } },
+  caveat: { label: "Caveat (handwriting)", css: "'Caveat', cursive", google: { family: "Caveat", weights: [400, 700] } },
+} as const satisfies Record<string, FontDef>;
 export type FontKey = keyof typeof FONTS;
+
+/** One stylesheet address that loads every Google font above. */
+export function googleFontsUrl(): string {
+  const families = (Object.values(FONTS) as FontDef[])
+    .filter((f) => f.google)
+    .map((f) => `family=${f.google!.family.replace(/ /g, "+")}:wght@${f.google!.weights.join(";")}`);
+  return `https://fonts.googleapis.com/css2?${families.join("&")}&display=swap`;
+}
 
 export interface SizePreset {
   key: string;
@@ -142,6 +173,82 @@ export function makeShape(type: "rect" | "ellipse" | "line", doc: Pick<DesignDoc
   };
 }
 
+export function makeIcon(doc: Pick<DesignDoc, "width" | "height">, icon: IconKey, patch: Partial<DesignElement> = {}): DesignElement {
+  const size = Math.round(doc.width * 0.25);
+  return {
+    id: newId(),
+    type: "icon",
+    x: Math.round((doc.width - size) / 2),
+    y: Math.round((doc.height - size) / 2),
+    w: size,
+    h: size,
+    rotation: 0,
+    opacity: 1,
+    icon,
+    fill: "#F5C518",
+    ...patch,
+  };
+}
+
+export type AlignMode = "left" | "center" | "right" | "top" | "middle" | "bottom";
+
+/**
+ * Lines up the chosen elements. One element lines up with the page; several line up with each other (their
+ * combined box). Rotation is ignored: each element's own box is used.
+ */
+export function alignElements(elements: DesignElement[], ids: string[], mode: AlignMode, page: Pick<DesignDoc, "width" | "height">): DesignElement[] {
+  const chosen = elements.filter((e) => ids.includes(e.id));
+  if (chosen.length === 0) return elements;
+  // A locked element stays put but still counts as part of the group the others line up with.
+  const bounds =
+    ids.length === 1
+      ? { left: 0, top: 0, right: page.width, bottom: page.height }
+      : {
+          left: Math.min(...chosen.map((e) => e.x)),
+          top: Math.min(...chosen.map((e) => e.y)),
+          right: Math.max(...chosen.map((e) => e.x + e.w)),
+          bottom: Math.max(...chosen.map((e) => e.y + e.h)),
+        };
+  return elements.map((e) => {
+    if (!ids.includes(e.id) || e.locked) return e;
+    switch (mode) {
+      case "left":
+        return { ...e, x: Math.round(bounds.left) };
+      case "center":
+        return { ...e, x: Math.round((bounds.left + bounds.right) / 2 - e.w / 2) };
+      case "right":
+        return { ...e, x: Math.round(bounds.right - e.w) };
+      case "top":
+        return { ...e, y: Math.round(bounds.top) };
+      case "middle":
+        return { ...e, y: Math.round((bounds.top + bounds.bottom) / 2 - e.h / 2) };
+      case "bottom":
+        return { ...e, y: Math.round(bounds.bottom - e.h) };
+    }
+  });
+}
+
+/** Spaces three or more elements evenly between the outermost two. */
+export function distributeElements(elements: DesignElement[], ids: string[], axis: "horizontal" | "vertical"): DesignElement[] {
+  const chosen = elements.filter((e) => ids.includes(e.id) && !e.locked);
+  if (chosen.length < 3) return elements;
+  const horizontal = axis === "horizontal";
+  const start = (e: DesignElement) => (horizontal ? e.x : e.y);
+  const size = (e: DesignElement) => (horizontal ? e.w : e.h);
+  const sorted = chosen.slice().sort((a, b) => start(a) - start(b));
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  const total = start(last) + size(last) - start(first);
+  const gap = (total - sorted.reduce((sum, e) => sum + size(e), 0)) / (sorted.length - 1);
+  const placed = new Map<string, number>();
+  let cursor = start(first);
+  for (const e of sorted) {
+    placed.set(e.id, Math.round(cursor));
+    cursor += size(e) + gap;
+  }
+  return elements.map((e) => (placed.has(e.id) ? { ...e, [horizontal ? "x" : "y"]: placed.get(e.id) } : e));
+}
+
 export function makeImage(doc: Pick<DesignDoc, "width" | "height">, src: string, naturalW: number, naturalH: number): DesignElement {
   const maxW = doc.width * 0.8;
   const maxH = doc.height * 0.6;
@@ -184,7 +291,7 @@ function finite(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
-const ELEMENT_TYPES: ElementType[] = ["text", "rect", "ellipse", "line", "image"];
+const ELEMENT_TYPES: ElementType[] = ["text", "rect", "ellipse", "line", "image", "icon"];
 
 /**
  * Cleans a design that came from the browser (or from storage) into a safe shape, or returns an error. The server
@@ -236,6 +343,10 @@ export function sanitizeDoc(input: unknown): { doc: DesignDoc } | { error: strin
       el.letterSpacing = clamp(finite(e.letterSpacing, 0), -10, 60);
       el.uppercase = e.uppercase === true;
       el.fill = safeColor(e.fill, "#111111");
+    } else if (type === "icon") {
+      if (!isIconKey(e.icon)) continue;
+      el.icon = e.icon;
+      el.fill = safeColor(e.fill, "#F5C518");
     } else if (type === "image") {
       // Only images the browser embedded itself, or hosted over https. Never script or other schemes.
       const src = typeof e.src === "string" ? e.src : "";

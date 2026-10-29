@@ -55,6 +55,7 @@ export const en = {
       ministries: "Ministries",
       worship: "Worship",
       media: "Media",
+      designStudio: "Design Studio",
       events: "Events",
       bibleSchool: "Bible School",
       prayer: "Prayer",

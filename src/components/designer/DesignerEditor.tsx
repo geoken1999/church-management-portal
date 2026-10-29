@@ -2,16 +2,21 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, Image as ImageIcon, Lock, Minus, Plus, Redo2, Square, Circle, Type, Undo2, Save, Building2, Layers, Check } from "lucide-react";
+import { ArrowLeft, Download, Image as ImageIcon, Lock, Minus, Plus, Redo2, Square, Circle, Star, Type, Undo2, Save, Building2, Layers, Check } from "lucide-react";
 import { saveDesign } from "@/lib/designer/actions";
+import { ICONS, ICON_KEYS, type IconKey } from "@/lib/designer/icons";
 import {
   MAX_ELEMENTS,
   MIN_SIZE,
   backgroundCss,
   clamp,
   duplicateElement,
+  makeIcon,
   makeImage,
   makeShape,
+  alignElements,
+  distributeElements,
+  type AlignMode,
   makeText,
   reorder,
   type DesignBackground,
@@ -21,7 +26,7 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ErrorToast } from "@/components/ui/error-toast";
 import { ElementBody, elementStyle } from "./DesignView";
-import { ElementProperties, PageProperties } from "./Properties";
+import { ElementProperties, MultiProperties, PageProperties } from "./Properties";
 
 type Handle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 const HANDLES: Record<Handle, [number, number]> = {
@@ -93,7 +98,8 @@ export function DesignerEditor({
 }) {
   const [doc, setDocState] = useState<DesignDoc>(initialDoc);
   const [name, setNameState] = useState(initialName);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [rev, setRev] = useState(0);
@@ -109,6 +115,7 @@ export function DesignerEditor({
   const [exportOpen, setExportOpen] = useState(false);
 
   const docRef = useRef(doc);
+  const selectedIdsRef = useRef<string[]>([]);
   const pastRef = useRef<DesignDoc[]>([]);
   const futureRef = useRef<DesignDoc[]>([]);
   const nameRef = useRef(name);
@@ -122,7 +129,16 @@ export function DesignerEditor({
   const readOnly = !canWrite;
   const fit = Math.min((workspace.w - 48) / doc.width, (workspace.h - 48) / doc.height, 1.5);
   const scale = Math.max(0.05, fit * zoom);
+  // One selected element can be resized and rotated; several can be moved, lined up and removed together.
+  const selectedId = selectedIds.length === 1 ? selectedIds[0] : null;
   const selected = doc.elements.find((e) => e.id === selectedId) ?? null;
+  const multi = doc.elements.filter((e) => selectedIds.includes(e.id));
+
+  const selectIds = useCallback((ids: string[]) => {
+    selectedIdsRef.current = ids;
+    setSelectedIds(ids);
+  }, []);
+  const setSelectedId = useCallback((id: string | null) => selectIds(id ? [id] : []), [selectIds]);
 
   // --- document changes -------------------------------------------------------------------------------------------
 
@@ -173,22 +189,48 @@ export function DesignerEditor({
       commit({ ...current, elements: [...current.elements, el] }, true);
       setSelectedId(el.id);
     },
-    [commit],
+    [commit, setSelectedId],
   );
 
-  const removeElement = useCallback(
-    (id: string) => {
+  const removeElements = useCallback(
+    (ids: string[]) => {
       const current = docRef.current;
-      commit({ ...current, elements: current.elements.filter((e) => e.id !== id) }, true);
-      setSelectedId(null);
+      const doomed = new Set(ids.filter((id) => !current.elements.find((e) => e.id === id)?.locked));
+      if (doomed.size === 0) return;
+      commit({ ...current, elements: current.elements.filter((e) => !doomed.has(e.id)) }, true);
+      selectIds([]);
+    },
+    [commit, selectIds],
+  );
+  const removeElement = useCallback((id: string) => removeElements([id]), [removeElements]);
+
+  const duplicateSelected = useCallback(() => {
+    const current = docRef.current;
+    const originals = current.elements.filter((e) => selectedIdsRef.current.includes(e.id));
+    if (originals.length === 0) return;
+    if (current.elements.length + originals.length > MAX_ELEMENTS) {
+      setError(`A design can have up to ${MAX_ELEMENTS} elements.`);
+      return;
+    }
+    const copies = originals.map(duplicateElement);
+    commit({ ...current, elements: [...current.elements, ...copies] }, true);
+    selectIds(copies.map((c) => c.id));
+  }, [commit, selectIds]);
+
+  const alignSelected = useCallback(
+    (mode: AlignMode) => {
+      const current = docRef.current;
+      commit({ ...current, elements: alignElements(current.elements, selectedIdsRef.current, mode, current) }, true);
     },
     [commit],
   );
-
-  const duplicateSelected = useCallback(() => {
-    const el = docRef.current.elements.find((e) => e.id === selectedId);
-    if (el) addElement(duplicateElement(el));
-  }, [selectedId, addElement]);
+  const distributeSelected = useCallback(
+    (axis: "horizontal" | "vertical") => {
+      const current = docRef.current;
+      commit({ ...current, elements: distributeElements(current.elements, selectedIdsRef.current, axis) }, true);
+    },
+    [commit],
+  );
 
   const setName = (value: string) => {
     nameRef.current = value;
@@ -307,27 +349,29 @@ export function DesignerEditor({
       } else if (mod && e.key.toLowerCase() === "d") {
         e.preventDefault();
         duplicateSelected();
-      } else if (e.key === "Escape") {
-        setSelectedId(null);
-      } else if (selectedId && (e.key === "Delete" || e.key === "Backspace")) {
+      } else if (mod && e.key.toLowerCase() === "a") {
         e.preventDefault();
-        removeElement(selectedId);
-      } else if (selectedId && e.key.startsWith("Arrow")) {
-        const el = docRef.current.elements.find((x) => x.id === selectedId);
-        if (!el || el.locked) return;
+        selectIds(docRef.current.elements.map((x) => x.id));
+      } else if (e.key === "Escape") {
+        selectIds([]);
+      } else if (selectedIdsRef.current.length > 0 && (e.key === "Delete" || e.key === "Backspace")) {
+        e.preventDefault();
+        removeElements(selectedIdsRef.current);
+      } else if (selectedIdsRef.current.length > 0 && e.key.startsWith("Arrow")) {
         e.preventDefault();
         const step = e.shiftKey ? 10 : 1;
-        const patch: Partial<DesignElement> = {};
-        if (e.key === "ArrowLeft") patch.x = el.x - step;
-        if (e.key === "ArrowRight") patch.x = el.x + step;
-        if (e.key === "ArrowUp") patch.y = el.y - step;
-        if (e.key === "ArrowDown") patch.y = el.y + step;
-        patchElement(selectedId, patch, "nudge");
+        const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+        const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+        const current = docRef.current;
+        commit(
+          { ...current, elements: current.elements.map((x) => (selectedIdsRef.current.includes(x.id) && !x.locked ? { ...x, x: x.x + dx, y: x.y + dy } : x)) },
+          "nudge",
+        );
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [save, undo, redo, duplicateSelected, removeElement, patchElement, selectedId, readOnly]);
+  }, [save, undo, redo, duplicateSelected, removeElements, commit, selectIds, readOnly]);
 
   // --- dragging ---------------------------------------------------------------------------------------------------
 
@@ -342,6 +386,8 @@ export function DesignerEditor({
     const startX = event.clientX;
     const startY = event.clientY;
     const origin = { ...el };
+    const group = docRef.current.elements.filter((e) => selectedIdsRef.current.includes(e.id) && !e.locked).map((e) => ({ ...e }));
+    if (group.length === 0) group.push(origin);
     let started = false;
 
     const onMove = (ev: PointerEvent) => {
@@ -357,14 +403,30 @@ export function DesignerEditor({
       let patch: Partial<DesignElement> = {};
 
       if (mode === "move") {
-        let x = origin.x + dx;
-        let y = origin.y + dy;
-        const snapV = Math.abs(x + origin.w / 2 - page.width / 2) < SNAP_PX / s;
-        const snapH = Math.abs(y + origin.h / 2 - page.height / 2) < SNAP_PX / s;
-        if (snapV) x = page.width / 2 - origin.w / 2;
-        if (snapH) y = page.height / 2 - origin.h / 2;
+        // Everything selected moves together; the group's box is what snaps to the middle of the page.
+        let mx = dx;
+        let my = dy;
+        const gl = Math.min(...group.map((g) => g.x)) + dx;
+        const gr = Math.max(...group.map((g) => g.x + g.w)) + dx;
+        const gt = Math.min(...group.map((g) => g.y)) + dy;
+        const gb = Math.max(...group.map((g) => g.y + g.h)) + dy;
+        const snapV = Math.abs((gl + gr) / 2 - page.width / 2) < SNAP_PX / s;
+        const snapH = Math.abs((gt + gb) / 2 - page.height / 2) < SNAP_PX / s;
+        if (snapV) mx += page.width / 2 - (gl + gr) / 2;
+        if (snapH) my += page.height / 2 - (gt + gb) / 2;
         setGuides({ v: snapV, h: snapH });
-        patch = { x: Math.round(x), y: Math.round(y) };
+        const starts = new Map(group.map((g) => [g.id, g]));
+        commit(
+          {
+            ...page,
+            elements: page.elements.map((e) => {
+              const start = starts.get(e.id);
+              return start ? { ...e, x: Math.round(start.x + mx), y: Math.round(start.y + my) } : e;
+            }),
+          },
+          false,
+        );
+        return;
       } else if (mode === "rotate") {
         const cx = origin.x + origin.w / 2;
         const cy = origin.y + origin.h / 2;
@@ -416,6 +478,39 @@ export function DesignerEditor({
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       setGuides({ v: false, h: false });
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
+
+  // Dragging on an empty part of the page draws a box and selects whatever it touches.
+  function beginMarquee(event: ReactPointerEvent) {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const additive = event.shiftKey || event.metaKey || event.ctrlKey;
+    const base = additive ? selectedIdsRef.current : [];
+    if (!additive) selectIds([]);
+    const rect = stage.getBoundingClientRect();
+    const s = scale;
+    const sx = (event.clientX - rect.left) / s;
+    const sy = (event.clientY - rect.top) / s;
+    let moved = false;
+    const onMove = (ev: PointerEvent) => {
+      const cx = (ev.clientX - rect.left) / s;
+      const cy = (ev.clientY - rect.top) / s;
+      if (!moved && Math.abs(cx - sx) + Math.abs(cy - sy) < 3 / s) return;
+      moved = true;
+      const box = { x: Math.min(sx, cx), y: Math.min(sy, cy), w: Math.abs(cx - sx), h: Math.abs(cy - sy) };
+      setMarquee(box);
+      const hit = docRef.current.elements
+        .filter((e) => e.x < box.x + box.w && e.x + e.w > box.x && e.y < box.y + box.h && e.y + e.h > box.y)
+        .map((e) => e.id);
+      selectIds(Array.from(new Set([...base, ...hit])));
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      setMarquee(null);
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
@@ -507,7 +602,7 @@ export function DesignerEditor({
       <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e) => { void onPickImage(e.target.files?.[0]); e.target.value = ""; }} />
 
       <div className="flex flex-wrap items-center gap-2">
-        <Link href="/dashboard/media/designer" className={buttonVariants({ variant: "outline", size: "sm" })}>
+        <Link href="/dashboard/studio" className={buttonVariants({ variant: "outline", size: "sm" })}>
           <ArrowLeft className="size-4" /> Designs
         </Link>
         <span className="truncate text-sm font-medium">{name}</span>
@@ -600,6 +695,23 @@ export function DesignerEditor({
                     <Minus className="size-4" />
                   </Button>
                 </div>
+                <p className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Shapes and symbols</p>
+                <div className="grid grid-cols-5 gap-1">
+                  {ICON_KEYS.map((key: IconKey) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => addElement(makeIcon(docRef.current, key))}
+                      className="flex aspect-square items-center justify-center rounded-md border p-1.5 hover:bg-muted"
+                      aria-label={`Add ${ICONS[key].label}`}
+                      title={ICONS[key].label}
+                    >
+                      <svg viewBox="0 0 24 24" className="size-full" aria-hidden>
+                        <path d={ICONS[key].path} fill="currentColor" fillRule="evenodd" />
+                      </svg>
+                    </button>
+                  ))}
+                </div>
                 <p className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pictures</p>
                 <Button variant="outline" className="w-full justify-start" onClick={() => fileRef.current?.click()}>
                   <ImageIcon className="size-4" /> Upload a picture
@@ -618,11 +730,15 @@ export function DesignerEditor({
                 <li key={el.id}>
                   <button
                     type="button"
-                    onClick={() => setSelectedId(el.id)}
-                    className={`flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm ${el.id === selectedId ? "bg-primary/10 font-medium" : "hover:bg-muted"}`}
+                    onClick={(e) =>
+                      e.shiftKey || e.metaKey || e.ctrlKey
+                        ? selectIds(selectedIds.includes(el.id) ? selectedIds.filter((x) => x !== el.id) : [...selectedIds, el.id])
+                        : setSelectedId(el.id)
+                    }
+                    className={`flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm ${selectedIds.includes(el.id) ? "bg-primary/10 font-medium" : "hover:bg-muted"}`}
                   >
-                    {el.type === "text" ? <Type className="size-3.5 shrink-0" /> : el.type === "image" ? <ImageIcon className="size-3.5 shrink-0" /> : el.type === "ellipse" ? <Circle className="size-3.5 shrink-0" /> : el.type === "line" ? <Minus className="size-3.5 shrink-0" /> : <Square className="size-3.5 shrink-0" />}
-                    <span className="truncate">{el.type === "text" ? (el.text || "Text").split("\n")[0] : el.type === "image" ? "Picture" : el.type === "rect" ? "Rectangle" : el.type === "ellipse" ? "Circle" : "Line"}</span>
+                    {el.type === "text" ? <Type className="size-3.5 shrink-0" /> : el.type === "image" ? <ImageIcon className="size-3.5 shrink-0" /> : el.type === "ellipse" ? <Circle className="size-3.5 shrink-0" /> : el.type === "line" ? <Minus className="size-3.5 shrink-0" /> : el.type === "icon" ? <Star className="size-3.5 shrink-0" /> : <Square className="size-3.5 shrink-0" />}
+                    <span className="truncate">{el.type === "text" ? (el.text || "Text").split("\n")[0] : el.type === "image" ? "Picture" : el.type === "icon" && el.icon ? ICONS[el.icon].label : el.type === "rect" ? "Rectangle" : el.type === "ellipse" ? "Circle" : "Line"}</span>
                     {el.locked && <Lock className="ml-auto size-3 shrink-0 text-muted-foreground" />}
                   </button>
                 </li>
@@ -636,11 +752,11 @@ export function DesignerEditor({
           ref={workspaceRef}
           className="relative order-1 h-[68vh] min-h-[360px] overflow-auto rounded-lg border bg-muted/60 lg:order-2"
           onPointerDown={(e) => {
-            if (e.target === e.currentTarget || (e.target as HTMLElement).dataset.stageWrap) setSelectedId(null);
+            if (e.target === e.currentTarget || (e.target as HTMLElement).dataset.stageWrap) selectIds([]);
           }}
         >
           <div data-stage-wrap="1" className="flex min-h-full min-w-full items-center justify-center p-6">
-            <div ref={stageRef} className="relative shadow-xl" style={{ width: doc.width * scale, height: doc.height * scale }} onPointerDown={(e) => { if (e.target === e.currentTarget) setSelectedId(null); }}>
+            <div ref={stageRef} className="relative shadow-xl" style={{ width: doc.width * scale, height: doc.height * scale }} onPointerDown={(e) => { if (e.target === e.currentTarget) beginMarquee(e); }}>
               {/* The page itself, at its natural size, scaled to fit. This is what gets downloaded. */}
               <div
                 ref={exportRef}
@@ -655,7 +771,7 @@ export function DesignerEditor({
                   background: backgroundCss(doc.background),
                   overflow: "hidden",
                 }}
-                onPointerDown={(e) => { if (e.target === e.currentTarget) setSelectedId(null); }}
+                onPointerDown={(e) => { if (e.target === e.currentTarget) beginMarquee(e); }}
               >
                 {doc.elements.map((el) => (
                   <div
@@ -663,7 +779,12 @@ export function DesignerEditor({
                     data-el={el.id}
                     style={{ ...elementStyle(el), cursor: readOnly || el.locked ? "default" : "move" }}
                     onPointerDown={(e) => {
-                      setSelectedId(el.id);
+                      if (e.shiftKey || e.metaKey || e.ctrlKey) {
+                        // Add to, or take out of, the selection
+                        selectIds(selectedIdsRef.current.includes(el.id) ? selectedIdsRef.current.filter((x) => x !== el.id) : [...selectedIdsRef.current, el.id]);
+                        return;
+                      }
+                      if (!selectedIdsRef.current.includes(el.id)) selectIds([el.id]);
                       beginDrag(e, el, "move");
                     }}
                   >
@@ -675,6 +796,46 @@ export function DesignerEditor({
               {/* Centre guides while dragging */}
               {guides.v && <div className="pointer-events-none absolute inset-y-0 left-1/2 w-px bg-fuchsia-500" />}
               {guides.h && <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px bg-fuchsia-500" />}
+
+              {/* Marquee while selecting by dragging */}
+              {marquee && (
+                <div
+                  className="pointer-events-none absolute border border-blue-500 bg-blue-500/10"
+                  style={{ left: marquee.x * scale, top: marquee.y * scale, width: marquee.w * scale, height: marquee.h * scale }}
+                />
+              )}
+
+              {/* Several selected: an outline on each and a dashed box around the group */}
+              {multi.length > 1 && (
+                <>
+                  {multi.map((el) => (
+                    <div
+                      key={el.id}
+                      className="pointer-events-none absolute"
+                      style={{
+                        left: el.x * scale,
+                        top: el.y * scale,
+                        width: el.w * scale,
+                        height: el.h * scale,
+                        transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
+                        border: "1px solid #3b82f6",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  ))}
+                  <div
+                    className="pointer-events-none absolute"
+                    style={{
+                      left: Math.min(...multi.map((e) => e.x)) * scale,
+                      top: Math.min(...multi.map((e) => e.y)) * scale,
+                      width: (Math.max(...multi.map((e) => e.x + e.w)) - Math.min(...multi.map((e) => e.x))) * scale,
+                      height: (Math.max(...multi.map((e) => e.y + e.h)) - Math.min(...multi.map((e) => e.y))) * scale,
+                      border: "1.5px dashed #3b82f6",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </>
+              )}
 
               {/* Selection outline and handles */}
               {selected && (
@@ -722,7 +883,13 @@ export function DesignerEditor({
 
         {/* Right: properties */}
         <aside className="order-3 rounded-lg border bg-card p-3">
-          {selected ? (
+          {multi.length > 1 ? (
+            readOnly ? (
+              <p className="text-sm text-muted-foreground">You can view this design but not change it.</p>
+            ) : (
+              <MultiProperties count={multi.length} onAlign={alignSelected} onDistribute={distributeSelected} onDuplicate={duplicateSelected} onDelete={() => removeElements(selectedIds)} />
+            )
+          ) : selected ? (
             readOnly ? (
               <p className="text-sm text-muted-foreground">You can view this design but not change it.</p>
             ) : (
@@ -732,6 +899,7 @@ export function DesignerEditor({
                 onLayer={(move) => commit({ ...docRef.current, elements: reorder(docRef.current.elements, selected.id, move) }, true)}
                 onDuplicate={duplicateSelected}
                 onDelete={() => removeElement(selected.id)}
+                onAlign={alignSelected}
               />
             )
           ) : (

@@ -55,7 +55,7 @@ export function DesignerGallery({
         churchName,
       });
       if (result.error) setError(result.error);
-      else if (result.id) router.push(`/dashboard/media/designer/${result.id}`);
+      else if (result.id) router.push(`/dashboard/studio/${result.id}`);
     });
   }
 
@@ -99,7 +99,7 @@ export function DesignerGallery({
             const scale = Math.min(THUMB / design.width, THUMB / design.height);
             return (
               <Card key={design.id} className="overflow-hidden">
-                <Link href={`/dashboard/media/designer/${design.id}`} className="flex h-[240px] items-center justify-center bg-muted/50 p-2">
+                <Link href={`/dashboard/studio/${design.id}`} className="flex h-[240px] items-center justify-center bg-muted/50 p-2">
                   <div className="shadow-md">
                     <DesignView doc={design.doc} scale={scale} />
                   </div>
@@ -112,7 +112,7 @@ export function DesignerGallery({
                     </p>
                   </div>
                   <div className="flex gap-1">
-                    <Link href={`/dashboard/media/designer/${design.id}`} className={buttonVariants({ size: "sm", variant: "outline" })}>
+                    <Link href={`/dashboard/studio/${design.id}`} className={buttonVariants({ size: "sm", variant: "outline" })}>
                       <Pencil className="size-3.5" /> {canWrite ? "Edit" : "Open"}
                     </Link>
                     {canWrite && (

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { backgroundCss, clamp, duplicateElement, makeShape, makeText, reorder, sanitizeDoc, safeColor, emptyDoc } from "./model";
+import { alignElements, distributeElements, googleFontsUrl, makeIcon, FONTS, backgroundCss, clamp, duplicateElement, makeShape, makeText, reorder, sanitizeDoc, safeColor, emptyDoc } from "./model";
 import { TEMPLATES, buildTemplate } from "./templates";
 
 const page = { width: 800, height: 1000 };
@@ -89,5 +89,47 @@ describe("templates", () => {
   });
   it("falls back to blank for an unknown key", () => {
     expect(buildTemplate("nope", 800, 1000, "").elements).toHaveLength(0);
+  });
+});
+
+describe("icons and fonts", () => {
+  it("keeps known icons and drops unknown ones", () => {
+    const good = makeIcon(page, "star");
+    const bad = { ...good, id: "bad", icon: "not-an-icon" };
+    const result = sanitizeDoc({ ...emptyDoc(800, 1000), elements: [good, bad] });
+    expect("doc" in result && result.doc.elements.map((e) => e.icon)).toEqual(["star"]);
+  });
+  it("accepts every Google font and builds one stylesheet address", () => {
+    const el = makeText(page, "x", { fontFamily: "bebas" });
+    const result = sanitizeDoc({ ...emptyDoc(800, 1000), elements: [el] });
+    expect("doc" in result && result.doc.elements[0].fontFamily).toBe("bebas");
+    const url = googleFontsUrl();
+    expect(url).toContain("family=Playfair+Display:wght@400;700;900");
+    expect(url).toContain("family=Bebas+Neue:wght@400");
+    expect(url.endsWith("&display=swap")).toBe(true);
+    expect(Object.keys(FONTS).length).toBeGreaterThan(10);
+  });
+});
+
+describe("align and distribute", () => {
+  const box = (id: string, x: number, y: number, w = 100, h = 50) => ({ ...makeShape("rect", page), id, x, y, w, h });
+  it("lines one element up with the page", () => {
+    const out = alignElements([box("a", 10, 10)], ["a"], "center", page);
+    expect(out[0].x).toBe(350);
+    expect(alignElements([box("a", 10, 10)], ["a"], "bottom", page)[0].y).toBe(950);
+  });
+  it("lines several up with each other", () => {
+    const els = [box("a", 10, 10), box("b", 300, 200), box("c", 50, 90)];
+    expect(alignElements(els, ["a", "b", "c"], "left", page).map((e) => e.x)).toEqual([10, 10, 10]);
+    expect(alignElements(els, ["a", "b"], "right", page).map((e) => e.x)).toEqual([300, 300, 50]);
+  });
+  it("leaves locked elements where they are", () => {
+    const els = [{ ...box("a", 10, 10), locked: true }, box("b", 300, 200)];
+    expect(alignElements(els, ["a", "b"], "left", page).map((e) => e.x)).toEqual([10, 10]);
+  });
+  it("spaces three or more evenly, and ignores fewer", () => {
+    const els = [box("a", 0, 0), box("b", 120, 0), box("c", 400, 0)];
+    expect(distributeElements(els, ["a", "b", "c"], "horizontal").map((e) => e.x)).toEqual([0, 200, 400]);
+    expect(distributeElements(els, ["a", "b"], "horizontal")).toBe(els);
   });
 });

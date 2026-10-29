@@ -168,9 +168,9 @@ export const DOC_CATEGORIES: DocCategory[] = [
         id: "media-designer",
         title: "Flyer and poster designer",
         body: [
-          "Open Designer from the Media page to make flyers, posters, Bible-verse pictures and social posts. Choose New design, pick a template (Sunday service, event poster, Bible verse, prayer night, youth night, Christmas or blank) and a size (A5, A4 or A3 for print, a square post, a story or a banner for social media, or your own size).",
-          "In the editor, add text, shapes, your church logo or a picture from your computer, then drag to move, drag the corners to resize and use the round handle to rotate. The panel on the right changes fonts, colours, spacing, order and background; Ctrl+Z undoes, Delete removes, arrow keys nudge, and a pink line shows when something is centred. Changes save automatically.",
-          "Use Download for a PNG or JPG picture, a high-quality PNG, or a PDF at the real page size, ready to print or share. You need Media write access to change designs; anyone with Media access can open and download them.",
+          "Open Design Studio from the menu to make flyers, posters, Bible-verse pictures and social posts. Choose New design, pick a template (Sunday service, event poster, Bible verse, prayer night, youth night, Christmas or blank) and a size (A5, A4 or A3 for print, a square post, a story or a banner for social media, or your own size).",
+          "In the editor, add text (16 fonts, including Google fonts), shapes and symbols (stars, crosses, hearts, arrows, badges, calendar, location and more), your church logo or a picture from your computer, then drag to move, drag the corners to resize and use the round handle to rotate. Shift-click or drag a box around several things to move, line up, space evenly, duplicate or delete them together. The panel on the right changes fonts, colours, spacing, order and background; Ctrl+Z undoes, Delete removes, arrow keys nudge, and a pink line shows when something is centred. Changes save automatically.",
+          "Use Download for a PNG or JPG picture, a high-quality PNG, or a PDF at the real page size, ready to print or share. Design Studio has its own permission under Team → Permissions: Write to create and edit designs, Delete to remove them, Read to open and download.",
         ],
       },
       {

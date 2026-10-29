@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { ICONS } from "@/lib/designer/icons";
 import { FONTS, backgroundCss, type DesignDoc, type DesignElement } from "@/lib/designer/model";
 
 // Draws a design as plain HTML at its natural pixel size. Callers scale it with CSS transform. The same markup is
@@ -39,6 +40,13 @@ export function ElementBody({ el }: { el: DesignElement }) {
       <div data-text style={style}>
         {el.text}
       </div>
+    );
+  }
+  if (el.type === "icon" && el.icon) {
+    return (
+      <svg viewBox="0 0 24 24" width="100%" height="100%" preserveAspectRatio="none" style={{ display: "block" }} aria-hidden>
+        <path d={ICONS[el.icon].path} fill={el.fill} fillRule="evenodd" />
+      </svg>
     );
   }
   if (el.type === "image") {

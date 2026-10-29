@@ -7,7 +7,7 @@ import { checkTabAccess } from "@/lib/permissions/dal";
 import { SIZE_PRESETS, cleanDesignName, normalizeKind, sanitizeDoc, type DesignDoc } from "./model";
 import { buildTemplate } from "./templates";
 
-const DESIGNER_PATH = "/dashboard/media/designer";
+const DESIGNER_PATH = "/dashboard/studio";
 
 export interface DesignActionResult {
   error?: string;
@@ -16,7 +16,7 @@ export interface DesignActionResult {
 
 export async function createDesign(input: { organizationId: string; name: string; template: string; size: string; customWidth?: number; customHeight?: number; churchName: string }): Promise<DesignActionResult> {
   const user = await requireUser();
-  const access = await checkTabAccess(input.organizationId, "media", "write");
+  const access = await checkTabAccess(input.organizationId, "designer", "write");
   if (!access.ok) return { error: access.message };
 
   const preset = SIZE_PRESETS.find((p) => p.key === input.size);
@@ -47,7 +47,7 @@ export async function saveDesign(input: { id: string; name: string; doc: DesignD
   await requireUser();
   const organizationId = await ownedBy(input.id);
   if (!organizationId) return { error: "That design no longer exists." };
-  const access = await checkTabAccess(organizationId, "media", "write");
+  const access = await checkTabAccess(organizationId, "designer", "write");
   if (!access.ok) return { error: access.message };
 
   const checked = sanitizeDoc(input.doc);
@@ -67,7 +67,7 @@ export async function duplicateDesign(id: string): Promise<DesignActionResult> {
   const user = await requireUser();
   const organizationId = await ownedBy(id);
   if (!organizationId) return { error: "That design no longer exists." };
-  const access = await checkTabAccess(organizationId, "media", "write");
+  const access = await checkTabAccess(organizationId, "designer", "write");
   if (!access.ok) return { error: access.message };
 
   const admin = createAdminClient();
@@ -95,7 +95,7 @@ export async function deleteDesign(id: string): Promise<DesignActionResult> {
   await requireUser();
   const organizationId = await ownedBy(id);
   if (!organizationId) return {};
-  const access = await checkTabAccess(organizationId, "media", "delete");
+  const access = await checkTabAccess(organizationId, "designer", "delete");
   if (!access.ok) return { error: access.message };
   const { error } = await createAdminClient().from("designs").delete().eq("id", id);
   if (error) return { error: "Couldn't delete the design. Please try again." };

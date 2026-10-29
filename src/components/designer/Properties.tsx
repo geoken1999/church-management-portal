@@ -1,13 +1,77 @@
 "use client";
 
-import { AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowUp, ChevronsDown, ChevronsUp, Copy, Lock, LockOpen, Trash2 } from "lucide-react";
-import { FONTS, type DesignBackground, type DesignDoc, type DesignElement, type FontKey } from "@/lib/designer/model";
+import { AlignCenter, AlignEndHorizontal, AlignEndVertical, AlignHorizontalSpaceAround, AlignStartHorizontal, AlignStartVertical, AlignVerticalSpaceAround, AlignCenterHorizontal, AlignCenterVertical, AlignLeft, AlignRight, ArrowDown, ArrowUp, ChevronsDown, ChevronsUp, Copy, Lock, LockOpen, Trash2 } from "lucide-react";
+import { FONTS, type AlignMode, type DesignBackground, type DesignDoc, type DesignElement, type FontKey } from "@/lib/designer/model";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ColorField, NumField, Section, Toggle } from "./fields";
 
 type Patch = Partial<DesignElement>;
+
+function AlignSection({ title, onAlign, onDistribute }: { title: string; onAlign: (mode: AlignMode) => void; onDistribute?: (axis: "horizontal" | "vertical") => void }) {
+  const buttons: [AlignMode, string, typeof AlignLeft][] = [
+    ["left", "Align left", AlignStartVertical],
+    ["center", "Align centres", AlignCenterVertical],
+    ["right", "Align right", AlignEndVertical],
+    ["top", "Align top", AlignStartHorizontal],
+    ["middle", "Align middles", AlignCenterHorizontal],
+    ["bottom", "Align bottom", AlignEndHorizontal],
+  ];
+  return (
+    <Section title={title}>
+      <div className="flex flex-wrap gap-1">
+        {buttons.map(([mode, label, Icon]) => (
+          <Button key={mode} size="sm" variant="outline" onClick={() => onAlign(mode)} aria-label={label} title={label}>
+            <Icon className="size-4" />
+          </Button>
+        ))}
+        {onDistribute && (
+          <>
+            <Button size="sm" variant="outline" onClick={() => onDistribute("horizontal")} aria-label="Space evenly across" title="Space evenly across (3 or more)">
+              <AlignHorizontalSpaceAround className="size-4" />
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => onDistribute("vertical")} aria-label="Space evenly down" title="Space evenly down (3 or more)">
+              <AlignVerticalSpaceAround className="size-4" />
+            </Button>
+          </>
+        )}
+      </div>
+    </Section>
+  );
+}
+
+export function MultiProperties({
+  count,
+  onAlign,
+  onDistribute,
+  onDuplicate,
+  onDelete,
+}: {
+  count: number;
+  onAlign: (mode: AlignMode) => void;
+  onDistribute: (axis: "horizontal" | "vertical") => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <p className="text-sm font-medium">{count} things selected</p>
+      <AlignSection title="Line up with each other" onAlign={onAlign} onDistribute={onDistribute} />
+      <Section title="Together">
+        <div className="flex flex-wrap gap-1">
+          <Button size="sm" variant="outline" onClick={onDuplicate}>
+            <Copy className="size-4" /> Duplicate
+          </Button>
+          <Button size="sm" variant="outline" onClick={onDelete}>
+            <Trash2 className="size-4" /> Delete
+          </Button>
+        </div>
+      </Section>
+      <p className="text-xs text-muted-foreground">Drag to move them together. Shift-click adds or removes one; drag on an empty part of the page to select an area.</p>
+    </div>
+  );
+}
 
 export function PageProperties({
   doc,
@@ -62,12 +126,14 @@ export function ElementProperties({
   onLayer,
   onDuplicate,
   onDelete,
+  onAlign,
 }: {
   el: DesignElement;
   onPatch: (patch: Patch, key: string) => void;
   onLayer: (move: "forward" | "backward" | "front" | "back") => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  onAlign: (mode: AlignMode) => void;
 }) {
   const set = (key: keyof DesignElement) => (value: unknown) => onPatch({ [key]: value } as Patch, String(key));
   return (
@@ -143,6 +209,12 @@ export function ElementProperties({
         </Section>
       )}
 
+      {el.type === "icon" && (
+        <Section title="Shape">
+          <ColorField label="Colour" value={el.fill} onChange={set("fill")} />
+        </Section>
+      )}
+
       {el.type === "image" && (
         <Section title="Picture">
           <div className="flex gap-1">
@@ -167,6 +239,8 @@ export function ElementProperties({
           <NumField label="Opacity %" value={Math.round(el.opacity * 100)} min={0} max={100} onChange={(v) => onPatch({ opacity: Math.min(1, Math.max(0, v / 100)) }, "opacity")} />
         </div>
       </Section>
+
+      <AlignSection title="Line up on the page" onAlign={onAlign} />
 
       <Section title="Arrange">
         <div className="flex flex-wrap gap-1">

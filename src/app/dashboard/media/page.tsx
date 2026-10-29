@@ -4,8 +4,6 @@ import { getGroupPosts } from "@/lib/groups/dal";
 import { GroupSharesPanel } from "@/components/groups/GroupSharesPanel";
 import { getMembers } from "@/lib/members/dal";
 import { getMediaTeamMembers, getMediaEquipment, getMediaSocialAccounts, getMediaDocuments } from "@/lib/media/dal";
-import Link from "next/link";
-import { Palette } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { MediaManager } from "@/components/media/MediaManager";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
@@ -53,16 +51,6 @@ export default async function MediaPage() {
           The team, equipment, and social accounts behind {membership.organization.name}&apos;s media ministry.
         </p>
       </div>
-
-      <Link href="/dashboard/media/designer" className="flex items-center gap-4 rounded-xl border bg-card p-4 transition hover:bg-muted/50">
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <Palette className="size-5" />
-        </span>
-        <span>
-          <span className="block font-medium">Flyer and poster designer</span>
-          <span className="block text-sm text-muted-foreground">Make flyers, posters and social posts from templates, then download them as PNG or PDF.</span>
-        </span>
-      </Link>
 
       <GroupSharesPanel groupKey="media" posts={groupPosts} canWrite={membership.tabAccess.media.write} canDelete={membership.tabAccess.media.delete} pagePath="/dashboard/media" note="Media team members also see the documents in your media library there." />
 

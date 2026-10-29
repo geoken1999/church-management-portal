@@ -315,3 +315,19 @@ describe("the Live stream tab", () => {
     expect(resolveTabStates("pro", { ...PLANS.pro, tabOverrides: { livestream: false } } as never).livestream).toBe(false);
   });
 });
+
+describe("the Design Studio tab", () => {
+  it("is included from Growth up, and not on Starter", () => {
+    expect(resolveTabStates("basic", null).designer).toBe(false);
+    expect(resolveTabStates("premium", null).designer).toBe(true);
+    expect(resolveTabStates("pro", null).designer).toBe(true);
+  });
+  it("opens on Starter when the church pays for the module", () => {
+    expect(resolveTabStates("basic", null, ["designer"]).designer).toBe(true);
+    expect(tabsOfModule("designer")).toEqual(["designer"]);
+  });
+  it("can be switched on or off for one church", () => {
+    expect(resolveTabStates("basic", { ...PLANS.basic, tabOverrides: { designer: true } } as never).designer).toBe(true);
+    expect(resolveTabStates("pro", { ...PLANS.pro, tabOverrides: { designer: false } } as never).designer).toBe(false);
+  });
+});

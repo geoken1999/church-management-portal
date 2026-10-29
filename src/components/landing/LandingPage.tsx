@@ -34,6 +34,7 @@ import {
   HandHeart,
   ClipboardList,
   Radio,
+  Palette,
   BadgeCheck,
   GraduationCap,
   Cake,
@@ -168,6 +169,12 @@ const FEATURE_CATEGORIES: FeatureCategory[] = [
         title: "Live stream",
         description:
           "Broadcast your service and let members watch live inside the app, with chat and a viewer count. Go live from a camera or from OBS with a stream key, send to YouTube and Facebook too, and record it. Set up for your church on request.",
+      },
+      {
+        icon: Palette,
+        title: "Design Studio",
+        description:
+          "Make flyers, posters and social posts from church templates, or describe what you need and let AI lay it out with your pictures and logo. Download as PNG or print-ready PDF. Included in Growth and Pro; Starter can add it as a module.",
       },
       {
         icon: GraduationCap,
@@ -377,6 +384,11 @@ const FAQS = [
     question: "Can we live stream our service to members?",
     answer:
       "Yes. Every church on Growth or Pro can go live on YouTube or Facebook from OBS, with step-by-step instructions in the Live stream tab. Streaming inside the app, with live chat and a viewer count, is switched on by request: use Request in-app streaming on the Live stream page and we will set it up with you. Starter can add Live stream as a module.",
+  },
+  {
+    question: "Can we design flyers and posters in KingdomFlow?",
+    answer:
+      "Yes. Design Studio has templates for Sunday services, events, Bible verses, prayer nights, youth nights and Christmas, with fonts, shapes, your own pictures and logo, and downloads as PNG, JPG or print-ready PDF. You can also describe a flyer and let AI lay it out for you (1 AI credit per design). It is included on Growth and Pro; Starter can add Design Studio as a module.",
   },
   {
     question: "Can we make a report for our church board in Tamil or Hindi?",

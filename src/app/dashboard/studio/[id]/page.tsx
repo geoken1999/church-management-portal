@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { notFound } from "next/navigation";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getDesign } from "@/lib/designer/dal";
@@ -13,6 +14,8 @@ export const metadata: Metadata = {
 export default async function DesignEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const membership = await requireOrganization();
+  // A plan without Design Studio sends people to the page where they can subscribe to it on its own.
+  if (membership.lockedTabs.includes("designer")) redirect("/dashboard/unlock/designer");
   if (!membership.tabAccess.designer.read) return <AccessRestricted label="Design Studio" />;
 
   const design = await getDesign(membership.organization.id, id);

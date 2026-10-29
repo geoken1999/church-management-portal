@@ -296,6 +296,8 @@ function planTabDefault(base: PlanLimits, tab: TabKey): boolean {
   // Growth and Pro include Live stream (the Instructions for going live on YouTube or Facebook from OBS, Verse
   // projection, and a request for in-app streaming). Starter can add it as a module of its own.
   if (tab === "livestream") return base.id !== "basic";
+  // Design Studio (flyers, posters and the AI designer) is included from Growth up. Starter can add it as a module.
+  if (tab === "designer") return base.id !== "basic";
   return true;
 }
 

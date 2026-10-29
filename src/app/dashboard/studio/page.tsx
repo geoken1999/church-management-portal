@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getDesigns } from "@/lib/designer/dal";
 import { DesignerGallery } from "@/components/designer/DesignerGallery";
@@ -10,6 +11,8 @@ export const metadata: Metadata = {
 
 export default async function DesignerPage() {
   const membership = await requireOrganization();
+  // A plan without Design Studio sends people to the page where they can subscribe to it on its own.
+  if (membership.lockedTabs.includes("designer")) redirect("/dashboard/unlock/designer");
   if (!membership.tabAccess.designer.read) return <AccessRestricted label="Design Studio" />;
 
   const designs = await getDesigns(membership.organization.id);

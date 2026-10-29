@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { BOOK_NAMES } from "@/lib/projection/books";
 import { formatReference, parseReference, type PassageRef } from "@/lib/projection/reference";
 import { apiBibleChapter, apiBibleSearch, listApiBibles } from "@/lib/projection/api-bible";
-import { pageReference, pageText, paginateVerses, type Slide, type VerseLine } from "@/lib/projection/slides";
+import { MAX_COMPARED, MAX_SLIDE_CHARS, pageReference, pageText, paginateVerses, type Slide, type VerseLine } from "@/lib/projection/slides";
 
 // Bible text for the projector, from three places:
 //  - Bibles that ship with the app and are free to redistribute (see scripts/build-bible-data.py and
@@ -107,17 +107,47 @@ async function versesOf(organizationId: string, key: string, ref: PassageRef): P
   return lines;
 }
 
-/** What to put on the screen for a typed reference: one slide per page of verses. */
-export async function lookupPassage(organizationId: string, translationKey: string, query: string): Promise<{ slides: Slide[] } | { error: string }> {
+const shortName = (name: string) => name.match(/\(([^)]+)\)$/)?.[1] ?? name;
+
+/**
+ * What to put on the screen for a typed reference: one slide per page of verses. With several translations each slide
+ * shows the same verses in all of them (the first is the main one), and pages are cut to fit them together.
+ */
+export async function lookupPassage(organizationId: string, translationKeys: string | string[], query: string): Promise<{ slides: Slide[] } | { error: string }> {
   const ref = parseReference(query);
   if (!ref) return { error: 'Type a reference such as "John 3:16", "Ps 23" or "1 Cor 13:4-7".' };
-  const name = await translationName(organizationId, translationKey);
-  if (!name) return { error: "Choose a translation." };
-  const verses = await versesOf(organizationId, translationKey, ref);
-  if ("error" in verses) return verses;
+  const keys = [...new Set(Array.isArray(translationKeys) ? translationKeys : [translationKeys])].slice(0, MAX_COMPARED);
+  if (keys.length === 0) return { error: "Choose a translation." };
+
+  const found: { name: string; verses: VerseLine[] }[] = [];
+  for (const key of keys) {
+    const name = await translationName(organizationId, key);
+    if (!name) return { error: "Choose a translation." };
+    const verses = await versesOf(organizationId, key, ref);
+    if ("error" in verses) return { error: keys.length > 1 ? `${shortName(name)}: ${verses.error}` : verses.error };
+    found.push({ name, verses });
+  }
+
   const bookName = BOOK_NAMES[ref.book - 1];
-  const short = name.match(/\(([^)]+)\)$/)?.[1] ?? name;
-  return { slides: paginateVerses(verses).map((page) => ({ kind: "bible" as const, title: pageReference(bookName, ref.chapter, page), text: pageText(page), footer: short })) };
+  if (found.length === 1) {
+    const short = shortName(found[0].name);
+    return { slides: paginateVerses(found[0].verses).map((page) => ({ kind: "bible" as const, title: pageReference(bookName, ref.chapter, page), text: pageText(page), footer: short })) };
+  }
+
+  // Cut the pages on the verses all the translations share, sized by the longest side so each column still fits.
+  const numbers = [...new Set(found.flatMap((f) => f.verses.map((v) => v.verse)))].sort((a, b) => a - b);
+  const byVerse = found.map((f) => new Map(f.verses.map((v) => [v.verse, v.text])));
+  const sizing: VerseLine[] = numbers.map((verse) => ({ verse, text: byVerse.reduce((longest, m) => ((m.get(verse) ?? "").length > longest.length ? m.get(verse)! : longest), "") }));
+  const footer = found.map((f) => shortName(f.name)).join(" · ");
+  const maxChars = found.length === 2 ? MAX_SLIDE_CHARS : Math.round(MAX_SLIDE_CHARS * 0.8);
+  return {
+    slides: paginateVerses(sizing, maxChars).map((page) => {
+      const versions = found
+        .map((f, i) => ({ name: shortName(f.name), text: pageText(page.filter((p) => byVerse[i].has(p.verse)).map((p) => ({ verse: p.verse, text: byVerse[i].get(p.verse)! }))) }))
+        .filter((v) => v.text);
+      return { kind: "bible" as const, title: pageReference(bookName, ref.chapter, page), text: versions.map((v) => v.text).join("\n\n"), footer, versions };
+    }),
+  };
 }
 
 export interface VerseHit {

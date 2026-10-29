@@ -11,7 +11,21 @@ describe("cleanTheme", () => {
     expect(cleanTheme("x")).toEqual({});
   });
   it("fills in the defaults", () => {
-    expect(withDefaults({ color: "#ff0000" })).toEqual({ background: "#000000", color: "#ff0000", font: "sans" });
+    expect(withDefaults({ color: "#ff0000" })).toMatchObject({ background: "#000000", color: "#ff0000", font: "sans" });
+  });
+});
+
+describe("banner", () => {
+  it("keeps a plain https address and clamps the darkening", () => {
+    expect(cleanTheme({ bannerImage: "https://x.supabase.co/storage/v1/object/public/projection-slides/a/b.jpg", bannerShade: 150 })).toEqual({
+      bannerImage: "https://x.supabase.co/storage/v1/object/public/projection-slides/a/b.jpg",
+      bannerShade: 100,
+    });
+  });
+  it("refuses anything that could break out of url(...)", () => {
+    expect(cleanTheme({ bannerImage: 'https://x.co/a.jpg");background:red' })).toEqual({});
+    expect(cleanTheme({ bannerImage: "javascript:alert(1)" })).toEqual({});
+    expect(cleanTheme({ bannerImage: "http://x.co/a.jpg" })).toEqual({});
   });
 });
 

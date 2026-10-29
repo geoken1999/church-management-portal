@@ -12,12 +12,17 @@ export interface Slide {
   footer: string;
   /** A picture shown across the whole screen instead of text (a PowerPoint slide). */
   image?: string;
+  /** A Bible passage in several translations at once: one entry each (name is short, e.g. "KJV"). `text` is them joined. */
+  versions?: { name: string; text: string }[];
 }
 
 export interface VerseLine {
   verse: number;
   text: string;
 }
+
+/** Most translations that can be shown together on one slide. */
+export const MAX_COMPARED = 4;
 
 /** About how much fits on one slide at a readable size. */
 export const MAX_SLIDE_CHARS = 260;

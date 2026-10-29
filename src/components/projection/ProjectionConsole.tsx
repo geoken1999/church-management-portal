@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { BookOpen, ChevronLeft, ChevronRight, Copy, EyeOff, ExternalLink, FileUp, ListPlus, Monitor, MonitorOff, Music, Plus, Search, Trash2, X } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, Copy, EyeOff, ExternalLink, FileUp, ImagePlus, ListPlus, Monitor, MonitorOff, Music, Plus, Search, Trash2, X } from "lucide-react";
 import {
   deleteItemAction,
   deleteTranslationAction,
@@ -14,13 +14,15 @@ import {
   setThemeAction,
   setVisibleAction,
   showSlideAction,
+  startSlideUploadAction,
 } from "@/lib/projection/actions";
 import { parseReference } from "@/lib/projection/reference";
-import { itemSlides, type Slide } from "@/lib/projection/slides";
+import { itemSlides, MAX_COMPARED, type Slide } from "@/lib/projection/slides";
 import { withDefaults } from "@/lib/projection/theme";
 import type { VerseHit } from "@/lib/projection/bible";
 import type { ProjectionItem, ProjectionSlide, ProjectionTheme } from "@/types/database";
 import { SlideView } from "@/components/projection/SlideView";
+import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import { PresentationImporter } from "@/components/projection/PresentationImporter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -300,7 +302,9 @@ function BiblePanel({
   onQueue: (slides: Slide[]) => void;
   onError: (message: string | null) => void;
 }) {
-  const [translation, setTranslation] = useState(translations[0]?.key ?? "kjv");
+  // One or more translations. With several, each slide shows the same verses in all of them, the first being the main one.
+  const [selected, setSelected] = useState<string[]>([translations[0]?.key ?? "kjv"]);
+  const translation = selected[0] ?? "kjv";
   const [query, setQuery] = useState("");
   const [slides, setSlides] = useState<Slide[]>([]);
   const [hits, setHits] = useState<VerseHit[] | null>(null);
@@ -335,7 +339,7 @@ function BiblePanel({
     onError(null);
     start(async () => {
       if (parseReference(value)) {
-        const result = await lookupPassageAction(translation, value);
+        const result = await lookupPassageAction(selected, value);
         if (result.error) return onError(result.error);
         setHits(null);
         setSlides(result.slides ?? []);
@@ -362,13 +366,29 @@ function BiblePanel({
           <Label htmlFor="pj-query">Verse or words</Label>
           <Input id="pj-query" value={query} placeholder="John 3:16, Ps 23, or words like “shepherd”" onChange={(e) => setQuery(e.target.value)} autoComplete="off" />
         </div>
-        <select aria-label="Translation" value={translation} onChange={(e) => setTranslation(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
-          {translations.map((t) => (
-            <option key={t.key} value={t.key}>
-              {t.name}
-            </option>
-          ))}
-        </select>
+        <details className="relative">
+          <summary className="flex h-9 cursor-pointer list-none items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm [&::-webkit-details-marker]:hidden">
+            {selected.length === 1 ? (translations.find((t) => t.key === selected[0])?.name ?? "Translation") : `${selected.length} translations`}
+            <ChevronDown className="size-4 opacity-60" />
+          </summary>
+          <div className="absolute right-0 z-20 mt-1 max-h-72 w-72 overflow-y-auto rounded-lg border border-border bg-popover p-2 shadow-lg">
+            <p className="px-1 pb-1.5 text-xs text-muted-foreground">Tick up to {MAX_COMPARED} to show them together. The first ticked is the main one.</p>
+            {translations.map((t) => {
+              const on = selected.includes(t.key);
+              return (
+                <label key={t.key} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1.5 text-sm hover:bg-muted">
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    disabled={!on && selected.length >= MAX_COMPARED}
+                    onChange={() => setSelected((cur) => (on ? (cur.length > 1 ? cur.filter((k) => k !== t.key) : cur) : [...cur, t.key]))}
+                  />
+                  <span>{t.name}</span>
+                </label>
+              );
+            })}
+          </div>
+        </details>
         <Button type="submit" disabled={pending}>
           <Search className="size-4" /> {pending ? "Looking…" : "Find"}
         </Button>
@@ -594,6 +614,7 @@ function SettingsPanel({
             </select>
           </label>
         </div>
+        <BannerSetting theme={theme} canWrite={canWrite} onTheme={onTheme} />
       </div>
 
       <div className="space-y-3">
@@ -665,6 +686,87 @@ function SettingsPanel({
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+const BANNER_WIDTH = 1920;
+
+// A picture for the lower-third bar (a church banner, a pattern). Shrunk in the browser, stored with the church's
+// other projector pictures, and shown behind the words under a wash of the screen colour.
+function BannerSetting({ theme, canWrite, onTheme }: { theme: ProjectionTheme; canWrite: boolean; onTheme: (theme: ProjectionTheme) => void }) {
+  const t = withDefaults(theme);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [shade, setShade] = useState(t.bannerShade);
+
+  async function upload(file: File | undefined) {
+    if (!file) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, BANNER_WIDTH / bitmap.width);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(bitmap.width * scale);
+      canvas.height = Math.round(bitmap.height * scale);
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("This browser can't prepare pictures.");
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+      if (!blob) throw new Error("Couldn't prepare that picture.");
+      const start = await startSlideUploadAction(1, blob.size);
+      if (start.error || !start.slots) return setError(start.error ?? "Couldn't start the upload.");
+      const storage = createBrowserClient().storage.from("projection-slides");
+      const { error: uploadError } = await storage.uploadToSignedUrl(start.slots[0].path, start.slots[0].token, blob, { contentType: "image/jpeg" });
+      if (uploadError) return setError(`The upload failed (${uploadError.message}). Check your connection and try again.`);
+      onTheme({ ...theme, bannerImage: storage.getPublicUrl(start.slots[0].path).data.publicUrl, bannerShade: shade });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't use that picture.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border border-border p-3">
+      <p className="text-sm font-medium">Lower-third banner picture <span className="font-normal text-muted-foreground">(optional)</span></p>
+      <p className="text-xs text-muted-foreground">Shown behind the words when the screen is in lower-third mode. A wide picture works best.</p>
+      <div className="flex flex-wrap items-center gap-3">
+        {t.bannerImage && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={t.bannerImage} alt="Banner" className="h-12 w-32 rounded border border-border object-cover" />
+        )}
+        {canWrite && (
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-input px-3 py-1.5 text-sm hover:bg-muted">
+            <ImagePlus className="size-4" /> {busy ? "Uploading…" : t.bannerImage ? "Change picture" : "Add a picture"}
+            <input type="file" accept="image/*" className="sr-only" disabled={busy} onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ""; }} />
+          </label>
+        )}
+        {canWrite && t.bannerImage && (
+          <Button type="button" size="sm" variant="ghost" onClick={() => { const { bannerImage: _removed, ...rest } = theme; void _removed; onTheme(rest); }}>
+            Remove
+          </Button>
+        )}
+      </div>
+      {t.bannerImage && (
+        <label className="flex items-center gap-3 text-sm">
+          <span className="w-28 shrink-0">Darken for reading</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={shade}
+            disabled={!canWrite}
+            onChange={(e) => setShade(Number(e.target.value))}
+            onPointerUp={() => onTheme({ ...theme, bannerShade: shade })}
+            onKeyUp={() => onTheme({ ...theme, bannerShade: shade })}
+            className="flex-1"
+          />
+          <span className="w-10 text-right text-xs text-muted-foreground">{shade}%</span>
+        </label>
+      )}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }

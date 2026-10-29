@@ -9,7 +9,7 @@ import { checkTabAccess } from "@/lib/permissions/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { lookupPassage, searchVerses, type VerseHit } from "@/lib/projection/bible";
 import { MAX_IMPORT_VERSES, parseVerseLines } from "@/lib/projection/import";
-import { updateScreen } from "@/lib/projection/service";
+import { ensureScreen, updateScreen } from "@/lib/projection/service";
 import { cleanTheme } from "@/lib/projection/theme";
 import type { ProjectionSlide, ProjectionTheme } from "@/types/database";
 import type { Slide } from "@/lib/projection/slides";
@@ -33,7 +33,7 @@ async function gate(level: "read" | "write"): Promise<{ organizationId: string; 
   return { organizationId, userId: user.id };
 }
 
-export async function lookupPassageAction(translation: string, query: string): Promise<{ error?: string; slides?: Slide[] }> {
+export async function lookupPassageAction(translation: string | string[], query: string): Promise<{ error?: string; slides?: Slide[] }> {
   const g = await gate("read");
   if ("error" in g) return g;
   const result = await lookupPassage(g.organizationId, translation, query);
@@ -58,7 +58,17 @@ const cleanSlide = (slide: Slide, organizationId: string): ProjectionSlide | nul
   if (!text.trim()) return null;
   const kind = slide.kind === "bible" || slide.kind === "song" || slide.kind === "announcement" || slide.kind === "presentation" ? slide.kind : "custom";
   const image = ownSlideImage(slide.image, organizationId);
-  return { kind: image ? "presentation" : kind === "presentation" ? "custom" : kind, title: String(slide.title ?? "").slice(0, 120), text, footer: String(slide.footer ?? "").slice(0, 80), ...(image ? { image } : {}) };
+  const versions = Array.isArray(slide.versions)
+    ? slide.versions.slice(0, 4).map((v) => ({ name: String(v?.name ?? "").slice(0, 40), text: String(v?.text ?? "").slice(0, 2000) })).filter((v) => v.text.trim())
+    : [];
+  return {
+    kind: image ? "presentation" : kind === "presentation" ? "custom" : kind,
+    title: String(slide.title ?? "").slice(0, 120),
+    text,
+    footer: String(slide.footer ?? "").slice(0, 160),
+    ...(image ? { image } : {}),
+    ...(versions.length > 1 && kind === "bible" ? { versions } : {}),
+  };
 };
 
 /** Puts a slide on the screen and makes the screen visible. */
@@ -89,7 +99,16 @@ export async function setModeAction(mode: "full" | "lower_third"): Promise<Proje
 export async function setThemeAction(theme: ProjectionTheme): Promise<ProjectionResult> {
   const g = await gate("write");
   if ("error" in g) return g;
-  await updateScreen(g.organizationId, { theme: cleanTheme(theme) });
+  const clean = cleanTheme(theme);
+  // The banner must be a picture stored for this church.
+  if (clean.bannerImage && !ownSlideImage(clean.bannerImage, g.organizationId)) delete clean.bannerImage;
+  const before = (await ensureScreen(g.organizationId)).theme?.bannerImage;
+  await updateScreen(g.organizationId, { theme: clean });
+  // A banner that was replaced or removed stops using the church's storage.
+  if (before && before !== clean.bannerImage) {
+    const path = ownSlideImage(before, g.organizationId)?.slice(slideImageBase().length);
+    if (path) await createAdminClient().storage.from(SLIDE_BUCKET).remove([path]);
+  }
   return {};
 }
 

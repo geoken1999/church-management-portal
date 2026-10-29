@@ -350,8 +350,8 @@ export type ExternalLiveStream = {
   created_by: string | null;
 };
 
-export type ProjectionSlide = { kind: "bible" | "song" | "announcement" | "custom" | "presentation"; title: string; text: string; footer: string; /** A picture to show across the whole screen (a PowerPoint slide). */ image?: string };
-export type ProjectionTheme = { background?: string; color?: string; font?: "sans" | "serif" };
+export type ProjectionSlide = { kind: "bible" | "song" | "announcement" | "custom" | "presentation"; title: string; text: string; footer: string; /** A picture to show across the whole screen (a PowerPoint slide). */ image?: string; /** A Bible passage in several translations at once; `text` holds them joined, for screens that only show text. */ versions?: { name: string; text: string }[] };
+export type ProjectionTheme = { background?: string; color?: string; font?: "sans" | "serif"; /** A picture behind the lower-third bar (an address in the projection-slides storage). */ bannerImage?: string; /** How strongly the bar's colour covers the banner picture, 0-100, so the words stay readable. */ bannerShade?: number };
 export type ProjectionScreen = {
   id: string;
   organization_id: string;

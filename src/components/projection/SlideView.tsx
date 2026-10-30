@@ -64,9 +64,11 @@ export function SlideView({
     // A bar along the bottom, over the video. A banner picture, when the church chose one, fills the bar behind the
     // words, under a wash of the screen colour so they stay readable.
     const wash = Math.round((t.bannerShade / 100) * 255).toString(16).padStart(2, "0");
-    const strip = !!t.bannerImage && t.bannerStyle === "below";
-    const bar: CSSProperties = t.bannerImage && !strip
-      ? { background: `linear-gradient(${t.background}${wash}, ${t.background}${wash}), url("${t.bannerImage}") center / cover no-repeat` }
+    // A slide can carry its own picture (chosen when it was projected); otherwise the church's usual one.
+    const picture = slide.bannerImage ?? t.bannerImage;
+    const strip = !!picture && t.bannerStyle === "below";
+    const bar: CSSProperties = picture && !strip
+      ? { background: `linear-gradient(${t.background}${wash}, ${t.background}${wash}), url("${picture}") center / cover no-repeat` }
       : { background: `${t.background}e6` };
     return (
       <div style={{ ...root, background: "transparent", position: "relative" }}>
@@ -89,7 +91,7 @@ export function SlideView({
           </div>
           {strip && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={t.bannerImage} alt="" style={{ display: "block", width: "calc(100% + 8cqw)", marginLeft: "-4cqw", marginTop: "1.4cqw", aspectRatio: String(BANNER_ASPECT), objectFit: "cover" }} />
+            <img src={picture} alt="" style={{ display: "block", width: "calc(100% + 8cqw)", marginLeft: "-4cqw", marginTop: "1.4cqw", aspectRatio: String(BANNER_ASPECT), objectFit: "cover" }} />
           )}
         </div>
       </div>

@@ -7,6 +7,9 @@ export const DEFAULT_THEME = { background: "#000000", color: "#ffffff", font: "s
 export const DEFAULT_BANNER_SHADE = 60;
 
 const HEX = /^#[0-9a-f]{6}$/i;
+const BANNER_URL = /^https:\/\/[^\s"'()\\<>]+$/;
+/** Most saved lower-third pictures a church can keep. */
+export const MAX_BANNER_LIBRARY = 8;
 
 export function cleanTheme(input: unknown): ProjectionTheme {
   const raw = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
@@ -19,6 +22,14 @@ export function cleanTheme(input: unknown): ProjectionTheme {
   if (typeof raw.bannerShade === "number" && Number.isFinite(raw.bannerShade)) theme.bannerShade = Math.min(100, Math.max(0, Math.round(raw.bannerShade)));
   if (raw.bannerStyle === "behind" || raw.bannerStyle === "below") theme.bannerStyle = raw.bannerStyle;
   if (raw.bannerAlways === true) theme.bannerAlways = true;
+  if (Array.isArray(raw.bannerLibrary)) {
+    const library = raw.bannerLibrary
+      .map((entry) => entry as { name?: unknown; url?: unknown })
+      .filter((entry) => typeof entry?.url === "string" && entry.url.length < 300 && BANNER_URL.test(entry.url))
+      .slice(0, MAX_BANNER_LIBRARY)
+      .map((entry, index) => ({ name: String(entry.name ?? "").trim().slice(0, 40) || `Picture ${index + 1}`, url: entry.url as string }));
+    if (library.length > 0) theme.bannerLibrary = library;
+  }
   return theme;
 }
 

@@ -18,7 +18,7 @@ import {
 } from "@/lib/projection/actions";
 import { parseReference } from "@/lib/projection/reference";
 import { itemSlides, MAX_COMPARED, type Slide } from "@/lib/projection/slides";
-import { withDefaults } from "@/lib/projection/theme";
+import { MAX_BANNER_LIBRARY, withDefaults } from "@/lib/projection/theme";
 import type { VerseHit } from "@/lib/projection/bible";
 import type { ProjectionItem, ProjectionSlide, ProjectionTheme } from "@/types/database";
 import { SlideView } from "@/components/projection/SlideView";
@@ -79,6 +79,8 @@ export function ProjectionConsole({
   const [tab, setTab] = useState<Tab>("bible");
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  // The saved lower-third picture to use for the slides projected from now on ("" = the church's usual one).
+  const [picture, setPicture] = useState("");
   const [, start] = useTransition();
 
   // The order of service: slides lined up in advance. Kept in this browser.
@@ -114,12 +116,13 @@ export function ProjectionConsole({
   }, []);
 
   const project = useCallback(
-    (slide: Slide) => {
+    (given: Slide) => {
       if (!canWrite) return;
+      const slide = picture && !given.bannerImage ? { ...given, bannerImage: picture } : given;
       setScreen((s) => ({ ...s, slide, visible: true }));
       run(() => showSlideAction(slide));
     },
-    [canWrite, run],
+    [canWrite, run, picture],
   );
 
   const toggleVisible = () => {
@@ -153,6 +156,19 @@ export function ProjectionConsole({
             </Button>
           )}
         </div>
+        {(screen.theme.bannerLibrary?.length ?? 0) > 0 && screen.mode === "lower_third" && (
+          <label className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="shrink-0">Lower-third picture for what you project next</span>
+            <select value={picture} onChange={(e) => setPicture(e.target.value)} disabled={!canWrite} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+              <option value="">The usual one</option>
+              {screen.theme.bannerLibrary?.map((entry) => (
+                <option key={entry.url} value={entry.url}>
+                  {entry.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {queue.length === 0 ? (
           <p className="text-sm text-muted-foreground">Add verses and slides here before the service, then tap them in turn. It is kept in this browser.</p>
         ) : (
@@ -766,6 +782,10 @@ function BannerSetting({ theme, canWrite, onTheme }: { theme: ProjectionTheme; c
   const [crop, setCrop] = useState<BannerCrop | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [shade, setShade] = useState(t.bannerShade);
+  const [name, setName] = useState("");
+  const library = theme.bannerLibrary ?? [];
+  // A picture chosen before the library existed is still the one in use; show it alongside the saved ones.
+  const unsaved = t.bannerImage && !library.some((entry) => entry.url === t.bannerImage) ? t.bannerImage : null;
 
   async function upload() {
     if (!crop) return;
@@ -773,13 +793,16 @@ function BannerSetting({ theme, canWrite, onTheme }: { theme: ProjectionTheme; c
     setBusy(true);
     try {
       const blob = await cropToBlob(crop);
+      if (library.length >= MAX_BANNER_LIBRARY) return setError(`You can keep ${MAX_BANNER_LIBRARY} pictures. Remove one first.`);
       if (blob.size > 3 * 1024 * 1024) return setError("That banner is too large (over 3 MB). Crop a smaller part or use a simpler picture.");
       const start = await startSlideUploadAction(1, blob.size, crop.png ? "png" : "jpg");
       if (start.error || !start.slots) return setError(start.error ?? "Couldn't start the upload.");
       const storage = createBrowserClient().storage.from("projection-slides");
       const { error: uploadError } = await storage.uploadToSignedUrl(start.slots[0].path, start.slots[0].token, blob, { contentType: crop.png ? "image/png" : "image/jpeg" });
       if (uploadError) return setError(`The upload failed (${uploadError.message}). Check your connection and try again.`);
-      onTheme({ ...theme, bannerImage: storage.getPublicUrl(start.slots[0].path).data.publicUrl, bannerShade: shade, bannerStyle: theme.bannerStyle ?? "below" });
+      const url = storage.getPublicUrl(start.slots[0].path).data.publicUrl;
+      onTheme({ ...theme, bannerImage: url, bannerLibrary: [...library, { name: name.trim() || `Picture ${library.length + 1}`, url }], bannerShade: shade, bannerStyle: theme.bannerStyle ?? "below" });
+      setName("");
       setAdding(false);
       setCrop(null);
     } catch (e) {
@@ -791,27 +814,51 @@ function BannerSetting({ theme, canWrite, onTheme }: { theme: ProjectionTheme; c
 
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
-      <p className="text-sm font-medium">Lower-third banner picture <span className="font-normal text-muted-foreground">(optional)</span></p>
-      <p className="text-xs text-muted-foreground">Your church&apos;s banner for the lower-third screen, such as the church name and logo. It is cropped to a wide strip (full width, 22% of the screen height) and can sit under the verse or behind it.</p>
-      <div className="flex flex-wrap items-center gap-3">
-        {t.bannerImage && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={t.bannerImage} alt="Banner" className="h-12 w-32 rounded border border-border object-cover" />
-        )}
-        {canWrite && !adding && (
-          <Button type="button" size="sm" variant="outline" onClick={() => setAdding(true)}>
-            <ImagePlus className="size-4" /> {t.bannerImage ? "Change picture" : "Add a picture"}
-          </Button>
-        )}
-        {canWrite && t.bannerImage && (
-          <Button type="button" size="sm" variant="ghost" onClick={() => { const { bannerImage: _removed, ...rest } = theme; void _removed; onTheme(rest); }}>
-            Remove
-          </Button>
-        )}
-      </div>
+      <p className="text-sm font-medium">Lower-third banner pictures <span className="font-normal text-muted-foreground">(optional)</span></p>
+      <p className="text-xs text-muted-foreground">Your church&apos;s banner for the lower-third screen, such as the church name and logo. Keep up to 8 (one per service, say) and tap Use to switch. It is cropped to a wide strip (full width, 22% of the screen height) and can sit under the verse or behind it. To use a different one for particular slides, pick it above the order of service.</p>
+      {(library.length > 0 || unsaved) && (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {[...library, ...(unsaved ? [{ name: "Current picture", url: unsaved }] : [])].map((entry) => {
+            const active = entry.url === t.bannerImage;
+            return (
+              <div key={entry.url} className={`flex items-center gap-2 rounded-md border p-2 ${active ? "border-primary" : "border-border"}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={entry.url} alt={entry.name} className="h-10 w-24 shrink-0 rounded border border-border object-cover" />
+                <span className="min-w-0 flex-1 truncate text-sm">{entry.name}</span>
+                {canWrite && (
+                  <>
+                    <Button type="button" size="sm" variant={active ? "secondary" : "outline"} disabled={active} onClick={() => onTheme({ ...theme, bannerImage: entry.url })}>
+                      {active ? "In use" : "Use"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label={`Remove ${entry.name}`}
+                      onClick={() => {
+                        const { bannerImage: current, ...rest } = theme;
+                        const kept = library.filter((e) => e.url !== entry.url);
+                        onTheme({ ...rest, ...(current && current !== entry.url ? { bannerImage: current } : {}), ...(kept.length > 0 ? { bannerLibrary: kept } : {}) });
+                      }}
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {canWrite && !adding && (
+        <Button type="button" size="sm" variant="outline" disabled={library.length >= MAX_BANNER_LIBRARY} onClick={() => setAdding(true)}>
+          <ImagePlus className="size-4" /> {library.length > 0 || t.bannerImage ? "Add another picture" : "Add a picture"}
+        </Button>
+      )}
       {adding && (
         <div className="space-y-3 rounded-md border border-border p-3">
           <p className="text-xs text-muted-foreground">The strip is the full width of the screen and 22% of its height. Drag the box to pick the part of your picture to show.</p>
+          <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="Name it, e.g. Sunday morning" aria-label="Picture name" disabled={busy} />
           <BannerCropper disabled={busy} onChange={setCrop} />
           <div className="flex gap-2">
             <Button type="button" size="sm" disabled={busy || !crop} onClick={() => void upload()}>

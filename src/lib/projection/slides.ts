@@ -14,6 +14,8 @@ export interface Slide {
   image?: string;
   /** A Bible passage in several translations at once: one entry each (name is short, e.g. "KJV"). `text` is them joined. */
   versions?: { name: string; text: string }[];
+  /** A lower-third picture for this slide only, instead of the church's usual one. */
+  bannerImage?: string;
 }
 
 export interface VerseLine {

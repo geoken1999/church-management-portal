@@ -41,4 +41,14 @@ describe("fontScale", () => {
     expect(fontScale(30, "full")).toBeGreaterThan(fontScale(300, "full"));
     expect(fontScale(100, "lower_third")).toBeLessThan(fontScale(100, "full"));
   });
+
+  it("keeps a clean picture library of at most 8, and drops bad addresses", () => {
+    const url = (n: number) => `https://x.supabase.co/storage/v1/object/public/projection-slides/a/${n}.jpg`;
+    const library = [{ name: "  Sunday  ", url: url(0) }, { name: "Bad", url: "javascript:alert(1)" }, ...Array.from({ length: 10 }, (_, n) => ({ name: "", url: url(n + 1) }))];
+    const cleaned = cleanTheme({ bannerLibrary: library }).bannerLibrary ?? [];
+    expect(cleaned).toHaveLength(8);
+    expect(cleaned[0]).toEqual({ name: "Sunday", url: url(0) });
+    expect(cleaned[1].name).toBe("Picture 2");
+    expect(cleanTheme({ bannerLibrary: [{ name: "x", url: "http://x.co/a.jpg" }] })).toEqual({});
+  });
 });

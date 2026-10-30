@@ -67,6 +67,7 @@ const cleanSlide = (slide: Slide, organizationId: string): ProjectionSlide | nul
     text,
     footer: String(slide.footer ?? "").slice(0, 160),
     ...(image ? { image } : {}),
+    ...(ownSlideImage(slide.bannerImage, organizationId) ? { bannerImage: ownSlideImage(slide.bannerImage, organizationId) } : {}),
     ...(versions.length > 1 && kind === "bible" ? { versions } : {}),
   };
 };
@@ -102,13 +103,20 @@ export async function setThemeAction(theme: ProjectionTheme): Promise<Projection
   const clean = cleanTheme(theme);
   // The banner must be a picture stored for this church.
   if (clean.bannerImage && !ownSlideImage(clean.bannerImage, g.organizationId)) delete clean.bannerImage;
-  const before = (await ensureScreen(g.organizationId)).theme?.bannerImage;
-  await updateScreen(g.organizationId, { theme: clean });
-  // A banner that was replaced or removed stops using the church's storage.
-  if (before && before !== clean.bannerImage) {
-    const path = ownSlideImage(before, g.organizationId)?.slice(slideImageBase().length);
-    if (path) await createAdminClient().storage.from(SLIDE_BUCKET).remove([path]);
+  if (clean.bannerLibrary) {
+    clean.bannerLibrary = clean.bannerLibrary.filter((entry) => ownSlideImage(entry.url, g.organizationId));
+    if (clean.bannerLibrary.length === 0) delete clean.bannerLibrary;
   }
+  const used = (theme?: ProjectionTheme) => new Set([theme?.bannerImage, ...(theme?.bannerLibrary ?? []).map((entry) => entry.url)].filter((url): url is string => !!url));
+  const before = used((await ensureScreen(g.organizationId)).theme);
+  const after = used(clean);
+  await updateScreen(g.organizationId, { theme: clean });
+  // A picture that is no longer the banner or in the library stops using the church's storage.
+  const gone = [...before]
+    .filter((url) => !after.has(url))
+    .map((url) => ownSlideImage(url, g.organizationId)?.slice(slideImageBase().length))
+    .filter((path): path is string => !!path);
+  if (gone.length > 0) await createAdminClient().storage.from(SLIDE_BUCKET).remove(gone);
   return {};
 }
 

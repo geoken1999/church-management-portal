@@ -1,15 +1,38 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { usePathname } from "next/navigation";
 import { MessageSquareHeart } from "lucide-react";
-import { submitWebFeedback } from "@/lib/feedback/actions";
+import { hasGivenFeedbackAction, submitWebFeedback } from "@/lib/feedback/actions";
 import { FEEDBACK_CATEGORIES, FEEDBACK_LABELS, MAX_FEEDBACK_MESSAGE, type FeedbackCategory } from "@/lib/feedback/validation";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { StarRating } from "./StarRating";
+
+// Until feedback has been sent, the dialog opens by itself now and then: the first time after a few minutes of use,
+// then again after a random number of days each time it is closed without sending. Kept per browser.
+const NEXT_KEY = "kf-feedback-next";
+const DONE_KEY = "kf-feedback-done";
+const MINUTE = 60_000;
+const DAY = 86_400_000;
+const between = (min: number, max: number) => min + Math.random() * (max - min);
+
+function readStore(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function writeStore(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Without storage the reminder simply doesn't repeat.
+  }
+}
 
 // The header's "Send feedback": a star rating, what kind of feedback it is, and a few words.
 export function FeedbackButton() {
@@ -22,8 +45,30 @@ export function FeedbackButton() {
   const [sent, setSent] = useState(false);
   const [pending, startTransition] = useTransition();
 
+  useEffect(() => {
+    if (readStore(DONE_KEY)) return;
+    const stored = Number(readStore(NEXT_KEY));
+    const due = stored > 0 ? stored : Date.now() + between(3 * MINUTE, 10 * MINUTE);
+    if (!(stored > 0)) writeStore(NEXT_KEY, String(due));
+    let cancelled = false;
+    const timer = window.setTimeout(
+      async () => {
+        const given = await hasGivenFeedbackAction().catch(() => false);
+        if (cancelled) return;
+        if (given) writeStore(DONE_KEY, "1");
+        else setOpen(true);
+      },
+      Math.min(Math.max(due - Date.now(), 0), 2_000_000_000),
+    );
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, []);
+
   function close(next: boolean) {
     setOpen(next);
+    if (!next) writeStore(sent ? DONE_KEY : NEXT_KEY, sent ? "1" : String(Date.now() + between(1 * DAY, 4 * DAY)));
     if (!next && sent) {
       setSent(false);
       setRating(0);

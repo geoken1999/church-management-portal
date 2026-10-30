@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { saveFeedback } from "@/lib/feedback/service";
+import { hasGivenFeedback, saveFeedback } from "@/lib/feedback/service";
 import { parseFeedback } from "@/lib/feedback/validation";
 
 // Feedback sent from inside the mobile app, by anyone signed in (team or member). Who they are comes from
@@ -25,4 +25,14 @@ export async function POST(request: Request) {
   const source = raw.platform === "ios" ? "ios" : "android";
   const result = await saveFeedback(source, data.user.id, parsed.feedback);
   return NextResponse.json(result);
+}
+
+// Whether this person has already sent feedback, so the app stops reminding them.
+export async function GET(request: Request) {
+  const authHeader = request.headers.get("authorization") ?? "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : null;
+  if (!token) return NextResponse.json({ ok: false, error: "Please sign in again." }, { status: 401 });
+  const { data, error } = await createAdminClient().auth.getUser(token);
+  if (error || !data.user) return NextResponse.json({ ok: false, error: "Please sign in again." }, { status: 401 });
+  return NextResponse.json({ ok: true, given: await hasGivenFeedback(data.user.id) });
 }

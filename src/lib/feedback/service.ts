@@ -54,3 +54,9 @@ export async function saveFeedback(source: FeedbackSource, userId: string, feedb
   }
   return { ok: true };
 }
+
+// Whether this person has ever sent feedback; the reminder to send some stops once they have.
+export async function hasGivenFeedback(userId: string): Promise<boolean> {
+  const { count } = await createAdminClient().from("app_feedback").select("id", { count: "exact", head: true }).eq("auth_user_id", userId);
+  return (count ?? 0) > 0;
+}

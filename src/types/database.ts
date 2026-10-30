@@ -2414,6 +2414,7 @@ export type ConferenceMeeting = {
   duration_minutes: number | null;
   join_url: string;
   passcode: string | null;
+  notified_at: string | null;
   created_by: string | null;
   created_at: string;
 };

@@ -9,6 +9,7 @@ import { getAccessToken, getConferenceMeeting, getConnection } from "@/lib/confe
 import { createZoomMeeting, deleteZoomMeeting, fetchZoomZak, getZoomEnv, ZOOM_SDK_VERSION } from "@/lib/conferencing/zoom";
 import { createMeetSpace } from "@/lib/conferencing/google-meet";
 import { zoomSignature } from "@/lib/conferencing/zoom-signature";
+import { notifyConferenceStarted } from "@/lib/conferencing/notify";
 
 const PATH = "/dashboard/kconnect/conferencing";
 
@@ -66,10 +67,13 @@ export async function createMeetRoomAction(input: { title: string }): Promise<Co
   if (!connection) return { error: "Connect your Google account first." };
   try {
     const space = await createMeetSpace(await getAccessToken(connection));
-    const { error } = await createAdminClient()
+    const { data, error } = await createAdminClient()
       .from("conference_meetings")
-      .insert({ organization_id: g.organizationId, provider: "google_meet", external_id: space.name, title, join_url: space.meetingUri, created_by: g.userId });
-    if (error) return { error: "The room was made in Google Meet but couldn't be saved here. Please try again." };
+      .insert({ organization_id: g.organizationId, provider: "google_meet", external_id: space.name, title, join_url: space.meetingUri, created_by: g.userId })
+      .select("id")
+      .single();
+    if (error || !data) return { error: "The room was made in Google Meet but couldn't be saved here. Please try again." };
+    await notifyConferenceStarted(data.id, g.userId);
     revalidatePath(PATH);
     return {};
   } catch (e) {
@@ -142,6 +146,7 @@ export async function getZoomJoinAction(id: string, as: "host" | "guest"): Promi
       return { error: e instanceof Error ? e.message : "Couldn't start the meeting as host." };
     }
   }
+  if (as === "host") await notifyConferenceStarted(meeting.id, g.userId);
   return {
     sdkKey: env.clientId,
     signature: zoomSignature({ sdkKey: env.clientId, sdkSecret: env.clientSecret, meetingNumber: meeting.external_id, role: as === "host" ? 1 : 0 }),

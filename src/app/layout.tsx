@@ -25,6 +25,10 @@ export const metadata: Metadata = {
     template: "%s",
   },
   description: "KingdomFlow — a connected platform for church management.",
+  // Zoom Marketplace domain verification.
+  other: {
+    "zoom-domain-verification": "ZOOM_verify_0e2a40fa90324465a744a80fe3cf7d70",
+  },
 };
 
 // Without this, mobile browsers have no width=device-width to go on and

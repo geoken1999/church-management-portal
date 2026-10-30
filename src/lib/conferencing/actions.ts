@@ -120,6 +120,8 @@ export interface ZoomJoinDetails {
   userName?: string;
   zak?: string;
   sdkVersion?: string;
+  // Opens the meeting as host in the Zoom app, for when the in-page window can't start it.
+  startUrl?: string;
 }
 
 /**
@@ -146,7 +148,6 @@ export async function getZoomJoinAction(id: string, as: "host" | "guest"): Promi
       return { error: e instanceof Error ? e.message : "Couldn't start the meeting as host." };
     }
   }
-  if (as === "host") await notifyConferenceStarted(meeting.id, g.userId);
   return {
     sdkKey: env.clientId,
     signature: zoomSignature({ sdkKey: env.clientId, sdkSecret: env.clientSecret, meetingNumber: meeting.external_id, role: as === "host" ? 1 : 0 }),
@@ -155,5 +156,14 @@ export async function getZoomJoinAction(id: string, as: "host" | "guest"): Promi
     userName,
     zak,
     sdkVersion: ZOOM_SDK_VERSION,
+    startUrl: zak ? `https://zoom.us/s/${meeting.external_id}?zak=${encodeURIComponent(zak)}` : undefined,
   };
+}
+
+/** Called once the host is actually in the meeting, so members are only told about a meeting that really started. */
+export async function zoomMeetingStartedAction(id: string): Promise<void> {
+  const g = await gate("write");
+  if ("error" in g) return;
+  const meeting = await getConferenceMeeting(g.organizationId, id);
+  if (meeting?.provider === "zoom") await notifyConferenceStarted(meeting.id, g.userId);
 }

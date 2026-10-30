@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { getZoomJoinAction } from "@/lib/conferencing/actions";
+import { getZoomJoinAction, zoomMeetingStartedAction } from "@/lib/conferencing/actions";
 
 // Zoom's own Meeting SDK (Component View), loaded from Zoom, drawn inside this page: the full Zoom meeting window
 // with all of its controls (mute, camera, share, chat, participants, reactions, record if allowed, leave...).
@@ -49,12 +49,14 @@ export function ZoomCall({ meetingId, as }: { meetingId: string; as: "host" | "g
   const clientRef = useRef<ZoomEmbeddedClient | null>(null);
   const [state, setState] = useState<"idle" | "joining" | "in" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [startUrl, setStartUrl] = useState<string | null>(null);
 
   async function join() {
     setState("joining");
     setError(null);
     try {
       const details = await getZoomJoinAction(meetingId, as);
+      setStartUrl(details.startUrl ?? null);
       if (details.error || !details.signature || !details.meetingNumber || !details.sdkVersion) throw new Error(details.error ?? "Couldn't join the meeting.");
       await loadSdk(details.sdkVersion);
       if (!window.ZoomMtgEmbedded || !root.current) throw new Error("Zoom loaded but didn't start. Reload the page and try again.");
@@ -70,6 +72,7 @@ export function ZoomCall({ meetingId, as }: { meetingId: string; as: "host" | "g
       });
       await client.join({ signature: details.signature, meetingNumber: details.meetingNumber, password: details.passcode ?? "", userName: details.userName ?? "Guest", zak: details.zak });
       setState("in");
+      if (as === "host") void zoomMeetingStartedAction(meetingId);
     } catch (e) {
       const reason = e as { reason?: string; message?: string };
       setError(reason.reason || reason.message || "Couldn't join the meeting.");
@@ -101,6 +104,15 @@ export function ZoomCall({ meetingId, as }: { meetingId: string; as: "host" | "g
         </div>
       )}
       {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && as === "host" && startUrl && (
+        <p className="text-sm text-muted-foreground">
+          Zoom wouldn&apos;t start it in this page.{" "}
+          <a href={startUrl} target="_blank" rel="noopener noreferrer" onClick={() => void zoomMeetingStartedAction(meetingId)} className="font-medium text-primary underline">
+            Start it in the Zoom app instead
+          </a>
+          .
+        </p>
+      )}
       <div ref={root} className="min-h-[70vh] w-full overflow-hidden rounded-xl" />
     </div>
   );

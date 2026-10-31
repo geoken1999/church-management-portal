@@ -55,12 +55,12 @@ const FRAME_HOSTS = [
 export function contentSecurityPolicy({ framingAllowed = true }: { framingAllowed?: boolean } = {}): string {
   const directives = [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${SCRIPT_HOSTS.join(" ")}`,
+    `script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: ${SCRIPT_HOSTS.join(" ")}`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: blob: https:",
     "media-src 'self' blob: data: https:",
     "font-src 'self' data: https://fonts.gstatic.com",
-    `connect-src 'self' ${CONNECT_HOSTS.join(" ")}`,
+    `connect-src 'self' blob: data: ${CONNECT_HOSTS.join(" ")}`,
     // Zoom starts its audio, video and decoding workers from its own host as well as from blobs.
     "worker-src 'self' blob: https://source.zoom.us https://*.zoom.us https://*.cloudfront.net",
     `frame-src ${FRAME_HOSTS.join(" ")}`,

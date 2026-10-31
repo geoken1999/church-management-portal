@@ -8,6 +8,8 @@ const sendWhatsApp = vi.fn();
 vi.mock("@/lib/email/send", () => ({ sendEmailCampaign: (...a: unknown[]) => sendEmail(...a) }));
 vi.mock("@/lib/sms/send", () => ({ sendSmsCampaign: (...a: unknown[]) => sendSms(...a) }));
 vi.mock("@/lib/whatsapp/send-campaign", () => ({ sendWhatsAppCampaign: (...a: unknown[]) => sendWhatsApp(...a) }));
+const sendBroadcast = vi.fn();
+vi.mock("@/lib/push/broadcast", () => ({ sendBroadcast: (...a: unknown[]) => sendBroadcast(...a) }));
 vi.mock("@/lib/push/client", () => ({ sendPushToUsers: vi.fn(async () => ({})) }));
 vi.mock("@/lib/platform-events/log", () => ({ logPlatformEvent: vi.fn(async () => {}) }));
 
@@ -55,6 +57,32 @@ describe("runDueCampaigns", () => {
     sendEmail.mockReset();
     sendSms.mockReset();
     sendWhatsApp.mockReset();
+    sendBroadcast.mockReset();
+  });
+
+  it("sends a scheduled push notification to its audience when an admin scheduled it", async () => {
+    sendBroadcast.mockResolvedValue({ success: true, sent: 7 });
+    const payload = { audienceType: "group", groupKey: "youth", title: "Youth night", body: "Tonight at 7" };
+    const tables = {
+      scheduled_campaigns: [{ ...base, id: "p", channel: "push", status: "scheduled", scheduled_at: "2026-10-14T09:58:00Z", payload }],
+      organization_members: [{ organization_id: "org", auth_user_id: "user", role: "admin", tab_permissions: null }],
+    };
+    const { runDueCampaigns } = await import("@/lib/scheduler/run");
+    const result = await runDueCampaigns(fakeAdmin(tables) as never, NOW);
+    expect(result).toMatchObject({ due: 1, sent: 1 });
+    expect(sendBroadcast).toHaveBeenCalledWith(expect.objectContaining({ organizationId: "org", userId: "user", audienceType: "group", groupKey: "youth", title: "Youth night" }));
+    expect(tables.scheduled_campaigns[0]).toMatchObject({ status: "sent", result: { sentCount: 7 } });
+  });
+
+  it("does not send a scheduled push whose scheduler is no longer an admin", async () => {
+    const tables = {
+      scheduled_campaigns: [{ ...base, id: "p", channel: "push", status: "scheduled", scheduled_at: "2026-10-14T09:58:00Z", payload: { audienceType: "church", title: "Hi", body: "There" } }],
+      organization_members: [{ organization_id: "org", auth_user_id: "user", role: "member", tab_permissions: null }],
+    };
+    const { runDueCampaigns } = await import("@/lib/scheduler/run");
+    const result = await runDueCampaigns(fakeAdmin(tables) as never, NOW);
+    expect(result).toMatchObject({ failed: 1 });
+    expect(sendBroadcast).not.toHaveBeenCalled();
   });
 
   it("sends what is due, not what is later, and records the result", async () => {

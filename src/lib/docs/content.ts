@@ -272,7 +272,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
         id: "app-notifications",
         title: "Push notifications to your members",
         body: [
-          "Organization → Mobile App → Notifications lets an owner or admin send a notification to your whole church, one branch, one group (for example Youth) or a single member. Add a link and a button label (for example \"Join\") and the notification opens that link when tapped. A link to a K-Connect call opens the call inside the app.",
+          "Organization → Mobile App → Notifications lets an owner or admin send a notification to your whole church, one branch, one group (for example Youth) or a single member. Add a link and a button label (for example \"Join\") and the notification opens that link when tapped. A link to a K-Connect call opens the call inside the app. Tick Send later to pick a date and time in your church's time zone; it goes out within 5 minutes of that time, you can cancel it from the Scheduled list until then, and who receives it (for example a group) is worked out when it is sent. Next to each group and branch you see how many of its members have the app, so you can tell when nobody would receive it.",
           "Members can switch off each kind of notification (announcements, events, prayer requests, tasks and so on) in the app's Settings, and a member who has switched a kind off isn't sent it.",
           "Your team also gets notifications for things that need them — such as a new prayer request, an event registration or a reply from support — and the same list appears in the notification center, on the web and in the app.",
         ],

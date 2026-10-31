@@ -1748,7 +1748,7 @@ export type AppPopup = {
   updated_at: string;
 };
 
-export type ScheduledCampaignChannel = "email" | "sms" | "whatsapp";
+export type ScheduledCampaignChannel = "email" | "sms" | "whatsapp" | "push";
 export type ScheduledCampaignStatus = "scheduled" | "sending" | "sent" | "failed" | "cancelled";
 export type ScheduledAttachment = { path: string; filename: string; contentType: string | null; size: number };
 export type ScheduledCampaign = {

@@ -5,6 +5,7 @@ import { sendEmailCampaign } from "@/lib/email/send";
 import { sendSmsCampaign } from "@/lib/sms/send";
 import { sendWhatsAppCampaign } from "@/lib/whatsapp/send-campaign";
 import { sendPushToUsers } from "@/lib/push/client";
+import { sendBroadcast } from "@/lib/push/broadcast";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { normalizeTabPermissions } from "@/lib/permissions/tabs";
 import { STUCK_SENDING_MINUTES } from "@/lib/scheduler/validation";
@@ -29,11 +30,30 @@ async function stillAllowed(admin: Admin, organizationId: string, userId: string
   const { data } = await admin.from("organization_members").select("role, tab_permissions").eq("organization_id", organizationId).eq("auth_user_id", userId).maybeSingle();
   if (!data) return false;
   if (data.role === "owner" || data.role === "admin") return true;
+  // Push notifications are for owners and admins only.
+  if (channel === "push") return false;
   return normalizeTabPermissions(data.tab_permissions as TabPermissions | null)[channel].write;
 }
 
 async function send(admin: Admin, row: ScheduledCampaign): Promise<{ ok: boolean; sentCount?: number; failedCount?: number; skippedCount?: number; error?: string }> {
   const userId = row.created_by as string;
+  if (row.channel === "push") {
+    const p = row.payload as Record<string, string | undefined>;
+    // Who receives it is worked out now, so people who joined the group since it was scheduled are included.
+    const result = await sendBroadcast({
+      organizationId: row.organization_id,
+      userId,
+      audienceType: String(p.audienceType ?? ""),
+      groupKey: p.groupKey,
+      memberId: p.memberId,
+      branchId: p.branchId,
+      title: String(p.title ?? ""),
+      body: String(p.body ?? ""),
+      linkUrl: p.linkUrl,
+      buttonLabel: p.buttonLabel,
+    });
+    return { ok: !result.error, sentCount: result.sent, error: result.error };
+  }
   const recipients = row.payload.recipients;
   if (row.channel === "email") {
     const [{ data: org }, { data: profile }] = await Promise.all([
@@ -65,7 +85,7 @@ async function send(admin: Admin, row: ScheduledCampaign): Promise<{ ok: boolean
   return { ok: !result.error, sentCount: result.sentCount, failedCount: result.failedCount, skippedCount: result.skippedCount, error: result.error };
 }
 
-const CHANNEL_NAMES = { email: "email", sms: "SMS", whatsapp: "WhatsApp message" } as const;
+const CHANNEL_NAMES = { email: "email", sms: "SMS", whatsapp: "WhatsApp message", push: "notification" } as const;
 
 // Sends every scheduled campaign that has come due. Safe to run again and again: a campaign
 // is claimed (marked sending) before it goes out, so two overlapping runs never send it twice.

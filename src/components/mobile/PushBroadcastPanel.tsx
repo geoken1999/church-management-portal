@@ -3,6 +3,10 @@
 import { matchesPerson } from "@/lib/people/search";
 import { useState, useTransition } from "react";
 import { sendBroadcastAction } from "@/lib/push/broadcast-actions";
+import { schedulePushAction } from "@/lib/scheduler/actions";
+import { SchedulePicker } from "@/components/scheduler/SchedulePicker";
+import { ScheduledCampaigns } from "@/components/scheduler/ScheduledCampaigns";
+import type { ScheduledCampaign } from "@/types/database";
 import { BUTTON_PRESETS } from "@/lib/push/button-presets";
 import { GROUP_KEYS, GROUP_LABELS, type GroupKey } from "@/lib/groups/shares";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -36,12 +40,38 @@ function audienceLabel(row: BroadcastHistoryRow): string {
   return "One member";
 }
 
-export function PushBroadcastPanel({ recipients, history, branches }: { recipients: RecipientOption[]; history: BroadcastHistoryRow[]; branches: { id: string; name: string }[] }) {
+// How many people with the app each audience would reach right now.
+export interface AudienceCounts {
+  church: number;
+  groups: Record<GroupKey, number>;
+  branches: Record<string, number>;
+}
+
+function reach(n: number): string {
+  return `${n} ${n === 1 ? "person" : "people"} with the app`;
+}
+
+export function PushBroadcastPanel({
+  recipients,
+  history,
+  branches,
+  counts,
+  scheduled,
+  timezone,
+}: {
+  recipients: RecipientOption[];
+  history: BroadcastHistoryRow[];
+  branches: { id: string; name: string }[];
+  counts: AudienceCounts;
+  scheduled: ScheduledCampaign[];
+  timezone: string;
+}) {
   const [audience, setAudience] = useState<"church" | "branch" | "group" | "member">("church");
   const [branchId, setBranchId] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [buttonLabel, setButtonLabel] = useState("");
-  const [groupKey, setGroupKey] = useState<GroupKey>("youth");
+  const [groupKey, setGroupKey] = useState<GroupKey | "">("");
+  const [scheduleAt, setScheduleAt] = useState<string | null>(null);
   const [memberId, setMemberId] = useState("");
   const [search, setSearch] = useState("");
   const [title, setTitle] = useState("");
@@ -57,6 +87,32 @@ export function PushBroadcastPanel({ recipients, history, branches }: { recipien
     setError(null);
     setNotice(null);
     startTransition(async () => {
+      if (audience === "group" && !groupKey) {
+        setError("Choose which group to send to.");
+        return;
+      }
+      if (audience === "branch" && !branchId) {
+        setError("Choose which branch to send to.");
+        return;
+      }
+      if (audience === "member" && !memberId) {
+        setError("Search for a member and pick them from the list.");
+        return;
+      }
+      if (scheduleAt) {
+        const scheduledResult = await schedulePushAction({ audienceType: audience, groupKey, memberId, branchId, title, body, linkUrl, buttonLabel, scheduledAt: scheduleAt });
+        if (scheduledResult.error) {
+          setError(scheduledResult.error);
+          return;
+        }
+        setNotice(`Scheduled for ${scheduledResult.scheduledLabel}. It goes out within 5 minutes of that time; you can cancel it below until then.`);
+        setScheduleAt(null);
+        setTitle("");
+        setBody("");
+        setLinkUrl("");
+        setButtonLabel("");
+        return;
+      }
       const result = await sendBroadcastAction(audience, groupKey, memberId, title, body, branchId, linkUrl, buttonLabel);
       if (result.error) {
         setError(result.error);
@@ -93,30 +149,44 @@ export function PushBroadcastPanel({ recipients, history, branches }: { recipien
                     ["member", "One member"],
                   ] as const
                 ).map(([value, label]) => (
-                  <Button key={value} type="button" size="sm" variant={audience === value ? "default" : "outline"} onClick={() => setAudience(value)}>
+                  <Button key={value} type="button" size="sm" variant={audience === value ? "default" : "outline"} aria-pressed={audience === value} onClick={() => setAudience(value)}>
                     {label}
                   </Button>
                 ))}
               </div>
             </div>
 
+            {audience === "church" && <p className="text-xs text-muted-foreground">{reach(counts.church)}.</p>}
+
             {audience === "branch" && (
-              <div className="flex flex-wrap gap-2">
-                {branches.map((branch) => (
-                  <Button key={branch.id} type="button" size="sm" variant={branchId === branch.id ? "secondary" : "outline"} onClick={() => setBranchId(branch.id)}>
-                    {branch.name}
-                  </Button>
-                ))}
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap gap-2">
+                  {branches.map((branch) => (
+                    <Button key={branch.id} type="button" size="sm" variant={branchId === branch.id ? "default" : "outline"} aria-pressed={branchId === branch.id} onClick={() => setBranchId(branch.id)}>
+                      {branch.name} ({counts.branches[branch.id] ?? 0})
+                    </Button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">{branchId ? `${reach(counts.branches[branchId] ?? 0)} in this branch.` : "Choose a branch. The number is how many people with the app are in it."}</p>
               </div>
             )}
 
             {audience === "group" && (
-              <div className="flex flex-wrap gap-2">
-                {GROUP_KEYS.map((key) => (
-                  <Button key={key} type="button" size="sm" variant={groupKey === key ? "secondary" : "outline"} onClick={() => setGroupKey(key)}>
-                    {GROUP_LABELS[key]}
-                  </Button>
-                ))}
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap gap-2">
+                  {GROUP_KEYS.map((key) => (
+                    <Button key={key} type="button" size="sm" variant={groupKey === key ? "default" : "outline"} aria-pressed={groupKey === key} onClick={() => setGroupKey(key)}>
+                      {GROUP_LABELS[key]} ({counts.groups[key] ?? 0})
+                    </Button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {groupKey
+                    ? counts.groups[groupKey] > 0
+                      ? `${reach(counts.groups[groupKey])} in ${GROUP_LABELS[groupKey]}.`
+                      : `Nobody in ${GROUP_LABELS[groupKey]} has the app yet. Add members to this group, and they need to sign in to the app to get notifications.`
+                    : "Choose a group. The number is how many of its members have the app."}
+                </p>
               </div>
             )}
 
@@ -191,12 +261,15 @@ export function PushBroadcastPanel({ recipients, history, branches }: { recipien
                 </p>
               </div>
             )}
+            <SchedulePicker value={scheduleAt} onChange={setScheduleAt} disabled={pending} />
             <Button type="submit" disabled={pending}>
-              {pending ? "Sending..." : "Send notification"}
+              {pending ? (scheduleAt ? "Scheduling..." : "Sending...") : scheduleAt ? "Schedule notification" : "Send notification"}
             </Button>
           </form>
         </CardContent>
       </Card>
+
+      <ScheduledCampaigns items={scheduled} timezone={timezone} />
 
       <div className="space-y-2">
         <p className="font-medium">Recently sent</p>

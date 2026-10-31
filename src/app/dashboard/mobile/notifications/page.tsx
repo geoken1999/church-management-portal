@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { createClient } from "@/lib/supabase/server";
-import { PushBroadcastPanel, type BroadcastHistoryRow, type RecipientOption } from "@/components/mobile/PushBroadcastPanel";
+import { getScheduledCampaigns } from "@/lib/scheduler/dal";
+import { resolveAudienceAuthIds } from "@/lib/push/audience";
+import { GROUP_KEYS, type GroupKey } from "@/lib/groups/shares";
+import { PushBroadcastPanel, type AudienceCounts, type BroadcastHistoryRow, type RecipientOption } from "@/components/mobile/PushBroadcastPanel";
 
 export const metadata: Metadata = {
   title: "App Notifications | KingdomFlow",
@@ -25,6 +28,14 @@ export default async function AppNotificationsPage() {
     supabase.from("branches").select("id, name").eq("organization_id", organizationId).order("name"),
   ]);
 
+  const [church, groupCounts, branchCounts, scheduled] = await Promise.all([
+    resolveAudienceAuthIds(organizationId, { type: "church" }),
+    Promise.all(GROUP_KEYS.map(async (key) => [key, (await resolveAudienceAuthIds(organizationId, { type: "group", groupKey: key })).length] as const)),
+    Promise.all((branches ?? []).map(async (b) => [b.id, (await resolveAudienceAuthIds(organizationId, { type: "branch", branchId: b.id })).length] as const)),
+    getScheduledCampaigns(organizationId, "push"),
+  ]);
+  const counts: AudienceCounts = { church: church.length, groups: Object.fromEntries(groupCounts) as Record<GroupKey, number>, branches: Object.fromEntries(branchCounts) };
+
   const recipients: RecipientOption[] = (members ?? []).map((m) => ({ id: m.id, name: `${m.first_name} ${m.last_name ?? ""}`.trim(), phone: m.phone }));
 
   return (
@@ -32,11 +43,11 @@ export default async function AppNotificationsPage() {
       <div>
         <h1 className="font-heading text-3xl font-bold tracking-tight">App notifications</h1>
         <p className="mt-1 text-muted-foreground">
-          Send a push notification to members who use the mobile app: the whole church, one group, or one person. Group announcement boards, birthdays and
+          Send a push notification to members who use the mobile app: the whole church, a branch, one group, or one person. Send it now or schedule it for later. Group announcement boards, birthdays and
           anniversaries notify automatically.
         </p>
       </div>
-      <PushBroadcastPanel recipients={recipients} history={(history ?? []) as BroadcastHistoryRow[]} branches={branches ?? []} />
+      <PushBroadcastPanel recipients={recipients} history={(history ?? []) as BroadcastHistoryRow[]} branches={branches ?? []} counts={counts} scheduled={scheduled} timezone={membership.organization.timezone} />
     </div>
   );
 }

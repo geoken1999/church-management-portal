@@ -13,10 +13,7 @@ export interface BroadcastResult {
   sent?: number;
 }
 
-// Sends a push notification to the whole church, one branch, one group or one
-// member, and records it in the history. The caller has already checked that
-// [userId] is an owner/admin of [organizationId].
-export async function sendBroadcast(input: {
+export interface BroadcastInput {
   organizationId: string;
   userId: string;
   audienceType: string;
@@ -27,7 +24,19 @@ export async function sendBroadcast(input: {
   body: string;
   linkUrl?: string;
   buttonLabel?: string;
-}): Promise<BroadcastResult> {
+}
+
+export interface PreparedBroadcast {
+  title: string;
+  body: string;
+  linkUrl: string | null;
+  buttonLabel: string | null;
+  audience: PushAudience;
+}
+
+// Checks a broadcast's wording, link and audience, and that a chosen member or branch belongs to the church.
+// Used both when sending now and when scheduling, so a scheduled one can't be saved with something that would fail.
+export async function prepareBroadcast(input: BroadcastInput): Promise<PreparedBroadcast | { error: string }> {
   const cleanTitle = input.title.trim();
   const cleanBody = input.body.trim();
   if (cleanTitle.length < 2 || cleanTitle.length > 60) return { error: "Title must be 2 to 60 characters." };
@@ -43,10 +52,7 @@ export async function sendBroadcast(input: {
   else if (input.audienceType === "member" && input.memberId) audience = { type: "member", memberId: input.memberId };
   else return { error: "Choose who should get this." };
 
-  if (!isPushConfigured()) return { error: "Push notifications aren't set up on this server yet." };
-
   const admin = createAdminClient();
-
   if (audience.type === "member") {
     const { data: member } = await admin.from("members").select("id").eq("id", audience.memberId).eq("organization_id", input.organizationId).maybeSingle();
     if (!member) return { error: "That member could not be found." };
@@ -55,6 +61,21 @@ export async function sendBroadcast(input: {
     const { data: branch } = await admin.from("branches").select("id").eq("id", audience.branchId).eq("organization_id", input.organizationId).maybeSingle();
     if (!branch) return { error: "That branch could not be found." };
   }
+  return { title: cleanTitle, body: cleanBody, linkUrl: action.linkUrl, buttonLabel: action.buttonLabel, audience };
+}
+
+// Sends a push notification to the whole church, one branch, one group or one
+// member, and records it in the history. The caller has already checked that
+// [userId] is an owner/admin of [organizationId].
+export async function sendBroadcast(input: BroadcastInput): Promise<BroadcastResult> {
+  const prepared = await prepareBroadcast(input);
+  if ("error" in prepared) return { error: prepared.error };
+  const { title: cleanTitle, body: cleanBody, audience } = prepared;
+  const action = { linkUrl: prepared.linkUrl, buttonLabel: prepared.buttonLabel };
+
+  if (!isPushConfigured()) return { error: "Push notifications aren't set up on this server yet." };
+
+  const admin = createAdminClient();
 
   const recipients = await resolveAudienceAuthIds(input.organizationId, audience);
   if (recipients.length === 0) return { error: "Nobody in that audience has the mobile app yet." };

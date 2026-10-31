@@ -7,9 +7,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, MAX_TOTAL_ATTACHMENT_BYTES } from "@/lib/email/validation";
 import { formatInTimezone } from "@/lib/organizations/timezone";
 import { parseScheduleTime, summarize } from "@/lib/scheduler/validation";
+import { prepareBroadcast } from "@/lib/push/broadcast";
 import type { ScheduledAttachment, ScheduledCampaignChannel } from "@/types/database";
 
-const PAGES: Record<ScheduledCampaignChannel, string> = { email: "/dashboard/email", sms: "/dashboard/sms", whatsapp: "/dashboard/whatsapp" };
+const PAGES: Record<ScheduledCampaignChannel, string> = { email: "/dashboard/email", sms: "/dashboard/sms", whatsapp: "/dashboard/whatsapp", push: "/dashboard/mobile/notifications" };
 const BUCKET = "scheduled-campaign-files";
 
 export interface ScheduleState {
@@ -129,7 +130,8 @@ export async function cancelScheduledCampaignAction(id: string): Promise<{ error
   const admin = createAdminClient();
   const { data: row } = await admin.from("scheduled_campaigns").select("channel, attachments, status").eq("id", id).eq("organization_id", membership.organization.id).maybeSingle();
   if (!row) return { error: "That campaign could not be found." };
-  if (!membership.tabAccess[row.channel].write) return { error: "You don't have permission to change this." };
+  const allowed = row.channel === "push" ? membership.role === "owner" || membership.role === "admin" : membership.tabAccess[row.channel].write;
+  if (!allowed) return { error: "You don't have permission to change this." };
   if (row.status !== "scheduled") return { error: row.status === "sending" ? "It is going out right now." : "It has already been dealt with." };
 
   // Only a still-scheduled one is cancelled, so a send that has just started isn't undone.
@@ -139,4 +141,53 @@ export async function cancelScheduledCampaignAction(id: string): Promise<{ error
   if (files.length > 0) await admin.storage.from(BUCKET).remove(files);
   revalidatePath(PAGES[row.channel]);
   return {};
+}
+
+// Saves a push notification to be sent later. Owner/admin only, like sending one now. The audience is stored as
+// chosen (the whole church, a branch, a group or a member) and worked out again when it goes out.
+export async function schedulePushAction(input: {
+  audienceType: string;
+  groupKey?: string;
+  memberId?: string;
+  branchId?: string;
+  title: string;
+  body: string;
+  linkUrl?: string;
+  buttonLabel?: string;
+  scheduledAt: string;
+}): Promise<ScheduleState> {
+  const user = await requireUser();
+  const membership = await requireOrganization();
+  if (membership.role !== "owner" && membership.role !== "admin") return { error: "Only an owner or admin can schedule notifications." };
+  const organizationId = membership.organization.id;
+
+  const when = parseScheduleTime(input.scheduledAt, membership.organization.timezone);
+  if ("error" in when) return { error: when.error };
+
+  const prepared = await prepareBroadcast({ ...input, organizationId, userId: user.id });
+  if ("error" in prepared) return { error: prepared.error };
+
+  const { error } = await createAdminClient().from("scheduled_campaigns").insert({
+    organization_id: organizationId,
+    channel: "push",
+    scheduled_at: when.at.toISOString(),
+    payload: {
+      audienceType: input.audienceType,
+      groupKey: input.groupKey,
+      memberId: input.memberId,
+      branchId: input.branchId,
+      title: prepared.title,
+      body: prepared.body,
+      linkUrl: prepared.linkUrl ?? undefined,
+      buttonLabel: prepared.buttonLabel ?? undefined,
+    },
+    attachments: [],
+    summary: summarize("sms", prepared.title),
+    recipient_count: 0,
+    created_by: user.id,
+  });
+  if (error) return { error: "Couldn't schedule that. Please try again." };
+  revalidatePath(PAGES.push);
+  const scheduledLabel = formatInTimezone(when.at.toISOString(), membership.organization.timezone, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }, "en-IN");
+  return { success: true, scheduledLabel };
 }

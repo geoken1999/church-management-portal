@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CalendarClock, X } from "lucide-react";
 import { cancelScheduledCampaignAction } from "@/lib/scheduler/actions";
 import { formatInTimezone } from "@/lib/organizations/timezone";
+import { GROUP_LABELS, isGroupKey } from "@/lib/groups/shares";
 import type { ScheduledCampaign } from "@/types/database";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,15 @@ const STATUS = {
   cancelled: { label: "Cancelled", variant: "outline" as const },
 };
 
+// Who a scheduled notification goes to. It is worked out when it is sent, so there is no count yet.
+function pushAudience(item: ScheduledCampaign): string {
+  const p = item.payload as { audienceType?: string; groupKey?: string };
+  if (p.audienceType === "group" && isGroupKey(p.groupKey)) return GROUP_LABELS[p.groupKey];
+  if (p.audienceType === "branch") return "A branch";
+  if (p.audienceType === "member") return "One member";
+  return "Whole church";
+}
+
 // What is waiting to go out on this channel, and how the latest scheduled ones went.
 export function ScheduledCampaigns({ items, timezone }: { items: ScheduledCampaign[]; timezone: string }) {
   const router = useRouter();
@@ -29,7 +39,7 @@ export function ScheduledCampaigns({ items, timezone }: { items: ScheduledCampai
   if (items.length === 0) return null;
 
   function cancel(id: string) {
-    if (!window.confirm("Cancel this scheduled campaign? It won't be sent.")) return;
+    if (!window.confirm("Cancel this scheduled message? It won't be sent.")) return;
     setError(null);
     startTransition(async () => {
       const result = await cancelScheduledCampaignAction(id);
@@ -59,7 +69,7 @@ export function ScheduledCampaigns({ items, timezone }: { items: ScheduledCampai
                   <Badge variant={status.variant}>{status.label}</Badge>
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {formatInTimezone(item.scheduled_at, timezone, { weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }, "en-IN")} · {item.recipient_count} recipient{item.recipient_count === 1 ? "" : "s"}
+                  {formatInTimezone(item.scheduled_at, timezone, { weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }, "en-IN")} · {item.channel === "push" ? pushAudience(item) : `${item.recipient_count} recipient${item.recipient_count === 1 ? "" : "s"}`}
                   {item.attachments.length > 0 && ` · ${item.attachments.length} attachment${item.attachments.length === 1 ? "" : "s"}`}
                 </p>
                 {item.status === "sent" && item.result?.sentCount !== undefined && (

@@ -24,6 +24,11 @@ const JOB_DEFINITIONS: Record<string, { label: string; description: string; load
     description: "Marks events whose date has passed as completed.",
     load: () => import("@/app/api/cron/event-status/route"),
   },
+  "attendance-close": {
+    label: "Close attendance registers",
+    description: "Marks a register complete once its day is over if anyone was marked or counted, so reports include it. Empty registers stay open.",
+    load: () => import("@/app/api/cron/attendance-close/route"),
+  },
   "youth-sync": {
     label: "Youth age rule",
     description: "Adds members who fall in a church's youth age range to Youth, and removes ones the rule added who have aged out.",

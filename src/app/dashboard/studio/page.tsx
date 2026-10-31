@@ -21,7 +21,7 @@ export default async function DesignerPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-3xl font-bold tracking-tight">Design Studio</h1>
-        <p className="mt-1 text-muted-foreground">Flyers, posters and social posts for {membership.organization.name}.</p>
+        <p className="mt-1 text-muted-foreground">Flyers, posters, social posts and YouTube thumbnails for {membership.organization.name}.</p>
       </div>
       <DesignerGallery
         organizationId={membership.organization.id}

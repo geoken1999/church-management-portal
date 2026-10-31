@@ -109,6 +109,7 @@ export const SIZE_PRESETS: SizePreset[] = [
   { key: "poster", label: "Poster (A3)", kind: "poster", width: 1123, height: 1587, note: "Print, 29.7 × 42 cm" },
   { key: "square", label: "Social post", kind: "social", width: 1080, height: 1080, note: "Instagram / Facebook, 1080 × 1080" },
   { key: "story", label: "Story", kind: "social", width: 1080, height: 1920, note: "Instagram / WhatsApp status, 1080 × 1920" },
+  { key: "thumbnail", label: "YouTube thumbnail", kind: "social", width: 1280, height: 720, note: "YouTube video cover, 1280 × 720" },
   { key: "banner", label: "Banner", kind: "social", width: 1600, height: 900, note: "Facebook / YouTube cover, 16:9" },
 ];
 

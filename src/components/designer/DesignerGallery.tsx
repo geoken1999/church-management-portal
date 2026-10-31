@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Copy, Trash2, Pencil, Sparkles } from "lucide-react";
+import { Plus, Copy, Trash2, Pencil, Sparkles, PlaySquare } from "lucide-react";
 import { createDesign, duplicateDesign, deleteDesign } from "@/lib/designer/actions";
 import { SIZE_PRESETS } from "@/lib/designer/model";
 import { TEMPLATES } from "@/lib/designer/templates";
@@ -45,6 +45,13 @@ export function DesignerGallery({
   const [customWidth, setCustomWidth] = useState("1000");
   const [customHeight, setCustomHeight] = useState("1000");
   const [toDelete, setToDelete] = useState<DesignListItem | null>(null);
+
+  function startThumbnail() {
+    setTemplate("thumb-sermon");
+    setSize("thumbnail");
+    setName("");
+    setCreating(true);
+  }
 
   function create() {
     setError(null);
@@ -95,13 +102,16 @@ export function DesignerGallery({
           <Button variant="outline" onClick={() => setCreating(true)}>
             <Plus className="size-4" /> New design
           </Button>
+          <Button variant="outline" onClick={startThumbnail}>
+            <PlaySquare className="size-4" /> YouTube thumbnail
+          </Button>
         </div>
       )}
       <AiDesignDialog open={aiOpen} onOpenChange={setAiOpen} organizationId={organizationId} churchName={churchName} logoUrl={logoUrl} onError={setError} />
 
       {designs.length === 0 ? (
         <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          No designs yet. Start from a template for a Sunday flyer, an event poster, a Bible verse or a social post.
+          No designs yet. Start from a template for a Sunday flyer, an event poster, a Bible verse, a social post or a YouTube thumbnail.
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">

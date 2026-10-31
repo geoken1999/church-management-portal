@@ -616,7 +616,7 @@ export function DesignerEditor({
                 {[
                   ["png", "PNG image", `${doc.width} × ${doc.height}`],
                   ["png2", "PNG, high quality", `${doc.width * 2} × ${doc.height * 2}, for printing`],
-                  ["jpg", "JPG image", "Smaller file"],
+                  ["jpg", "JPG image", doc.width === 1280 && doc.height === 720 ? "Smaller file, under YouTube's 2 MB limit" : "Smaller file"],
                   ["pdf", "PDF", "Print-ready at the page size"],
                 ].map(([key, label, note]) => (
                   <button key={key} type="button" onClick={() => void exportAs(key as "png" | "png2" | "jpg" | "pdf")} className="block w-full rounded px-2 py-1.5 text-left hover:bg-muted">

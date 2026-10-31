@@ -144,6 +144,84 @@ export const TEMPLATES: DesignTemplate[] = [
       return doc;
     },
   },
+  {
+    key: "thumb-sermon",
+    label: "Sermon thumbnail",
+    description: "YouTube: title, series and a photo",
+    swatch: ["#10213f", "#ffd23f"],
+    build: (w, h, church) => {
+      const doc = emptyDoc(w, h);
+      doc.background = { type: "gradient", color: "#10213f", color2: "#050b18", angle: 120 };
+      const left = Math.round(w * 0.05);
+      const textW = Math.round(w * 0.55);
+      doc.elements = [
+        makeShape("rect", doc, { x: Math.round(w * 0.62), y: 0, w: Math.round(w * 0.38), h, fill: "#1d3a6e" }),
+        makeShape("ellipse", doc, { x: Math.round(w * 0.64), y: Math.round(h * 0.12), w: Math.round(w * 0.33), h: Math.round(w * 0.33), fill: "#ffd23f", opacity: 0.9 }),
+        text(doc, "ADD YOUR\nPHOTO", 0.36, 0.035, { x: Math.round(w * 0.64), w: Math.round(w * 0.33), fill: "#10213f", fontFamily: "display", lineHeight: 1.1 }),
+        text(doc, "SUNDAY MESSAGE", 0.1, 0.03, { x: left, w: textW, align: "left", fill: "#ffd23f", fontWeight: 700, letterSpacing: 6 }),
+        text(doc, "SERMON\nTITLE\nHERE", 0.2, 0.115, { x: left, w: textW, align: "left", fill: "#ffffff", fontFamily: "anton", lineHeight: 1.0 }),
+        makeShape("rect", doc, { x: left, y: Math.round(h * 0.82), w: Math.round(w * 0.3), h: Math.round(h * 0.09), fill: "#ffd23f" }),
+        text(doc, "JOHN 3:16", 0.835, 0.032, { x: left, w: Math.round(w * 0.3), fill: "#10213f", fontWeight: 700 }),
+        text(doc, church.toUpperCase(), 0.94, 0.017, { x: left, w: textW, align: "left", fill: "#9fb3d9", letterSpacing: 4 }),
+      ];
+      return doc;
+    },
+  },
+  {
+    key: "thumb-live",
+    label: "Live service thumbnail",
+    description: "YouTube: a red LIVE tag and the service",
+    swatch: ["#d00000", "#111111"],
+    build: (w, h, church) => {
+      const doc = emptyDoc(w, h);
+      doc.background = { type: "gradient", color: "#1a1a1a", color2: "#000000", angle: 150 };
+      doc.elements = [
+        makeShape("ellipse", doc, { x: Math.round(w * 0.55), y: Math.round(h * -0.35), w: Math.round(w * 0.7), h: Math.round(w * 0.7), fill: "#d00000", opacity: 0.55 }),
+        makeShape("rect", doc, { x: Math.round(w * 0.05), y: Math.round(h * 0.09), w: Math.round(w * 0.17), h: Math.round(h * 0.15), fill: "#e10600", radius: 12 }),
+        text(doc, "LIVE", 0.115, 0.07, { x: Math.round(w * 0.05), w: Math.round(w * 0.17), fill: "#ffffff", fontFamily: "anton" }),
+        text(doc, "SUNDAY\nWORSHIP\nSERVICE", 0.3, 0.115, { x: Math.round(w * 0.05), w: Math.round(w * 0.75), align: "left", fill: "#ffffff", fontFamily: "anton", lineHeight: 1.0 }),
+        text(doc, "9:30 AM  ·  JOIN US ONLINE", 0.82, 0.032, { x: Math.round(w * 0.05), w: Math.round(w * 0.75), align: "left", fill: "#ffd23f", fontWeight: 700, letterSpacing: 3 }),
+        text(doc, church.toUpperCase(), 0.92, 0.02, { x: Math.round(w * 0.05), w: Math.round(w * 0.75), align: "left", fill: "#bbbbbb", letterSpacing: 4 }),
+      ];
+      return doc;
+    },
+  },
+  {
+    key: "thumb-worship",
+    label: "Worship thumbnail",
+    description: "YouTube: songs and worship nights",
+    swatch: ["#3a0ca3", "#f72585"],
+    build: (w, h, church) => {
+      const doc = emptyDoc(w, h);
+      doc.background = { type: "gradient", color: "#3a0ca3", color2: "#f72585", angle: 135 };
+      doc.elements = [
+        makeShape("ellipse", doc, { x: Math.round(w * 0.58), y: Math.round(h * 0.1), w: Math.round(h * 0.8), h: Math.round(h * 0.8), fill: "#ffffff", opacity: 0.14 }),
+        text(doc, "WORSHIP", 0.1, 0.045, { x: Math.round(w * 0.06), w: Math.round(w * 0.7), align: "left", fill: "#ffd6e8", fontWeight: 700, letterSpacing: 10 }),
+        text(doc, "Song Title", 0.26, 0.15, { x: Math.round(w * 0.06), w: Math.round(w * 0.8), align: "left", fill: "#ffffff", fontFamily: "script", lineHeight: 1.0 }),
+        text(doc, "Live worship  ·  Lyrics in the description", 0.72, 0.03, { x: Math.round(w * 0.06), w: Math.round(w * 0.8), align: "left", fill: "#ffffff", fontWeight: 700 }),
+        text(doc, church, 0.86, 0.026, { x: Math.round(w * 0.06), w: Math.round(w * 0.8), align: "left", fill: "#ffd6e8" }),
+      ];
+      return doc;
+    },
+  },
+  {
+    key: "thumb-verse",
+    label: "Verse thumbnail",
+    description: "YouTube: a short verse or devotion",
+    swatch: ["#0f4c5c", "#fb8b24"],
+    build: (w, h, church) => {
+      const doc = emptyDoc(w, h);
+      doc.background = { type: "gradient", color: "#0f4c5c", color2: "#062a33", angle: 160 };
+      doc.elements = [
+        makeShape("rect", doc, { x: 0, y: Math.round(h * 0.86), w, h: Math.round(h * 0.14), fill: "#fb8b24" }),
+        text(doc, "VERSE OF THE DAY", 0.1, 0.03, { fill: "#fb8b24", fontWeight: 700, letterSpacing: 8 }),
+        text(doc, "The Lord is my shepherd;\nI shall not want.", 0.26, 0.065, { x: Math.round(w * 0.1), w: Math.round(w * 0.8), fill: "#ffffff", fontFamily: "playfair", fontWeight: 700, lineHeight: 1.25 }),
+        text(doc, "PSALM 23:1", 0.66, 0.035, { fill: "#fb8b24", fontWeight: 700, letterSpacing: 6 }),
+        text(doc, church.toUpperCase(), 0.895, 0.022, { fill: "#062a33", fontWeight: 700, letterSpacing: 5 }),
+      ];
+      return doc;
+    },
+  },
 ];
 
 export function getTemplate(key: string): DesignTemplate {

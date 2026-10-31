@@ -31,6 +31,7 @@ export async function POST(request: Request) {
     body: text("message"),
     linkUrl: text("linkUrl"),
     buttonLabel: text("buttonLabel"),
+    pin: body.pin === true,
   });
   if (result.error)
     return NextResponse.json({ ok: false, error: result.error });

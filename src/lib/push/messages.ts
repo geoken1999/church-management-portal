@@ -35,13 +35,18 @@ export interface PushBatch {
 // Firebase's default channel, which is only normal importance (no pop-up on the screen).
 export const ANDROID_CHANNEL_ID = "kingdomflow_priority";
 
+/** A notification the app should keep at the top of the list (built by the app itself, so it can be marked ongoing). */
+export function wantsPin(data: Record<string, string> | undefined): boolean {
+  return data?.pin === "1";
+}
+
 export function hasActionButton(data: Record<string, string> | undefined): boolean {
   return Boolean(data?.link && data?.buttonLabel);
 }
 
 export function buildPushBatches(rows: PushTokenRow[], payload: PushMessageInput): PushBatch[] {
   const action = hasActionButton(payload.data);
-  const androidTokens = action ? rows.filter((r) => r.platform === "android").map((r) => r.token) : [];
+  const androidTokens = action || wantsPin(payload.data) ? rows.filter((r) => r.platform === "android").map((r) => r.token) : [];
   const standardTokens = rows.filter((r) => !androidTokens.includes(r.token)).map((r) => r.token);
 
   const batches: PushBatch[] = [];

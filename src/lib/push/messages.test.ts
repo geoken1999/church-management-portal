@@ -46,4 +46,15 @@ describe("buildPushBatches", () => {
     expect(button[0].message.android?.priority).toBe("high");
     expect(button[0].message.notification).toBeUndefined(); // the app draws this one itself, on the same channel
   });
+
+  it("sends a pinned notification to Android as app-built data so it can be kept on top", () => {
+    const batches = buildPushBatches(
+      [{ token: "a1", platform: "android" }, { token: "i1", platform: "ios" }],
+      { title: "Join", body: "Now", data: { pin: "1" } },
+    );
+    const android = batches.find((b) => b.tokens.includes("a1"))!;
+    expect(android.message.notification).toBeUndefined();
+    expect(android.message.data).toMatchObject({ pin: "1", title: "Join", body: "Now" });
+    expect(batches.find((b) => b.tokens.includes("i1"))!.message.notification).toEqual({ title: "Join", body: "Now" });
+  });
 });

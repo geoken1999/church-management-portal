@@ -24,6 +24,8 @@ export interface BroadcastInput {
   body: string;
   linkUrl?: string;
   buttonLabel?: string;
+  /** Android: keep it at the top of the notification list for a few hours (see PIN_HOURS in the app). */
+  pin?: boolean;
 }
 
 export interface PreparedBroadcast {
@@ -109,6 +111,7 @@ export async function sendBroadcast(input: BroadcastInput): Promise<BroadcastRes
       ...(row ? { broadcastId: row.id } : {}),
       ...(action.linkUrl ? { link: action.linkUrl } : {}),
       ...(action.buttonLabel ? { buttonLabel: action.buttonLabel } : {}),
+      ...(input.pin ? { pin: "1" } : {}),
     },
   });
   if (result.delivered === 0) {

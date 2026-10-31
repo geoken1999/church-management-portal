@@ -39,19 +39,20 @@ async function stillAllowed(admin: Admin, organizationId: string, userId: string
 async function send(admin: Admin, row: ScheduledCampaign): Promise<{ ok: boolean; sentCount?: number; failedCount?: number; skippedCount?: number; error?: string }> {
   const userId = row.created_by as string;
   if (row.channel === "push") {
-    const p = row.payload as Record<string, string | undefined>;
+    const p = row.payload as Record<string, string | boolean | undefined>;
     // Who receives it is worked out now, so people who joined the group since it was scheduled are included.
     const result = await sendBroadcast({
       organizationId: row.organization_id,
       userId,
       audienceType: String(p.audienceType ?? ""),
-      groupKey: p.groupKey,
-      memberId: p.memberId,
-      branchId: p.branchId,
+      groupKey: p.groupKey as string | undefined,
+      memberId: p.memberId as string | undefined,
+      branchId: p.branchId as string | undefined,
       title: String(p.title ?? ""),
       body: String(p.body ?? ""),
-      linkUrl: p.linkUrl,
-      buttonLabel: p.buttonLabel,
+      linkUrl: p.linkUrl as string | undefined,
+      buttonLabel: p.buttonLabel as string | undefined,
+      pin: p.pin === true,
     });
     return { ok: !result.error, sentCount: result.sent, error: result.error };
   }

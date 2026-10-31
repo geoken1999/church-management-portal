@@ -156,6 +156,7 @@ export async function schedulePushAction(input: {
   body: string;
   linkUrl?: string;
   buttonLabel?: string;
+  pin?: boolean;
   scheduledAt: string;
   repeat?: Repeat;
   /** The last day it may go out (a date, in the church's time zone). */
@@ -194,6 +195,7 @@ export async function schedulePushAction(input: {
       body: prepared.body,
       linkUrl: prepared.linkUrl ?? undefined,
       buttonLabel: prepared.buttonLabel ?? undefined,
+      pin: input.pin === true ? true : undefined,
       // Keeps a monthly message on the same day of the month after a short month.
       anchorDay: partsInTimezone(when.at, membership.organization.timezone).day,
     },

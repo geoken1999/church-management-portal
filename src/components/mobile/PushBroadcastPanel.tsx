@@ -75,6 +75,7 @@ export function PushBroadcastPanel({
   const [buttonLabel, setButtonLabel] = useState("");
   const [groupKey, setGroupKey] = useState<GroupKey | "">("");
   const [scheduleAt, setScheduleAt] = useState<string | null>(null);
+  const [pin, setPin] = useState(false);
   const [repeat, setRepeat] = useState<Repeat>("none");
   const [repeatUntil, setRepeatUntil] = useState("");
   const [memberId, setMemberId] = useState("");
@@ -105,7 +106,7 @@ export function PushBroadcastPanel({
         return;
       }
       if (scheduleAt) {
-        const scheduledResult = await schedulePushAction({ audienceType: audience, groupKey, memberId, branchId, title, body, linkUrl, buttonLabel, scheduledAt: scheduleAt, repeat, repeatUntil: repeat !== "none" ? repeatUntil : "" });
+        const scheduledResult = await schedulePushAction({ audienceType: audience, groupKey, memberId, branchId, title, body, linkUrl, buttonLabel, pin, scheduledAt: scheduleAt, repeat, repeatUntil: repeat !== "none" ? repeatUntil : "" });
         if (scheduledResult.error) {
           setError(scheduledResult.error);
           return;
@@ -114,13 +115,14 @@ export function PushBroadcastPanel({
         setScheduleAt(null);
         setRepeat("none");
         setRepeatUntil("");
+        setPin(false);
         setTitle("");
         setBody("");
         setLinkUrl("");
         setButtonLabel("");
         return;
       }
-      const result = await sendBroadcastAction(audience, groupKey, memberId, title, body, branchId, linkUrl, buttonLabel);
+      const result = await sendBroadcastAction(audience, groupKey, memberId, title, body, branchId, linkUrl, buttonLabel, pin);
       if (result.error) {
         setError(result.error);
         return;
@@ -130,6 +132,7 @@ export function PushBroadcastPanel({
       setBody("");
       setLinkUrl("");
       setButtonLabel("");
+      setPin(false);
     });
   }
 
@@ -268,6 +271,15 @@ export function PushBroadcastPanel({
                 </p>
               </div>
             )}
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-0.5 size-4" checked={pin} onChange={(e) => setPin(e.target.checked)} />
+              <span>
+                <span className="font-medium">Keep at the top of the notification list</span>
+                <span className="block text-xs text-muted-foreground">
+                  Android phones: the notification stays pinned near the top for 6 hours, or until the person taps or swipes it away. Android decides the final order, so a call or a music player can still sit above it. iPhones show it as a normal notification.
+                </span>
+              </span>
+            </label>
             <SchedulePicker value={scheduleAt} onChange={setScheduleAt} disabled={pending} />
             {scheduleAt && (
               <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border p-3">

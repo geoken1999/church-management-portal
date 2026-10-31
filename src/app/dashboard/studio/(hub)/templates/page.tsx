@@ -5,7 +5,8 @@ import { requireStudio } from "@/lib/designer/guard";
 import { TEMPLATE_PAGE_SIZE, getCategories, getTemplateSizes, listTemplates, type TemplateSort } from "@/lib/designer/templates-dal";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
 import { TemplateCard } from "@/components/designer/TemplateCard";
-import { TemplateFilters, templateHref, type TemplateQuery } from "@/components/designer/TemplateFilters";
+import { TemplateFilters } from "@/components/designer/TemplateFilters";
+import { templateHref, type TemplateQuery } from "@/lib/designer/template-query";
 import { buttonVariants } from "@/components/ui/button";
 
 export const metadata: Metadata = { title: "Templates | KingdomFlow" };

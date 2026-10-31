@@ -4,23 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Heart, Search } from "lucide-react";
 import type { DesignCategoryRow } from "@/types/database";
+import { templateHref, type TemplateQuery } from "@/lib/designer/template-query";
 import { Button } from "@/components/ui/button";
-
-export interface TemplateQuery {
-  q?: string;
-  category?: string;
-  size?: string;
-  price?: string;
-  sort?: string;
-  fav?: string;
-}
-
-export function templateHref(query: TemplateQuery & { page?: number }): string {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(query)) if (value && !(key === "page" && value === 1)) params.set(key, String(value));
-  const text = params.toString();
-  return `/dashboard/studio/templates${text ? `?${text}` : ""}`;
-}
 
 const selectClass = "h-9 rounded-md border bg-background px-2 text-sm";
 

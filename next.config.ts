@@ -1,6 +1,7 @@
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import type { NextConfig } from "next";
+import { contentSecurityPolicy, cspHeaderName } from "./src/lib/security/csp";
 
 // What this build is: the version in package.json, and the commit and time it was built from.
 // Vercel provides the commit; locally it is read from git.
@@ -26,24 +27,10 @@ const appVersion = (
 // someone else's page, which blocks clickjacking. Public pages are left embeddable: churches put the
 // website widget on their own sites.
 //
-// The content security policy is sent in REPORT-ONLY mode first: the browser lists what it would have
-// blocked at /api/csp-report (Vercel logs) but blocks nothing. Once a few weeks of reports show nothing
-// legitimate being flagged, switch the header name below to "Content-Security-Policy" to enforce it.
-const CSP = [
-  "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://sdk.cashfree.com https://checkout.razorpay.com https://source.zoom.us https://*.zoom.us",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "img-src 'self' data: blob: https:",
-  "media-src 'self' blob: https:",
-  "font-src 'self' data: https://fonts.gstatic.com",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.videosdk.live wss://*.videosdk.live https://api.razorpay.com https://sdk.cashfree.com https://fonts.googleapis.com https://fonts.gstatic.com https://*.zoom.us wss://*.zoom.us https://*.zoom.com wss://*.zoom.com",
-  "worker-src 'self' blob:",
-  "frame-src https://*.zoom.us https://checkout.razorpay.com https://api.razorpay.com https://sdk.cashfree.com https://www.youtube.com https://www.youtube-nocookie.com",
-  "form-action 'self' https://secure.payu.in https://test.payu.in",
-  "base-uri 'self'",
-  "object-src 'none'",
-  "report-uri /api/csp-report",
-].join("; ");
+// The content security policy (src/lib/security/csp.ts) is enforced. Anything it blocks is still reported to
+// /api/csp-report (Vercel logs, "[csp-report]"). If it ever blocks something it should not, set CSP_MODE=report-only
+// in Vercel and redeploy to turn it back into a log-only policy while the allow-list is fixed.
+const CSP_HEADER = cspHeaderName();
 
 const BASE_HEADERS = [
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -54,14 +41,14 @@ const BASE_HEADERS = [
     value:
       "camera=(self), microphone=(self), geolocation=(self), display-capture=(self)",
   },
-  { key: "Content-Security-Policy-Report-Only", value: CSP },
+  { key: CSP_HEADER, value: contentSecurityPolicy() },
 ];
 
 const NO_FRAMING = [
   { key: "X-Frame-Options", value: "DENY" },
   {
-    key: "Content-Security-Policy-Report-Only",
-    value: `${CSP}; frame-ancestors 'none'`,
+    key: CSP_HEADER,
+    value: contentSecurityPolicy({ framingAllowed: false }),
   },
 ];
 

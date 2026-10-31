@@ -6,8 +6,9 @@ import { requireOrganization } from "@/lib/organizations/dal";
 import { checkTabAccess } from "@/lib/permissions/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAccessToken, getConferenceMeeting, getConnection } from "@/lib/conferencing/dal";
-import { createZoomMeeting, deleteZoomMeeting, fetchZoomZak, getZoomEnv, ZOOM_SDK_VERSION } from "@/lib/conferencing/zoom";
-import { createMeetSpace } from "@/lib/conferencing/google-meet";
+import { createZoomMeeting, deleteZoomMeeting, fetchZoomZak, getZoomEnv, revokeZoomToken, ZOOM_SDK_VERSION } from "@/lib/conferencing/zoom";
+import { createMeetSpace, revokeMeetToken } from "@/lib/conferencing/google-meet";
+import { openSecret } from "@/lib/security/connection-secrets";
 import { zoomSignature } from "@/lib/conferencing/zoom-signature";
 import { notifyConferenceStarted } from "@/lib/conferencing/notify";
 
@@ -106,6 +107,16 @@ export async function disconnectConferencingAction(provider: "zoom" | "google_me
   const g = await gate("write");
   if ("error" in g) return g;
   if (g.role !== "owner" && g.role !== "admin") return { error: "Only an owner or admin can disconnect an account." };
+  // Also withdraw the permission at the provider, so it no longer shows as connected in the Zoom or Google account.
+  const connection = await getConnection(g.organizationId, provider);
+  if (connection) {
+    try {
+      // Zoom revokes by access token, Google by the refresh token (which ends the whole grant).
+      await (provider === "zoom" ? revokeZoomToken(openSecret(connection.access_token)) : revokeMeetToken(openSecret(connection.refresh_token)));
+    } catch {
+      // Already revoked or unreachable; the connection is removed here either way.
+    }
+  }
   await createAdminClient().from("conference_connections").delete().eq("organization_id", g.organizationId).eq("provider", provider);
   revalidatePath(PATH);
   return {};

@@ -48,6 +48,11 @@ async function tokenRequest(params: Record<string, string>): Promise<MeetTokens>
 }
 
 export const exchangeMeetCode = (code: string) => tokenRequest({ grant_type: "authorization_code", code, redirect_uri: meetRedirectUri() });
+/** Tells Google to stop honouring the sign-in, so disconnecting also ends KingdomFlow's access on Google's side. Best-effort. */
+export async function revokeMeetToken(token: string): Promise<void> {
+  await fetch("https://oauth2.googleapis.com/revoke", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ token }), cache: "no-store" });
+}
+
 export const refreshMeetToken = (refreshToken: string) => tokenRequest({ grant_type: "refresh_token", refresh_token: refreshToken });
 
 export async function fetchGoogleUser(accessToken: string): Promise<{ id: string; email: string; name: string }> {

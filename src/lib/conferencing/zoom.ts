@@ -52,6 +52,18 @@ async function tokenRequest(params: Record<string, string>): Promise<ZoomTokens>
 
 export const exchangeZoomCode = (code: string) => tokenRequest({ grant_type: "authorization_code", code, redirect_uri: zoomRedirectUri() });
 /** Zoom hands out a new refresh token each time, and the old one stops working: the caller must store the new one. */
+/** Tells Zoom to stop honouring a token, so disconnecting also ends KingdomFlow's access on Zoom's side. Best-effort. */
+export async function revokeZoomToken(token: string): Promise<void> {
+  const env = getZoomEnv();
+  if (!env) return;
+  await fetch("https://zoom.us/oauth/revoke", {
+    method: "POST",
+    headers: { Authorization: `Basic ${Buffer.from(`${env.clientId}:${env.clientSecret}`).toString("base64")}`, "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ token }),
+    cache: "no-store",
+  });
+}
+
 export const refreshZoomToken = (refreshToken: string) => tokenRequest({ grant_type: "refresh_token", refresh_token: refreshToken });
 
 async function zoomApi<T>(accessToken: string, path: string, init?: RequestInit): Promise<T> {

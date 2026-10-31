@@ -20,6 +20,7 @@ describe("contentSecurityPolicy", () => {
     expect(directive(policy, "script-src")).toContain("https://connect.facebook.net");
     expect(directive(policy, "connect-src")).toContain("https://zoom.us");
     expect(directive(policy, "connect-src")).toContain("wss://*.zoom.us");
+    expect(directive(policy, "script-src")).toContain("https://*.cloudfront.net");
     expect(directive(policy, "worker-src")).toContain("https://source.zoom.us");
     expect(directive(policy, "connect-src")).toContain("https://*.facebook.com");
     expect(directive(policy, "frame-src")).toContain("https://*.facebook.com");

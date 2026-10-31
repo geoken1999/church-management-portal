@@ -13,6 +13,10 @@ const SCRIPT_HOSTS = [
   "https://checkout.razorpay.com",
   "https://source.zoom.us",
   "https://*.zoom.us",
+  "https://*.zoom.com",
+  "https://*.zoomgov.com",
+  // Zoom's fallback CDN for its media engine, used when source.zoom.us is slow or blocked.
+  "https://*.cloudfront.net",
   // The WhatsApp Business sign-up window loads Facebook's SDK.
   "https://connect.facebook.net",
 ];
@@ -58,7 +62,7 @@ export function contentSecurityPolicy({ framingAllowed = true }: { framingAllowe
     "font-src 'self' data: https://fonts.gstatic.com",
     `connect-src 'self' ${CONNECT_HOSTS.join(" ")}`,
     // Zoom starts its audio, video and decoding workers from its own host as well as from blobs.
-    "worker-src 'self' blob: https://source.zoom.us https://*.zoom.us",
+    "worker-src 'self' blob: https://source.zoom.us https://*.zoom.us https://*.cloudfront.net",
     `frame-src ${FRAME_HOSTS.join(" ")}`,
     "form-action 'self' https://secure.payu.in https://test.payu.in",
     "base-uri 'self'",

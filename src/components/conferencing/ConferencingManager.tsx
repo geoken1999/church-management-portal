@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Check, Copy, ExternalLink, Plus, Trash2, Video } from "lucide-react";
-import { createMeetRoomAction, createZoomMeetingAction, deleteConferenceMeetingAction, disconnectConferencingAction } from "@/lib/conferencing/actions";
+import { createMeetRoomAction, createZoomMeetingAction, deleteConferenceMeetingAction, disconnectConferencingAction, type MeetingAudienceInput } from "@/lib/conferencing/actions";
+import { GROUP_KEYS, GROUP_LABELS } from "@/lib/groups/shares";
 import { zonedToIso } from "@/lib/conferencing/time";
 import { Button } from "@/components/ui/button";
 import { ErrorToast } from "@/components/ui/error-toast";
@@ -22,6 +23,43 @@ interface Item {
   durationMinutes: number | null;
   joinUrl: string;
   passcode: string | null;
+  audience: string;
+}
+type Branch = { id: string; name: string };
+
+// Who the meeting is for: only they are sent the "meeting is live" notification.
+function AudiencePicker({ idPrefix, branches, value, onChange }: { idPrefix: string; branches: Branch[]; value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="space-y-1">
+      <Label htmlFor={`${idPrefix}-audience`}>Who is it for?</Label>
+      <select id={`${idPrefix}-audience`} value={value} onChange={(e) => onChange(e.target.value)} className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm">
+        <option value="church">Whole church</option>
+        {branches.length > 0 && (
+          <optgroup label="A branch">
+            {branches.map((b) => (
+              <option key={b.id} value={`branch:${b.id}`}>
+                {b.name}
+              </option>
+            ))}
+          </optgroup>
+        )}
+        <optgroup label="A group">
+          {GROUP_KEYS.map((key) => (
+            <option key={key} value={`group:${key}`}>
+              {GROUP_LABELS[key]}
+            </option>
+          ))}
+        </optgroup>
+      </select>
+      <p className="text-xs text-muted-foreground">Only these people are notified when the meeting starts.</p>
+    </div>
+  );
+}
+
+function toAudience(value: string): MeetingAudienceInput {
+  if (value.startsWith("branch:")) return { audienceType: "branch", branchId: value.slice(7) };
+  if (value.startsWith("group:")) return { audienceType: "group", groupKey: value.slice(6) };
+  return { audienceType: "church" };
 }
 
 const STATUS: Record<string, string> = {
@@ -44,6 +82,7 @@ export function ConferencingManager({
   zoom,
   meet,
   meetings,
+  branches,
   timezone,
 }: {
   status: string | null;
@@ -52,6 +91,7 @@ export function ConferencingManager({
   zoom: { available: boolean; missing: string; account: Account | null };
   meet: { available: boolean; missing: string; account: Account | null };
   meetings: Item[];
+  branches: Branch[];
   timezone: string;
 }) {
   const [error, setError] = useState<string | null>(status && status !== "connected" ? (STATUS[status] ?? null) : null);
@@ -77,8 +117,8 @@ export function ConferencingManager({
       {status === "connected" && <p className="rounded-lg bg-primary/10 px-3 py-2 text-sm text-primary">Account connected.</p>}
 
       <div className="grid gap-4 md:grid-cols-2">
-        <ZoomCard missing={zoom.missing} available={zoom.available} account={zoom.account} canWrite={canWrite} canConnect={canConnect} pending={pending} timezone={timezone} run={run} />
-        <MeetCard missing={meet.missing} available={meet.available} account={meet.account} canWrite={canWrite} canConnect={canConnect} pending={pending} run={run} />
+        <ZoomCard missing={zoom.missing} available={zoom.available} account={zoom.account} canWrite={canWrite} canConnect={canConnect} pending={pending} timezone={timezone} branches={branches} run={run} />
+        <MeetCard missing={meet.missing} available={meet.available} account={meet.account} canWrite={canWrite} canConnect={canConnect} pending={pending} branches={branches} run={run} />
       </div>
 
       <div className="space-y-2">
@@ -92,6 +132,7 @@ export function ConferencingManager({
                 {m.provider === "zoom" ? "Zoom" : "Google Meet"}
                 {m.startTime ? ` · ${new Date(m.startTime).toLocaleString(undefined, { timeZone: timezone || undefined, dateStyle: "medium", timeStyle: "short" })}` : m.provider === "zoom" ? " · start any time" : ""}
                 {m.durationMinutes ? ` · ${m.durationMinutes} min` : ""}
+                {` · ${m.audience}`}
                 {m.passcode ? ` · passcode ${m.passcode}` : ""}
               </p>
             </div>
@@ -169,8 +210,9 @@ function ConnectRow({ label, missing, available, account, canConnect, connectHre
   );
 }
 
-function ZoomCard({ missing, available, account, canWrite, canConnect, pending, timezone, run }: { missing: string; available: boolean; account: Account | null; canWrite: boolean; canConnect: boolean; pending: boolean; timezone: string; run: Run }) {
+function ZoomCard({ missing, available, account, canWrite, canConnect, pending, timezone, branches, run }: { missing: string; available: boolean; account: Account | null; canWrite: boolean; canConnect: boolean; pending: boolean; timezone: string; branches: Branch[]; run: Run }) {
   const [title, setTitle] = useState("");
+  const [audience, setAudience] = useState("church");
   const [startsAt, setStartsAt] = useState("");
   const [minutes, setMinutes] = useState(60);
   return (
@@ -184,7 +226,7 @@ function ZoomCard({ missing, available, account, canWrite, canConnect, pending, 
             e.preventDefault();
             run(async () => {
               // The time field is in the church's time zone; send it as an exact moment.
-              const result = await createZoomMeetingAction({ title, startsAt: startsAt ? zonedToIso(startsAt, timezone) : undefined, durationMinutes: minutes });
+              const result = await createZoomMeetingAction({ title, startsAt: startsAt ? zonedToIso(startsAt, timezone) : undefined, durationMinutes: minutes, audience: toAudience(audience) });
               if (!result.error) {
                 setTitle("");
                 setStartsAt("");
@@ -207,6 +249,7 @@ function ZoomCard({ missing, available, account, canWrite, canConnect, pending, 
               <Input id="zoom-len" type="number" min={5} max={1440} value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} className="w-24" />
             </div>
           </div>
+          <AudiencePicker idPrefix="zoom" branches={branches} value={audience} onChange={setAudience} />
           <Button type="submit" size="sm" disabled={pending || !title.trim()}>
             <Plus className="size-4" /> Create Zoom meeting
           </Button>
@@ -216,8 +259,9 @@ function ZoomCard({ missing, available, account, canWrite, canConnect, pending, 
   );
 }
 
-function MeetCard({ missing, available, account, canWrite, canConnect, pending, run }: { missing: string; available: boolean; account: Account | null; canWrite: boolean; canConnect: boolean; pending: boolean; run: Run }) {
+function MeetCard({ missing, available, account, canWrite, canConnect, pending, branches, run }: { missing: string; available: boolean; account: Account | null; canWrite: boolean; canConnect: boolean; pending: boolean; branches: Branch[]; run: Run }) {
   const [title, setTitle] = useState("");
+  const [audience, setAudience] = useState("church");
   return (
     <div className="space-y-3 rounded-xl border border-border p-4">
       <p className="font-medium">Google Meet</p>
@@ -228,7 +272,7 @@ function MeetCard({ missing, available, account, canWrite, canConnect, pending, 
           onSubmit={(e) => {
             e.preventDefault();
             run(async () => {
-              const result = await createMeetRoomAction({ title });
+              const result = await createMeetRoomAction({ title, audience: toAudience(audience) });
               if (!result.error) setTitle("");
               return result;
             });
@@ -238,6 +282,7 @@ function MeetCard({ missing, available, account, canWrite, canConnect, pending, 
             <Label htmlFor="meet-title">New meeting room</Label>
             <Input id="meet-title" value={title} maxLength={120} placeholder="e.g. Sunday school" onChange={(e) => setTitle(e.target.value)} />
           </div>
+          <AudiencePicker idPrefix="meet" branches={branches} value={audience} onChange={setAudience} />
           <p className="text-xs text-muted-foreground">Google Meet opens in its own tab with all of Meet&apos;s controls. Anyone with the link can join.</p>
           <Button type="submit" size="sm" disabled={pending || !title.trim()}>
             <Plus className="size-4" /> Create Meet room

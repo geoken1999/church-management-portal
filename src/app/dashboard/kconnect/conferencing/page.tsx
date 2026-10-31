@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { GROUP_LABELS, isGroupKey } from "@/lib/groups/shares";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getConferenceMeetings, getConnectionSummary } from "@/lib/conferencing/dal";
 import { getZoomEnv } from "@/lib/conferencing/zoom";
@@ -25,7 +27,9 @@ export default async function ConferencingPage({ searchParams }: { searchParams:
   if (!access.read) return <AccessRestricted label="K-Connect" />;
   const organizationId = membership.organization.id;
 
-  const [zoom, meet, meetings] = await Promise.all([getConnectionSummary(organizationId, "zoom"), getConnectionSummary(organizationId, "google_meet"), getConferenceMeetings(organizationId)]);
+  const [zoom, meet, meetings, { data: branches }] = await Promise.all([getConnectionSummary(organizationId, "zoom"), getConnectionSummary(organizationId, "google_meet"), getConferenceMeetings(organizationId), createAdminClient().from("branches").select("id, name").eq("organization_id", organizationId).order("name")]);
+  const branchName = new Map((branches ?? []).map((b) => [b.id, b.name]));
+  const audienceLabel = (m: (typeof meetings)[number]) => (m.audience_type === "branch" ? `${(m.audience_branch_id && branchName.get(m.audience_branch_id)) || "A branch"}` : m.audience_type === "group" && isGroupKey(m.audience_group_key) ? GROUP_LABELS[m.audience_group_key] : "Whole church");
 
   return (
     <div className="space-y-6">
@@ -43,7 +47,8 @@ export default async function ConferencingPage({ searchParams }: { searchParams:
         canConnect={membership.role === "owner" || membership.role === "admin"}
         zoom={{ available: !!getZoomEnv() && isConnectionSecretsConfigured(), missing: missing(!!getZoomEnv(), "ZOOM_CLIENT_ID and ZOOM_CLIENT_SECRET"), account: zoom }}
         meet={{ available: !!getMeetEnv() && isConnectionSecretsConfigured(), missing: missing(!!getMeetEnv(), "GOOGLE_MEET_CLIENT_ID and GOOGLE_MEET_CLIENT_SECRET (or the YouTube ones)"), account: meet }}
-        meetings={meetings.map((m) => ({ id: m.id, provider: m.provider, title: m.title, startTime: m.start_time, durationMinutes: m.duration_minutes, joinUrl: m.join_url, passcode: m.passcode }))}
+        meetings={meetings.map((m) => ({ id: m.id, provider: m.provider, title: m.title, startTime: m.start_time, durationMinutes: m.duration_minutes, joinUrl: m.join_url, passcode: m.passcode, audience: audienceLabel(m) }))}
+        branches={branches ?? []}
         timezone={membership.organization.timezone}
       />
     </div>

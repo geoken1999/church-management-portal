@@ -11,11 +11,34 @@ import { createMeetSpace, revokeMeetToken } from "@/lib/conferencing/google-meet
 import { openSecret } from "@/lib/security/connection-secrets";
 import { zoomSignature } from "@/lib/conferencing/zoom-signature";
 import { notifyConferenceStarted } from "@/lib/conferencing/notify";
+import { isGroupKey } from "@/lib/groups/shares";
 
 const PATH = "/dashboard/kconnect/conferencing";
 
 export interface ConferencingResult {
   error?: string;
+}
+
+/** Who a meeting is for; only they are told when it starts. */
+export interface MeetingAudienceInput {
+  audienceType: "church" | "branch" | "group";
+  branchId?: string;
+  groupKey?: string;
+}
+
+// Checks the audience belongs to this church and returns the columns to store.
+async function audienceColumns(organizationId: string, input: MeetingAudienceInput | undefined) {
+  if (input?.audienceType === "branch") {
+    if (!input.branchId) return { error: "Choose which branch the meeting is for." } as const;
+    const { data } = await createAdminClient().from("branches").select("id").eq("id", input.branchId).eq("organization_id", organizationId).maybeSingle();
+    if (!data) return { error: "That branch wasn't found." } as const;
+    return { columns: { audience_type: "branch" as const, audience_branch_id: data.id, audience_group_key: null } };
+  }
+  if (input?.audienceType === "group") {
+    if (!isGroupKey(input.groupKey)) return { error: "Choose which group the meeting is for." } as const;
+    return { columns: { audience_type: "group" as const, audience_branch_id: null, audience_group_key: input.groupKey } };
+  }
+  return { columns: { audience_type: "church" as const, audience_branch_id: null, audience_group_key: null } };
 }
 
 // Anyone who can use K-Connect video may create meetings on the church's connected accounts; connecting and
@@ -28,7 +51,7 @@ async function gate(level: "read" | "write") {
   return { organizationId: membership.organization.id, userId: user.id, timezone: membership.organization.timezone || "UTC", role: membership.role } as const;
 }
 
-export async function createZoomMeetingAction(input: { title: string; startsAt?: string; durationMinutes: number }): Promise<ConferencingResult & { id?: string }> {
+export async function createZoomMeetingAction(input: { title: string; startsAt?: string; durationMinutes: number; audience?: MeetingAudienceInput }): Promise<ConferencingResult & { id?: string }> {
   const g = await gate("write");
   if ("error" in g) return g;
   const title = input.title.trim().slice(0, 120);
@@ -41,6 +64,8 @@ export async function createZoomMeetingAction(input: { title: string; startsAt?:
     if (Number.isNaN(when.getTime())) return { error: "That start time isn't valid." };
     startTime = when.toISOString();
   }
+  const audience = await audienceColumns(g.organizationId, input.audience);
+  if ("error" in audience) return audience;
   const connection = await getConnection(g.organizationId, "zoom");
   if (!connection) return { error: "Connect your Zoom account first." };
   try {
@@ -48,7 +73,7 @@ export async function createZoomMeetingAction(input: { title: string; startsAt?:
     const meeting = await createZoomMeeting(token, { topic: title, startTime, durationMinutes: duration, timezone: "UTC" });
     const { data, error } = await createAdminClient()
       .from("conference_meetings")
-      .insert({ organization_id: g.organizationId, provider: "zoom", external_id: meeting.id, title, start_time: startTime ?? null, duration_minutes: duration, join_url: meeting.joinUrl, passcode: meeting.passcode, created_by: g.userId })
+      .insert({ organization_id: g.organizationId, provider: "zoom", external_id: meeting.id, title, start_time: startTime ?? null, duration_minutes: duration, join_url: meeting.joinUrl, passcode: meeting.passcode, created_by: g.userId, ...audience.columns })
       .select("id")
       .single();
     if (error || !data) return { error: "The meeting was made in Zoom but couldn't be saved here. Please try again." };
@@ -59,18 +84,20 @@ export async function createZoomMeetingAction(input: { title: string; startsAt?:
   }
 }
 
-export async function createMeetRoomAction(input: { title: string }): Promise<ConferencingResult> {
+export async function createMeetRoomAction(input: { title: string; audience?: MeetingAudienceInput }): Promise<ConferencingResult> {
   const g = await gate("write");
   if ("error" in g) return g;
   const title = input.title.trim().slice(0, 120);
   if (!title) return { error: "Give the room a title." };
+  const audience = await audienceColumns(g.organizationId, input.audience);
+  if ("error" in audience) return audience;
   const connection = await getConnection(g.organizationId, "google_meet");
   if (!connection) return { error: "Connect your Google account first." };
   try {
     const space = await createMeetSpace(await getAccessToken(connection));
     const { data, error } = await createAdminClient()
       .from("conference_meetings")
-      .insert({ organization_id: g.organizationId, provider: "google_meet", external_id: space.name, title, join_url: space.meetingUri, created_by: g.userId })
+      .insert({ organization_id: g.organizationId, provider: "google_meet", external_id: space.name, title, join_url: space.meetingUri, created_by: g.userId, ...audience.columns })
       .select("id")
       .single();
     if (error || !data) return { error: "The room was made in Google Meet but couldn't be saved here. Please try again." };

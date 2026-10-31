@@ -2418,6 +2418,9 @@ export type ConferenceMeeting = {
   join_url: string;
   passcode: string | null;
   notified_at: string | null;
+  audience_type: "church" | "branch" | "group";
+  audience_branch_id: string | null;
+  audience_group_key: string | null;
   created_by: string | null;
   created_at: string;
 };

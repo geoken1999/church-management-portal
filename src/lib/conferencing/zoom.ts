@@ -100,7 +100,9 @@ export async function createZoomMeeting(accessToken: string, input: ZoomMeetingI
     method: "POST",
     body: JSON.stringify({
       topic: input.topic,
-      type: scheduled ? 2 : 1,
+      // 3 is a recurring meeting with no fixed time: it can be started again after it ends. An instant meeting (1)
+      // can only be started once, and Zoom then refuses a second start with "Not support start meeting via tokens".
+      type: scheduled ? 2 : 3,
       ...(scheduled ? { start_time: input.startTime, timezone: input.timezone } : {}),
       duration: input.durationMinutes,
       settings: { join_before_host: false, waiting_room: true, participant_video: false, host_video: true },

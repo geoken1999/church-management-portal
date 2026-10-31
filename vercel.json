@@ -1,4 +1,5 @@
 {
+  "regions": ["hnd1"],
   "crons": [
     {
       "path": "/api/instagram/cron/refresh-tokens",

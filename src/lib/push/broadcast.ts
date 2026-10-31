@@ -80,34 +80,45 @@ export async function sendBroadcast(input: BroadcastInput): Promise<BroadcastRes
   const recipients = await resolveAudienceAuthIds(input.organizationId, audience);
   if (recipients.length === 0) return { error: "Nobody in that audience has the mobile app yet." };
 
+  // The history row is made first so the notification can carry its id: when the app reports a tap, that is
+  // how the open is matched to this notification.
+  const { data: row } = await admin
+    .from("push_broadcasts")
+    .insert({
+      organization_id: input.organizationId,
+      audience: audience.type,
+      group_key: audience.type === "group" ? audience.groupKey : null,
+      member_id: audience.type === "member" ? audience.memberId : null,
+      branch_id: audience.type === "branch" ? audience.branchId : null,
+      title: cleanTitle,
+      body: cleanBody,
+      link_url: action.linkUrl,
+      button_label: action.buttonLabel,
+      recipient_count: 0,
+      audience_size: recipients.length,
+      created_by: input.userId,
+    })
+    .select("id")
+    .single();
+
   const result = await sendPushToUsers(recipients, "church_announcement", {
     title: cleanTitle,
     body: cleanBody,
     data: {
       type: "church_announcement",
+      ...(row ? { broadcastId: row.id } : {}),
       ...(action.linkUrl ? { link: action.linkUrl } : {}),
       ...(action.buttonLabel ? { buttonLabel: action.buttonLabel } : {}),
     },
   });
   if (result.delivered === 0) {
+    // Nothing went out, so it doesn't belong in the history.
+    if (row) await admin.from("push_broadcasts").delete().eq("id", row.id);
     if (result.skipped === "no_devices") return { error: "Those members haven't allowed notifications on a device yet." };
     if (result.skipped === "opted_out") return { error: "Those members have turned notifications off." };
     return { error: `The notification could not be delivered${result.error ? `: ${result.error}` : "."}` };
   }
-
-  await admin.from("push_broadcasts").insert({
-    organization_id: input.organizationId,
-    audience: audience.type,
-    group_key: audience.type === "group" ? audience.groupKey : null,
-    member_id: audience.type === "member" ? audience.memberId : null,
-    branch_id: audience.type === "branch" ? audience.branchId : null,
-    title: cleanTitle,
-    body: cleanBody,
-    link_url: action.linkUrl,
-    button_label: action.buttonLabel,
-    recipient_count: result.delivered,
-    created_by: input.userId,
-  });
+  if (row) await admin.from("push_broadcasts").update({ recipient_count: result.delivered }).eq("id", row.id);
 
   return { success: true, sent: result.delivered };
 }

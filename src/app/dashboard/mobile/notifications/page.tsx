@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getScheduledCampaigns } from "@/lib/scheduler/dal";
 import { resolveAudienceAuthIds } from "@/lib/push/audience";
 import { GROUP_KEYS, type GroupKey } from "@/lib/groups/shares";
@@ -24,7 +25,7 @@ export default async function AppNotificationsPage() {
       .not("auth_user_id", "is", null)
       .order("first_name")
       .limit(1000),
-    supabase.from("push_broadcasts").select("id, audience, group_key, title, body, recipient_count, created_at").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(20),
+    supabase.from("push_broadcasts").select("id, audience, group_key, title, body, recipient_count, audience_size, created_at").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(20),
     supabase.from("branches").select("id, name").eq("organization_id", organizationId).order("name"),
   ]);
 
@@ -35,6 +36,12 @@ export default async function AppNotificationsPage() {
     getScheduledCampaigns(organizationId, "push"),
   ]);
   const counts: AudienceCounts = { church: church.length, groups: Object.fromEntries(groupCounts) as Record<GroupKey, number>, branches: Object.fromEntries(branchCounts) };
+
+  // Who tapped each notification (the table has no row policies, so it is read by the server).
+  const admin = createAdminClient();
+  const opened = new Map<string, number>(
+    await Promise.all((history ?? []).map(async (h) => [h.id, (await admin.from("push_opens").select("auth_user_id", { count: "exact", head: true }).eq("broadcast_id", h.id)).count ?? 0] as const)),
+  );
 
   const recipients: RecipientOption[] = (members ?? []).map((m) => ({ id: m.id, name: `${m.first_name} ${m.last_name ?? ""}`.trim(), phone: m.phone }));
 
@@ -47,7 +54,7 @@ export default async function AppNotificationsPage() {
           anniversaries notify automatically.
         </p>
       </div>
-      <PushBroadcastPanel recipients={recipients} history={(history ?? []) as BroadcastHistoryRow[]} branches={branches ?? []} counts={counts} scheduled={scheduled} timezone={membership.organization.timezone} />
+      <PushBroadcastPanel recipients={recipients} history={((history ?? []) as BroadcastHistoryRow[]).map((h) => ({ ...h, opened_count: opened.get(h.id) ?? 0 }))} branches={branches ?? []} counts={counts} scheduled={scheduled} timezone={membership.organization.timezone} />
     </div>
   );
 }

@@ -31,6 +31,8 @@ export interface BroadcastHistoryRow {
   title: string;
   body: string;
   recipient_count: number;
+  audience_size?: number | null;
+  opened_count?: number;
   created_at: string;
 }
 
@@ -316,7 +318,18 @@ export function PushBroadcastPanel({
                 <p className="text-sm font-medium">{row.title}</p>
                 <p className="text-sm text-muted-foreground">{row.body}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  {audienceLabel(row)} · {row.recipient_count} {row.recipient_count === 1 ? "person" : "people"} · {new Date(row.created_at).toLocaleString()}
+                  {audienceLabel(row)} · {new Date(row.created_at).toLocaleString()}
+                </p>
+                <p className="mt-0.5 text-xs">
+                  <span title="Accepted by Google or Apple for the person's phone. A phone that is off or offline gets it when it reconnects.">
+                    Delivered to <b>{row.recipient_count}</b>
+                    {row.audience_size && row.audience_size > row.recipient_count ? ` of ${row.audience_size}` : ""}
+                  </span>
+                  {" · "}
+                  <span title="People who tapped the notification. Opens are counted from the app version that supports it.">
+                    Opened by <b>{row.opened_count ?? 0}</b>
+                    {row.recipient_count > 0 ? ` (${Math.round(((row.opened_count ?? 0) / row.recipient_count) * 100)}%)` : ""}
+                  </span>
                 </p>
               </div>
             ))}

@@ -4265,6 +4265,12 @@ export type Database = {
         Update: Partial<PushBroadcast>;
         Relationships: [];
       };
+      push_opens: {
+        Row: PushOpen;
+        Insert: Partial<PushOpen> & Pick<PushOpen, "broadcast_id" | "auth_user_id">;
+        Update: Partial<PushOpen>;
+        Relationships: [];
+      };
       special_day_digests: {
         Row: { organization_id: string; day: string; kind: string; created_at: string };
         Insert: { organization_id: string; day: string; kind?: string; created_at?: string };
@@ -5705,9 +5711,13 @@ export type PushBroadcast = {
   link_url: string | null;
   button_label: string | null;
   recipient_count: number;
+  // How many people with the app were in the audience (recipient_count is how many it was delivered to).
+  audience_size: number | null;
   created_by: string | null;
   created_at: string;
 };
+
+export type PushOpen = { broadcast_id: string; auth_user_id: string; opened_at: string };
 
 export type SpecialDayPush = {
   member_id: string;

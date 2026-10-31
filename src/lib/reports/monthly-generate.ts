@@ -83,7 +83,7 @@ export async function buildMonthlyReport(input: BuildReportInput): Promise<Month
   }
 
   if (want.has("attendance")) {
-    let query = admin.from("attendance_sessions").select("id, title, occurrence_date, headcount").eq("organization_id", organizationId).gte("occurrence_date", from).lt("occurrence_date", toExclusive).not("recorded_at", "is", null);
+    let query = admin.from("attendance_sessions").select("id, title, occurrence_date, headcount, recorded_at").eq("organization_id", organizationId).gte("occurrence_date", from).lt("occurrence_date", toExclusive);
     if (branchId) query = query.eq("branch_id", branchId);
     const { data: sessions } = await query.limit(PAGE);
     const ids = (sessions ?? []).map((s) => s.id);
@@ -92,8 +92,12 @@ export async function buildMonthlyReport(input: BuildReportInput): Promise<Month
       const { data: records } = await admin.from("attendance_records").select("session_id").in("session_id", ids.slice(i, i + 200)).limit(PAGE);
       for (const r of records ?? []) perSession.set(r.session_id, (perSession.get(r.session_id) ?? 0) + 1);
     }
-    // A session's attendance is its marked members, or the headcount someone entered if that is higher.
-    const counts = (sessions ?? []).map((s) => ({ title: s.title, date: s.occurrence_date, count: Math.max(perSession.get(s.id) ?? 0, s.headcount ?? 0) }));
+    // A session's attendance is its marked members, or the headcount someone entered if that is higher. A service counts
+    // once its register is marked complete or anyone has been marked or counted, so a register nobody remembered to
+    // tick "complete" doesn't make the month look empty; a session with nothing in it is left out.
+    const counts = (sessions ?? [])
+      .map((s) => ({ title: s.title, date: s.occurrence_date, count: Math.max(perSession.get(s.id) ?? 0, s.headcount ?? 0), complete: Boolean(s.recorded_at) }))
+      .filter((c) => c.complete || c.count > 0);
     const total = counts.reduce((sum, c) => sum + c.count, 0);
     const best = counts.length ? counts.reduce((a, b) => (b.count > a.count ? b : a)) : null;
     data.attendance = { services: counts.length, total, average: counts.length ? Math.round(total / counts.length) : 0, best: best ? { ...best, dateLabel: dateLabelIn(best.date, language) } : null };

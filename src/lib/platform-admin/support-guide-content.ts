@@ -105,10 +105,10 @@ export const SUPPORT_GUIDE_CATEGORIES: DocCategory[] = [
         body: [
           "- /api/instagram/cron/refresh-tokens — 0 3 * * * UTC (about 8:30 AM IST) — refreshes Instagram long-lived tokens before they expire.",
           "- /api/cron/daily-health-report — 30 4 * * * UTC (about 10:00 AM IST) — emails a platform health summary to HEALTH_REPORT_EMAIL.",
-          "- /api/cron/event-reminders — 45 2 * * * UTC (about 8:15 AM IST) — sends \"24h before\" and \"morning of\" event registration reminder emails.",
+          "- /api/cron/event-reminders — every 15 minutes — sends \"1 hour before\", \"24h before\" and \"morning of\" (8 AM in the church's timezone) event registration reminder emails. Each occurrence is reminded once, so the frequent runs never double-send.",
           "- /api/cron/todo-reminders — 15 3 * * * UTC (about 8:45 AM IST) — sends due-soon and assignment reminders for To Do items.",
           "- /api/cron/automation-run — 0 1 * * * UTC (about 6:30 AM IST) — the one daily pass for automations. It runs birthday and anniversary wishes, the staff digest, member follow-up tasks (on each automation's chosen weekday), and monthly membership fee requests, reminders and receipts (on each church's due day, in its own timezone).",
-          "Vercel's Hobby plan rejects any cron schedule finer than daily at deploy time — this is a hard platform ceiling, not a choice. The practical effect: an event's \"1 hour before\" reminder option can only fire if that moment happens to land within a few minutes of the one fixed daily run, so it's functionally unreliable today. Upgrading to Vercel Pro removes this ceiling.",
+          "On Vercel Pro, crons can run as often as every minute. Only event reminders needs that today; the rest are once a day by design.",
         ],
       },
       {

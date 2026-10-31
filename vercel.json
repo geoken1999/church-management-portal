@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/event-reminders",
-      "schedule": "45 2 * * *"
+      "schedule": "*/15 * * * *"
     },
     {
       "path": "/api/cron/special-days",

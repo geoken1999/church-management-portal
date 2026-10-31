@@ -15,11 +15,14 @@ import {
   isReportLanguage,
   isReportTone,
   isSectionKey,
+  MAX_BLOCK_TEXT,
+  MAX_REPORT_BLOCKS,
   MAX_REPORT_PHOTOS,
   MONTHLY_SECTIONS,
   periodLabelIn,
   type Letterhead,
   type MonthlyReportData,
+  type ReportBlock,
   type MonthlySectionKey,
   type ReportKind,
   type ReportPhoto,
@@ -123,7 +126,11 @@ export async function generateMonthlyReportAction(input: GenerateInput): Promise
   let existingQuery = admin.from("monthly_reports").select("id, data").eq("organization_id", organizationId).eq("period", input.period).eq("language", language);
   existingQuery = branchId ? existingQuery.eq("branch_id", branchId) : existingQuery.is("branch_id", null);
   const { data: existing } = await existingQuery.maybeSingle();
-  if (existing) data.photos = (existing.data as MonthlyReportData | null)?.photos ?? [];
+  if (existing) {
+    const previous = existing.data as MonthlyReportData | null;
+    data.photos = previous?.photos ?? [];
+    if (previous?.blocks?.length) data.blocks = previous.blocks;
+  }
 
   // The report keeps its own copy of each event's flyer, so it still shows if the flyer is changed later.
   const oldFlyers = ((existing?.data as MonthlyReportData | null)?.events?.list ?? []).map((e) => e.flyerPath).filter((p): p is string => Boolean(p));
@@ -207,7 +214,7 @@ export async function deleteMonthlyReportAction(id: string): Promise<MonthlyRepo
   if (error) return { error: "Couldn't delete that report." };
   // Its photos go with it.
   const reportData = report?.data as MonthlyReportData | null;
-  const files = [...(reportData?.photos ?? []).map((p) => p.path), ...(reportData?.events?.list ?? []).map((e) => e.flyerPath).filter((p): p is string => Boolean(p))];
+  const files = [...(reportData?.photos ?? []).map((p) => p.path), ...(reportData?.blocks ?? []).flatMap((b) => (b.type === "image" ? [b.path] : [])), ...(reportData?.events?.list ?? []).map((e) => e.flyerPath).filter((p): p is string => Boolean(p))];
   if (files.length > 0) await admin.storage.from(BUCKET).remove(files);
   revalidatePath(PATH);
   return { success: true };
@@ -274,6 +281,103 @@ export async function removeReportPhotoAction(reportId: string, path: string): P
   if (path.startsWith(`${organizationId}/`)) await admin.storage.from(BUCKET).remove([path]);
   revalidatePath(PATH);
   return { success: true };
+}
+
+// --- Edit the written content ------------------------------------------------
+
+export interface ReportContentInput {
+  // The summary's text and highlights; ignored when the report has no summary.
+  summary?: string;
+  highlights?: string[];
+  note?: string;
+  blocks: ReportBlock[];
+}
+
+async function loadReportForEdit(reportId: string) {
+  await requireUser();
+  const membership = await requireOrganization();
+  const organizationId = membership.organization.id;
+  const access = await checkTabAccess(organizationId, "reports", "write");
+  if (!access.ok) return { error: access.message } as const;
+  const admin = createAdminClient();
+  const { data: report } = await admin.from("monthly_reports").select("data, note").eq("id", reportId).eq("organization_id", organizationId).maybeSingle();
+  if (!report) return { error: "That report could not be found." } as const;
+  return { admin, organizationId, data: report.data as MonthlyReportData } as const;
+}
+
+// Saves what the team wrote or arranged: the summary, the note, and the added text and pictures. A picture can only
+// be one already uploaded to this report, so a request can't point a report at someone else's files.
+export async function saveReportContentAction(reportId: string, input: ReportContentInput): Promise<MonthlyReportResult> {
+  const loaded = await loadReportForEdit(reportId);
+  if ("error" in loaded) return loaded;
+  const { admin, organizationId, data } = loaded;
+
+  if (!Array.isArray(input.blocks) || input.blocks.length > MAX_REPORT_BLOCKS) return { error: `A report can have at most ${MAX_REPORT_BLOCKS} added items.` };
+  const known = new Map((data.blocks ?? []).flatMap((b) => (b.type === "image" ? [[b.path, b] as const] : [])));
+  const blocks: ReportBlock[] = [];
+  const seen = new Set<string>();
+  for (const block of input.blocks) {
+    const id = clip(block?.id, 64) || crypto.randomUUID();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    if (block?.type === "text") {
+      const heading = clip(block.heading, 120);
+      const text = clip(block.text, MAX_BLOCK_TEXT);
+      if (heading || text) blocks.push({ id, type: "text", heading, text });
+    } else if (block?.type === "image" && known.has(block.path)) {
+      blocks.push({ id, type: "image", path: block.path, caption: clip(block.caption, 140) });
+    }
+  }
+
+  const next: MonthlyReportData = { ...data, blocks };
+  if (data.narrative) {
+    next.narrative = {
+      ...data.narrative,
+      text: clip(input.summary, 6000),
+      highlights: (input.highlights ?? []).map((h) => clip(h, 300)).filter(Boolean).slice(0, 12),
+    };
+  }
+  const { error } = await admin.from("monthly_reports").update({ data: next as unknown as Record<string, unknown>, note: clip(input.note, 1500) || null }).eq("id", reportId).eq("organization_id", organizationId);
+  if (error) return { error: "Couldn't save your changes. Please try again." };
+
+  // Pictures taken off the report are removed from storage.
+  const kept = new Set(blocks.flatMap((b) => (b.type === "image" ? [b.path] : [])));
+  const dropped = [...known.keys()].filter((path) => !kept.has(path) && path.startsWith(`${organizationId}/`));
+  if (dropped.length > 0) await admin.storage.from(BUCKET).remove(dropped);
+  revalidatePath(PATH);
+  return { success: true };
+}
+
+// Uploads a picture for the report and adds it as a block at the end. Counts against the church's storage.
+export async function addReportBlockImageAction(formData: FormData): Promise<MonthlyReportResult & { block?: ReportBlock }> {
+  const reportId = String(formData.get("reportId") ?? "");
+  const loaded = await loadReportForEdit(reportId);
+  if ("error" in loaded) return loaded;
+  const { admin, organizationId, data } = loaded;
+
+  const file = formData.get("photo");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose a picture." };
+  const extension = PHOTO_TYPES[file.type];
+  if (!extension) return { error: "Pictures must be JPEG, PNG or WebP." };
+  if (file.size > MAX_PHOTO_BYTES) return { error: "That picture is over 3 MB. Choose a smaller one." };
+  const blocks = data.blocks ?? [];
+  if (blocks.length >= MAX_REPORT_BLOCKS) return { error: `A report can have at most ${MAX_REPORT_BLOCKS} added items.` };
+
+  const quotaError = await checkStorageQuota(organizationId, file.size);
+  if (quotaError) return { error: quotaError };
+
+  const path = `${organizationId}/${reportId}/${crypto.randomUUID()}.${extension}`;
+  const { error: uploadError } = await admin.storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: false });
+  if (uploadError) return { error: "Couldn't upload that picture. Please try again." };
+
+  const block: ReportBlock = { id: crypto.randomUUID(), type: "image", path, caption: clip(formData.get("caption"), 140) };
+  const { error } = await admin.from("monthly_reports").update({ data: { ...data, blocks: [...blocks, block] } as unknown as Record<string, unknown> }).eq("id", reportId);
+  if (error) {
+    await admin.storage.from(BUCKET).remove([path]);
+    return { error: "Couldn't add that picture to the report." };
+  }
+  revalidatePath(PATH);
+  return { success: true, block };
 }
 
 // --- Templates ---------------------------------------------------------------

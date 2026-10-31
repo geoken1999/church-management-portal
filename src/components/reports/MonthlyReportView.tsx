@@ -251,6 +251,29 @@ export function MonthlyReportView({ data, note, photoUrl }: { data: MonthlyRepor
         )}
       </div>
 
+      {data.blocks && data.blocks.length > 0 && (
+        <div className="space-y-4">
+          {data.blocks.map((block) =>
+            block.type === "text" ? (
+              <section key={block.id} className="space-y-1.5">
+                {block.heading && <h2 className="font-heading text-lg font-bold">{block.heading}</h2>}
+                {block.text.split(/\n{2,}/).map((paragraph, i) => (
+                  <p key={i} className="text-sm leading-relaxed whitespace-pre-wrap">
+                    {paragraph}
+                  </p>
+                ))}
+              </section>
+            ) : (
+              <figure key={block.id} className="space-y-1">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photoUrl(block.path)} alt={block.caption} className="max-h-[32rem] w-full rounded-lg object-contain" />
+                {block.caption && <figcaption className="text-xs text-muted-foreground">{block.caption}</figcaption>}
+              </figure>
+            ),
+          )}
+        </div>
+      )}
+
       {data.photos && data.photos.length > 0 && (
         <div className="space-y-3">
           <h2 className="font-heading text-lg font-bold">{t.photos}</h2>

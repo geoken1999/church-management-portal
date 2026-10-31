@@ -99,6 +99,11 @@ export interface ReportPhoto {
 
 export const MAX_REPORT_PHOTOS = 12;
 
+// Content the team adds to a finished report by hand, shown after the figures: a heading with some text, or a picture.
+export type ReportBlock = { id: string; type: "text"; heading: string; text: string } | { id: string; type: "image"; path: string; caption: string };
+export const MAX_REPORT_BLOCKS = 30;
+export const MAX_BLOCK_TEXT = 4000;
+
 export const isYear = (value: unknown): boolean => typeof value === "string" && /^\d{4}$/.test(value);
 
 export interface MonthlyReportData {
@@ -116,6 +121,7 @@ export interface MonthlyReportData {
   // An AI-written summary of the figures, in the report's language.
   narrative?: { text: string; highlights: string[]; sections?: Partial<Record<MonthlySectionKey, string>> } | null;
   photos?: ReportPhoto[];
+  blocks?: ReportBlock[];
   // Annual reports: giving and expenses month by month.
   byMonth?: { month: string; giving: number; expenses: number }[];
   members?: { total: number; joined: number };

@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getMonthlyReport } from "@/lib/reports/monthly-dal";
 import { MonthlyReportView } from "@/components/reports/MonthlyReportView";
+import { ReportContentEditor } from "@/components/reports/ReportContentEditor";
 import { ReportPhotosEditor } from "@/components/reports/ReportPhotosEditor";
 import { PrintButton } from "@/components/reports/PrintButton";
 import { AccessRestricted } from "@/components/dashboard/AccessRestricted";
@@ -35,6 +36,15 @@ export default async function MonthlyReportPage({ params, searchParams }: { para
         <PrintButton wordHref={`/dashboard/reports/monthly/${report.id}/word`} autoStart={pdf === "1"} fileName={`${report.data.letterhead?.churchName ?? "Church"} report ${report.period}`} />
       </div>
       <MonthlyReportView data={report.data} note={report.note} photoUrl={photoUrl} />
+      {membership.tabAccess.reports.write && (
+        <ReportContentEditor
+          reportId={report.id}
+          narrative={report.data.narrative ? { text: report.data.narrative.text, highlights: report.data.narrative.highlights } : null}
+          note={report.note}
+          blocks={report.data.blocks ?? []}
+          photoBase={photoBase}
+        />
+      )}
       {membership.tabAccess.reports.write && <ReportPhotosEditor reportId={report.id} photos={report.data.photos ?? []} photoBase={photoBase} eventTitles={report.data.events?.list.map((e) => e.title) ?? []} />}
     </div>
   );

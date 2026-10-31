@@ -91,6 +91,18 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (data.volunteers) body.push(heading(t.volunteers), ...words("volunteers"), table([[t.active, String(data.volunteers.active)], [annual ? t.joinedYear : t.joinedMonth, String(data.volunteers.joined)]]));
   if (data.prayer) body.push(heading(t.prayer), ...words("prayer"), table([[t.received, String(data.prayer.received)], [t.answered, String(data.prayer.answered)]]));
 
+  for (const block of data.blocks ?? []) {
+    if (block.type === "text") {
+      if (block.heading) body.push(heading(block.heading));
+      for (const p of block.text.split(/\n{2,}/)) if (p.trim()) body.push(para(p));
+      continue;
+    }
+    const picture = await fetchImage(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/report-images/${block.path}`);
+    if (!picture) continue;
+    body.push(new Paragraph({ spacing: { before: 120 }, children: [new ImageRun({ type: picture.type, data: picture.data, transformation: fit(picture.data, 450, 500) })] }));
+    if (block.caption) body.push(para(block.caption, { size: 18, color: "666666" }));
+  }
+
   if (data.photos?.length) {
     body.push(heading(t.photos));
     const base = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/report-images/`;

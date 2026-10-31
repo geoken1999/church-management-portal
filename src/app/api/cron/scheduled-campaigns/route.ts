@@ -4,8 +4,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { withCronLogging } from "@/lib/cron/run-logger";
 import { runDueCampaigns } from "@/lib/scheduler/run";
 
-// Called every 5 minutes (by Supabase, see supabase/setup/scheduled-campaigns-cron.sql) to send
-// the email, SMS and WhatsApp campaigns that have come due. Guarded by CRON_SECRET like the
+// Called every 5 minutes by Vercel (vercel.json). The Supabase job in supabase/setup/scheduled-campaigns-cron.sql
+// also works and is safe to run alongside it: a campaign is claimed before it is sent, so it never goes out twice.
+// Sends the email, SMS, WhatsApp and push campaigns that have come due. Guarded by CRON_SECRET like the
 // other cron routes.
 export const maxDuration = 60;
 

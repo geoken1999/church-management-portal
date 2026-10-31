@@ -14,6 +14,10 @@
       "schedule": "*/15 * * * *"
     },
     {
+      "path": "/api/cron/scheduled-campaigns",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/special-days",
       "schedule": "30 2 * * *"
     },

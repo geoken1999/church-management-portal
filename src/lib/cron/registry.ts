@@ -14,6 +14,11 @@ const JOB_DEFINITIONS: Record<string, { label: string; description: string; load
     description: "Reminds registrants about upcoming events.",
     load: () => import("@/app/api/cron/event-reminders/route"),
   },
+  "scheduled-campaigns": {
+    label: "Scheduled messages",
+    description: "Sends scheduled emails, SMS, WhatsApp messages and push notifications that have come due.",
+    load: () => import("@/app/api/cron/scheduled-campaigns/route"),
+  },
   "event-status": {
     label: "Event status",
     description: "Marks events whose date has passed as completed.",

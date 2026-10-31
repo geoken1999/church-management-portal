@@ -7,5 +7,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
   const { token } = await params;
   const state = await screenByToken(token);
   if (!state) return NextResponse.json({ ok: false }, { status: 404, headers: { "Cache-Control": "no-store" } });
-  return NextResponse.json({ ok: true, ...state }, { headers: { "Cache-Control": "no-store" } });
+  // Everyone watching the same screen (OBS, a projector, members) shares one answer a second from Vercel's cache instead
+  // of each causing a function run. The address is the secret, so the cache key is per screen.
+  return NextResponse.json({ ok: true, ...state }, { headers: { "Cache-Control": "public, s-maxage=1" } });
 }

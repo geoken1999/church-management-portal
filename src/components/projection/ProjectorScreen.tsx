@@ -19,6 +19,8 @@ export function ProjectorScreen({ token, transparent, chroma }: { token: string;
   useEffect(() => {
     let stopped = false;
     let last = "";
+    let changedAt = Date.now();
+    let timer: ReturnType<typeof setTimeout> | undefined;
     async function poll() {
       try {
         const res = await fetch(`/api/projector/${token}`, { cache: "no-store" });
@@ -28,17 +30,35 @@ export function ProjectorScreen({ token, transparent, chroma }: { token: string;
         const stamp = `${body.updatedAt}|${body.visible}`;
         if (!stopped && stamp !== last) {
           last = stamp;
+          changedAt = Date.now();
           setState({ visible: body.visible, mode: body.mode, slide: body.slide, theme: body.theme });
         }
       } catch {
         // Keep showing the last slide through a short connection drop.
       }
     }
-    poll();
-    const timer = setInterval(poll, 1000);
+    // Quick while the operator is working, slower once nothing has changed for a while, and paused while the tab is
+    // hidden (it catches up the moment it is shown again).
+    function delay() {
+      const quiet = Date.now() - changedAt;
+      return quiet < 120_000 ? 1000 : quiet < 600_000 ? 2000 : 3000;
+    }
+    function schedule() {
+      timer = setTimeout(async () => {
+        if (!document.hidden) await poll();
+        if (!stopped) schedule();
+      }, delay());
+    }
+    function onVisible() {
+      if (!document.hidden) void poll();
+    }
+    void poll();
+    schedule();
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       stopped = true;
-      clearInterval(timer);
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [token]);
 

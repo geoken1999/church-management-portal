@@ -14,6 +14,28 @@ const PROTECTED_PREFIXES = [
   "/support-desk",
 ];
 
+// Routes that never use the browser's sign-in cookie: polled screens, scheduled jobs, the mobile app (which signs in with
+// a token header) and the providers' webhooks. The sign-in check is a round trip to Supabase on every request, so these
+// skip it. Anything that does read the cookie (the web-session hand-off, the social connect callbacks) is not listed.
+const NO_SESSION_PREFIXES = [
+  "/api/projector/",
+  "/api/cron/",
+  "/api/mobile/",
+  "/api/razorpay/",
+  "/api/payu/",
+  "/api/cashfree/",
+  "/api/twilio/",
+  "/api/whatsapp/",
+  "/api/resend/",
+  "/api/csp-report",
+  "/api/netcheck",
+];
+
+export function skipsSessionCheck(pathname: string): boolean {
+  if (pathname.startsWith("/api/mobile/web-session")) return false;
+  return NO_SESSION_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
 function isPublicRoute(pathname: string) {
   return (
     PUBLIC_ROUTES.includes(pathname) ||
@@ -72,6 +94,8 @@ export async function updateSession(request: NextRequest) {
   ) {
     return NextResponse.redirect(new URL(MOBILE_RESTRICTED_PATH, request.url));
   }
+
+  if (skipsSessionCheck(pathname)) return NextResponse.next({ request });
 
   let response = NextResponse.next({ request });
 

@@ -37,6 +37,8 @@ export function NotificationBell({
 
   useEffect(() => {
     const interval = setInterval(() => {
+      // Nothing to refresh while the tab is in the background.
+      if (document.hidden) return;
       getNotificationsForOrg(organizationId).then(setNotifications);
     }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);

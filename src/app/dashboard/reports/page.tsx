@@ -6,7 +6,7 @@ import { REPORT_DEFINITIONS } from "@/lib/reports/registry";
 import { ReportsManager } from "@/components/reports/ReportsManager";
 import { MonthlyReportsPanel } from "@/components/reports/MonthlyReportsPanel";
 import { getMonthlyReports, getReportTemplates } from "@/lib/reports/monthly-dal";
-import { EMPTY_LETTERHEAD, MONTHLY_SECTIONS, periodOf } from "@/lib/reports/monthly";
+import { churchToday, EMPTY_LETTERHEAD, MONTHLY_SECTIONS, periodOf } from "@/lib/reports/monthly";
 import { CustomReportsPanel } from "@/components/reports/CustomReportsPanel";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { CustomReport } from "@/types/database";
@@ -72,8 +72,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           canWrite={membership.tabAccess.reports.write}
           canDelete={membership.tabAccess.reports.delete}
           canPublish={membership.role === "owner" || membership.role === "admin"}
-          latestFinishedMonth={periodOf(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1))}
-          latestFinishedYear={String(new Date().getFullYear() - 1)}
+          latestFinishedMonth={periodOf(new Date(churchToday(membership.organization.timezone).getFullYear(), churchToday(membership.organization.timezone).getMonth() - 1, 1))}
+          latestFinishedYear={String(churchToday(membership.organization.timezone).getFullYear() - 1)}
           defaultLetterhead={{ ...EMPTY_LETTERHEAD, ...(reports[0]?.data.letterhead ?? {}), churchName: reports[0]?.data.letterhead?.churchName || membership.organization.name }}
           canUseAi={Boolean(process.env.OPENAI_API_KEY)}
         />

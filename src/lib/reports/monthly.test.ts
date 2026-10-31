@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isFinishedMonth, isPeriod, isSectionKey, money, periodDateRange, periodLabel } from "./monthly";
+import { churchToday, isFinishedMonth, isPeriod, isSectionKey, money, periodDateRange, periodLabel } from "./monthly";
 
 describe("monthly report periods", () => {
   it("accepts only YYYY-MM", () => {
@@ -91,5 +91,13 @@ describe("fullDateIn", () => {
     expect(fullDateIn("2026-10-13T08:00:00Z", "en")).toContain("October");
     expect(fullDateIn("2026-10-13T08:00:00Z", "ta")).not.toContain("October");
     expect(fullDateIn("2026-10-13T08:00:00Z", "hi")).not.toContain("October");
+  });
+});
+
+describe("churchToday", () => {
+  it("reads the date in the church's zone, which is ahead of the server's UTC", () => {
+    const lateOct31Utc = new Date("2026-10-31T20:00:00Z"); // 1:30 AM on 1 Nov in India
+    expect(isFinishedMonth("2026-10", churchToday("Asia/Kolkata", lateOct31Utc))).toBe(true);
+    expect(isFinishedMonth("2026-10", churchToday("UTC", lateOct31Utc))).toBe(false);
   });
 });

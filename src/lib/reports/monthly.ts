@@ -1,3 +1,4 @@
+import { partsInTimezone } from "@/lib/organizations/timezone";
 // What goes into a monthly church report, and how its month is worked out. Pure, so
 // the generator, the page that shows it and the tests agree.
 
@@ -41,6 +42,20 @@ export function periodDateRange(period: string): { from: string; toExclusive: st
     from: `${period}-01`,
     toExclusive: `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-01`,
   };
+}
+
+/**
+ * Today's date in the church's time zone, as a Date whose local year, month and day are that date. The server runs
+ * in UTC, which is hours behind India, so "today" must be read in the church's zone or a month looks unfinished for
+ * the first hours of the 1st.
+ */
+export function churchToday(timeZone: string, now: Date = new Date()): Date {
+  try {
+    const { year, month, day } = partsInTimezone(now, timeZone || "UTC");
+    return new Date(year, month - 1, day);
+  } catch {
+    return now;
+  }
 }
 
 /** A month that has not finished yet can't be reported on. */

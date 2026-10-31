@@ -10,6 +10,7 @@ import { buildMonthlyReport } from "@/lib/reports/monthly-generate";
 import { writeReportNarrative } from "@/lib/reports/narrative";
 import {
   isFinishedPeriod,
+  churchToday,
   isPeriodOfKind,
   isReportLanguage,
   isReportTone,
@@ -75,7 +76,7 @@ export async function generateMonthlyReportAction(input: GenerateInput): Promise
 
   const kind: ReportKind = input.kind === "annual" ? "annual" : "monthly";
   if (!isPeriodOfKind(kind, input.period)) return { error: kind === "annual" ? "Choose a year." : "Choose a month." };
-  if (!isFinishedPeriod(input.period, new Date())) return { error: kind === "annual" ? "That year isn't over yet. Choose a year that has finished." : "That month isn't over yet. Choose a month that has finished." };
+  if (!isFinishedPeriod(input.period, churchToday(membership.organization.timezone))) return { error: kind === "annual" ? "That year isn't over yet. Choose a year that has finished." : "That month isn't over yet. Choose a month that has finished." };
 
   const language = isReportLanguage(input.language) ? input.language : "en";
   const tone = isReportTone(input.tone) ? input.tone : "warm";

@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, Image as ImageIcon, Lock, Minus, Plus, Redo2, Square, Circle, Star, Type, Undo2, Save, Building2, Layers, Check } from "lucide-react";
-import { saveDesign } from "@/lib/designer/actions";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Download, Image as ImageIcon, Lock, Minus, Plus, Redo2, Square, Circle, Star, Type, Undo2, Save, Building2, Layers, Check, Scaling } from "lucide-react";
+import { saveDesign, saveResizedCopy } from "@/lib/designer/actions";
 import { readImage } from "@/lib/designer/image-utils";
 import { ICONS, ICON_KEYS, type IconKey } from "@/lib/designer/icons";
 import {
@@ -20,6 +21,7 @@ import {
   type AlignMode,
   makeText,
   reorder,
+  resizeDoc,
   type DesignBackground,
   type DesignDoc,
   type DesignElement,
@@ -27,6 +29,7 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ErrorToast } from "@/components/ui/error-toast";
 import { ElementBody, elementStyle } from "./DesignView";
+import { ResizeDialog } from "./ResizeDialog";
 import { ElementProperties, MultiProperties, PageProperties } from "./Properties";
 
 type Handle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
@@ -86,6 +89,9 @@ export function DesignerEditor({
   const [tab, setTab] = useState<"add" | "layers">("add");
   const [exporting, setExporting] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [resizeOpen, setResizeOpen] = useState(false);
+  const [resizing, setResizing] = useState(false);
+  const router = useRouter();
 
   const docRef = useRef(doc);
   const selectedIdsRef = useRef<string[]>([]);
@@ -523,6 +529,26 @@ export function DesignerEditor({
     setTimeout(() => document.getElementById("design-text-input")?.focus(), 50);
   }
 
+  // --- resize -----------------------------------------------------------------------------------------------------
+
+  function resizeThis(width: number, height: number) {
+    commit(resizeDoc(docRef.current, width, height), true);
+    selectIds([]);
+    setResizeOpen(false);
+  }
+
+  async function resizeCopy(width: number, height: number) {
+    setResizing(true);
+    const result = await saveResizedCopy({ id: designId, name: `${nameRef.current} (${width}×${height})`, doc: resizeDoc(docRef.current, width, height) });
+    setResizing(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    setResizeOpen(false);
+    if (result.id) router.push(`/dashboard/studio/${result.id}`);
+  }
+
   // --- export -----------------------------------------------------------------------------------------------------
 
   async function exportAs(format: "png" | "png2" | "jpg" | "pdf") {
@@ -572,10 +598,11 @@ export function DesignerEditor({
   return (
     <div className="space-y-3">
       <ErrorToast message={error} />
+      {resizeOpen && <ResizeDialog open onOpenChange={setResizeOpen} width={doc.width} height={doc.height} busy={resizing} onResize={resizeThis} onCopy={(w, h) => void resizeCopy(w, h)} />}
       <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e) => { void onPickImage(e.target.files?.[0]); e.target.value = ""; }} />
 
       <div className="flex flex-wrap items-center gap-2">
-        <Link href="/dashboard/studio" className={buttonVariants({ variant: "outline", size: "sm" })}>
+        <Link href="/dashboard/studio/designs" className={buttonVariants({ variant: "outline", size: "sm" })}>
           <ArrowLeft className="size-4" /> Designs
         </Link>
         <span className="truncate text-sm font-medium">{name}</span>
@@ -602,6 +629,11 @@ export function DesignerEditor({
           <Button size="sm" variant="outline" onClick={() => setZoom((z) => clamp(Math.round((z + 0.25) * 100) / 100, 0.25, 3))} aria-label="Zoom in">
             <Plus className="size-4" />
           </Button>
+          {!readOnly && (
+            <Button size="sm" variant="outline" onClick={() => setResizeOpen(true)} title="Change the page size">
+              <Scaling className="size-4" /> Resize
+            </Button>
+          )}
           {!readOnly && (
             <Button size="sm" variant="outline" onClick={() => void save()} disabled={saving || status === "saved"}>
               <Save className="size-4" /> Save

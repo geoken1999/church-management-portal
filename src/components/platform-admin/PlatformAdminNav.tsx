@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  LayoutTemplate,
   LayoutDashboard,
   Building2,
   LifeBuoy,
@@ -98,6 +99,12 @@ const NAV_ITEMS = [
     href: "/platform-admin/unenrolled-payments",
     label: "Paid, not enrolled",
     icon: UserRoundX,
+    exact: false,
+  },
+  {
+    href: "/platform-admin/design-templates",
+    label: "Design templates",
+    icon: LayoutTemplate,
     exact: false,
   },
   {

@@ -109,6 +109,13 @@ export const SIZE_PRESETS: SizePreset[] = [
   { key: "poster", label: "Poster (A3)", kind: "poster", width: 1123, height: 1587, note: "Print, 29.7 × 42 cm" },
   { key: "square", label: "Social post", kind: "social", width: 1080, height: 1080, note: "Instagram / Facebook, 1080 × 1080" },
   { key: "story", label: "Story", kind: "social", width: 1080, height: 1920, note: "Instagram / WhatsApp status, 1080 × 1920" },
+  { key: "ig-portrait", label: "Instagram portrait", kind: "social", width: 1080, height: 1350, note: "Instagram, 1080 × 1350" },
+  { key: "fb-post", label: "Facebook post", kind: "social", width: 1200, height: 1200, note: "Facebook, 1200 × 1200" },
+  { key: "fb-cover", label: "Facebook cover", kind: "social", width: 1640, height: 624, note: "Facebook page cover, 1640 × 624" },
+  { key: "yt-banner", label: "YouTube banner", kind: "social", width: 2560, height: 1440, note: "YouTube channel art, 2560 × 1440" },
+  { key: "slide", label: "Presentation slide", kind: "social", width: 1920, height: 1080, note: "Slides and livestream screens, 1920 × 1080" },
+  { key: "a4-hd", label: "A4 portrait (300 dpi)", kind: "flyer", width: 2480, height: 3508, note: "Print, 21 × 29.7 cm at 300 dpi" },
+  { key: "a4-hd-landscape", label: "A4 landscape (300 dpi)", kind: "flyer", width: 3508, height: 2480, note: "Print, 29.7 × 21 cm at 300 dpi" },
   { key: "thumbnail", label: "YouTube thumbnail", kind: "social", width: 1280, height: 720, note: "YouTube video cover, 1280 × 720" },
   { key: "banner", label: "Banner", kind: "social", width: 1600, height: 900, note: "Facebook / YouTube cover, 16:9" },
 ];
@@ -286,6 +293,32 @@ export function reorder(elements: DesignElement[], id: string, move: "forward" |
 /** A copy of an element, nudged so it doesn't sit exactly on top of the original. */
 export function duplicateElement(el: DesignElement): DesignElement {
   return { ...el, id: newId(), x: el.x + 20, y: el.y + 20, locked: false };
+}
+
+/**
+ * Fits a design to a new page size. Positions and sizes follow the page proportionally; text, symbols and pictures
+ * keep their shape (scaled by the smaller of the two ratios), so nothing is stretched out of proportion.
+ */
+export function resizeDoc(doc: DesignDoc, width: number, height: number): DesignDoc {
+  const sx = width / doc.width;
+  const sy = height / doc.height;
+  const s = Math.min(sx, sy);
+  const elements = doc.elements.map((el) => {
+    const keepsShape = el.type === "text" || el.type === "icon" || el.type === "image" || el.type === "ellipse";
+    const w = Math.max(1, Math.round(el.w * (el.type === "text" ? sx : keepsShape ? s : sx)));
+    const h = Math.max(1, Math.round(el.h * (el.type === "text" ? s : keepsShape ? s : sy)));
+    const cx = (el.x + el.w / 2) * sx;
+    const cy = (el.y + el.h / 2) * sy;
+    const next: DesignElement = { ...el, x: Math.round(cx - w / 2), y: Math.round(cy - h / 2), w, h };
+    if (el.type === "text") {
+      next.fontSize = clamp(Math.round((el.fontSize ?? 32) * s), 4, 600);
+      next.letterSpacing = el.letterSpacing ? Math.round(el.letterSpacing * s * 10) / 10 : el.letterSpacing;
+    }
+    if (el.strokeWidth) next.strokeWidth = Math.max(1, Math.round(el.strokeWidth * s));
+    if (el.radius) next.radius = Math.round(el.radius * s);
+    return next;
+  });
+  return { ...doc, width, height, elements };
 }
 
 function finite(value: unknown, fallback: number): number {

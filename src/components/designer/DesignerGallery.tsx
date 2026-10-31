@@ -26,6 +26,7 @@ export function DesignerGallery({
   designs,
   canWrite,
   canDelete,
+  start,
 }: {
   organizationId: string;
   churchName: string;
@@ -33,15 +34,17 @@ export function DesignerGallery({
   designs: DesignListItem[];
   canWrite: boolean;
   canDelete: boolean;
+  /** Opens a dialog straight away, when the person came here from a shortcut on the Home page. */
+  start?: "new" | "ai" | "thumbnail";
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [aiOpen, setAiOpen] = useState(false);
+  const [creating, setCreating] = useState(canWrite && (start === "new" || start === "thumbnail"));
+  const [aiOpen, setAiOpen] = useState(canWrite && start === "ai");
   const [name, setName] = useState("");
-  const [template, setTemplate] = useState("sunday");
-  const [size, setSize] = useState("a4");
+  const [template, setTemplate] = useState(start === "thumbnail" ? "thumb-sermon" : "sunday");
+  const [size, setSize] = useState(start === "thumbnail" ? "thumbnail" : "a4");
   const [customWidth, setCustomWidth] = useState("1000");
   const [customHeight, setCustomHeight] = useState("1000");
   const [toDelete, setToDelete] = useState<DesignListItem | null>(null);
@@ -111,7 +114,7 @@ export function DesignerGallery({
 
       {designs.length === 0 ? (
         <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          No designs yet. Start from a template for a Sunday flyer, an event poster, a Bible verse, a social post or a YouTube thumbnail.
+          No designs yet. Browse the Templates tab, or start from a layout for a Sunday flyer, an event poster, a Bible verse, a social post or a YouTube thumbnail.
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
@@ -221,14 +224,14 @@ export function DesignerGallery({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete this design?</DialogTitle>
-            <DialogDescription>“{toDelete?.name}” will be removed for everyone. This can&apos;t be undone.</DialogDescription>
+            <DialogDescription>“{toDelete?.name}” moves to the Trash. You can restore it for 30 days.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setToDelete(null)}>
               Cancel
             </Button>
             <Button variant="destructive" onClick={remove} disabled={pending}>
-              Delete
+              Move to trash
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -38,7 +38,7 @@ export async function createDesign(input: { organizationId: string; name: string
     .select("id")
     .single();
   if (error || !data) return { error: "Couldn't create the design. Please try again." };
-  revalidatePath(DESIGNER_PATH);
+  revalidatePath(DESIGNER_PATH, "layout");
   return { id: data.id };
 }
 
@@ -63,7 +63,7 @@ export async function saveDesign(input: { id: string; name: string; doc: DesignD
     .update({ name, doc: checked.doc, width: checked.doc.width, height: checked.doc.height })
     .eq("id", input.id);
   if (error) return { error: "Couldn't save the design. Please try again." };
-  revalidatePath(DESIGNER_PATH);
+  revalidatePath(DESIGNER_PATH, "layout");
   return { id: input.id };
 }
 
@@ -91,7 +91,26 @@ export async function duplicateDesign(id: string): Promise<DesignActionResult> {
     .select("id")
     .single();
   if (error || !data) return { error: "Couldn't copy the design. Please try again." };
-  revalidatePath(DESIGNER_PATH);
+  revalidatePath(DESIGNER_PATH, "layout");
+  return { id: data.id };
+}
+
+/** Saves a resized version of a design as a new design, leaving the original as it is. */
+export async function saveResizedCopy(input: { id: string; name: string; doc: DesignDoc }): Promise<DesignActionResult> {
+  const user = await requireUser();
+  const organizationId = await ownedBy(input.id);
+  if (!organizationId) return { error: "That design no longer exists." };
+  const access = await checkTabAccess(organizationId, "designer", "write");
+  if (!access.ok) return { error: access.message };
+  const checked = sanitizeDoc(input.doc);
+  if ("error" in checked) return { error: checked.error };
+  const { data, error } = await createAdminClient()
+    .from("designs")
+    .insert({ organization_id: organizationId, name: (cleanDesignName(input.name) || "Untitled design").slice(0, 80), kind: "custom", width: checked.doc.width, height: checked.doc.height, doc: checked.doc, created_by: user.id })
+    .select("id")
+    .single();
+  if (error || !data) return { error: "Couldn't create the resized copy. Please try again." };
+  revalidatePath(DESIGNER_PATH, "layout");
   return { id: data.id };
 }
 
@@ -101,9 +120,10 @@ export async function deleteDesign(id: string): Promise<DesignActionResult> {
   if (!organizationId) return {};
   const access = await checkTabAccess(organizationId, "designer", "delete");
   if (!access.ok) return { error: access.message };
-  const { error } = await createAdminClient().from("designs").delete().eq("id", id);
+  // Moves it to the trash; it can be restored for 30 days.
+  const { error } = await createAdminClient().from("designs").update({ deleted_at: new Date().toISOString() }).eq("id", id);
   if (error) return { error: "Couldn't delete the design. Please try again." };
-  revalidatePath(DESIGNER_PATH);
+  revalidatePath(DESIGNER_PATH, "layout");
   return {};
 }
 

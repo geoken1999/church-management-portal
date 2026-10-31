@@ -133,3 +133,22 @@ describe("align and distribute", () => {
     expect(distributeElements(els, ["a", "b"], "horizontal")).toBe(els);
   });
 });
+
+describe("resizeDoc", () => {
+  it("scales positions with the page and keeps text, symbols and pictures in proportion", async () => {
+    const { resizeDoc } = await import("./model");
+    const doc = emptyDoc(1000, 1000);
+    const band = makeShape("rect", doc, { x: 0, y: 0, w: 1000, h: 100 });
+    const text = makeText(doc, "Hello", { x: 100, y: 500, w: 800, h: 60, fontSize: 50 });
+    const icon = makeIcon(doc, "cross", { x: 400, y: 400, w: 200, h: 200 });
+    doc.elements = [band, text, icon];
+    const out = resizeDoc(doc, 2000, 1000);
+    expect(out.width).toBe(2000);
+    expect(out.elements[0]).toMatchObject({ x: 0, w: 2000, h: 100 }); // the band still spans the page
+    expect(out.elements[1].fontSize).toBe(50); // limited by the shorter side
+    expect(out.elements[1].w).toBe(1600);
+    expect(out.elements[2].w).toBe(out.elements[2].h); // the symbol stays square
+    expect(out.elements[2].x + out.elements[2].w / 2).toBe(1000); // and stays centred
+    expect("error" in sanitizeDoc(out)).toBe(false);
+  });
+});

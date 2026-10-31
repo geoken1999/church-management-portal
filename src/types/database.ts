@@ -2449,6 +2449,42 @@ export type DesignRow = {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
+  template_id: string | null;
+};
+
+export type DesignCategoryRow = {
+  id: string;
+  slug: string;
+  name: string;
+  group_name: string;
+  sort_order: number;
+  created_at: string;
+};
+
+export type DesignTemplateRow = {
+  id: string;
+  slug: string;
+  title: string;
+  category_id: string;
+  width: number;
+  height: number;
+  tags: string[];
+  is_premium: boolean;
+  published: boolean;
+  popularity: number;
+  featured_rank: number;
+  doc: import("@/lib/designer/model").DesignDoc;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DesignFavoriteRow = {
+  organization_id: string;
+  user_id: string;
+  template_id: string;
+  created_at: string;
 };
 
 export type BudgetLine = {
@@ -3455,6 +3491,24 @@ export type Database = {
         Row: DesignRow;
         Insert: Partial<DesignRow> & Pick<DesignRow, "organization_id" | "name" | "width" | "height" | "doc">;
         Update: Partial<DesignRow>;
+        Relationships: [];
+      };
+      design_categories: {
+        Row: DesignCategoryRow;
+        Insert: Partial<DesignCategoryRow> & Pick<DesignCategoryRow, "slug" | "name" | "group_name">;
+        Update: Partial<DesignCategoryRow>;
+        Relationships: [];
+      };
+      design_templates: {
+        Row: DesignTemplateRow;
+        Insert: Partial<DesignTemplateRow> & Pick<DesignTemplateRow, "slug" | "title" | "category_id" | "width" | "height" | "doc">;
+        Update: Partial<DesignTemplateRow>;
+        Relationships: [];
+      };
+      design_favorites: {
+        Row: DesignFavoriteRow;
+        Insert: DesignFavoriteRow | Omit<DesignFavoriteRow, "created_at">;
+        Update: Partial<DesignFavoriteRow>;
         Relationships: [];
       };
       budget_lines: {

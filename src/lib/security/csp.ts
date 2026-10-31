@@ -31,6 +31,10 @@ const CONNECT_HOSTS = [
   "wss://*.zoom.us",
   "https://*.zoom.com",
   "wss://*.zoom.com",
+  "https://*.zoomgov.com",
+  "wss://*.zoomgov.com",
+  // The Zoom meeting window also loads assets and talks to media gateways through these.
+  "https://*.cloudfront.net",
   "https://*.facebook.com",
   "https://*.facebook.net",
 ];
@@ -50,10 +54,11 @@ export function contentSecurityPolicy({ framingAllowed = true }: { framingAllowe
     `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${SCRIPT_HOSTS.join(" ")}`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: blob: https:",
-    "media-src 'self' blob: https:",
+    "media-src 'self' blob: data: https:",
     "font-src 'self' data: https://fonts.gstatic.com",
     `connect-src 'self' ${CONNECT_HOSTS.join(" ")}`,
-    "worker-src 'self' blob:",
+    // Zoom starts its audio, video and decoding workers from its own host as well as from blobs.
+    "worker-src 'self' blob: https://source.zoom.us https://*.zoom.us",
     `frame-src ${FRAME_HOSTS.join(" ")}`,
     "form-action 'self' https://secure.payu.in https://test.payu.in",
     "base-uri 'self'",

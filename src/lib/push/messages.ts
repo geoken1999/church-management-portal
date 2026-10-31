@@ -25,7 +25,7 @@ export interface PushBatch {
   message: {
     notification?: { title: string; body: string };
     data?: Record<string, string>;
-    android?: { priority: "high"; notification?: { channelId: string; sound?: string } };
+    android?: { priority: "high"; notification?: { channelId: string; sound?: string; priority?: "max"; visibility?: "public"; defaultVibrateTimings?: boolean } };
     apns?: { headers: { "apns-priority": string }; payload: { aps: { sound: string; category?: string } } };
   };
 }
@@ -57,7 +57,7 @@ export function buildPushBatches(rows: PushTokenRow[], payload: PushMessageInput
           : payload.data,
         // iPhones only play a sound for a notification that asks for one, and deliver at once when sent with
         // priority 10. Android tokens in this batch ignore the apns block.
-        android: { priority: "high", notification: { channelId: ANDROID_CHANNEL_ID, sound: "default" } },
+        android: { priority: "high", notification: { channelId: ANDROID_CHANNEL_ID, sound: "default", priority: "max", visibility: "public", defaultVibrateTimings: true } },
         apns: {
           headers: { "apns-priority": "10" },
           payload: { aps: { sound: "default", ...(action ? { category: iosCategoryFor(payload.data?.buttonLabel ?? "") } : {}) } },

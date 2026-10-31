@@ -41,7 +41,7 @@ describe("buildPushBatches", () => {
 
   it("sends Android notifications at high priority on the app's urgent channel, with or without a button", () => {
     const plain = buildPushBatches([{ token: "a1", platform: "android" }], { title: "Hi", body: "There" });
-    expect(plain[0].message.android).toEqual({ priority: "high", notification: { channelId: "kingdomflow_priority", sound: "default" } });
+    expect(plain[0].message.android).toEqual({ priority: "high", notification: { channelId: "kingdomflow_priority", sound: "default", priority: "max", visibility: "public", defaultVibrateTimings: true } });
     const button = buildPushBatches([{ token: "a1", platform: "android" }], { title: "Hi", body: "There", data: { link: "https://x.com", buttonLabel: "Join" } });
     expect(button[0].message.android?.priority).toBe("high");
     expect(button[0].message.notification).toBeUndefined(); // the app draws this one itself, on the same channel

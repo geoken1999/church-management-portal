@@ -6,6 +6,7 @@ import { CalendarClock, X } from "lucide-react";
 import { cancelScheduledCampaignAction } from "@/lib/scheduler/actions";
 import { formatInTimezone } from "@/lib/organizations/timezone";
 import { GROUP_LABELS, isGroupKey } from "@/lib/groups/shares";
+import { REPEAT_LABELS } from "@/lib/scheduler/recurrence";
 import type { ScheduledCampaign } from "@/types/database";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -72,6 +73,14 @@ export function ScheduledCampaigns({ items, timezone }: { items: ScheduledCampai
                   {formatInTimezone(item.scheduled_at, timezone, { weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }, "en-IN")} · {item.channel === "push" ? pushAudience(item) : `${item.recipient_count} recipient${item.recipient_count === 1 ? "" : "s"}`}
                   {item.attachments.length > 0 && ` · ${item.attachments.length} attachment${item.attachments.length === 1 ? "" : "s"}`}
                 </p>
+                {item.repeat !== "none" && (
+                  <p className="text-xs text-muted-foreground">
+                    {REPEAT_LABELS[item.repeat]}
+                    {item.repeat_until ? `, until ${formatInTimezone(item.repeat_until, timezone, { day: "numeric", month: "short", year: "numeric" }, "en-IN")}` : ", until you cancel it"}.
+                    {item.result?.sentCount !== undefined && !item.result.error ? ` Last time it went to ${item.result.sentCount}.` : ""}
+                    {item.result?.error ? ` Last time it didn't go out: ${item.result.error}` : ""}
+                  </p>
+                )}
                 {item.status === "sent" && item.result?.sentCount !== undefined && (
                   <p className="text-xs text-muted-foreground">
                     Sent to {item.result.sentCount}

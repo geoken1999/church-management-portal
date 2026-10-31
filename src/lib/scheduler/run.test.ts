@@ -74,6 +74,31 @@ describe("runDueCampaigns", () => {
     expect(tables.scheduled_campaigns[0]).toMatchObject({ status: "sent", result: { sentCount: 7 } });
   });
 
+  it("puts a repeating notification back on the schedule for its next time", async () => {
+    sendBroadcast.mockResolvedValue({ success: true, sent: 3 });
+    const tables = {
+      scheduled_campaigns: [{ ...base, id: "r", channel: "push", repeat: "weekly", repeat_until: null, status: "scheduled", scheduled_at: "2026-10-14T03:30:00Z", payload: { audienceType: "church", title: "Sunday", body: "See you", anchorDay: 14 } }],
+      organization_members: [{ organization_id: "org", auth_user_id: "user", role: "owner", tab_permissions: null }],
+      organizations: [{ id: "org", timezone: "Asia/Kolkata" }],
+    };
+    const { runDueCampaigns } = await import("@/lib/scheduler/run");
+    const result = await runDueCampaigns(fakeAdmin(tables) as never, NOW);
+    expect(result).toMatchObject({ due: 1, sent: 1 });
+    expect(tables.scheduled_campaigns[0]).toMatchObject({ status: "scheduled", scheduled_at: "2026-10-21T03:30:00.000Z", result: { sentCount: 3 } });
+  });
+
+  it("finishes a repeating notification once its last day has passed", async () => {
+    sendBroadcast.mockResolvedValue({ success: true, sent: 3 });
+    const tables = {
+      scheduled_campaigns: [{ ...base, id: "r", channel: "push", repeat: "daily", repeat_until: "2026-10-14T18:29:00Z", status: "scheduled", scheduled_at: "2026-10-14T03:30:00Z", payload: { audienceType: "church", title: "Daily", body: "Verse" } }],
+      organization_members: [{ organization_id: "org", auth_user_id: "user", role: "owner", tab_permissions: null }],
+      organizations: [{ id: "org", timezone: "Asia/Kolkata" }],
+    };
+    const { runDueCampaigns } = await import("@/lib/scheduler/run");
+    await runDueCampaigns(fakeAdmin(tables) as never, NOW);
+    expect(tables.scheduled_campaigns[0].status).toBe("sent");
+  });
+
   it("does not send a scheduled push whose scheduler is no longer an admin", async () => {
     const tables = {
       scheduled_campaigns: [{ ...base, id: "p", channel: "push", status: "scheduled", scheduled_at: "2026-10-14T09:58:00Z", payload: { audienceType: "church", title: "Hi", body: "There" } }],

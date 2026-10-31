@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { sendBroadcastAction } from "@/lib/push/broadcast-actions";
 import { schedulePushAction } from "@/lib/scheduler/actions";
 import { SchedulePicker } from "@/components/scheduler/SchedulePicker";
+import { REPEATS, REPEAT_LABELS, type Repeat } from "@/lib/scheduler/recurrence";
 import { ScheduledCampaigns } from "@/components/scheduler/ScheduledCampaigns";
 import type { ScheduledCampaign } from "@/types/database";
 import { BUTTON_PRESETS } from "@/lib/push/button-presets";
@@ -72,6 +73,8 @@ export function PushBroadcastPanel({
   const [buttonLabel, setButtonLabel] = useState("");
   const [groupKey, setGroupKey] = useState<GroupKey | "">("");
   const [scheduleAt, setScheduleAt] = useState<string | null>(null);
+  const [repeat, setRepeat] = useState<Repeat>("none");
+  const [repeatUntil, setRepeatUntil] = useState("");
   const [memberId, setMemberId] = useState("");
   const [search, setSearch] = useState("");
   const [title, setTitle] = useState("");
@@ -100,13 +103,15 @@ export function PushBroadcastPanel({
         return;
       }
       if (scheduleAt) {
-        const scheduledResult = await schedulePushAction({ audienceType: audience, groupKey, memberId, branchId, title, body, linkUrl, buttonLabel, scheduledAt: scheduleAt });
+        const scheduledResult = await schedulePushAction({ audienceType: audience, groupKey, memberId, branchId, title, body, linkUrl, buttonLabel, scheduledAt: scheduleAt, repeat, repeatUntil: repeat !== "none" ? repeatUntil : "" });
         if (scheduledResult.error) {
           setError(scheduledResult.error);
           return;
         }
-        setNotice(`Scheduled for ${scheduledResult.scheduledLabel}. It goes out within 5 minutes of that time; you can cancel it below until then.`);
+        setNotice(`Scheduled for ${scheduledResult.scheduledLabel}${repeat !== "none" ? `, then ${REPEAT_LABELS[repeat].toLowerCase()}` : ""}. It goes out within 5 minutes of that time; you can cancel it below.`);
         setScheduleAt(null);
+        setRepeat("none");
+        setRepeatUntil("");
         setTitle("");
         setBody("");
         setLinkUrl("");
@@ -262,8 +267,37 @@ export function PushBroadcastPanel({
               </div>
             )}
             <SchedulePicker value={scheduleAt} onChange={setScheduleAt} disabled={pending} />
+            {scheduleAt && (
+              <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border p-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="push-repeat" className="text-xs">
+                    Repeat
+                  </Label>
+                  <select id="push-repeat" value={repeat} onChange={(e) => setRepeat(e.target.value as Repeat)} className="h-9 rounded-md border bg-background px-2 text-sm">
+                    {REPEATS.map((r) => (
+                      <option key={r} value={r}>
+                        {REPEAT_LABELS[r]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {repeat !== "none" && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="push-until" className="text-xs">
+                      Last day (optional)
+                    </Label>
+                    <Input id="push-until" type="date" value={repeatUntil} onChange={(e) => setRepeatUntil(e.target.value)} className="w-44" />
+                  </div>
+                )}
+                {repeat !== "none" && (
+                  <p className="basis-full text-xs text-muted-foreground">
+                    {repeat === "weekly" ? "Repeats on the same weekday" : repeat === "monthly" ? "Repeats on the same day of the month (the last day of shorter months)" : "Repeats every day"} at the same time. Without a last day it keeps going until you cancel it from the Scheduled list.
+                  </p>
+                )}
+              </div>
+            )}
             <Button type="submit" disabled={pending}>
-              {pending ? (scheduleAt ? "Scheduling..." : "Sending...") : scheduleAt ? "Schedule notification" : "Send notification"}
+              {pending ? (scheduleAt ? "Scheduling..." : "Sending...") : scheduleAt ? (repeat !== "none" ? "Schedule repeating notification" : "Schedule notification") : "Send notification"}
             </Button>
           </form>
         </CardContent>

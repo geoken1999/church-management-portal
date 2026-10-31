@@ -9,6 +9,7 @@ import { sendBroadcast } from "@/lib/push/broadcast";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { normalizeTabPermissions } from "@/lib/permissions/tabs";
 import { STUCK_SENDING_MINUTES } from "@/lib/scheduler/validation";
+import { nextOccurrence } from "@/lib/scheduler/recurrence";
 import type { EmailAttachment } from "@/lib/email/client";
 import type { ScheduledAttachment, ScheduledCampaign, TabPermissions } from "@/types/database";
 
@@ -113,17 +114,31 @@ export async function runDueCampaigns(admin: Admin, now: Date = new Date(), orga
     result.due++;
 
     let outcome: Awaited<ReturnType<typeof send>>;
+    let allowed = false;
     try {
-      outcome = (await stillAllowed(admin, row.organization_id, row.created_by, row.channel))
-        ? await send(admin, row)
-        : { ok: false, error: "The person who scheduled this no longer has permission to send it." };
+      allowed = await stillAllowed(admin, row.organization_id, row.created_by, row.channel);
+      outcome = allowed ? await send(admin, row) : { ok: false, error: "The person who scheduled this no longer has permission to send it." };
     } catch (err) {
       outcome = { ok: false, error: err instanceof Error ? err.message : "Something went wrong while sending." };
     }
 
+    // A repeating message goes back on the schedule for its next time, unless its end date has passed or the person
+    // who set it up lost permission. A run that fails (say, nobody in the group has the app yet) doesn't stop it.
+    let next: Date | null = null;
+    if (allowed && row.repeat && row.repeat !== "none") {
+      const { data: org } = await admin.from("organizations").select("timezone").eq("id", row.organization_id).maybeSingle();
+      const anchorDay = Number((row.payload as { anchorDay?: number }).anchorDay) || undefined;
+      const candidate = nextOccurrence(new Date(row.scheduled_at), row.repeat, org?.timezone ?? "Asia/Kolkata", now, anchorDay);
+      if (!row.repeat_until || candidate.getTime() <= Date.parse(row.repeat_until)) next = candidate;
+    }
+    const resultJson = { sentCount: outcome.sentCount, failedCount: outcome.failedCount, skippedCount: outcome.skippedCount, error: outcome.error };
     await admin
       .from("scheduled_campaigns")
-      .update({ status: outcome.ok ? "sent" : "failed", finished_at: new Date().toISOString(), result: { sentCount: outcome.sentCount, failedCount: outcome.failedCount, skippedCount: outcome.skippedCount, error: outcome.error } })
+      .update(
+        next
+          ? { status: "scheduled", scheduled_at: next.toISOString(), started_at: null, finished_at: new Date().toISOString(), result: resultJson }
+          : { status: outcome.ok ? "sent" : "failed", finished_at: new Date().toISOString(), result: resultJson },
+      )
       .eq("id", row.id);
     const files = (row.attachments as ScheduledAttachment[]).map((a) => a.path);
     if (files.length > 0) await admin.storage.from(BUCKET).remove(files);
@@ -135,7 +150,8 @@ export async function runDueCampaigns(admin: Admin, now: Date = new Date(), orga
     }
 
     // Tell whoever scheduled it how it went.
-    if (row.created_by) {
+    // A repeating one that went out fine doesn't need a message every time.
+    if (row.created_by && !(next && outcome.ok)) {
       await sendPushToUsers([row.created_by], "team_alert", {
         title: outcome.ok ? `Your scheduled ${CHANNEL_NAMES[row.channel]} was sent` : `Your scheduled ${CHANNEL_NAMES[row.channel]} didn't go out`,
         body: outcome.ok ? `"${row.summary}" went to ${outcome.sentCount ?? row.recipient_count} ${outcome.sentCount === 1 ? "person" : "people"}.` : `"${row.summary}": ${outcome.error ?? "it couldn't be sent."}`.slice(0, 200),

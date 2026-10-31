@@ -1766,6 +1766,9 @@ export type ScheduledCampaign = {
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
+  // Repeating messages (push notifications): after each send, scheduled_at moves to the next time.
+  repeat: "none" | "daily" | "weekly" | "monthly";
+  repeat_until: string | null;
 };
 
 // A WhatsApp message the system sent on its own, for idempotency and plan usage (migration 0175).

@@ -8,6 +8,8 @@ import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, MAX_TOTAL_ATTACHMENT_BYTES } fro
 import { formatInTimezone } from "@/lib/organizations/timezone";
 import { parseScheduleTime, summarize } from "@/lib/scheduler/validation";
 import { prepareBroadcast } from "@/lib/push/broadcast";
+import { isRepeat, type Repeat } from "@/lib/scheduler/recurrence";
+import { partsInTimezone, zonedTimeToUtc } from "@/lib/organizations/timezone";
 import type { ScheduledAttachment, ScheduledCampaignChannel } from "@/types/database";
 
 const PAGES: Record<ScheduledCampaignChannel, string> = { email: "/dashboard/email", sms: "/dashboard/sms", whatsapp: "/dashboard/whatsapp", push: "/dashboard/mobile/notifications" };
@@ -155,6 +157,9 @@ export async function schedulePushAction(input: {
   linkUrl?: string;
   buttonLabel?: string;
   scheduledAt: string;
+  repeat?: Repeat;
+  /** The last day it may go out (a date, in the church's time zone). */
+  repeatUntil?: string;
 }): Promise<ScheduleState> {
   const user = await requireUser();
   const membership = await requireOrganization();
@@ -166,6 +171,15 @@ export async function schedulePushAction(input: {
 
   const prepared = await prepareBroadcast({ ...input, organizationId, userId: user.id });
   if ("error" in prepared) return { error: prepared.error };
+
+  const repeat: Repeat = isRepeat(input.repeat) ? input.repeat : "none";
+  let repeatUntil: Date | null = null;
+  if (repeat !== "none" && input.repeatUntil) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.repeatUntil)) return { error: "Choose a valid end date." };
+    repeatUntil = zonedTimeToUtc(`${input.repeatUntil}T23:59`, membership.organization.timezone);
+    if (Number.isNaN(repeatUntil.getTime()) || repeatUntil.getTime() < when.at.getTime()) return { error: "The end date must be on or after the first send." };
+    if (repeatUntil.getTime() > Date.now() + 2 * 366 * 86_400_000) return { error: "Choose an end date within the next two years." };
+  }
 
   const { error } = await createAdminClient().from("scheduled_campaigns").insert({
     organization_id: organizationId,
@@ -180,7 +194,11 @@ export async function schedulePushAction(input: {
       body: prepared.body,
       linkUrl: prepared.linkUrl ?? undefined,
       buttonLabel: prepared.buttonLabel ?? undefined,
+      // Keeps a monthly message on the same day of the month after a short month.
+      anchorDay: partsInTimezone(when.at, membership.organization.timezone).day,
     },
+    repeat,
+    repeat_until: repeatUntil ? repeatUntil.toISOString() : null,
     attachments: [],
     summary: summarize("sms", prepared.title),
     recipient_count: 0,

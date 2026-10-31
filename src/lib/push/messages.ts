@@ -25,10 +25,15 @@ export interface PushBatch {
   message: {
     notification?: { title: string; body: string };
     data?: Record<string, string>;
-    android?: { priority: "high" };
+    android?: { priority: "high"; notification?: { channelId: string; sound?: string } };
     apns?: { headers: { "apns-priority": string }; payload: { aps: { sound: string; category?: string } } };
   };
 }
+
+// The channel the app creates at the top "urgent" importance (lib/services/push_notification_service.dart). A
+// notification Firebase shows itself while the app is closed uses the channel named here; without one it lands on
+// Firebase's default channel, which is only normal importance (no pop-up on the screen).
+export const ANDROID_CHANNEL_ID = "kingdomflow_priority";
 
 export function hasActionButton(data: Record<string, string> | undefined): boolean {
   return Boolean(data?.link && data?.buttonLabel);
@@ -52,6 +57,7 @@ export function buildPushBatches(rows: PushTokenRow[], payload: PushMessageInput
           : payload.data,
         // iPhones only play a sound for a notification that asks for one, and deliver at once when sent with
         // priority 10. Android tokens in this batch ignore the apns block.
+        android: { priority: "high", notification: { channelId: ANDROID_CHANNEL_ID, sound: "default" } },
         apns: {
           headers: { "apns-priority": "10" },
           payload: { aps: { sound: "default", ...(action ? { category: iosCategoryFor(payload.data?.buttonLabel ?? "") } : {}) } },

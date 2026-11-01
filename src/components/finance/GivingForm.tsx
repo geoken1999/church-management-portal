@@ -194,11 +194,16 @@ export function GivingForm({
       theme: { color: "#6C47FF" },
       handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
         showPaymentLoading("Confirming your payment…");
-        const confirmResult = await confirmGivingPayment(
-          response.razorpay_order_id,
-          response.razorpay_payment_id,
-          response.razorpay_signature,
-        );
+        let confirmResult: Awaited<ReturnType<typeof confirmGivingPayment>>;
+        try {
+          confirmResult = await confirmGivingPayment(
+            response.razorpay_order_id,
+            response.razorpay_payment_id,
+            response.razorpay_signature,
+          );
+        } catch {
+          confirmResult = { error: "We couldn't confirm your payment just now. If money was deducted it will be credited shortly; please don't pay again." };
+        }
         setSubmitting(false);
         hidePaymentLoading();
         if (confirmResult.error) {

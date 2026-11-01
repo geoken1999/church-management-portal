@@ -27,6 +27,7 @@ describe("contentSecurityPolicy", () => {
     expect(directive(policy, "frame-src")).toContain("https://*.facebook.com");
     expect(directive(policy, "frame-src")).toContain("https://*.razorpay.com");
     expect(directive(policy, "form-action")).toContain("https://secure.payu.in");
+    expect(directive(policy, "form-action")).toContain("https://*.cashfree.com");
   });
 
   it("never allows scripts from anywhere", () => {

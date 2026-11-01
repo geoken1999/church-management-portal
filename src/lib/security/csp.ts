@@ -66,7 +66,8 @@ export function contentSecurityPolicy({ framingAllowed = true }: { framingAllowe
     // Zoom starts its audio, video and decoding workers from its own host as well as from blobs.
     "worker-src 'self' blob: https://source.zoom.us https://*.zoom.us https://*.cloudfront.net",
     `frame-src ${FRAME_HOSTS.join(" ")}`,
-    "form-action 'self' https://secure.payu.in https://test.payu.in",
+    // Cashfree's checkout posts a form to its own API host (and redirects through its payment pages).
+    "form-action 'self' https://secure.payu.in https://test.payu.in https://*.cashfree.com https://*.razorpay.com",
     "base-uri 'self'",
     "object-src 'none'",
     "report-uri /api/csp-report",

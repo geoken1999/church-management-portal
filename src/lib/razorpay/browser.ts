@@ -44,8 +44,8 @@ function postResultHere(callbackUrl: string, response: unknown): void {
   // A successful post replaces this page, so nothing below runs. If the page is still here after a while (the
   // browser blocked the redirect, the server never answered, or the person came back to a cached copy), take the
   // cover down rather than leave them looking at a spinner. The payment itself is confirmed by the webhook.
-  window.setTimeout(() => hidePaymentLoading(), 30_000);
-  window.addEventListener("pageshow", (event) => {
+  setTimeout(() => hidePaymentLoading(), 30_000);
+  window.addEventListener?.("pageshow", (event) => {
     if ((event as PageTransitionEvent).persisted) hidePaymentLoading();
   }, { once: true });
 }

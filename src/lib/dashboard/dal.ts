@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cache } from "react";
+import { placeInWeeks } from "@/lib/dashboard/celebration-weeks";
 import { createClient } from "@/lib/supabase/server";
 
 export interface DashboardOverviewStats {
@@ -125,30 +126,13 @@ function parseIsoDateParts(iso: string): { year: number; month: number; day: num
   return { year, month: month - 1, day };
 }
 
-// Birthdays/anniversaries recur annually — this resolves a stored date to
-// its next occurrence from `today` (this year if it hasn't passed yet,
-// otherwise next year), which is what "falls in this/next week" needs
-// regardless of what year the original event happened.
-function nextOccurrence(iso: string, today: Date): Date {
-  const { month, day } = parseIsoDateParts(iso);
-  const year = today.getFullYear();
-  let occurrence = new Date(year, month, day);
-  if (occurrence < today) occurrence = new Date(year + 1, month, day);
-  return occurrence;
-}
-
-function daysBetween(from: Date, to: Date): number {
-  return Math.round((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000));
-}
-
 export interface UpcomingCelebrations {
   thisWeek: UpcomingCelebration[];
   nextWeek: UpcomingCelebration[];
 }
 
-// Rolling 7-day windows (today..+6, +7..+13) rather than calendar
-// Sun-Sat weeks — same convention as eventsThisWeek above, and it means
-// "this week" always means "the next 7 days" regardless of what day it is.
+// Calendar weeks, Monday to Sunday: "this week" is the current week (days already past still show) and "next week"
+// the one after (see celebration-weeks.ts).
 export const getUpcomingCelebrations = cache(
   async (organizationId: string): Promise<UpcomingCelebrations> => {
     const supabase = await createClient();
@@ -165,40 +149,41 @@ export const getUpcomingCelebrations = cache(
     const thisWeek: UpcomingCelebration[] = [];
     const nextWeek: UpcomingCelebration[] = [];
 
-    const add = (entry: UpcomingCelebration, daysAway: number) => {
-      if (daysAway <= 6) thisWeek.push(entry);
-      else if (daysAway <= 13) nextWeek.push(entry);
-    };
+    const add = (entry: UpcomingCelebration, week: "thisWeek" | "nextWeek") => (week === "thisWeek" ? thisWeek : nextWeek).push(entry);
 
     for (const row of rows) {
       const name = `${row.first_name} ${row.last_name}`;
 
       if (row.date_of_birth) {
-        const occurrence = nextOccurrence(row.date_of_birth, today);
-        add(
-          {
-            memberId: row.id,
-            name,
-            type: "birthday",
-            occursOn: formatIsoDate(occurrence),
-            years: occurrence.getFullYear() - parseIsoDateParts(row.date_of_birth).year,
-          },
-          daysBetween(today, occurrence),
-        );
+        const placed = placeInWeeks(row.date_of_birth, today);
+        if (placed) {
+          add(
+            {
+              memberId: row.id,
+              name,
+              type: "birthday",
+              occursOn: formatIsoDate(placed.occurrence),
+              years: placed.occurrence.getFullYear() - parseIsoDateParts(row.date_of_birth).year,
+            },
+            placed.week,
+          );
+        }
       }
 
       if (row.marital_status === "married" && row.wedding_date) {
-        const occurrence = nextOccurrence(row.wedding_date, today);
-        add(
-          {
-            memberId: row.id,
-            name,
-            type: "anniversary",
-            occursOn: formatIsoDate(occurrence),
-            years: occurrence.getFullYear() - parseIsoDateParts(row.wedding_date).year,
-          },
-          daysBetween(today, occurrence),
-        );
+        const placed = placeInWeeks(row.wedding_date, today);
+        if (placed) {
+          add(
+            {
+              memberId: row.id,
+              name,
+              type: "anniversary",
+              occursOn: formatIsoDate(placed.occurrence),
+              years: placed.occurrence.getFullYear() - parseIsoDateParts(row.wedding_date).year,
+            },
+            placed.week,
+          );
+        }
       }
     }
 

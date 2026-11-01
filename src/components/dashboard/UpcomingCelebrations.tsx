@@ -1,11 +1,18 @@
 import { Cake, HeartHandshake, PartyPopper } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { celebrationWindows } from "@/lib/dashboard/celebration-weeks";
 import { getUpcomingCelebrations, type UpcomingCelebration } from "@/lib/dashboard/dal";
 
 function formatDayLabel(iso: string): string {
   const [year, month, day] = iso.split("-").map(Number);
   const date = new Date(year, month - 1, day);
   return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
+// "2 Nov – 8 Nov": the Monday to Sunday a list covers.
+function rangeLabel(start: Date, end: Date): string {
+  const short = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return `${short(start)} – ${short(end)}`;
 }
 
 function CelebrationRow({ celebration }: { celebration: UpcomingCelebration }) {
@@ -45,6 +52,9 @@ function CelebrationList({ items, emptyText }: { items: UpcomingCelebration[]; e
 
 export async function UpcomingCelebrations({ organizationId }: { organizationId: string }) {
   const { thisWeek, nextWeek } = await getUpcomingCelebrations(organizationId);
+  const { thisStart, nextStart, nextEnd } = celebrationWindows(new Date());
+  const current = { start: thisStart, end: new Date(nextStart.getFullYear(), nextStart.getMonth(), nextStart.getDate() - 1) };
+  const next = { start: nextStart, end: nextEnd };
 
   return (
     <div>
@@ -55,7 +65,7 @@ export async function UpcomingCelebrations({ organizationId }: { organizationId:
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">This week</CardTitle>
+            <CardTitle className="text-sm">This week · {rangeLabel(current.start, current.end)}</CardTitle>
           </CardHeader>
           <CardContent>
             <CelebrationList items={thisWeek} emptyText="No birthdays or anniversaries this week." />
@@ -63,7 +73,7 @@ export async function UpcomingCelebrations({ organizationId }: { organizationId:
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Next week</CardTitle>
+            <CardTitle className="text-sm">Next week · {rangeLabel(next.start, next.end)}</CardTitle>
           </CardHeader>
           <CardContent>
             <CelebrationList items={nextWeek} emptyText="No birthdays or anniversaries next week." />

@@ -48,6 +48,8 @@ export interface AudienceCounts {
   church: number;
   groups: Record<GroupKey, number>;
   branches: Record<string, number>;
+  /** People with the app whose member record has no branch, so no branch send reaches them. */
+  noBranch?: number;
 }
 
 function reach(n: number): string {
@@ -178,6 +180,11 @@ export function PushBroadcastPanel({
                   ))}
                 </div>
                 <p className="text-xs text-muted-foreground">{branchId ? `${reach(counts.branches[branchId] ?? 0)} in this branch.` : "Choose a branch. The number is how many people with the app are in it."}</p>
+                {(counts.noBranch ?? 0) > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {counts.noBranch} {counts.noBranch === 1 ? "person with the app has" : "people with the app have"} no branch set on their member record, so a branch send won&apos;t reach them. Set their branch in Members to include them.
+                  </p>
+                )}
               </div>
             )}
 

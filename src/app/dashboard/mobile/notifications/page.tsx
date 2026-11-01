@@ -35,7 +35,7 @@ export default async function AppNotificationsPage() {
     Promise.all((branches ?? []).map(async (b) => [b.id, (await resolveAudienceAuthIds(organizationId, { type: "branch", branchId: b.id })).length] as const)),
     getScheduledCampaigns(organizationId, "push"),
   ]);
-  const counts: AudienceCounts = { church: church.length, groups: Object.fromEntries(groupCounts) as Record<GroupKey, number>, branches: Object.fromEntries(branchCounts) };
+  const counts: AudienceCounts = { church: church.length, groups: Object.fromEntries(groupCounts) as Record<GroupKey, number>, branches: Object.fromEntries(branchCounts), noBranch: Math.max(0, church.length - branchCounts.reduce((sum, [, n]) => sum + n, 0)) };
 
   // Who tapped each notification (the table has no row policies, so it is read by the server).
   const admin = createAdminClient();

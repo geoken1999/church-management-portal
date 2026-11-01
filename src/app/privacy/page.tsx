@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: "How KingdomFlow collects, uses, and protects data for churches and their congregations.",
 };
 
-const LAST_UPDATED = "October 19, 2026";
+const LAST_UPDATED = "November 1, 2026";
 
 export default function PrivacyPolicyPage() {
   return (
@@ -136,6 +136,30 @@ export default function PrivacyPolicyPage() {
           users, or the public, or in connection with a merger, acquisition, or sale of assets (with notice to
           affected Organizations where required).
         </p>
+      </LegalSection>
+
+      <LegalSection heading="Google user data and Limited Use">
+        <p>
+          If your Organization connects a Google account to KingdomFlow (for Google Meet, and for YouTube where
+          offered), we receive only what you approve on Google&apos;s consent screen: your Google email address,
+          name and profile details, and permission to create Google Meet meeting spaces on that account. We use
+          this only to show which account is connected and to create the meetings your team asks for. The access
+          tokens are encrypted before they are stored, and you can disconnect the account at any time from
+          KingdomFlow, which also revokes the permission with Google.
+        </p>
+        <p>
+          <strong>
+            The use of raw or derived user data received from Workspace APIs will adhere to the Google User Data
+            Policy, including the Limited Use requirements.
+          </strong>
+        </p>
+        <ul>
+          <li>We use Google user data only to provide and improve the user-facing features you requested, such as creating a Google Meet meeting.</li>
+          <li>We do not use, transfer or sell Google user data, whether raw, aggregated or derived, to create, train or improve generalized or foundational artificial intelligence or machine learning models.</li>
+          <li>We do not send Google user data to any third-party AI or machine learning service. The AI features in KingdomFlow (provided through OpenAI) never receive data from Google APIs.</li>
+          <li>We do not sell Google user data or use it for advertising, including personalized, retargeted or interest-based advertising.</li>
+          <li>We do not allow people to read Google user data, except with the account owner&apos;s consent, to investigate abuse or a security issue, to comply with the law, or when the data is aggregated and anonymized for internal operations.</li>
+        </ul>
       </LegalSection>
 
       <LegalSection heading="Data retention">

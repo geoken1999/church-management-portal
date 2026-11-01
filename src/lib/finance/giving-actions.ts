@@ -190,7 +190,8 @@ async function startGivingPayment(
         customerId: `giver_${Date.now()}`,
         customerName: donorName,
         customerEmail: donorEmail.trim() || `no-reply+${target.referenceId}@kingdomflow.app`,
-        customerPhone: donorPhone.trim() || "9999999999",
+        // Cashfree wants exactly 10 digits: "+91 98765 43210" or "098765-43210" would be refused.
+        customerPhone: donorPhone.replace(/\D/g, "").slice(-10).padStart(10, "9"),
         returnUrl,
         note: `Gift: ${target.title}`,
       },

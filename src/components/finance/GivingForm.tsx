@@ -152,7 +152,9 @@ export function GivingForm({
         await loadCashfreeScript();
         if (!window.Cashfree) throw new Error("missing");
         // Cashfree takes over the page, then returns to this one with the result.
-        await window.Cashfree({ mode: result.cashfreeMode ?? "production" }).checkout({ paymentSessionId: result.cashfreeSessionId, redirectTarget: "_self" });
+        const outcome = (await window.Cashfree({ mode: result.cashfreeMode ?? "production" }).checkout({ paymentSessionId: result.cashfreeSessionId, redirectTarget: "_self" })) as { error?: unknown } | undefined;
+        // Cashfree reports a failure to open by returning it, not by throwing.
+        if (outcome?.error) throw new Error("cashfree");
       } catch {
         setError(t.publicGive.paymentFormLoadError);
         setSubmitting(false);

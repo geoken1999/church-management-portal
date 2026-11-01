@@ -10,6 +10,7 @@
 const SCRIPT_HOSTS = [
   "https://sdk.cashfree.com",
   "https://*.cashfree.com",
+  "https://cashfree.com",
   "https://checkout.razorpay.com",
   "https://source.zoom.us",
   "https://*.zoom.us",
@@ -56,10 +57,11 @@ export function contentSecurityPolicy({ framingAllowed = true }: { framingAllowe
   const directives = [
     "default-src 'self'",
     `script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: ${SCRIPT_HOSTS.join(" ")}`,
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    // Cashfree's checkout loads its own stylesheet and fonts from its hosts.
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.cashfree.com",
     "img-src 'self' data: blob: https:",
     "media-src 'self' blob: data: https:",
-    "font-src 'self' data: https://fonts.gstatic.com",
+    "font-src 'self' data: https://fonts.gstatic.com https://*.cashfree.com",
     `connect-src 'self' blob: data: ${CONNECT_HOSTS.join(" ")}`,
     // Zoom starts its audio, video and decoding workers from its own host as well as from blobs.
     "worker-src 'self' blob: https://source.zoom.us https://*.zoom.us https://*.cloudfront.net",

@@ -106,7 +106,9 @@ async function openCashfreeCheckout(cashfree: NonNullable<RazorpayCheckout["cash
     await loadCashfree();
     if (!window.Cashfree) throw new Error("Couldn't load the payment window.");
     // Cashfree takes over this tab, so the cover stays until the page changes.
-    await window.Cashfree({ mode: cashfree.mode }).checkout({ paymentSessionId: cashfree.paymentSessionId, redirectTarget: "_self" });
+    const outcome = (await window.Cashfree({ mode: cashfree.mode }).checkout({ paymentSessionId: cashfree.paymentSessionId, redirectTarget: "_self" })) as { error?: { message?: string } } | undefined;
+    // Cashfree reports a failure to open (a bad session, a blocked page) by returning it, not by throwing.
+    if (outcome?.error) throw new Error(outcome.error.message || "Couldn't open the payment window.");
   } catch (err) {
     hidePaymentLoading();
     throw err;

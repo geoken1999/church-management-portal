@@ -4,10 +4,13 @@
 
 Sources:
   asv, bsb, ylt, darby, bbe (English; public domain): https://github.com/scrollmapper/bible_databases (formats/json/<NAME>.json)
-  hin (Hindi IRV) and tam (Tamil IRV), Indian Revised Version, (c) Bridge Connectivity Solutions, CC BY-SA 4.0:
-    https://ebible.org/Scriptures/hin2017_usfm.zip and tam2017_usfm.zip
+  webster, akjv, geneva (English; public domain): the same repository (Webster.json, AKJV.json, Geneva1599.json)
+  hin (Hindi IRV), tam (Tamil IRV), tel (Telugu IRV) and guj (Gujarati IRV), Indian Revised Version,
+    (c) Bridge Connectivity Solutions, CC BY-SA 4.0:
+    https://ebible.org/Scriptures/hin2017_usfm.zip, tam2017_usfm.zip, tel2017_usfm.zip and guj2017_usfm.zip
 
-Usage: python3 scripts/build-bible-extra.py <dir with ASV.json, BSB.json, YLT.json, Darby.json, BBE.json> <dir with hin2017/ and tam2017/ (unzipped USFM)>
+Usage: python3 scripts/build-bible-extra.py <dir with the scrollmapper *.json files> <dir with hin2017/, tam2017/, tel2017/, guj2017/ (unzipped USFM)>
+A Bible whose source is not in the given folders is skipped, so one can be added without rebuilding the others.
 """
 import json, os, re, sys, glob
 
@@ -62,9 +65,11 @@ def counts(b): return sum(len(c) for bk in b for c in bk)
 if __name__ == "__main__":
     en_dir, usfm_root = sys.argv[1], sys.argv[2]
     here = os.path.join(os.path.dirname(__file__), "..", "src", "data", "bible")
-    jobs = {name.lower(): scrollmapper(os.path.join(en_dir, name + ".json")) for name in ["ASV", "BSB", "YLT", "Darby", "BBE"]}
-    for key, folder in {"hin": "hin2017", "tam": "tam2017"}.items():
-        jobs[key] = usfm_dir(os.path.join(usfm_root, folder))
+    english = {"asv": "ASV", "bsb": "BSB", "ylt": "YLT", "darby": "Darby", "bbe": "BBE", "webster": "Webster", "akjv": "AKJV", "geneva": "Geneva1599"}
+    jobs = {key: scrollmapper(os.path.join(en_dir, name + ".json")) for key, name in english.items() if os.path.exists(os.path.join(en_dir, name + ".json"))}
+    for key, folder in {"hin": "hin2017", "tam": "tam2017", "tel": "tel2017", "guj": "guj2017"}.items():
+        if os.path.isdir(os.path.join(usfm_root, folder)):
+            jobs[key] = usfm_dir(os.path.join(usfm_root, folder))
     for key, bible in jobs.items():
         with open(os.path.join(here, key + ".json"), "w", encoding="utf-8") as f:
             json.dump({"books": bible}, f, ensure_ascii=False, separators=(",", ":"))

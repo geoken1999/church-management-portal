@@ -8,7 +8,7 @@ import { MAX_COMPARED, MAX_SLIDE_CHARS, pageReference, pageText, paginateVerses,
 
 // Bible text for the projector, from three places:
 //  - Bibles that ship with the app and are free to redistribute (see scripts/build-bible-data.py and
-//    build-bible-extra.py): English public-domain ones, and the Hindi and Tamil Indian Revised Versions (CC BY-SA 4.0).
+//    build-bible-extra.py): English public-domain ones, and the Hindi, Tamil, Telugu and Gujarati Indian Revised Versions (CC BY-SA 4.0).
 //  - Licensed translations (ESV, NKJV, NIV...) read live from API.Bible when API_BIBLE_KEY is set; their text is never stored.
 //  - Any translation a church added itself (stored per church).
 
@@ -20,8 +20,13 @@ export const BUILT_IN_TRANSLATIONS = [
   { key: "ylt", name: "Young's Literal Translation (YLT)", note: "public domain" },
   { key: "darby", name: "Darby Bible (DARBY)", note: "public domain" },
   { key: "bbe", name: "Bible in Basic English (BBE)", note: "public domain" },
+  { key: "webster", name: "Webster Bible (WBT)", note: "public domain" },
+  { key: "akjv", name: "American King James Version (AKJV)", note: "public domain" },
+  { key: "geneva", name: "Geneva Bible 1599 (GNV)", note: "public domain" },
   { key: "hin", name: "हिन्दी – Indian Revised Version (IRV-HI)", note: "© Bridge Connectivity Solutions, CC BY-SA 4.0" },
   { key: "tam", name: "தமிழ் – Indian Revised Version (IRV-TA)", note: "© Bridge Connectivity Solutions, CC BY-SA 4.0" },
+  { key: "tel", name: "తెలుగు – Indian Revised Version (IRV-TE)", note: "© Bridge Connectivity Solutions, CC BY-SA 4.0" },
+  { key: "guj", name: "ગુજરાતી – Indian Revised Version (IRV-GU)", note: "© Bridge Connectivity Solutions, CC BY-SA 4.0" },
 ] as const;
 
 type Compact = { books: string[][][] };
@@ -37,8 +42,13 @@ const LOADERS: Record<string, () => Promise<{ default: unknown }>> = {
   ylt: () => import("@/data/bible/ylt.json"),
   darby: () => import("@/data/bible/darby.json"),
   bbe: () => import("@/data/bible/bbe.json"),
+  webster: () => import("@/data/bible/webster.json"),
+  akjv: () => import("@/data/bible/akjv.json"),
+  geneva: () => import("@/data/bible/geneva.json"),
   hin: () => import("@/data/bible/hin.json"),
   tam: () => import("@/data/bible/tam.json"),
+  tel: () => import("@/data/bible/tel.json"),
+  guj: () => import("@/data/bible/guj.json"),
 };
 
 async function builtIn(key: string): Promise<Compact | null> {

@@ -178,5 +178,15 @@ export async function endChannel(userId: string, channelId: string): Promise<Wal
   const access = (await groupAccessFor(userId)).find((a) => a.organizationId === channel.organization_id && a.groupKey === channel.group_key);
   if (!access || !(access.isAdmin || channel.started_by === userId)) return fail("Only the person who started it, or an admin, can end this channel.");
   await admin.from("walkie_channels").update({ status: "ended", ended_at: new Date().toISOString() }).eq("id", channelId);
+  try {
+    const recipients = (await resolveAudienceAuthIds(channel.organization_id, { type: "group", groupKey: channel.group_key as GroupKey })).filter((id) => id !== userId);
+    await sendPushToUsers(recipients, "church_announcement", {
+      title: `${channel.name} has ended`,
+      body: `The ${GROUP_LABELS[channel.group_key as GroupKey]} walkie-talkie is over.`,
+      data: { type: "walkie_ended", channelId },
+    });
+  } catch (err) {
+    console.error("walkie end notification failed:", err);
+  }
   return { ok: true };
 }

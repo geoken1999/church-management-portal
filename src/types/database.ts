@@ -4268,6 +4268,12 @@ export type Database = {
         Update: Partial<PushBroadcast>;
         Relationships: [];
       };
+      walkie_channels: {
+        Row: WalkieChannel;
+        Insert: Partial<WalkieChannel> & Pick<WalkieChannel, "organization_id" | "group_key" | "name" | "room_id">;
+        Update: Partial<WalkieChannel>;
+        Relationships: [];
+      };
       push_opens: {
         Row: PushOpen;
         Insert: Partial<PushOpen> & Pick<PushOpen, "broadcast_id" | "auth_user_id">;
@@ -5727,4 +5733,16 @@ export type SpecialDayPush = {
   kind: "birthday" | "anniversary";
   year: number;
   sent_at: string;
+};
+
+export type WalkieChannel = {
+  id: string;
+  organization_id: string;
+  group_key: "leaders" | "youth" | "worship" | "media" | "committee";
+  name: string;
+  room_id: string;
+  status: "live" | "ended";
+  started_by: string | null;
+  started_at: string;
+  ended_at: string | null;
 };

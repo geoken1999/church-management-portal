@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireMobileAdmin } from "@/lib/mobile/staff-auth";
 import { generatePassword } from "@/lib/auth/password";
+import { sendProfileSetupLink } from "@/lib/auth/profile-setup";
 import { validateName, validatePhone } from "@/lib/auth/validation";
 import { TAB_KEYS } from "@/lib/permissions/tabs";
 import { checkTeamMemberQuota, getPlanUsage } from "@/lib/plans/dal";
@@ -139,7 +140,23 @@ export async function POST(request: Request) {
         error: "Couldn't add that user to your organization. Please try again.",
       });
     }
-    return NextResponse.json({ ok: true, email, password });
+    const { data: organization } = await admin
+      .from("organizations")
+      .select("name")
+      .eq("id", organizationId)
+      .maybeSingle();
+    const emailed = await sendProfileSetupLink(
+      email,
+      firstName,
+      organization?.name ?? "your church",
+    );
+    // The generated password is only handed back when the setup email could not be sent.
+    return NextResponse.json({
+      ok: true,
+      email,
+      emailed,
+      password: emailed ? "" : password,
+    });
   }
 
   if (body.action === "permissions") {

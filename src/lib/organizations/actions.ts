@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/dal";
 import { getAuthErrorMessage } from "@/lib/auth/errors";
 import { generatePassword } from "@/lib/auth/password";
+import { sendProfileSetupLink } from "@/lib/auth/profile-setup";
 import { validateName, validatePhone } from "@/lib/auth/validation";
 import { TAB_KEYS } from "@/lib/permissions/tabs";
 import {
@@ -376,13 +377,14 @@ export interface CreateLoginState {
   fieldErrors?: { firstName?: string; lastName?: string; email?: string; phone?: string };
   success?: boolean;
   email?: string;
+  /** Only set when the setup email could not be sent, so the church can share it by hand. */
   password?: string;
+  emailed?: boolean;
 }
 
-// Issues a ready-to-use login directly, rather than requiring the person to
-// self-register and pick their own password — meant for church staff who
-// won't sign up on their own; the admin shares the generated password with
-// them out of band.
+// Creates the login directly, rather than requiring the person to self-register — meant for church staff who
+// won't sign up on their own. They are emailed a link to set up their profile and choose their own password;
+// the generated one is only handed back if that email could not be sent.
 export async function createMemberLogin(
   _prevState: CreateLoginState,
   formData: FormData,
@@ -453,8 +455,11 @@ export async function createMemberLogin(
     return { error: "Couldn't add that user to your organization. Please try again." };
   }
 
+  const { data: organization } = await admin.from("organizations").select("name").eq("id", organizationId).maybeSingle();
+  const emailed = await sendProfileSetupLink(email, firstName, organization?.name ?? "your church");
+
   revalidatePath("/dashboard/team");
-  return { success: true, email, password };
+  return emailed ? { success: true, email, emailed } : { success: true, email, password };
 }
 
 // Member-only by the .eq("role", "member") guard below — owner/admin access

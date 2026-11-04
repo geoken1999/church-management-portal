@@ -81,18 +81,31 @@ export function CreateLoginForm({
         <DialogHeader>
           <DialogTitle>Create a login</DialogTitle>
           <DialogDescription>
-            Issue a ready-to-use email and password for someone who won&apos;t sign up themselves — you&apos;ll
-            share these credentials with them directly.
+            Add someone who won&apos;t sign up themselves. They&apos;ll get an email with a link to set up their
+            profile and choose their own password.
           </DialogDescription>
         </DialogHeader>
 
-        {state.success && state.email && state.password ? (
+        {state.success && state.email && state.emailed ? (
+          <div className="space-y-4">
+            <Alert>
+              <AlertDescription>
+                Login created. We emailed a profile setup link to {state.email} from teams@kingdomflow.in.
+              </AlertDescription>
+            </Alert>
+            <DialogFooter>
+              <Button type="button" onClick={() => setOpen(false)}>
+                Done
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : state.success && state.email && state.password ? (
           <div className="space-y-4">
             <Alert>
               <AlertDescription>
                 <p className="mb-2">
-                  Login created. This password is shown only once — copy it now and share it with{" "}
-                  {state.email}.
+                  Login created, but we couldn&apos;t email the setup link. This password is shown only once — copy
+                  it now and share it with {state.email}, or ask them to use Forgot password.
                 </p>
                 <div className="space-y-2">
                   <code className="block truncate rounded bg-muted px-2 py-1 text-xs">{state.email}</code>

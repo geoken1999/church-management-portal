@@ -9,6 +9,7 @@ const NAV = [
   { href: "/features", label: "Features" },
   { href: "/apps", label: "Mobile apps" },
   { href: "/pricing", label: "Pricing" },
+  { href: "/docs", label: "Docs" },
 ];
 
 // The header and footer shared by the home page and its sub-pages
@@ -73,6 +74,7 @@ export function LandingShell({ children }: { children: ReactNode }) {
               </a>
             )}
             <Link href="/login" className="text-sm text-muted-foreground hover:text-foreground">Sign in</Link>
+            <Link href="/docs" className="text-sm text-muted-foreground hover:text-foreground">Documentation</Link>
             <Link href="/about" className="text-sm text-muted-foreground hover:text-foreground">About Us</Link>
             <Link href="/privacy" className="text-sm text-muted-foreground hover:text-foreground">Privacy Policy</Link>
             <Link href="/terms" className="text-sm text-muted-foreground hover:text-foreground">Terms of Use</Link>

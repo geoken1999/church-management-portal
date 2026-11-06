@@ -5,7 +5,7 @@ import { endChannel, joinChannel, listChannels, startChannel } from "@/lib/walki
 // The mobile app's walkie-talkie: list the channels a person can use, start or end one, and get what the app needs
 // to connect to it. Who may do what is decided in lib/walkie/service.ts.
 // Switched off for now: set to true to turn the walkie-talkie back on (the mobile app hides its entries with the same flag).
-const WALKIE_ENABLED = false;
+const WALKIE_ENABLED = true;
 
 export async function POST(request: Request) {
   if (!WALKIE_ENABLED) return NextResponse.json({ ok: false, error: "The walkie-talkie isn't available yet." }, { status: 503 });

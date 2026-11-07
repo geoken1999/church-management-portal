@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { Smartphone } from "lucide-react";
 import { Logo } from "@/components/Logo";
-import { APP_STORE_URL } from "@/lib/app-links";
 import { AppStoreButtons } from "@/components/landing/AppStoreButtons";
 import {
   Card,
@@ -19,10 +17,7 @@ export const metadata: Metadata = {
 // Landed on by the middleware (src/lib/supabase/middleware.ts) whenever a phone browser requests the app itself
 // (sign-in and anything past it). The public landing page, public forms and the public join link never redirect
 // here. Instead of a dead end it is the download screen for the KingdomFlow app.
-export default async function MobileRestrictedPage() {
-  const userAgent = (await headers()).get("user-agent") ?? "";
-  const onIphone = /iPhone|iPod|iPad/i.test(userAgent);
-  const iphoneNotReady = onIphone && !APP_STORE_URL;
+export default function MobileRestrictedPage() {
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-background px-4 py-12 sm:px-6">
@@ -51,12 +46,6 @@ export default async function MobileRestrictedPage() {
           </CardHeader>
           <CardContent className="space-y-5">
             <AppStoreButtons className="flex-col" />
-            {iphoneNotReady && (
-              <p className="rounded-lg bg-muted px-3 py-2 text-center text-sm text-muted-foreground">
-                The iPhone app is coming soon. Until then, please sign in from a
-                computer or tablet.
-              </p>
-            )}
             <ul className="space-y-1.5 text-sm text-muted-foreground">
               <li>
                 Already installed? Open the KingdomFlow app and sign in there.

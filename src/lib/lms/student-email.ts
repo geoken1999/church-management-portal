@@ -2,7 +2,7 @@ import "server-only";
 
 import { sendBulkEmail } from "@/lib/email/client";
 import { isEmailConfigured } from "@/lib/email/env";
-import { PLAY_STORE_URL } from "@/lib/app-links";
+import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/app-links";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 
 function escapeHtml(value: string): string {
@@ -38,7 +38,7 @@ export async function emailStudentApproved(
         options.learnUrl
           ? `<p><a href="${options.learnUrl}">Open your courses on the web</a></p>`
           : ""
-      }<p><a href="${PLAY_STORE_URL}">Or get the app on Google Play</a></p></div>`,
+      }<p>Or get the app: <a href="${PLAY_STORE_URL}">Google Play</a>${APP_STORE_URL ? ` · <a href="${APP_STORE_URL}">App Store</a>` : ""}</p></div>`,
       recipients: [email],
     });
   } catch (err) {

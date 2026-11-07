@@ -58,8 +58,8 @@ import { AppStoreButtons } from "@/components/landing/AppStoreButtons";
 const STATS = [
   { value: "30+", label: "built-in modules" },
   {
-    value: "Android app",
-    label: "on Google Play for your team and members, iPhone coming soon",
+    value: "Android & iPhone",
+    label: "apps on Google Play and the App Store for your team and members",
   },
   { value: "14-day", label: "free trial, no card" },
   { value: "Multi-branch", label: "ready from day one" },
@@ -372,7 +372,7 @@ const FAQS = [
   {
     question: "Is there a mobile app?",
     answer:
-      "Yes — the KingdomFlow app is on Google Play for Android phones, and the iPhone app is coming soon. Your team signs in with their dashboard login to manage the church, and members sign in with their phone number to see the Home screen you design, register for events, give, pray and join calls.",
+      "Yes — the KingdomFlow app is on Google Play for Android phones and on the App Store for iPhone. Your team signs in with their dashboard login to manage the church, and members sign in with their phone number to see the Home screen you design, register for events, give, pray and join calls.",
   },
   {
     question: "Can we hold video and audio calls without another tool?",

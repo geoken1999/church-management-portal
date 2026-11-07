@@ -3,4 +3,4 @@ export const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com
 
 // The App Store listing, e.g. "https://apps.apple.com/in/app/kingdomflow/id1234567890". While it is
 // empty, no App Store button or link is shown.
-export const APP_STORE_URL = "";
+export const APP_STORE_URL = "https://apps.apple.com/us/app/kingdomflow/id6826385582";

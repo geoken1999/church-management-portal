@@ -15,6 +15,19 @@ export const getEvents = cache(async (organizationId: string) => {
   return data ?? [];
 });
 
+// How many people are registered for each event (cancelled registrations not counted), for the event cards.
+export const getRegistrationCounts = cache(async (organizationId: string) => {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("event_registrations")
+    .select("event_id")
+    .eq("organization_id", organizationId)
+    .neq("status", "cancelled");
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) counts.set(row.event_id, (counts.get(row.event_id) ?? 0) + 1);
+  return counts;
+});
+
 // Per-event payout ledger for platform-gateway paid events — mirrors
 // getFundraisers' aggregation in src/lib/finance/dal.ts exactly.
 // "Collected" is deliberately read from event_registration_payment_orders

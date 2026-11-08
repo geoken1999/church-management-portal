@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organizations/dal";
 import { getLeaderMembers } from "@/lib/leaders/dal";
 import { getBranches } from "@/lib/branches/dal";
-import { getEvents, getEventPayoutLedger } from "@/lib/events/dal";
+import { getEvents, getEventPayoutLedger, getRegistrationCounts } from "@/lib/events/dal";
 import { getOrganizationPayoutDetails } from "@/lib/organizations/payout-details-dal";
 import { getKmeetMeetingsByEvent } from "@/lib/kmeet/dal";
 import { getPlanLimits } from "@/lib/plans/dal";
@@ -25,7 +25,7 @@ export default async function EventsPage() {
 
   // Event managers are picked from Leaders, not the full members list —
   // see /dashboard/leaders.
-  const [assignableMembers, branches, events, kmeetByEvent, plan, payoutLedger, payoutDetails] = await Promise.all([
+  const [assignableMembers, branches, events, kmeetByEvent, plan, payoutLedger, payoutDetails, registrationCounts] = await Promise.all([
     getLeaderMembers(organizationId),
     getBranches(organizationId),
     getEvents(organizationId),
@@ -33,10 +33,12 @@ export default async function EventsPage() {
     getPlanLimits(organizationId),
     getEventPayoutLedger(organizationId),
     getOrganizationPayoutDetails(organizationId),
+    getRegistrationCounts(organizationId),
   ]);
 
   const eventsWithPayouts = events.map((event) => ({
     ...event,
+    registrationCount: registrationCounts.get(event.id) ?? 0,
     ...(payoutLedger.get(event.id) ?? { collected: 0, owed: 0, pendingPayoutRequest: null, payoutHistory: [] }),
   }));
 

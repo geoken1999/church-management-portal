@@ -15,6 +15,7 @@ import {
   Video,
   Phone,
   Webcam,
+  Ticket,
 } from "lucide-react";
 import { cn } from "cn";
 import {
@@ -89,6 +90,7 @@ type BranchBasic = Pick<Branch, "id" | "name">;
 type EventRow = Event & {
   members: MemberBasic | null;
   branches: BranchBasic | null;
+  registrationCount: number;
   collected: number;
   owed: number;
   pendingPayoutRequest: { id: string; amount: number } | null;
@@ -895,6 +897,21 @@ function EventCard({
                       : ""}
                 </a>
               ))}
+            </div>
+          )}
+          {event.registration_enabled && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Ticket className="size-3.5 shrink-0" />
+              <span>
+                {event.registrationCount}{" "}
+                {event.registrationCount === 1 ? "registrant" : "registrants"}
+                {event.registration_capacity
+                  ? ` of ${event.registration_capacity}`
+                  : ""}
+                {shownStatus === "completed" || shownStatus === "cancelled"
+                  ? " · registration closed"
+                  : ""}
+              </span>
             </div>
           )}
           <div className="flex items-center gap-2 text-sm text-muted-foreground">

@@ -53,6 +53,25 @@ const PASS_TEMPLATE_EXAMPLES = [
   "Sunday Service",
   "Sat, 21 Nov 2026, 9:00 AM",
 ];
+
+// The same message with the venue, map link and contact added. Sent instead of the one above only when the event
+// has a map link; an event without one sends just the pass. (A template's variables are fixed, so this is a
+// second template, created and approved the same way.)
+export const PASS_DETAILS_TEMPLATE_NAME = "event_registration_pass_details";
+const PASS_DETAILS_TEMPLATE_BODY =
+  "Hi {{1}}, your registration for {{2}} on {{3}} is confirmed. Venue: {{4}}. Map: {{5}}. Contact: {{6}}. Tap the button below to view your pass for check-in.";
+const PASS_DETAILS_TEMPLATE_EXAMPLES = [
+  ...PASS_TEMPLATE_EXAMPLES,
+  "Grace Church, Andheri",
+  "https://maps.app.goo.gl/example",
+  "Ann, +91 98765 43210",
+];
+
+type PassVariant = "basic" | "details";
+const VARIANTS = {
+  basic: { name: PASS_TEMPLATE_NAME, body: PASS_TEMPLATE_BODY, examples: PASS_TEMPLATE_EXAMPLES, variables: 3 },
+  details: { name: PASS_DETAILS_TEMPLATE_NAME, body: PASS_DETAILS_TEMPLATE_BODY, examples: PASS_DETAILS_TEMPLATE_EXAMPLES, variables: 6 },
+} as const;
 // Rejected earlier versions, cleaned out of the Templates list.
 const LEGACY_PASS_TEMPLATE_NAMES = [
   "event_registration_pass",
@@ -76,7 +95,9 @@ export interface PassTemplateState {
 export async function ensurePassTemplate(
   organizationId: string,
   credentials?: WhatsAppCredentials,
+  variant: PassVariant = "basic",
 ): Promise<PassTemplateState> {
+  const template = VARIANTS[variant];
   const admin = createAdminClient();
   const creds = credentials ?? (await getWhatsAppCredentials(organizationId));
 
@@ -91,7 +112,7 @@ export async function ensurePassTemplate(
     .from("whatsapp_templates")
     .select("id, status, meta_template_id")
     .eq("organization_id", organizationId)
-    .eq("name", PASS_TEMPLATE_NAME)
+    .eq("name", template.name)
     .maybeSingle();
 
   if (existing) {
@@ -134,7 +155,7 @@ export async function ensurePassTemplate(
     // this one, use it (nothing in it is specific to a church) instead of
     // failing on the duplicate name.
     const onMeta = await findMetaTemplateByName(
-      PASS_TEMPLATE_NAME,
+      template.name,
       "en_US",
       creds,
     );
@@ -146,11 +167,11 @@ export async function ensurePassTemplate(
         }
       : {
           ...(await createMetaTemplate({
-            name: PASS_TEMPLATE_NAME,
+            name: template.name,
             language: "en_US",
             category: "utility",
-            bodyText: PASS_TEMPLATE_BODY,
-            exampleValues: PASS_TEMPLATE_EXAMPLES,
+            bodyText: template.body,
+            exampleValues: [...template.examples],
             buttons,
             credentials: creds,
           })),
@@ -159,11 +180,11 @@ export async function ensurePassTemplate(
 
     await admin.from("whatsapp_templates").insert({
       organization_id: organizationId,
-      name: PASS_TEMPLATE_NAME,
+      name: template.name,
       language: "en_US",
       category: "utility",
-      body_text: PASS_TEMPLATE_BODY,
-      variable_count: 3,
+      body_text: template.body,
+      variable_count: template.variables,
       header_type: "none",
       header_image_path: null,
       buttons,
@@ -202,7 +223,7 @@ export async function sendPassWhatsAppForRegistration(
     const { data: registration } = await admin
       .from("event_registrations")
       .select(
-        "answers, phone, confirmation_code, pass_token, organization_id, events(title, start_at, branch_id, registration_pass_whatsapp, registration_fields, organizations(name, timezone, country))",
+        "answers, phone, confirmation_code, pass_token, organization_id, events(title, start_at, branch_id, venue, map_link, contact_name, contact_phone, branches(name), registration_pass_whatsapp, registration_fields, organizations(name, timezone, country))",
       )
       .eq("id", registrationId)
       .maybeSingle();
@@ -212,6 +233,11 @@ export async function sendPassWhatsAppForRegistration(
       title: string;
       start_at: string;
       branch_id: string | null;
+      venue: string | null;
+      map_link: string | null;
+      contact_name: string | null;
+      contact_phone: string | null;
+      branches: { name: string } | null;
       registration_pass_whatsapp: boolean;
       registration_fields: EventRegistrationField[] | null;
       organizations: {
@@ -247,8 +273,16 @@ export async function sendPassWhatsAppForRegistration(
     if (!phone) return;
 
     const credentials = await getWhatsAppCredentials(organizationId);
-    const template = await ensurePassTemplate(organizationId, credentials);
-    if (template.status !== "approved") return; // not approved yet; the email already went out
+    // With a map link, the message carries the venue, map and contact; without one, just the pass. If the details
+    // message isn't approved yet, fall back to the plain pass rather than sending nothing.
+    const mapLink = event.map_link?.trim() ?? "";
+    let variant: PassVariant = "basic";
+    if (mapLink) {
+      const details = await ensurePassTemplate(organizationId, credentials, "details");
+      if (details.status === "approved") variant = "details";
+    }
+    const template = await ensurePassTemplate(organizationId, credentials, "basic");
+    if (variant === "basic" && template.status !== "approved") return; // not approved yet; the email already went out
 
     const quotaError = await checkWhatsAppQuota(organizationId, 1);
     if (quotaError) return; // logged by checkWhatsAppQuota
@@ -264,13 +298,20 @@ export async function sendPassWhatsAppForRegistration(
       "en-IN",
     );
 
+    const contact = [event.contact_name?.trim(), event.contact_phone?.trim()].filter(Boolean).join(", ");
+    const templateName = VARIANTS[variant].name;
+    const bodyParams =
+      variant === "details"
+        ? [name, event.title, startLabel, event.venue?.trim() || event.branches?.name || "See the map", mapLink, contact || "Not provided"]
+        : [name, event.title, startLabel];
+
     let failure: string | null = null;
     try {
       const sent = await sendTemplateMessage({
         to: phone,
-        templateName: PASS_TEMPLATE_NAME,
+        templateName,
         languageCode: "en_US",
-        bodyParams: [name, event.title, startLabel],
+        bodyParams,
         buttonUrlParam: registration.pass_token,
         credentials,
       });
@@ -281,7 +322,7 @@ export async function sendPassWhatsAppForRegistration(
           refId: null,
           recipient: phone,
           wamid: sent.id,
-          templateName: PASS_TEMPLATE_NAME,
+          templateName,
           category: "utility",
           senderKey: senderKeyFor(credentials),
         },

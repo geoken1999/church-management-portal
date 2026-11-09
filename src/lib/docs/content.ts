@@ -409,6 +409,17 @@ export const DOC_CATEGORIES: DocCategory[] = [
         ],
       },
       {
+        id: "qr-codes",
+        title: "QR Codes — dynamic codes, short links and scan counts",
+        body: [
+          "QR Codes makes a code that points at a short link of yours (kingdomflow.in/q/…). Print it once, then change where it goes whenever you like, so a poster or bulletin never goes out of date.",
+          "Platform links: send iPhone, Android and computer visitors to different places, for example the App Store, Google Play and your website. Anything left empty uses the main link.",
+          "Short link: leave it empty for a random one, or choose your own such as /q/give. Share the link directly if you don't need the picture.",
+          "Look: pick colours or a gradient, dot and corner shapes, put your church logo in the middle, and add a line of text under the code like \"Scan to give\". Keep the dots clearly darker than the background so phones can scan it. Download as a PNG for screens or an SVG for print.",
+          "Settings: set an end date, or pause a code, and scans go to a link of your choice instead. Each code shows its scan count, with scans by phone type, by day and by country. Link previews and robots are not counted.",
+        ],
+      },
+      {
         id: "accounting",
         title: "Accounting — income, expenses, ledger & invoices",
         body: [

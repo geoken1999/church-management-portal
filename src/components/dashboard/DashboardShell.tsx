@@ -52,6 +52,7 @@ import {
   HandHelping,
   Wallet,
   Radio,
+  QrCode,
   ChevronDown,
 } from "lucide-react";
 import { MENU_PREFS_EVENT, readMenuPrefsFromBrowser, saveMenuPrefs, type MenuPrefs } from "@/lib/menu-prefs";
@@ -134,6 +135,7 @@ const NAV_GROUPS = [
       { href: "/dashboard/attendance", itemKey: "attendance" as const, icon: ClipboardCheck, tab: "attendance" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/reports", itemKey: "reports" as const, icon: FileBarChart, tab: "reports" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/widget", itemKey: "widget" as const, icon: LayoutTemplate, tab: "widget" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
+      { href: "/dashboard/qr-codes", itemKey: "qrCodes" as const, icon: QrCode, tab: "qrcodes" as TabKey, planFeature: NO_PLAN_FEATURE, managerOnly: false },
       { href: "/dashboard/accounting", itemKey: "accounting" as const, icon: Calculator, tab: "accounting" as TabKey, planFeature: "finance" as PlanFeature, managerOnly: false },
     ],
   },

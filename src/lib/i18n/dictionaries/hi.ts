@@ -69,6 +69,7 @@ export const hi: Dictionary = {
       attendance: "उपस्थिति",
       reports: "रिपोर्ट",
       widget: "विजेट",
+      qrCodes: "QR कोड",
       accounting: "लेखांकन",
       fundraisers: "निधि संग्रह",
       offerings: "भेंट",

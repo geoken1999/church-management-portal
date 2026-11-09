@@ -29,6 +29,7 @@ const NO_SESSION_PREFIXES = [
   "/api/resend/",
   "/api/csp-report",
   "/api/netcheck",
+  "/q/",
 ];
 
 export function skipsSessionCheck(pathname: string): boolean {

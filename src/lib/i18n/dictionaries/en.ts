@@ -71,6 +71,7 @@ export const en = {
       attendance: "Attendance",
       reports: "Reports",
       widget: "Widget",
+      qrCodes: "QR Codes",
       accounting: "Accounting",
       fundraisers: "Fund Raiser",
       offerings: "Offering",

@@ -4268,6 +4268,18 @@ export type Database = {
         Update: Partial<PushBroadcast>;
         Relationships: [];
       };
+      qr_codes: {
+        Row: QrCodeRow;
+        Insert: Partial<QrCodeRow> & Pick<QrCodeRow, "organization_id" | "name" | "code" | "destination_url">;
+        Update: Partial<QrCodeRow>;
+        Relationships: [];
+      };
+      qr_scans: {
+        Row: QrScanRow;
+        Insert: Partial<QrScanRow> & Pick<QrScanRow, "qr_code_id" | "organization_id" | "platform">;
+        Update: Partial<QrScanRow>;
+        Relationships: [];
+      };
       walkie_channels: {
         Row: WalkieChannel;
         Insert: Partial<WalkieChannel> & Pick<WalkieChannel, "organization_id" | "group_key" | "name" | "room_id">;
@@ -5273,6 +5285,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      record_qr_scan: {
+        Args: { p_qr: string; p_org: string; p_platform: string; p_country: string | null };
+        Returns: undefined;
+      };
       create_organization: {
         Args: {
           org_name: string;
@@ -5745,4 +5761,33 @@ export type WalkieChannel = {
   started_by: string | null;
   started_at: string;
   ended_at: string | null;
+};
+
+export type QrCodeRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  code: string;
+  destination_url: string;
+  ios_url: string | null;
+  android_url: string | null;
+  desktop_url: string | null;
+  expires_at: string | null;
+  expired_url: string | null;
+  status: "active" | "paused";
+  design: Record<string, unknown>;
+  scan_count: number;
+  last_scanned_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type QrScanRow = {
+  id: number;
+  qr_code_id: string;
+  organization_id: string;
+  platform: "ios" | "android" | "desktop";
+  country: string | null;
+  scanned_at: string;
 };

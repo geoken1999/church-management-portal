@@ -43,6 +43,7 @@ export const MODULES: ModuleDef[] = [
   { key: "prayer", group: "Ministry", records: s("prayer_requests", "prayer requests") },
   { key: "todos", group: "Ministry", records: s("todos", "to-dos") },
   { key: "planner", group: "Tools", records: s("plans", "plans") },
+  { key: "qrcodes", group: "Tools", records: s("qr_codes", "QR codes"), activity: s("qr_scans", "scans") },
   { key: "kmeet", group: "Tools", records: s("kmeet_meetings", "meetings") },
   { key: "kaudio", group: "Tools" },
   { key: "livestream", group: "Tools", records: s("live_streams", "streams") },

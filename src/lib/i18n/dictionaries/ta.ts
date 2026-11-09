@@ -69,6 +69,7 @@ export const ta: Dictionary = {
       attendance: "வருகை",
       reports: "அறிக்கைகள்",
       widget: "விட்ஜெட்",
+      qrCodes: "QR குறியீடுகள்",
       accounting: "கணக்கியல்",
       fundraisers: "நிதி திரட்டல்",
       offerings: "காணிக்கை",

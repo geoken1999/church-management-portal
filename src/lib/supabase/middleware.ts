@@ -80,6 +80,8 @@ function isMobilePhone(userAgent: string | null): boolean {
   return userAgent ? MOBILE_PHONE_UA.test(userAgent) : false;
 }
 
+const SESSION_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+
 // Refreshes the Supabase session cookie on every request and performs
 // optimistic route protection, per the Next.js Proxy + Supabase SSR pattern.
 // This is the app's single source of truth for which routes require auth —
@@ -122,13 +124,24 @@ export async function updateSession(request: NextRequest) {
   // Do not run any logic between createServerClient and getUser — it
   // refreshes the auth token and must run on every request.
   const {
-    data: { user },
+    data: { user: signedInUser },
   } = await supabase.auth.getUser();
+
+  // A web sign-in lasts SESSION_MAX_AGE_MS from the moment the person signed in, however often the token refreshes
+  // in between; after that they sign in again. last_sign_in_at moves only on a real sign-in, not on a refresh.
+  const expired =
+    !!signedInUser?.last_sign_in_at &&
+    Date.now() - new Date(signedInUser.last_sign_in_at).getTime() > SESSION_MAX_AGE_MS;
+  if (expired) await supabase.auth.signOut();
+  const user = expired ? null : signedInUser;
 
   if (isProtectedRoute(pathname) && !user) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(loginUrl);
+    const redirect = NextResponse.redirect(loginUrl);
+    // Carry the cleared auth cookies onto the redirect so the expired session doesn't linger.
+    for (const cookie of response.cookies.getAll()) redirect.cookies.set(cookie);
+    return redirect;
   }
 
   // A phone-number sign-in (a Bible School student or member using the web learning portal) has no email

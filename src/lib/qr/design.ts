@@ -25,6 +25,10 @@ export interface QrDesign {
   logoShape: (typeof LOGO_SHAPES)[number];
   /** A solid patch in the background colour behind the logo; off lets a transparent logo sit straight on the code. */
   logoBacking: boolean;
+  /** Colour of that patch, or null for the code's background colour. */
+  logoBg: string | null;
+  /** A ring in the dot colour around the logo, which is what makes its shape visible on a plain background. */
+  logoBorder: boolean;
   /** Text on a bar under the code, e.g. "Scan to give". */
   label: string;
   labelBar: string;
@@ -42,6 +46,8 @@ export const DEFAULT_QR_DESIGN: QrDesign = {
   logo: false,
   logoShape: "square",
   logoBacking: true,
+  logoBg: null,
+  logoBorder: true,
   label: "",
   labelBar: "#111827",
   labelText: "#ffffff",
@@ -66,6 +72,8 @@ export function normalizeDesign(raw: unknown): QrDesign {
     logo: d.logo === true,
     logoShape: oneOf(d.logoShape, LOGO_SHAPES, base.logoShape),
     logoBacking: d.logoBacking !== false,
+    logoBg: d.logoBg ? color(d.logoBg, base.bg) : null,
+    logoBorder: d.logoBorder !== false,
     label: typeof d.label === "string" ? d.label.slice(0, 30) : "",
     labelBar: color(d.labelBar, base.labelBar),
     labelText: color(d.labelText, base.labelText),
@@ -155,19 +163,24 @@ export function renderQrSvg(text: string, design: QrDesign, options: RenderOptio
   const dotFill = design.fg2 ? `url(#${gid})` : design.fg;
 
   const logoX = QUIET + (n - logoSize) / 2;
-  const cx = logoX + logoSize / 2;
   const clipId = `${gid}c`;
-  const shapeAt = (pad: number, attrs: string) => {
-    const size = logoSize + pad * 2;
-    const at = logoX - pad;
-    if (design.logoShape === "circle") return `<circle cx="${f(cx)}" cy="${f(cx)}" r="${f(size / 2)}" ${attrs}/>`;
+  // The logo's shape: a circle, rounded square or square of `size` modules with its top-left at (at, at).
+  const shape = (at: number, size: number, attrs: string) => {
+    if (design.logoShape === "circle") return `<circle cx="${f(at + size / 2)}" cy="${f(at + size / 2)}" r="${f(size / 2)}" ${attrs}/>`;
     const rx = design.logoShape === "rounded" ? f(size * 0.22) : 0;
     return `<rect x="${f(at)}" y="${f(at)}" width="${f(size)}" height="${f(size)}" rx="${rx}" ${attrs}/>`;
   };
+  // A logo with its own white background looks the same in any shape on a white code, so the shape is drawn as a
+  // patch (and ring) around the logo, with the logo sitting inside it.
+  const framed = design.logoBacking || design.logoBorder;
+  const inset = framed ? logoSize * 0.12 : 0;
+  const imageSize = logoSize - inset * 2;
+  const patch = design.logoBg ?? (design.transparent ? "#ffffff" : design.bg);
   const logoMarkup = logo
-    ? (design.logoBacking ? shapeAt(0.4, `fill="${design.transparent ? "#ffffff" : design.bg}"`) : "") +
-      `<clipPath id="${clipId}">${shapeAt(0, "")}</clipPath>` +
-      `<image href="${logo}" x="${f(logoX)}" y="${f(logoX)}" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet" clip-path="url(#${clipId})"/>`
+    ? (design.logoBacking ? shape(logoX, logoSize, `fill="${patch}"`) : "") +
+      (design.logoBorder ? shape(logoX + 0.18, logoSize - 0.36, `fill="none" stroke="${design.eyeColor ?? design.fg}" stroke-width="0.36"`) : "") +
+      `<clipPath id="${clipId}">${shape(logoX + inset, imageSize, "")}</clipPath>` +
+      `<image href="${logo}" x="${f(logoX + inset)}" y="${f(logoX + inset)}" width="${f(imageSize)}" height="${f(imageSize)}" preserveAspectRatio="xMidYMid meet" clip-path="url(#${clipId})"/>`
     : "";
 
   const label = labelHeight

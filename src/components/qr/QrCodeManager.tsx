@@ -464,6 +464,11 @@ function QrEditor({ siteUrl, code }: { siteUrl: string; code?: QrCodeRow }) {
                       <input type="checkbox" checked={design.logoBacking} onChange={(e) => patch({ logoBacking: e.target.checked })} />
                       Solid background behind the logo (turn off for a transparent logo)
                     </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={design.logoBorder} onChange={(e) => patch({ logoBorder: e.target.checked })} />
+                      Outline around the logo (shows its shape clearly)
+                    </label>
+                    {design.logoBacking && <ColorField label="Logo background" value={design.logoBg ?? design.bg} onChange={(v) => patch({ logoBg: v })} onClear={design.logoBg ? () => patch({ logoBg: null }) : undefined} />}
                   </>
                 )}
                 <Field label="Text under the code" hint="e.g. Scan to give. Leave empty for none.">

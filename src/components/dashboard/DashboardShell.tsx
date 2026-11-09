@@ -230,7 +230,7 @@ export function DashboardShell(
   const { initialLocale, ...rest } = props;
   return (
     <DashboardLocaleProvider initialLocale={initialLocale}>
-      <QrLogoProvider value={{ url: rest.organization.qr_logo_url ?? null, sizePercent: rest.organization.qr_logo_size ?? 20 }}>
+      <QrLogoProvider value={{ url: rest.organization.qr_logo_url ?? null, sizePercent: rest.organization.qr_logo_size ?? 20, fallbackUrl: rest.organization.logo_url ?? null }}>
         <DashboardShellInner {...rest} />
       </QrLogoProvider>
     </DashboardLocaleProvider>

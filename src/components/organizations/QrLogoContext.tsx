@@ -5,6 +5,8 @@ import { createContext, useContext, type ReactNode } from "react";
 export interface QrLogoSetting {
   url: string | null;
   sizePercent: number;
+  /** The church's main logo, for places that may use it when no QR logo has been uploaded. */
+  fallbackUrl?: string | null;
 }
 
 // The church's QR centre logo and its size, available to every QR dialog in

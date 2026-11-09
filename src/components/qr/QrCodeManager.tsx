@@ -38,6 +38,12 @@ function QrPreview({ value, design, className, logoUrl, logoSizePercent }: { val
   );
 }
 
+// The centre logo for a code: the church's QR logo if one was uploaded, otherwise its main logo.
+function useCodeLogo() {
+  const { url, sizePercent, fallbackUrl } = useQrLogo();
+  return { url: url ?? fallbackUrl ?? null, sizePercent };
+}
+
 function shortLink(siteUrl: string, code: string) {
   return `${siteUrl}/q/${code}`;
 }
@@ -70,7 +76,7 @@ export function QrCodeManager({ codes, siteUrl, canWrite, canDelete }: { codes: 
 }
 
 function QrCard({ code, siteUrl, canWrite, canDelete }: { code: QrCodeRow; siteUrl: string; canWrite: boolean; canDelete: boolean }) {
-  const logo = useQrLogo();
+  const logo = useCodeLogo();
   const design = useMemo(() => normalizeDesign(code.design), [code.design]);
   const link = shortLink(siteUrl, code.code);
   const [copied, setCopied] = useState(false);
@@ -298,7 +304,7 @@ function Choice<T extends string>({ label, value, options, labels, onChange }: {
 }
 
 function QrEditor({ siteUrl, code }: { siteUrl: string; code?: QrCodeRow }) {
-  const logo = useQrLogo();
+  const logo = useCodeLogo();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -448,7 +454,7 @@ function QrEditor({ siteUrl, code }: { siteUrl: string; code?: QrCodeRow }) {
                 </label>
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={design.logo} disabled={!logo.url} onChange={(e) => patch({ logo: e.target.checked })} />
-                  Church logo in the middle{!logo.url && " (add your logo in the church profile first)"}
+                  Church logo in the middle{!logo.url && " (upload a logo in Profile first)"}
                 </label>
                 <Field label="Text under the code" hint="e.g. Scan to give. Leave empty for none.">
                   <Input value={design.label} onChange={(e) => patch({ label: e.target.value })} maxLength={30} placeholder="Scan me" />

@@ -5777,6 +5777,9 @@ export type QrCodeRow = {
   status: "active" | "paused";
   design: Record<string, unknown>;
   scan_count: number;
+  ios_scans: number;
+  android_scans: number;
+  desktop_scans: number;
   last_scanned_at: string | null;
   created_by: string | null;
   created_at: string;

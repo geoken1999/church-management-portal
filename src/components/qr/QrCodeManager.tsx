@@ -121,7 +121,11 @@ function QrCard({ code, siteUrl, canWrite, canDelete }: { code: QrCodeRow; siteU
               {code.desktop_url && <Badge variant="secondary">Computer</Badge>}
             </div>
             <p className="text-sm text-muted-foreground">
-              <span className="font-semibold text-foreground">{code.scan_count}</span> {code.scan_count === 1 ? "scan" : "scans"}
+              <span className="font-semibold text-foreground">{code.scan_count}</span> {code.scan_count === 1 ? "visit" : "visits"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              iPhone <span className="font-semibold text-foreground">{code.ios_scans}</span> · Android <span className="font-semibold text-foreground">{code.android_scans}</span> · Computer{" "}
+              <span className="font-semibold text-foreground">{code.desktop_scans}</span>
             </p>
           </div>
         </div>
@@ -201,7 +205,7 @@ function QrStatsDialog({ code }: { code: QrCodeRow }) {
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{code.name}: scans</DialogTitle>
+          <DialogTitle>{code.name}: visits</DialogTitle>
           <DialogDescription>
             {code.scan_count} in total{code.last_scanned_at ? `, last on ${new Date(code.last_scanned_at).toLocaleString()}` : ""}. Link previews and robots are not counted.
           </DialogDescription>
@@ -223,9 +227,9 @@ function QrStatsDialog({ code }: { code: QrCodeRow }) {
             <div className="grid grid-cols-3 gap-2 text-center">
               {(
                 [
-                  ["iPhone", stats.byPlatform.ios],
-                  ["Android", stats.byPlatform.android],
-                  ["Computer", stats.byPlatform.desktop],
+                  ["iPhone", code.ios_scans],
+                  ["Android", code.android_scans],
+                  ["Computer", code.desktop_scans],
                 ] as const
               ).map(([label, count]) => (
                 <div key={label} className="rounded-lg border p-3">

@@ -120,6 +120,17 @@
   --sidebar-ring: oklch(0.66 0.22 292 / 0.5);
 }
 
+/* The public pages take the logo's colours: its royal blue for the accent and its deep navy for text. Set on <html>
+   by ForceLightTheme, so the dashboard keeps the app's own palette. */
+html.landing-light {
+  --foreground: oklch(0.22 0.06 259);
+  --card-foreground: oklch(0.22 0.06 259);
+  --popover-foreground: oklch(0.22 0.06 259);
+  --primary: oklch(0.53 0.24 263);
+  --accent: oklch(0.95 0.035 255);
+  --ring: oklch(0.53 0.24 263 / 0.4);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

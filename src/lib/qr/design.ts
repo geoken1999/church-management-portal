@@ -146,8 +146,9 @@ export function renderQrSvg(text: string, design: QrDesign, options: RenderOptio
     .map(([x, y]) => eyePath(x, y, design.eyes))
     .join("");
 
-  // Unique per code so several inline SVGs on one page do not share a gradient.
-  const gid = `g${Array.from(text + design.fg + design.fg2).reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7)}`;
+  // Ids inside inline SVGs are page-wide, so they must differ whenever the drawing differs: the card and the open editor
+  // show the same code, and a shared clip-path id would make the editor keep drawing the card's logo shape.
+  const gid = `g${Array.from(text + JSON.stringify(design) + logoSize).reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7)}`;
   const gradient = design.fg2
     ? `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${design.fg}"/><stop offset="1" stop-color="${design.fg2}"/></linearGradient></defs>`
     : "";

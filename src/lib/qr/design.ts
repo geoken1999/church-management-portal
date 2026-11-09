@@ -7,7 +7,7 @@ import { qrLogoRatio } from "@/lib/qr/logo-size";
 
 export const DOT_STYLES = ["square", "rounded", "dots"] as const;
 export const EYE_STYLES = ["square", "rounded", "circle"] as const;
-export const LABEL_STYLES = ["none", "below"] as const;
+export const LOGO_SHAPES = ["square", "rounded", "circle"] as const;
 
 export interface QrDesign {
   /** Colour of the dots, and of the start of the gradient. */
@@ -22,6 +22,9 @@ export interface QrDesign {
   eyeColor: string | null;
   /** Put the church's logo in the middle. */
   logo: boolean;
+  logoShape: (typeof LOGO_SHAPES)[number];
+  /** A solid patch in the background colour behind the logo; off lets a transparent logo sit straight on the code. */
+  logoBacking: boolean;
   /** Text on a bar under the code, e.g. "Scan to give". */
   label: string;
   labelBar: string;
@@ -37,6 +40,8 @@ export const DEFAULT_QR_DESIGN: QrDesign = {
   eyes: "square",
   eyeColor: null,
   logo: false,
+  logoShape: "square",
+  logoBacking: true,
   label: "",
   labelBar: "#111827",
   labelText: "#ffffff",
@@ -59,6 +64,8 @@ export function normalizeDesign(raw: unknown): QrDesign {
     eyes: oneOf(d.eyes, EYE_STYLES, base.eyes),
     eyeColor: d.eyeColor ? color(d.eyeColor, base.fg) : null,
     logo: d.logo === true,
+    logoShape: oneOf(d.logoShape, LOGO_SHAPES, base.logoShape),
+    logoBacking: d.logoBacking !== false,
     label: typeof d.label === "string" ? d.label.slice(0, 30) : "",
     labelBar: color(d.labelBar, base.labelBar),
     labelText: color(d.labelText, base.labelText),
@@ -146,9 +153,20 @@ export function renderQrSvg(text: string, design: QrDesign, options: RenderOptio
     : "";
   const dotFill = design.fg2 ? `url(#${gid})` : design.fg;
 
+  const logoX = QUIET + (n - logoSize) / 2;
+  const cx = logoX + logoSize / 2;
+  const clipId = `${gid}c`;
+  const shapeAt = (pad: number, attrs: string) => {
+    const size = logoSize + pad * 2;
+    const at = logoX - pad;
+    if (design.logoShape === "circle") return `<circle cx="${f(cx)}" cy="${f(cx)}" r="${f(size / 2)}" ${attrs}/>`;
+    const rx = design.logoShape === "rounded" ? f(size * 0.22) : 0;
+    return `<rect x="${f(at)}" y="${f(at)}" width="${f(size)}" height="${f(size)}" rx="${rx}" ${attrs}/>`;
+  };
   const logoMarkup = logo
-    ? `<rect x="${f(QUIET + (n - logoSize) / 2 - 0.4)}" y="${f(QUIET + (n - logoSize) / 2 - 0.4)}" width="${logoSize + 0.8}" height="${logoSize + 0.8}" rx="1.2" fill="${design.transparent ? "#ffffff" : design.bg}"/>` +
-      `<image href="${logo}" x="${f(QUIET + (n - logoSize) / 2)}" y="${f(QUIET + (n - logoSize) / 2)}" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>`
+    ? (design.logoBacking ? shapeAt(0.4, `fill="${design.transparent ? "#ffffff" : design.bg}"`) : "") +
+      `<clipPath id="${clipId}">${shapeAt(0, "")}</clipPath>` +
+      `<image href="${logo}" x="${f(logoX)}" y="${f(logoX)}" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet" clip-path="url(#${clipId})"/>`
     : "";
 
   const label = labelHeight

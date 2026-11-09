@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { BarChart3, Check, Copy, Download, ExternalLink, Pencil, Plus, QrCode, Trash2 } from "lucide-react";
 import { createQrCode, deleteQrCode, loadQrStats, updateQrCode, type QrFormState } from "@/lib/qr/actions";
-import { DEFAULT_QR_DESIGN, DOT_STYLES, EYE_STYLES, contrastRatio, normalizeDesign, renderQrSvg, type QrDesign } from "@/lib/qr/design";
+import { DEFAULT_QR_DESIGN, DOT_STYLES, EYE_STYLES, LOGO_SHAPES, contrastRatio, normalizeDesign, renderQrSvg, type QrDesign } from "@/lib/qr/design";
 import { downloadBlob, fetchAsDataUrl, fileSafe, svgToPngBlob } from "@/lib/qr/export";
 import type { QrStats } from "@/lib/qr/dal";
 import type { QrCodeRow } from "@/types/database";
@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsIndicator, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
 
 const DOT_LABELS = { square: "Square", rounded: "Rounded", dots: "Dots" } as const;
+const LOGO_SHAPE_LABELS = { square: "Square", rounded: "Rounded", circle: "Circle" } as const;
 const EYE_LABELS = { square: "Square", rounded: "Rounded", circle: "Round" } as const;
 
 const PRESETS: { name: string; design: Partial<QrDesign> }[] = [
@@ -456,6 +457,15 @@ function QrEditor({ siteUrl, code }: { siteUrl: string; code?: QrCodeRow }) {
                   <input type="checkbox" checked={design.logo} disabled={!logo.url} onChange={(e) => patch({ logo: e.target.checked })} />
                   Church logo in the middle{!logo.url && " (upload a logo in Profile first)"}
                 </label>
+                {design.logo && logo.url && (
+                  <>
+                    <Choice label="Logo shape" value={design.logoShape} options={LOGO_SHAPES} labels={LOGO_SHAPE_LABELS} onChange={(v) => patch({ logoShape: v })} />
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={design.logoBacking} onChange={(e) => patch({ logoBacking: e.target.checked })} />
+                      Solid background behind the logo (turn off for a transparent logo)
+                    </label>
+                  </>
+                )}
                 <Field label="Text under the code" hint="e.g. Scan to give. Leave empty for none.">
                   <Input value={design.label} onChange={(e) => patch({ label: e.target.value })} maxLength={30} placeholder="Scan me" />
                 </Field>

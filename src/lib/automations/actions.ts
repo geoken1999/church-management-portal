@@ -175,6 +175,9 @@ export async function upsertAutomationDestinationAction(params: {
   isActive: boolean;
   recipientLeaderIds?: string[];
   digestTemplateId?: string | null;
+  /** The Sunday-morning summary of the week's special days (staff_digest only). Left out: the saved setting is kept. */
+  weeklyEnabled?: boolean;
+  weeklyTemplateId?: string | null;
 }): Promise<AutomationActionResult> {
   await requireUser();
   const membership = await requireOrganization();
@@ -198,6 +201,17 @@ export async function upsertAutomationDestinationAction(params: {
   }
   if (recipientLeaderIds.length > MAX_DIGEST_LEADERS) return { error: `Pick at most ${MAX_DIGEST_LEADERS} leaders.` };
 
+  // The weekly template must be one of this church's own digest templates (a template id from anywhere else is refused).
+  if (params.kind === "staff_digest" && params.weeklyTemplateId) {
+    const { data: weekly } = await admin
+      .from("automation_templates")
+      .select("id, kind")
+      .eq("id", params.weeklyTemplateId)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    if (!weekly || weekly.kind !== "staff_digest") return { error: "Pick a staff digest template for the weekly summary." };
+  }
+
   const row = {
     automation_id: params.automationId,
     organization_id: organizationId,
@@ -205,6 +219,9 @@ export async function upsertAutomationDestinationAction(params: {
     is_active: params.isActive,
     recipient_leader_ids: recipientLeaderIds,
     digest_template_id: params.kind === "staff_digest" ? params.digestTemplateId ?? null : null,
+    ...(params.kind === "staff_digest" && params.weeklyEnabled !== undefined
+      ? { weekly_enabled: params.weeklyEnabled, weekly_template_id: params.weeklyTemplateId ?? null }
+      : {}),
   };
 
   const { data, error } = await admin

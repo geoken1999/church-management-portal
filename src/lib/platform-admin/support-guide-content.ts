@@ -107,7 +107,7 @@ export const SUPPORT_GUIDE_CATEGORIES: DocCategory[] = [
           "- /api/cron/daily-health-report — 30 4 * * * UTC (about 10:00 AM IST) — emails a platform health summary to HEALTH_REPORT_EMAIL.",
           "- /api/cron/event-reminders — every 15 minutes — sends \"1 hour before\", \"24h before\" and \"morning of\" (8 AM in the church's timezone) event registration reminder emails. Each occurrence is reminded once, so the frequent runs never double-send.",
           "- /api/cron/todo-reminders — 15 3 * * * UTC (about 8:45 AM IST) — sends due-soon and assignment reminders for To Do items.",
-          "- /api/cron/automation-run — 0 1 * * * UTC (about 6:30 AM IST) — the one daily pass for automations. It runs birthday and anniversary wishes, the staff digest, member follow-up tasks (on each automation's chosen weekday), and monthly membership fee requests, reminders and receipts (on each church's due day, in its own timezone).",
+          "- /api/cron/automation-run — 0 1 * * * UTC (about 6:30 AM IST) — the one daily pass for automations. It runs birthday and anniversary wishes, the staff digest, the Sunday-morning weekly summary of the week's special days (only on a Sunday in each church's timezone, to the digest leaders, using the weekly template picked on the digest destination), member follow-up tasks (on each automation's chosen weekday), and monthly membership fee requests, reminders and receipts (on each church's due day, in its own timezone).",
           "On Vercel Pro, crons can run as often as every minute. Only event reminders needs that today; the rest are once a day by design.",
         ],
       },

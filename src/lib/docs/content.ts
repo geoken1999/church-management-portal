@@ -312,7 +312,7 @@ export const DOC_CATEGORIES: DocCategory[] = [
         id: "automation-birthdays",
         title: "Birthday and anniversary wishes",
         body: [
-          "Automate Wishes for Members sends birthday and anniversary wishes over WhatsApp, on the day, to each member it applies to. Choose which occasions to send for, the message template, and whether your staff also get a daily digest of who was celebrated.",
+          "Automate Wishes for Members sends birthday and anniversary wishes over WhatsApp, on the day, to each member it applies to. Choose which occasions to send for, the message template, and whether your staff also get a daily digest of who was celebrated. You can also switch on a weekly summary: every Sunday morning your chosen leaders get one WhatsApp message listing every birthday, anniversary and other special day in that week (Sunday to Saturday). It needs its own approved WhatsApp template with the single variable {{celebrant_list}}, and nothing is sent for a week with no special days.",
         ],
       },
       {

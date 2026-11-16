@@ -284,6 +284,8 @@ export function AutomationWizard({
   const [directEnabled, setDirectEnabled] = useState(directDestination?.is_active ?? false);
   const [digestEnabled, setDigestEnabled] = useState(digestDestination?.is_active ?? false);
   const [digestTemplateId, setDigestTemplateId] = useState<string | null>(digestDestination?.digest_template_id ?? null);
+  const [weeklyEnabled, setWeeklyEnabled] = useState(digestDestination?.weekly_enabled ?? false);
+  const [weeklyTemplateId, setWeeklyTemplateId] = useState<string | null>(digestDestination?.weekly_template_id ?? null);
   const [recipientLeaderIds, setRecipientLeaderIds] = useState<string[]>(
     // A leader who was removed after being picked stays in the saved list; drop them so they don't use up a slot.
     (digestDestination?.recipient_leader_ids ?? []).filter((id) => leaders.some((l) => l.id === id)),
@@ -327,6 +329,10 @@ export function AutomationWizard({
         isActive: digestEnabled,
         recipientLeaderIds,
         digestTemplateId,
+        // The weekly settings are sent only when they were changed here, so saving the daily digest never touches (or depends on) them.
+        ...(weeklyEnabled !== (digestDestination?.weekly_enabled ?? false) || weeklyTemplateId !== (digestDestination?.weekly_template_id ?? null)
+          ? { weeklyEnabled, weeklyTemplateId }
+          : {}),
       });
       if (digestResult.error) {
         setDestinationError(digestResult.error);
@@ -350,7 +356,8 @@ export function AutomationWizard({
 
   const hasApprovedDirectTemplate = triggers.some((t) => memberTemplates.find((m) => m.id === t.templateId && m.status === "approved"));
   const hasApprovedDigestTemplate = digestTemplates.find((t) => t.id === digestTemplateId && t.status === "approved");
-  const readyToActivate = (directEnabled && hasApprovedDirectTemplate) || (digestEnabled && hasApprovedDigestTemplate);
+  const hasApprovedWeeklyTemplate = digestTemplates.find((t) => t.id === weeklyTemplateId && t.status === "approved");
+  const readyToActivate = (directEnabled && hasApprovedDirectTemplate) || (digestEnabled && hasApprovedDigestTemplate) || (weeklyEnabled && hasApprovedWeeklyTemplate);
 
   return (
     <div className="space-y-6">
@@ -496,6 +503,59 @@ export function AutomationWizard({
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+              )}
+
+              <label className="flex items-start gap-2">
+                <Checkbox
+                  checked={weeklyEnabled}
+                  onCheckedChange={(c) => {
+                    setWeeklyEnabled(c === true);
+                    setDestinationSaved(false);
+                  }}
+                  disabled={!canWrite}
+                />
+                <span className="text-sm">
+                  <span className="font-medium">Send a weekly summary every Sunday morning</span>
+                  <br />
+                  <span className="text-muted-foreground">
+                    One message on Sunday listing every birthday, anniversary and other special day coming up in that week (Sunday to Saturday), sent to the same people. Nothing is sent for a week with none.
+                  </span>
+                </span>
+              </label>
+              {weeklyEnabled && (
+                <div className="ml-6 space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Weekly summary template</Label>
+                    <Select
+                      value={weeklyTemplateId ?? "none"}
+                      onValueChange={(v) => {
+                        setWeeklyTemplateId(v === "none" ? null : v);
+                        setDestinationSaved(false);
+                      }}
+                      disabled={!canWrite}
+                    >
+                      <SelectTrigger className="w-full sm:w-80">
+                        <SelectValue>{() => digestTemplates.find((t) => t.id === weeklyTemplateId)?.meta_template_name ?? "No template selected"}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No template selected</SelectItem>
+                        {digestTemplates.map((template) => (
+                          <SelectItem key={template.id} value={template.id}>
+                            {template.meta_template_name} ({template.status})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    WhatsApp only delivers a message like this from a template it has approved. Create one under Staff digest templates above with the single variable {"{{celebrant_list}}"}, for example: &quot;Special days this week: {"{{celebrant_list}}"}&quot;, and pick it here once it is approved.
+                  </p>
+                </div>
+              )}
+
+              {(digestEnabled || weeklyEnabled) && (
+                <div className="ml-6 space-y-3">
                   <div className="space-y-1.5">
                     <Label className="text-xs">Send the digest to (pick up to {MAX_DIGEST_LEADERS} leaders)</Label>
                     {leaders.length === 0 ? (
@@ -554,6 +614,7 @@ export function AutomationWizard({
               <li>{triggers.length} occasion(s) configured</li>
               <li>Direct member messages: {directEnabled ? "enabled" : "disabled"}</li>
               <li>Staff digest: {digestEnabled ? "enabled" : "disabled"}</li>
+              <li>Weekly summary (Sunday morning): {weeklyEnabled ? "enabled" : "disabled"}</li>
             </ul>
             {!readyToActivate && (
               <Alert>

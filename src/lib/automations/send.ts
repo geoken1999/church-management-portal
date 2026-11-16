@@ -10,7 +10,8 @@ import { sendTemplateMessage, sendBulkTemplateMessage } from "@/lib/whatsapp/cli
 import { normalizePhoneNumber, resolvePhoneCountry } from "@/lib/whatsapp/validation";
 import { describeWhatsAppError } from "@/lib/whatsapp/graph-error";
 import { resolveBodyParams, resolveVariableValues } from "@/lib/automations/template-mapping";
-import { buildCelebrantList, buildDirectIdempotencyKey, buildDigestIdempotencyKey } from "@/lib/automations/date-logic";
+import { buildCelebrantList, buildDirectIdempotencyKey, buildDigestIdempotencyKey, buildWeeklyCelebrantList, buildWeeklyIdempotencyKey, todayInTimezone } from "@/lib/automations/date-logic";
+import type { WeeklyEntry } from "@/lib/automations/date-logic";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 import type { AutomationDestination, AutomationTemplate, AutomationTrigger, Member } from "@/types/database";
@@ -189,32 +190,38 @@ async function resolveDigestRecipientPhones(admin: AdminClient, destination: Aut
   return [...phones];
 }
 
-export async function sendStaffDigest(
+// Everything a staff message needs once the list is written: the approved template, who may be sent to right now, a claim on the idempotency
+// key so a re-run never sends twice, then the send itself. Used by the daily digest and the weekly summary, which differ only in the
+// template, the key and the list.
+async function deliverStaffMessage(
   admin: AdminClient,
-  automationId: string,
-  organizationId: string,
-  destination: AutomationDestination,
-  celebrantsToday: { name: string; occasionLabel: string }[],
-  now: Date = new Date(),
+  params: {
+    automationId: string;
+    organizationId: string;
+    destination: AutomationDestination;
+    templateId: string;
+    idempotencyKey: string;
+    celebrantList: string;
+    what: string;
+  },
 ): Promise<boolean> {
-  if (celebrantsToday.length === 0) return false;
-  if (!destination.digest_template_id) return false;
+  const { automationId, organizationId, destination, templateId, idempotencyKey, celebrantList, what } = params;
 
-  const template = await fetchApprovedTemplate(admin, destination.digest_template_id);
+  const template = await fetchApprovedTemplate(admin, templateId);
   if (!template) return false;
 
   const credentials = await getWhatsAppCredentials(organizationId);
   const senderKey = senderKeyFor(credentials);
   const allPhones = await resolveDigestRecipientPhones(admin, destination, organizationId);
-  // The same hold as for member messages: a marketing digest isn't sent to a
-  // leader WhatsApp is refusing marketing to. Tomorrow's run tries again.
+  // The same hold as for member messages: a marketing message isn't sent to a
+  // leader WhatsApp is refusing marketing to. The next run tries again.
   const { sendable } = await splitBlocked(senderKey, isMarketingCategory(template.category), allPhones.map((phone) => ({ phone })));
   const recipientPhones = sendable.map((r) => r.phone);
   if (allPhones.length > 0 && recipientPhones.length === 0) {
     await logPlatformEvent({
       level: "info",
       source: "automation_send",
-      message: "Staff digest not sent: WhatsApp is limiting marketing messages to every recipient right now.",
+      message: `${what} not sent: WhatsApp is limiting marketing messages to every recipient right now.`,
       organizationId,
       metadata: { automationId },
     });
@@ -224,22 +231,20 @@ export async function sendStaffDigest(
     await logPlatformEvent({
       level: "warning",
       source: "automation_send",
-      message: "Staff digest skipped: no leader with a usable phone number is selected.",
+      message: `${what} skipped: no leader with a usable phone number is selected.`,
       organizationId,
       metadata: { automationId },
     });
     return false;
   }
 
-  const { data: org } = await admin.from("organizations").select("timezone").eq("id", organizationId).maybeSingle();
-  const key = buildDigestIdempotencyKey(automationId, now, org?.timezone || DEFAULT_TIMEZONE);
   const { data: reserved } = await admin
     .from("automation_executions")
     .insert({
       organization_id: organizationId,
       automation_id: automationId,
       destination_kind: "staff_digest",
-      idempotency_key: key,
+      idempotency_key: idempotencyKey,
       status: "sent",
       recipient_count: recipientPhones.length,
     })
@@ -247,7 +252,6 @@ export async function sendStaffDigest(
     .single();
   if (!reserved) return false;
 
-  const celebrantList = buildCelebrantList(celebrantsToday);
   const bodyParams = resolveBodyParams(template.variable_names, { celebrant_list: celebrantList });
 
   const result = await sendBulkTemplateMessage({
@@ -272,9 +276,61 @@ export async function sendStaffDigest(
 
   const allFailed = result.failed.length === recipientPhones.length;
   if (allFailed) {
-    const message = result.failed[0]?.error ?? "Digest send failed.";
+    const message = result.failed[0]?.error ?? `${what} send failed.`;
     await admin.from("automation_executions").update({ status: "failed", error_message: message }).eq("id", reserved.id);
     await logPlatformEvent({ level: "error", source: "automation_send", message, organizationId, metadata: { automationId } });
   }
   return !allFailed;
+}
+
+export async function sendStaffDigest(
+  admin: AdminClient,
+  automationId: string,
+  organizationId: string,
+  destination: AutomationDestination,
+  celebrantsToday: { name: string; occasionLabel: string }[],
+  now: Date = new Date(),
+): Promise<boolean> {
+  if (celebrantsToday.length === 0) return false;
+  if (!destination.digest_template_id) return false;
+
+  const { data: org } = await admin.from("organizations").select("timezone").eq("id", organizationId).maybeSingle();
+  return deliverStaffMessage(admin, {
+    automationId,
+    organizationId,
+    destination,
+    templateId: destination.digest_template_id,
+    idempotencyKey: buildDigestIdempotencyKey(automationId, now, org?.timezone || DEFAULT_TIMEZONE),
+    celebrantList: buildCelebrantList(celebrantsToday),
+    what: "Staff digest",
+  });
+}
+
+/**
+ * The Sunday-morning summary: every special day in the week that starts today, in one WhatsApp message to the same leaders as the daily
+ * digest, using the weekly template chosen for the destination. Nothing is sent for a week with no special days. Once per automation per
+ * Sunday (a re-run the same day does nothing).
+ */
+export async function sendWeeklySpecialDaysDigest(
+  admin: AdminClient,
+  automationId: string,
+  organizationId: string,
+  destination: AutomationDestination,
+  entries: WeeklyEntry[],
+  now: Date = new Date(),
+): Promise<boolean> {
+  if (entries.length === 0) return false;
+  if (!destination.weekly_template_id) return false;
+
+  const { data: org } = await admin.from("organizations").select("timezone").eq("id", organizationId).maybeSingle();
+  const timeZone = org?.timezone || DEFAULT_TIMEZONE;
+  return deliverStaffMessage(admin, {
+    automationId,
+    organizationId,
+    destination,
+    templateId: destination.weekly_template_id,
+    idempotencyKey: buildWeeklyIdempotencyKey(automationId, now, timeZone),
+    celebrantList: buildWeeklyCelebrantList(todayInTimezone(now, timeZone), entries),
+    what: "Weekly special days summary",
+  });
 }

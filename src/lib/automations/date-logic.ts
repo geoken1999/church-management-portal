@@ -83,3 +83,70 @@ export function buildCelebrantList(celebrants: { name: string; occasionLabel: st
 
 // Staff digest recipients are picked from the org's leaders, capped here.
 export const MAX_DIGEST_LEADERS = 3;
+
+// ---- The weekly summary (Sunday morning) ----------------------------------------------------------------------------------------------------
+// Sent once a week to the same leaders as the daily digest: everything special in the seven days that start today (Sunday to Saturday).
+
+/** True when it is Sunday, on the calendar of the church's own timezone. */
+export function isSundayInTimezone(now: Date = new Date(), timeZone: string = DEFAULT_TIMEZONE): boolean {
+  const today = todayInTimezone(now, timeZone);
+  return new Date(Date.UTC(today.year, today.month - 1, today.day)).getUTCDay() === 0;
+}
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "Mon 17 Nov": the calendar day `offset` days after `today`. */
+export function weekDayLabel(today: { year: number; month: number; day: number }, offset: number): string {
+  const d = new Date(Date.UTC(today.year, today.month - 1, today.day));
+  d.setUTCDate(d.getUTCDate() + offset);
+  return `${WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+}
+
+export interface WeeklyEntry {
+  /** 0 is today (the Sunday), 6 is the Saturday. */
+  offset: number;
+  name: string;
+  occasionLabel: string;
+}
+
+// WhatsApp refuses a template parameter longer than 1024 characters, so the list is cut well short of that and says how many more there are.
+export const WEEKLY_LIST_MAX_CHARS = 900;
+
+/**
+ * One line of text for the template's {{celebrant_list}}: days in order, each with who is celebrating what, for example
+ * "Sun 16 Nov: Priya Nair — Birthday; Wed 19 Nov: Thomas & Anjali — Wedding Anniversary, Mary Joseph — Birthday".
+ * No newlines (Meta rejects them). Entries that would not fit are left out and counted: "...and 4 more".
+ */
+export function buildWeeklyCelebrantList(
+  today: { year: number; month: number; day: number },
+  entries: WeeklyEntry[],
+  maxChars: number = WEEKLY_LIST_MAX_CHARS,
+): string {
+  const sorted = [...entries].sort((a, b) => a.offset - b.offset || a.name.localeCompare(b.name));
+  const days = new Map<number, string[]>();
+  for (const e of sorted) days.set(e.offset, [...(days.get(e.offset) ?? []), `${e.name} — ${e.occasionLabel}`]);
+
+  const groups: { text: string; count: number }[] = [...days.entries()].map(([offset, people]) => ({ text: `${weekDayLabel(today, offset)}: ${people.join(", ")}`, count: people.length }));
+  const total = sorted.length;
+  let out = "";
+  let shown = 0;
+  for (const g of groups) {
+    const next = out ? `${out}${CELEBRANT_SEPARATOR}${g.text}` : g.text;
+    if (next.length > maxChars) break;
+    out = next;
+    shown += g.count;
+  }
+  if (shown === total) return out;
+  if (!out) {
+    // Even the first day alone is too long: keep what fits of it.
+    const first = groups[0]!;
+    const room = Math.max(0, maxChars - 20);
+    out = first.text.length > room ? `${first.text.slice(0, room).replace(/[,;\s—-]+$/, "")}...` : first.text;
+  }
+  return `${out}${CELEBRANT_SEPARATOR}...and ${Math.max(1, total - shown)} more`;
+}
+
+export function buildWeeklyIdempotencyKey(automationId: string, now: Date = new Date(), timeZone: string = DEFAULT_TIMEZONE): string {
+  return `weekly:${automationId}:${dateKeyInOrgTimezone(now, timeZone)}`;
+}

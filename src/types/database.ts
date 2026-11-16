@@ -2759,6 +2759,9 @@ export type AutomationDestination = {
   recipient_phones: string[] | null;
   recipient_leader_ids: string[];
   digest_template_id: string | null;
+  /** The Sunday-morning summary of the week's special days (see migration 0243). */
+  weekly_enabled: boolean;
+  weekly_template_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -5255,6 +5258,13 @@ export type Database = {
           {
             foreignKeyName: "automation_destinations_digest_template_id_fkey";
             columns: ["digest_template_id"];
+            isOneToOne: false;
+            referencedRelation: "automation_templates";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "automation_destinations_weekly_template_id_fkey";
+            columns: ["weekly_template_id"];
             isOneToOne: false;
             referencedRelation: "automation_templates";
             referencedColumns: ["id"];

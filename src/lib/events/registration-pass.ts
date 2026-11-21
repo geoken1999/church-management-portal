@@ -110,6 +110,8 @@ export async function sendRegistrationPassEmail(input: {
   passColor: string;
   passMessage: string | null;
   backgroundUrl: string | null;
+  /** The registrant's own pass page (/pass/{token}). Shown as a link under the QR, for mail apps that don't display the QR image inside the email. */
+  passUrl?: string | null;
 }): Promise<void> {
   if (!isEmailConfigured()) return;
 
@@ -217,6 +219,7 @@ export async function sendRegistrationPassEmail(input: {
               </td>
             </tr>
           </table>
+          ${input.passUrl ? `<p style="margin: 14px 0 0; font-size: 13px; color: #555;">QR code not showing? <a href="${escapeHtml(input.passUrl)}" style="color: ${passColor}; font-weight: 600;">Open your pass online</a>, or show the confirmation code above at check-in.</p>` : ""}
         </div>
 
         <div style="padding: 12px 24px; background: #fafafa; border-top: 1px solid #f0f0f0;">
@@ -228,7 +231,7 @@ export async function sendRegistrationPassEmail(input: {
   `;
 
   try {
-    await sendBulkEmail({
+    const result = await sendBulkEmail({
       fromName: input.organizationName,
       subject: `You're registered for ${input.eventTitle}`,
       html,
@@ -248,6 +251,16 @@ export async function sendRegistrationPassEmail(input: {
       ],
       organizationId: input.organizationId,
     });
+    // A send the provider refused used to vanish without a trace; record it so a missing pass can be explained.
+    for (const f of result.failed) {
+      await logPlatformEvent({
+        level: "warning",
+        source: "email_send",
+        message: `Registration pass email was refused: ${f.error}`,
+        organizationId: input.organizationId,
+        metadata: { to: f.email },
+      });
+    }
   } catch (err) {
     await logPlatformEvent({
       level: "warning",

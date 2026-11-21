@@ -6,6 +6,7 @@ import { pushToTeam } from "@/lib/push/team";
 import { sendRegistrationPassEmail } from "@/lib/events/registration-pass";
 import { sendPassWhatsAppForRegistration } from "@/lib/events/pass-whatsapp";
 import { eventVenueLabel, eventJoinLink } from "@/lib/events/location";
+import { getSiteUrl } from "@/lib/site-url";
 import { DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 import type {
   EventMeetingMode,
@@ -46,7 +47,7 @@ export async function sendPassEmailForRegistration(
   const { data: registration } = await admin
     .from("event_registrations")
     .select(
-      "email, answers, event_id, confirmation_code, events(title, description, start_at, end_at, meeting_mode, meeting_link, venue, map_link, contact_name, contact_phone, organization_id, registration_pass_color, registration_pass_message, registration_pass_background_url, branches(name), organizations(name, timezone))",
+      "email, answers, event_id, confirmation_code, pass_token, events(title, description, start_at, end_at, meeting_mode, meeting_link, venue, map_link, contact_name, contact_phone, organization_id, registration_pass_color, registration_pass_message, registration_pass_background_url, branches(name), organizations(name, timezone))",
     )
     .eq("id", registrationId)
     .maybeSingle();
@@ -105,6 +106,7 @@ export async function sendPassEmailForRegistration(
     passColor: event.registration_pass_color,
     passMessage: event.registration_pass_message,
     backgroundUrl: event.registration_pass_background_url,
+    passUrl: registration.pass_token ? `${getSiteUrl()}/pass/${registration.pass_token}` : null,
   });
 
   // The same pass on WhatsApp, when the event has that turned on. Separate

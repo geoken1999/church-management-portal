@@ -3,6 +3,7 @@ import { cronAuthResponse } from "@/lib/cron/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOccurrencesInRange } from "@/lib/events/recurrence";
 import { sendRegistrationReminderEmail } from "@/lib/events/registration-reminder";
+import { getSiteUrl } from "@/lib/site-url";
 import { eventVenueLabel, eventJoinLink } from "@/lib/events/location";
 import { partsInTimezone, DEFAULT_TIMEZONE } from "@/lib/organizations/timezone";
 import { withCronLogging } from "@/lib/cron/run-logger";
@@ -83,7 +84,7 @@ async function run(request: Request) {
 
     const { data: registrations } = await admin
       .from("event_registrations")
-      .select("id, email, answers, confirmation_code, status, last_reminder_occurrence_date")
+      .select("id, email, answers, confirmation_code, pass_token, status, last_reminder_occurrence_date")
       .eq("event_id", event.id)
       .neq("status", "cancelled");
 
@@ -115,6 +116,7 @@ async function run(request: Request) {
         joinLink,
         confirmationCode: registration.confirmation_code,
         passColor: event.registration_pass_color,
+        passUrl: registration.pass_token ? `${getSiteUrl()}/pass/${registration.pass_token}` : null,
       });
 
       await admin

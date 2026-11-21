@@ -1,6 +1,7 @@
 import "server-only";
 
 import { sendBulkEmail } from "@/lib/email/client";
+import { buildQrPng } from "@/lib/events/registration-pass";
 import { isEmailConfigured } from "@/lib/email/env";
 import { logPlatformEvent } from "@/lib/platform-events/log";
 import { formatInTimezone } from "@/lib/organizations/timezone";
@@ -17,9 +18,10 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-// A lighter companion to sendRegistrationPassEmail — no QR code or .ics
-// attachment, since the registrant already has both from their original
-// pass email; this is purely a "don't forget" nudge. Wording deliberately
+// A lighter companion to sendRegistrationPassEmail — no .ics attachment
+// (the registrant already has it), but it carries the QR code too: on the
+// day, this is the email people open at the door, and a reminder with no QR
+// in it sent them hunting for the original email. Wording deliberately
 // avoids claiming a specific lead time ("in 24 hours") since the sending
 // cron (src/app/api/cron/event-reminders) is idempotent per occurrence
 // but not exact-to-the-minute — it just states the real date/time.
@@ -36,8 +38,18 @@ export async function sendRegistrationReminderEmail(input: {
   joinLink: string | null;
   confirmationCode: string;
   passColor: string;
+  /** The registrant's own pass page, shown as a link under the QR for mail apps that don't display the image inside the email. */
+  passUrl?: string | null;
 }): Promise<void> {
   if (!isEmailConfigured()) return;
+
+  // The pass QR (with the church's logo when it has one). If it can't be made the reminder still goes, with the code and the link.
+  let qrPng: Buffer | null = null;
+  try {
+    qrPng = await buildQrPng(input.confirmationCode, input.organizationId);
+  } catch {
+    qrPng = null;
+  }
 
   const startLabel = formatInTimezone(
     input.startAt,
@@ -74,7 +86,9 @@ export async function sendRegistrationReminderEmail(input: {
         </table>
         <p style="margin-bottom: 4px; font-size: 13px; color: #666;">Your confirmation code</p>
         <p style="margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 2px; color: ${passColor};">${input.confirmationCode}</p>
-        <p style="color: #999; font-size: 12px; margin-top: 24px;">Your QR code and calendar invite are in your original confirmation email — this is just a reminder.</p>
+        ${qrPng ? `<p style="margin: 16px 0 0;"><img src="cid:registration-pass-qr" width="160" height="160" alt="QR code" style="display: block; border-radius: 8px;" /></p>` : ""}
+        ${input.passUrl ? `<p style="margin: 14px 0 0; font-size: 13px; color: #555;">${qrPng ? "QR code not showing? " : ""}<a href="${escapeHtml(input.passUrl)}" style="color: ${passColor}; font-weight: 600;">Open your pass online</a>, or show the confirmation code above at check-in.</p>` : ""}
+        <p style="color: #999; font-size: 12px; margin-top: 24px;">Show your QR code or confirmation code at check-in. Your calendar invite is in your original confirmation email.</p>
         <p style="color: #999; font-size: 12px;">— ${escapeHtml(input.organizationName)}, via KingdomFlow</p>
       </div>
     </div>
@@ -86,6 +100,7 @@ export async function sendRegistrationReminderEmail(input: {
       subject: `Reminder: ${input.eventTitle}`,
       html,
       recipients: [input.to],
+      attachments: qrPng ? [{ filename: "registration-pass-qr.png", content: qrPng, contentType: "image/png", contentId: "registration-pass-qr" }] : undefined,
       organizationId: input.organizationId,
     });
   } catch (err) {
